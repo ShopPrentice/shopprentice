@@ -83,3 +83,7 @@ See [mcp/README.md](mcp/README.md) for full setup instructions and Claude Deskto
 ```
 
 Removes only the skill files that `install.sh` installed.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Sample scripts in `samples/` retain their original MIT licenses from their respective authors.
