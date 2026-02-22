@@ -200,13 +200,55 @@ All positioned with parametric offset expressions. Common planes:
 
 ## MCP Live Execution
 
-When an MCP connection to Fusion 360 is available (via `fusion360-mcp-server` or `FusionMCPSample`):
+When an MCP connection to Fusion 360 is available (via FusionMCPSample), you MUST automatically execute the script after generating it. Do not wait for the user to ask — the full generate-execute-verify loop is the default workflow.
 
-1. **Generate the complete script as usual** — a standalone, parametric Fusion 360 Python script
-2. Use `execute_api_script` to run the script live in Fusion 360
-3. Use `get_screenshot` to verify the result visually
-4. Iterate: adjust parameters or features and re-execute
+### Available MCP Tools
 
-**Important:** Always generate complete parametric scripts first. MCP is just the delivery mechanism — the script must also work when pasted into Fusion 360's script editor. Never generate partial snippets that only work via MCP.
+| Tool | Purpose |
+|------|---------|
+| `execute_api_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. |
+| `get_screenshot` | Capture the current Fusion 360 viewport. Use to verify results visually. |
+| `get_api_documentation` | Search Fusion 360 API docs by class/member name. Use when diagnosing API errors. |
+| `get_best_practices` | Retrieve Fusion 360 scripting best practices. |
+
+### Automatic Execution Loop
+
+After generating the complete script, immediately run this loop:
+
+1. **Execute** — call `execute_api_script` to run the script in Fusion 360.
+2. **Check result** — inspect the `isError` flag. On failure, the `content` field contains the full Python stack trace with line numbers and exception type.
+3. **On success** — take a screenshot with `get_screenshot` and present it to the user. Done.
+4. **On error** — analyze the stack trace, fix the script, and re-execute. Track each distinct error by its core message. If the **same error persists after 3 attempts**, stop and report the error to the user with your analysis of what went wrong. Do not keep retrying the same failure.
+
+### Error Retry Rules
+
+- **Max 3 attempts per distinct error.** An error is "the same" if its core message is unchanged (ignore line numbers and memory addresses when comparing).
+- **Different errors reset the counter.** If a fix resolves one error but surfaces a new one, the new error gets its own 3-attempt budget.
+- **No infinite loops.** If you hit 3 distinct errors in a row (each failing 3 times), stop and present a summary of all errors to the user.
+- After each failed attempt, explain what error occurred and what you changed before retrying.
+- Failed scripts are automatically rolled back (transaction abort), so each retry starts from a clean state.
+
+### Project Handling
+
+- If the user is starting a new piece, create a new Fusion 360 document before executing.
+- If this is an incremental update to an existing design, execute against the current active document. Use `get_screenshot` first to confirm the current state before modifying.
+
+### Example Flow
+
+```
+Generate script
+  → execute_api_script
+  → ERROR: isError=true, "RuntimeError: No target body found to cut" (line 142)
+  → Fix: reposition mortise sketch inside the target body
+  → execute_api_script (attempt 2 for this error)
+  → SUCCESS
+  → get_screenshot → show user
+```
+
+### Important
+
+- Always generate complete, standalone parametric scripts. MCP is the delivery mechanism — the script must also work when pasted into Fusion 360's script editor.
+- Never generate partial snippets that only work via MCP.
+- Scripts must NOT catch exceptions — let them propagate so Fusion 360 aborts the transaction and returns the full error to the agent.
 
 See `mcp/README.md` for setup instructions.

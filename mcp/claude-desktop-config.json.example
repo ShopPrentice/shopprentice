@@ -1,10 +1,6 @@
 {
   "mcpServers": {
-    "fusion360-mycelia": {
-      "command": "fusion360-mcp-server",
-      "args": []
-    },
-    "fusion360-autodesk": {
+    "fusion360": {
       "command": "python",
       "args": ["-m", "fusion_mcp_client"]
     }

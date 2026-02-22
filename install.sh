@@ -17,8 +17,8 @@ set -e
 AUTOFUSION_HOME="$HOME/.autofusion"
 REPO_DIR="$AUTOFUSION_HOME/repo"
 REPO_URL="https://github.com/YLZha/autofusion.git"
-MCP_REPO_URL="https://github.com/mycelia1/fusion360-mcp-server.git"
-MCP_DIR="$AUTOFUSION_HOME/mcp-servers/fusion360-mcp-server"
+MCP_REPO_URL="https://github.com/AutodeskFusion360/FusionMCPSample.git"
+MCP_DIR="$AUTOFUSION_HOME/mcp-servers/FusionMCPSample"
 
 # --- Parse flags ---
 opt_claude_code=false
@@ -198,12 +198,12 @@ if [ "$opt_mcp" = true ]; then
         echo "MCP server repo exists, pulling latest..."
         git -C "$MCP_DIR" pull --ff-only
     else
-        echo "Cloning fusion360-mcp-server..."
+        echo "Cloning FusionMCPSample..."
         mkdir -p "$(dirname "$MCP_DIR")"
         git clone "$MCP_REPO_URL" "$MCP_DIR"
     fi
 
-    echo "Installing fusion360-mcp-server..."
+    echo "Installing FusionMCPSample..."
     pip install -e "$MCP_DIR"
 
     # Configure MCP for Claude Code
@@ -222,8 +222,8 @@ if os.path.isfile(path):
 
 data.setdefault('mcpServers', {})
 data['mcpServers']['fusion360'] = {
-    'command': 'fusion360-mcp-server',
-    'args': []
+    'command': 'python',
+    'args': ['-m', 'fusion_mcp_client']
 }
 
 os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -246,8 +246,8 @@ with open(path, 'w') as f:
             cat >> "$CODEX_CONFIG" <<'TOML'
 
 [mcp_servers.fusion360]
-command = "fusion360-mcp-server"
-args = []
+command = "python"
+args = ["-m", "fusion_mcp_client"]
 TOML
             echo "Added fusion360 MCP server to $CODEX_CONFIG"
         fi
@@ -258,11 +258,11 @@ TOML
     echo "  1. Copy the Fusion 360 add-in to your add-ins directory:"
     if [ "$(uname)" = "Darwin" ]; then
         ADDIN_DIR="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns"
-        echo "     cp -r $MCP_DIR/fusion_addin \"$ADDIN_DIR/Fusion360MCPAddin\""
+        echo "     cp -r $MCP_DIR/FusionMCPServer \"$ADDIN_DIR/FusionMCPServer\""
     else
-        echo "     Copy $MCP_DIR/fusion_addin to %APPDATA%\\Autodesk\\Autodesk Fusion 360\\API\\AddIns\\Fusion360MCPAddin"
+        echo "     Copy $MCP_DIR/FusionMCPServer to %APPDATA%\\Autodesk\\Autodesk Fusion 360\\API\\AddIns\\FusionMCPServer"
     fi
-    echo "  2. In Fusion 360: Tools > Add-Ins > Fusion360MCPAddin > Run"
+    echo "  2. In Fusion 360: Tools > Add-Ins > FusionMCPServer > Run"
     echo
 fi
 

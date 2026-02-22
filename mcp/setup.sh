@@ -2,10 +2,10 @@
 set -e
 
 MCP_DIR="$HOME/.autofusion/mcp-servers"
-REPO_URL="https://github.com/mycelia1/fusion360-mcp-server.git"
-REPO_DIR="$MCP_DIR/fusion360-mcp-server"
+REPO_URL="https://github.com/AutodeskFusion360/FusionMCPSample.git"
+REPO_DIR="$MCP_DIR/FusionMCPSample"
 
-echo "=== Fusion 360 MCP Server Setup ==="
+echo "=== Fusion 360 MCP Server Setup (FusionMCPSample) ==="
 echo
 
 # Check Python version
@@ -37,7 +37,7 @@ else
 fi
 
 # Install
-echo "Installing fusion360-mcp-server..."
+echo "Installing FusionMCPSample..."
 pip install -e "$REPO_DIR"
 
 echo
@@ -48,13 +48,13 @@ echo "  1. Copy the Fusion 360 add-in to your add-ins directory:"
 echo
 if [ "$(uname)" = "Darwin" ]; then
     ADDIN_DIR="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns"
-    echo "     cp -r $REPO_DIR/fusion_addin \"$ADDIN_DIR/Fusion360MCPAddin\""
+    echo "     cp -r $REPO_DIR/FusionMCPServer \"$ADDIN_DIR/FusionMCPServer\""
 else
     ADDIN_DIR="%APPDATA%\\Autodesk\\Autodesk Fusion 360\\API\\AddIns"
-    echo "     Copy $REPO_DIR/fusion_addin to $ADDIN_DIR\\Fusion360MCPAddin"
+    echo "     Copy $REPO_DIR/FusionMCPServer to $ADDIN_DIR\\FusionMCPServer"
 fi
 echo
-echo "  2. In Fusion 360: Tools > Add-Ins > Fusion360MCPAddin > Run"
+echo "  2. In Fusion 360: Tools > Add-Ins > FusionMCPServer > Run"
 echo
-echo "  3. Add to ~/.claude/claude_desktop_config.json (see mcp/claude-desktop-config.json.example)"
+echo "  3. Add to your Claude settings (see mcp/claude-desktop-config.json.example)"
 echo
