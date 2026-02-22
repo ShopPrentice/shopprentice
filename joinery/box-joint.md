@@ -133,5 +133,3 @@ pat_input = pat_feats.createInput(body_coll,
     adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
 pat_feats.add(pat_input)
 ```
-
-**See also:** [box-maker sample](../samples/box-maker/) for a complete finger joint implementation.

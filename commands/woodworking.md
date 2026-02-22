@@ -198,24 +198,6 @@ All positioned with parametric offset expressions. Common planes:
 | `TypeError` on participantBodies | Passed `ObjectCollection` instead of list | Use Python `[body]` list |
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
 
-## Reference Samples
-
-The `samples/` directory contains MIT-licensed scripts from open-source Fusion 360 projects. Consult these when you need to use API features beyond basic Sketch > Extrude:
-
-| Sample | Script | Key Patterns |
-|--------|--------|--------------|
-| Spur Gear | `samples/spur-gear/SpurGear.py` | Involute splines, circular pattern, construction planes |
-| Bolt | `samples/bolt/Bolt.py` | Chamfer, fillet, revolve cut, thread features, join operation |
-| Bottle | `samples/bottle/Bottle.py` | Revolve from profile, shell, fillet, thread, scale, material/appearance |
-| Pipe | `samples/pipe/Pipe.py` | Sweep along path, shell, construction plane on path |
-| BoxMaker | `samples/box-maker/BoxMaker.py` | Finger/box joints, multi-plane sketching, move features |
-| SurfaceText | `samples/surface-text/SurfaceText.py` | Text engraving, surface evaluators, coordinate transforms |
-| Voronoi | `samples/voronoi/Voronoi.py` | SVG import into sketch, profile analysis, decorative patterns |
-| HelixGenerator | `samples/helix-generator/HelixCommand.py` | Fitted splines from math, helix curves for sweep paths |
-| DuplicateComponent | `samples/duplicate-component/entry.py` | Component duplication, bounding box, Matrix3D transforms |
-
-When the user's piece requires **sweep, revolve, shell, threads, chamfer, fillet, circular pattern, finger joints, text engraving, decorative patterns, spline curves, or material assignment**, read the relevant sample script to see the correct API calls and patterns before generating code.
-
 ## MCP Live Execution
 
 When an MCP connection to Fusion 360 is available (via `fusion360-mcp-server` or `FusionMCPSample`):
