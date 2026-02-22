@@ -179,3 +179,28 @@ All positioned with parametric offset expressions. Common planes:
 | Cut/Join affects wrong body | No `participantBodies` specified | Use `ext_input.participantBodies = [body]` |
 | `TypeError` on participantBodies | Passed `ObjectCollection` instead of list | Use Python `[body]` list |
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
+
+## Reference Samples
+
+The `samples/` directory contains MIT-licensed scripts from official Autodesk Fusion 360 projects. Consult these when you need to use API features beyond basic Sketch > Extrude:
+
+| Sample | Script | Key Patterns |
+|--------|--------|--------------|
+| Spur Gear | `samples/spur-gear/SpurGear.py` | Involute splines, circular pattern, construction planes |
+| Bolt | `samples/bolt/Bolt.py` | Chamfer, fillet, revolve cut, thread features, join operation |
+| Bottle | `samples/bottle/Bottle.py` | Revolve from profile, shell, fillet, thread, scale, material/appearance |
+
+When the user's piece requires **revolve, shell, threads, chamfer, fillet, circular pattern, or material assignment**, read the relevant sample script to see the correct API calls and patterns before generating code.
+
+## MCP Live Execution
+
+When an MCP connection to Fusion 360 is available (via `fusion360-mcp-server` or `FusionMCPSample`):
+
+1. **Generate the complete script as usual** — a standalone, parametric Fusion 360 Python script
+2. Use `execute_api_script` to run the script live in Fusion 360
+3. Use `get_screenshot` to verify the result visually
+4. Iterate: adjust parameters or features and re-execute
+
+**Important:** Always generate complete parametric scripts first. MCP is just the delivery mechanism — the script must also work when pasted into Fusion 360's script editor. Never generate partial snippets that only work via MCP.
+
+See `mcp/README.md` for setup instructions.
