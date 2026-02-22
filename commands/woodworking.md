@@ -142,6 +142,24 @@ When `floor(space / element_width)` leaves a remainder, add a gap-filling piece:
 - Only build if gap > 0.01 cm at script time
 - Mirror gap features to opposite side
 
+### Additional Joinery Types
+
+For joints beyond M&T, T&G, and gap filling, read the corresponding reference file from `joinery/` before generating code:
+
+| Joint | File | Prefix | Use For |
+|-------|------|--------|---------|
+| Dado & Rabbet | `joinery/dado-rabbet.md` | `dr_` | Shelves, case backs, drawer bottoms |
+| Lap Joint | `joinery/lap-joint.md` | `lj_` | Frames, cross braces, lattice |
+| Box Joint | `joinery/box-joint.md` | `bj_` | Boxes, drawers, decorative corners |
+| Bridle Joint | `joinery/bridle-joint.md` | `br_` | Frame corners, open mortise T-connections |
+| Dowel Joint | `joinery/dowel-joint.md` | `dw_` | Edge joining, panel glue-ups, face frames |
+| Spline Joint | `joinery/spline-joint.md` | `sp_` | Reinforced miters, decorative accents |
+| Miter Joint | `joinery/miter-joint.md` | `mj_` | Picture frames, trim, hidden end grain |
+| Dovetail | `joinery/dovetail.md` | `dt_` | Drawer fronts, premium boxes, visible joints |
+| Pocket Hole | `joinery/pocket-hole.md` | `ph_` | Face frames, quick assemblies, tabletops |
+
+Each file includes parameters, geometry workflow, replication strategy, pitfalls, and a code snippet. All follow the same conventions: `ValueInput.createByString`, Sketch > Extrude, `participantBodies = [body]` as Python list, 2-letter parameter prefixes.
+
 ## Component Structure Template
 ```
 Root

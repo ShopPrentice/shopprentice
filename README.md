@@ -58,6 +58,24 @@ MIT-licensed reference scripts from open-source Fusion 360 projects. These are r
 
 See [samples/README.md](samples/README.md) for full details and attribution.
 
+## Joinery Reference
+
+The `joinery/` directory contains parametric modeling guides for 9 joint types. Claude reads the relevant file when a design needs that joint.
+
+| Joint | File | Best For |
+|-------|------|----------|
+| Dado & Rabbet | [joinery/dado-rabbet.md](joinery/dado-rabbet.md) | Shelves, case backs |
+| Lap Joint | [joinery/lap-joint.md](joinery/lap-joint.md) | Frames, cross braces |
+| Box Joint | [joinery/box-joint.md](joinery/box-joint.md) | Boxes, drawers |
+| Bridle Joint | [joinery/bridle-joint.md](joinery/bridle-joint.md) | Frame corners |
+| Dowel Joint | [joinery/dowel-joint.md](joinery/dowel-joint.md) | Panel glue-ups |
+| Spline Joint | [joinery/spline-joint.md](joinery/spline-joint.md) | Reinforced miters |
+| Miter Joint | [joinery/miter-joint.md](joinery/miter-joint.md) | Picture frames, trim |
+| Dovetail | [joinery/dovetail.md](joinery/dovetail.md) | Drawer fronts, premium boxes |
+| Pocket Hole | [joinery/pocket-hole.md](joinery/pocket-hole.md) | Face frames, quick assembly |
+
+Mortise-and-tenon, tongue-and-groove, and gap filling rules remain inline in the `/woodworking` skill. See [joinery/README.md](joinery/README.md) for the full selection guide and conventions.
+
 ## MCP Integration
 
 Connect Claude Code to a running Fusion 360 instance to execute scripts live via the Model Context Protocol.
