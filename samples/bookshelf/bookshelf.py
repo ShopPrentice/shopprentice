@@ -44,7 +44,7 @@ def run(context):
         ("mt_tenon_w",    "2 in",     "in"),
         ("dt_angle",      "8 deg",    "deg"),
         ("dt_tail_w",     "2 in",     "in"),
-        ("dt_pin_w",      "0.5 in",   "in"),
+        ("dt_tail_count", "8",        ""),
     ]:
         params.add(pname, adsk.core.ValueInput.createByString(expr), unit, "")
 
@@ -52,10 +52,10 @@ def run(context):
         ("inner_width",    "total_width - 2 * board_thick",                              "in"),
         ("shelf_spacing",  "(total_height - 2 * board_thick - kick_height) / n_shelves", "in"),
         ("mt_tenon_y1",    "total_depth / 4 - mt_tenon_w / 2",                           "in"),
-        ("dt_pitch",       "dt_tail_w + dt_pin_w",                                       "in"),
+        ("dt_pin_w",       "total_depth / dt_tail_count - dt_tail_w",                    "in"),
+        ("dt_pitch",       "total_depth / dt_tail_count",                                "in"),
         ("dt_narrow_w",    "dt_tail_w - 2 * board_thick * tan(dt_angle)",                "in"),
-        ("dt_n_tails",     "floor(total_depth / dt_pitch)",                              ""),
-        ("dt_start_y",     "(total_depth - dt_n_tails * dt_pitch + dt_tail_w) / 2",      "in"),
+        ("dt_start_y",     "dt_pin_w / 2 + dt_tail_w / 2",                              "in"),
     ]:
         params.add(pname, adsk.core.ValueInput.createByString(expr), unit, "")
 
@@ -322,11 +322,11 @@ def run(context):
 
     # Body pattern left tails along Y
     left_pat = body_pattern(top_c, left_tail, top_c.yConstructionAxis,
-                            "dt_n_tails", "dt_pitch", "DT_PatL")
+                            "dt_tail_count", "dt_pitch", "DT_PatL")
 
     # Body pattern right tails along Y
     right_pat = body_pattern(top_c, right_tail, top_c.yConstructionAxis,
-                             "dt_n_tails", "dt_pitch", "DT_PatR")
+                             "dt_tail_count", "dt_pitch", "DT_PatR")
 
     # Collect all tail bodies
     all_left_tails = [left_tail]

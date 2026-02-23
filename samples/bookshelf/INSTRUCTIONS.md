@@ -25,7 +25,7 @@ All exposed as User Parameters (Modify > Change Parameters):
 | `mt_tenon_w` | 2 in | Mortise & tenon width |
 | `dt_angle` | 8 deg | Dovetail angle |
 | `dt_tail_w` | 2 in | Dovetail tail width |
-| `dt_pin_w` | 0.5 in | Dovetail pin width |
+| `dt_tail_count` | 8 | Number of dovetail tails |
 
 ---
 
@@ -71,7 +71,8 @@ Change any parameter in Fusion 360's Change Parameters dialog. Key relationships
 
 - `shelf_spacing` = `(total_height - 2 * board_thick - kick_height) / n_shelves`
 - `inner_width` = `total_width - 2 * board_thick`
-- `dt_n_tails` = `floor(total_depth / dt_pitch)`
+- `dt_pin_w` = `total_depth / dt_tail_count - dt_tail_w` (derived from tail count)
+- `dt_pitch` = `total_depth / dt_tail_count`
 
 Changing `n_shelves` updates the shelf body pattern count AND the bulk CUT operations automatically.
 

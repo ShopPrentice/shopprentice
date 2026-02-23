@@ -23,32 +23,39 @@ A **dovetail joint** uses trapezoidal (fan-shaped) pins and tails that interlock
 |-----------|------------|------|-------------|
 | `dt_angle` | `"8 deg"` | `"deg"` | Dovetail angle (7-14 deg; 8 for hardwood, 14 for softwood) |
 | `dt_tail_w` | `"0.75 in"` | `"in"` | Tail width at the wide end |
-| `dt_pin_w` | `"0.25 in"` | `"in"` | Pin width (narrow part between tails) |
+| `dt_tail_count` | `"6"` | `""` | Number of tails |
 | `dt_thick` | `"0.75 in"` | `"in"` | Board thickness (= tail/pin length) |
 | `dt_board_h` | `"6 in"` | `"in"` | Board height (joint runs along this edge) |
-| `dt_n_tails` | `"floor(dt_board_h / (dt_tail_w + dt_pin_w))"` | `""` | Number of tails |
 
 ```python
 params = design.userParameters
 params.add("dt_angle", adsk.core.ValueInput.createByString("8 deg"), "deg", "Dovetail angle")
 params.add("dt_tail_w", adsk.core.ValueInput.createByString("0.75 in"), "in", "Tail width (wide end)")
-params.add("dt_pin_w", adsk.core.ValueInput.createByString("0.25 in"), "in", "Pin width")
+params.add("dt_tail_count", adsk.core.ValueInput.createByString("6"), "", "Number of tails")
 params.add("dt_thick", adsk.core.ValueInput.createByString("0.75 in"), "in", "Board thickness")
 params.add("dt_board_h", adsk.core.ValueInput.createByString("6 in"), "in", "Board height")
-params.add("dt_n_tails", adsk.core.ValueInput.createByString("floor(dt_board_h / (dt_tail_w + dt_pin_w))"), "", "Number of tails")
 ```
 
 ## Derived Parameters
 
 | Parameter | Expression | Description |
 |-----------|------------|-------------|
-| `dt_n_tails` | `floor(dt_board_h / (dt_tail_w + dt_pin_w))` | Parametric tail count |
-| `dt_pitch` | `dt_tail_w + dt_pin_w` | Center-to-center distance between tails |
+| `dt_pin_w` | `dt_board_h / dt_tail_count - dt_tail_w` | Pin width (derived from board height and tail count) |
+| `dt_pitch` | `dt_board_h / dt_tail_count` | Center-to-center distance between tails |
+| `dt_start_y` | `dt_pin_w / 2 + dt_tail_w / 2` | Center of first tail (half-pin offset from edge) |
 | `dt_narrow_w` | `dt_tail_w - 2 * dt_thick * tan(dt_angle)` | Tail width at the narrow end |
 | `dt_half_pin` | `dt_pin_w / 2` | Half-pin at top and bottom edges |
 
+**Layout equation:** `n * dt_tail_w + n * dt_pin_w = dt_board_h`, where n = `dt_tail_count`. Layout is always `[half_pin] [tail] [pin] [tail] ... [tail] [half_pin]`, ensuring symmetric half-pins on both outer edges.
+
+**Why count-based, not width-based:** Defining `dt_tail_w` + `dt_tail_count` as user parameters and deriving `dt_pin_w` guarantees the tails always fill the board exactly. The alternative — defining both `dt_tail_w` and `dt_pin_w` independently and using `floor()` to compute count — leaves uneven leftover space that makes front and back edges asymmetric.
+
+**Centering requirement:** The first tail's sketch position MUST be parametrically constrained to `dt_start_y` via a sketch dimension (not evaluated once at script time). If the position is baked in via `ev()` / `evaluateExpression()`, changing `dt_tail_count` in Change Parameters will update the pattern spacing but NOT the first tail's position — the front half-pin stays fixed while the back half-pin drifts. Constraining the sketch dimension to `"dt_start_y"` ensures both half-pins stay equal at `dt_pin_w / 2`.
+
 ```python
-params.add("dt_pitch", adsk.core.ValueInput.createByString("dt_tail_w + dt_pin_w"), "in", "Tail pitch")
+params.add("dt_pin_w", adsk.core.ValueInput.createByString("dt_board_h / dt_tail_count - dt_tail_w"), "in", "Pin width (derived)")
+params.add("dt_pitch", adsk.core.ValueInput.createByString("dt_board_h / dt_tail_count"), "in", "Tail pitch")
+params.add("dt_start_y", adsk.core.ValueInput.createByString("dt_pin_w / 2 + dt_tail_w / 2"), "in", "Center of first tail")
 params.add("dt_narrow_w", adsk.core.ValueInput.createByString("dt_tail_w - 2 * dt_thick * tan(dt_angle)"), "in", "Tail narrow width")
 params.add("dt_half_pin", adsk.core.ValueInput.createByString("dt_pin_w / 2"), "in", "Half-pin width")
 ```
@@ -71,7 +78,7 @@ Dovetails require trapezoidal sketch profiles rather than simple rectangles. The
    - Operation: `CutFeatureOperation`
    - `participantBodies = [pin_board]`
 4. **Pattern** — `RectangularPatternFeature` along the board height:
-   - Count: `dt_n_tails`
+   - Count: `dt_tail_count`
    - Spacing: `dt_pitch`
 
 **Pin board (cut the waste between pins in the tail board):**
@@ -99,7 +106,8 @@ Same approach, but the tail socket cut depth is less than `dt_thick`, leaving ma
 | Tails don't interlock | Tail and socket angles don't match | Both reference same `dt_angle` parameter |
 | Gap between pins and tails | `dt_narrow_w` not derived correctly | Use `dt_tail_w - 2 * dt_thick * tan(dt_angle)` |
 | Dovetail angle too steep | Angle > 14 degrees | Keep 7-14 deg; 8 deg for hardwood |
-| Pattern misaligned | Pitch doesn't match tail + pin width | Set spacing = `dt_pitch` = `dt_tail_w + dt_pin_w` |
+| Pattern misaligned | Pitch doesn't match board division | Set spacing = `dt_pitch` = `dt_board_h / dt_tail_count`; first tail at `dt_start_y` |
+| Half-pins asymmetric after parameter change | First tail position baked in at script time (not parametrically constrained) | Add sketch dimension from origin to first tail edge = `"dt_pin_w / 2"`, or to first tail center = `"dt_start_y"` |
 | Half-blind depth wrong | Socket deeper than board thickness | `dt_socket_depth < dt_thick` for half-blind |
 
 ## Example Snippet
@@ -172,7 +180,7 @@ feat_coll = adsk.core.ObjectCollection.create()
 feat_coll.add(socket_feat)
 pat_input = pat_feats.createInput(feat_coll,
     comp.yConstructionAxis,
-    adsk.core.ValueInput.createByString("dt_n_tails"),
+    adsk.core.ValueInput.createByString("dt_tail_count"),
     adsk.core.ValueInput.createByString("dt_pitch"),
     adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
 pat_feats.add(pat_input)
