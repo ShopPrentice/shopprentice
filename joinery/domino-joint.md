@@ -19,49 +19,67 @@ A **Festool Domino joint** is a loose tenon system: a flat oval wafer (domino) i
 
 ## Parameters
 
-| Parameter | Expression | Unit | Description |
-|-----------|------------|------|-------------|
-| `dm_width` | `"8 mm"` | `"in"` | Domino narrow dimension (fits within board thickness) |
-| `dm_height` | `"40 mm"` | `"in"` | Domino long dimension (runs along board) |
-| `dm_depth` | `"20 mm"` | `"in"` | Mortise depth per side (half the domino length) |
-| `dm_count` | `"2"` | `""` | Number of dominos along the joint |
+Use **per-joint prefixes** (e.g., `dm_kick_*`, `dm_back_*`) so each joint gets domino dimensions that fit its specific boards. Shared params like `dm_width` cause problems when joints involve boards of different thicknesses.
+
+| Parameter | Role | Constraint |
+|-----------|------|------------|
+| `dm_<joint>_w` | Domino narrow dimension | Must fit within the thinnest board at the joint |
+| `dm_<joint>_h` | Domino long dimension | Runs along the longer dimension of the mating face |
+| `dm_<joint>_d` | Mortise depth per side | Must be ≤ the thinnest piece at the joint |
+| `dm_<joint>_count` | Number of dominos | Drives spacing via derived param |
 
 ```python
-params = design.userParameters
-params.add("dm_width", adsk.core.ValueInput.createByString("8 mm"), "in", "Domino width")
-params.add("dm_height", adsk.core.ValueInput.createByString("40 mm"), "in", "Domino height")
-params.add("dm_depth", adsk.core.ValueInput.createByString("20 mm"), "in", "Domino depth per side")
-params.add("dm_count", adsk.core.ValueInput.createByString("2"), "", "Dominos per joint")
+# Example: two joints with different sizing
+# Kick-to-side (both pieces are board_thick = 19.05mm)
+params.add("dm_kick_w", adsk.core.ValueInput.createByString("5 mm"), "in", "")
+params.add("dm_kick_h", adsk.core.ValueInput.createByString("30 mm"), "in", "")
+params.add("dm_kick_d", adsk.core.ValueInput.createByString("15 mm"), "in", "")
+
+# Shelf-to-back (thinnest piece is back_thick = 12.7mm)
+params.add("dm_back_w", adsk.core.ValueInput.createByString("6 mm"), "in", "")
+params.add("dm_back_h", adsk.core.ValueInput.createByString("40 mm"), "in", "")
+params.add("dm_back_d", adsk.core.ValueInput.createByString("10 mm"), "in", "")
 ```
 
 ## Derived Parameters
 
 | Parameter | Expression | Description |
 |-----------|------------|-------------|
-| `dm_spacing` | `joint_length / (dm_count + 1)` | Even spacing between dominos |
+| `dm_<joint>_spacing` | `joint_length / (dm_<joint>_count + 1)` | Even spacing between dominos |
 
-```python
-params.add("dm_spacing", adsk.core.ValueInput.createByString("joint_length / (dm_count + 1)"), "in", "Domino spacing")
-```
+## Sizing Rules
+
+1. **`dm_depth` ≤ thinnest piece** — The mortise depth per side must not exceed the thickness of the thinnest board at the joint. Otherwise the domino pokes through. Example: shelf-to-back with `back_thick = 0.5" = 12.7mm` requires `dm_back_d ≤ 12 mm`.
+2. **`dm_width` < perpendicular board dimension** — The narrow dimension must fit within the board face perpendicular to the mating surface (usually the board thickness of the piece the slot is sketched on).
+3. **Different joints need different sizes** — A kick-to-side joint (two 3/4" boards) can use larger dominos than a shelf-to-back joint (3/4" shelf meeting 1/2" backboard). Always size per-joint.
+
+## Orientation Rule
+
+The domino long axis (`dm_<joint>_h`) should run parallel to the **longer dimension** of the mating surface. This maximizes glue area and mechanical interlock.
+
+- **Kick end face** (board_thick × kick_height): taller than wide → `vertical=True`
+- **Shelf back edge** (inner_width × board_thick): wider than tall → `vertical=False`
 
 ## Geometry Workflow
 
-The domino mortise is modeled as a **void body** — a rectangular block that spans the interface between two mating pieces. The void extends `dm_depth` into each piece. After creation, the void is CUT from both pieces (with `keepTool=True` on the first CUT so it survives for the second).
+The domino mortise is modeled as a **stadium-shaped void body** sketched on the mating surface and symmetric-extruded so it penetrates equally into both pieces. The stadium shape is two semicircles (radius = `dm_w / 2`) connected by two straight lines — use `sketch_slot` to draw this. After creation, the void is CUT from both pieces (with `keepTool=True` on the first CUT so it survives for the second).
+
+**IMPORTANT — sketch on the mating face, not a construction plane.** Find the BRep face of the piece where the domino will be inserted and create the sketch directly on that face. This follows the "reference related pieces" principle. When the sketch is on a face, Fusion may project face edges and create multiple profiles — always select the **inner profile** (the slot itself, `profileLoops.count == 1`) not the surrounding face region.
 
 ### Void Body Approach
 
-1. **Plane** — Offset plane at the mating interface minus `dm_depth` (so the void starts inside piece A).
-2. **Sketch** — Rectangle on that plane:
-   - Position: centered on board thickness, offset along joint length by `dm_spacing`
-   - Size: `dm_height` × `dm_width` (height runs along board, width fits within thickness)
-3. **Extrude** — `NewBodyFeatureOperation`, distance = `dm_depth * 2`:
-   - The void spans `dm_depth` into piece A and `dm_depth` into piece B
+1. **Face** — Find the mating face on the piece (e.g., `body.faces` iteration by position or normal). Do NOT use a construction plane offset from origin.
+2. **Sketch** — `sketch_slot` on that face:
+   - Center: positioned at the domino location on the mating face
+   - Size: `dm_<joint>_h` (long) × `dm_<joint>_w` (short)
+   - Orientation: `vertical=True/False` per the orientation rule
+3. **Extrude** — `ext_new_sym` with `NewBodyFeatureOperation`, distance = `dm_<joint>_d`:
+   - Symmetric extrude extends `dm_<joint>_d / 2` into each piece
 4. **Pattern** — `RectangularPatternFeature` along the joint:
-   - Count: `dm_count`
-   - Spacing: `dm_spacing`
-5. **JOIN** — Combine all void bodies into one combined void (simplifies later CUT operations).
-6. **CUT piece A** — `combine(comp, piece_a, combined_void, CUT, True)` — pockets in piece A, void survives.
-7. **CUT piece B** — `combine(comp, piece_b, combined_void, CUT, False)` — pockets in piece B, void consumed.
+   - Count: `dm_<joint>_count`
+   - Spacing: `dm_<joint>_spacing`
+5. **CUT piece A** — `combine(comp, piece_a, void_bodies, CUT, True)` — pockets in piece A, voids survive.
+6. **CUT piece B** — `combine(root, piece_b_proxy, void_proxies, CUT, True)` — pockets in piece B via assembly proxy.
 
 ### Why Void Bodies Instead of Direct CUT
 
@@ -79,7 +97,8 @@ The domino mortise is modeled as a **void body** — a rectangular block that sp
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| Void doesn't span interface | Plane offset wrong — void entirely inside one piece | Offset plane = interface position minus `dm_depth` |
+| Domino pokes through board | `dm_depth` exceeds the thinnest piece at the joint | Use per-joint `dm_<joint>_d` sized ≤ thinnest board |
+| Shared params don't fit all joints | One `dm_depth` used for joints with different board thicknesses | Define separate `dm_<joint>_*` params per joint |
 | Pockets don't align | Different sketch origins for each piece | Use a single void body that spans both pieces |
 | Pattern count off by one | Spacing includes endpoint | Use `dm_count` with `SpacingPatternDistanceType` |
 | CUT fails on second piece | `keepTool=False` on first CUT consumed the void | Use `keepTool=True` on all CUTs except the last |
@@ -87,45 +106,43 @@ The domino mortise is modeled as a **void body** — a rectangular block that sp
 
 ## Example Snippet
 
-Domino voids connecting a kick board to two side panels (symmetric left/right):
+Domino voids connecting a kick board to two side panels (symmetric left/right), using `sketch_slot` for stadium shape and `ext_new_sym` for symmetric extrude:
 
 ```python
-# -- Domino voids for kick-to-side joint --
-# Offset plane at left interface (inside left side board)
-dm_pl = off_plane(kick_c, kick_c.yZConstructionPlane,
-                  "board_thick - dm_depth", "DmKick_Pl")
+# -- Kick-to-side domino voids (per-joint sizing) --
+# Sketch plane at mating interface: inner face of left side
+k_dm_pl = off_plane(kick_c, kick_c.yZConstructionPlane,
+                    "board_thick", "KDm_Pl")
 
-# One domino void rect
-_, pr = sketch_rect(kick_c, dm_pl,
-    "board_thick / 2 - dm_width / 2",   # Y: centered on board thickness
-    "dm_spacing - dm_height / 2",         # Z: first domino position
-    "dm_width", "dm_height", "DmKick_Sk")
+# Stadium void — vertical (kick end face is taller than wide)
+_, pr = sketch_slot(kick_c, k_dm_pl,
+    cxe="board_thick / 2",
+    cye="dm_kick_zsp",
+    long_e="dm_kick_h", short_e="dm_kick_w",
+    vertical=True, name="KDm_Sk")
 
-# Extrude void spanning interface
-ext_dm = ext_new(kick_c, pr, "dm_depth * 2", "DmKick_Void")
+# Symmetric extrude: dm_kick_d/2 into each piece
+ext_k_dm = ext_new_sym(kick_c, pr, "dm_kick_d", "KDm_Void")
+k_dm_body = ext_k_dm.bodies.item(0)
 
-# Pattern along Z for dm_count
-dm_pat = body_pattern(kick_c, ext_dm.bodies.item(0),
-    kick_c.zConstructionAxis, "dm_count", "dm_spacing", "DmKick_Pat")
+# Pattern along Z
+k_dm_pat = body_pattern(kick_c, k_dm_body,
+    kick_c.zConstructionAxis, "dm_kick_count", "dm_kick_zsp", "KDm_PatZ")
 
-# Collect all void bodies
-dm_voids = [ext_dm.bodies.item(0)]
-for i in range(dm_pat.bodies.count):
-    dm_voids.append(dm_pat.bodies.item(i))
+# Collect void bodies
+dm_left = [k_dm_body]
+for i in range(k_dm_pat.bodies.count):
+    dm_left.append(k_dm_pat.bodies.item(i))
 
-# JOIN voids into one combined body
-combined = dm_voids[0]
-if len(dm_voids) > 1:
-    combine(kick_c, combined, dm_voids[1:], JOIN, False, "DmKick_JoinVoids")
+# CUT kick board (keepTool=True — voids survive for side CUT)
+combine(kick_c, kick_body, dm_left, CUT, True, "KDm_CutKick")
 
-# CUT kick board (keepTool=True — void survives for side CUT)
-combine(kick_c, kick_body, combined, CUT, True, "DmKick_CutKick")
-
-# Mirror across XMid for right side
-mir_dm = mirror_feat(kick_c, [ext_dm, dm_pat], k_XMid, "DmKick_MirX")
+# Mirror extrude across XMid → right side voids + independent pattern
+mir_k_dm = mirror_feat(kick_c, [ext_k_dm], k_XMid, "KDm_MirX")
+# ... pattern right side, CUT right voids from kick ...
 
 # CUT sides via assembly proxies in root
-dm_left_proxy = combined.createForAssemblyContext(kick_occ)
-combine(root, left_side_proxy, dm_left_proxy, CUT, True, "DmKickL")
-# ... mirror proxies for right side ...
+dm_left_proxies = [b.createForAssemblyContext(kick_occ) for b in dm_left]
+combine(root, left_side_proxy, dm_left_proxies, CUT, True, "KickDomL")
+# ... right side proxies ...
 ```
