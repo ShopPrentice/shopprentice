@@ -2,15 +2,50 @@
 
 You are generating a Fusion 360 Python script to build a parametric furniture model. Follow these rules strictly.
 
-## Design Philosophy: Build Like a Human
+## Design Philosophy: Think Like a Furniture Maker at the Fusion 360 UI
 
-1. **Build one, replicate the rest.** Never build every piece from scratch. Build one representative instance, then use Mirror, Pattern, and Copy features for the rest. This makes the model manageable and editable.
+Before writing any code, plan the modeling steps the way an experienced designer would approach the Fusion 360 UI — component by component, feature by feature. You are not a software engineer writing a program. You are a craftsperson building a piece of furniture, and the API is just your hands on the mouse.
 
-2. **Everything parametric.** When the user changes any dimension in Modify > Change Parameters, the entire model must recompute automatically -- lengths, mirror positions, pattern counts, everything.
+1. **Plan before building.** Before writing code, outline every modeling step in order: which component, which feature, which replication strategy. Think: "If I were clicking through the Fusion 360 UI, what would I do next?" Write the plan as a step list (see Design-First Planning below).
 
-3. **Organize with components.** Group related bodies into named components (e.g., Legs, Rails, Slats, Panels). Never dump everything flat in the root component.
+2. **Build one, replicate the rest.** Never build every piece from scratch. Build one template, then use **Mirror** and **Rectangular Pattern** features for the rest. If you find yourself reaching for a Python `for` loop to create geometry, stop — use a Fusion 360 pattern instead.
 
-4. **Feature-based modeling only.** Every shape is: Sketch rectangle > Constrain dimensions parametrically > Extrude. This creates timeline features that recompute when parameters change.
+3. **Everything parametric.** When the user changes any dimension in Modify > Change Parameters, the entire model must recompute automatically — lengths, mirror positions, pattern counts, everything.
+
+4. **Organize with components.** Group related bodies into named components (e.g., Sides, Shelves, Top, Kick). Features live inside their respective components. Cross-component operations (like CUT) live in root via assembly proxies.
+
+5. **Feature-based modeling only.** Every shape is: Sketch > Constrain dimensions parametrically > Extrude. This creates timeline features that recompute when parameters change.
+
+6. **Joinery = one shape, two operations.** Never draw mortises and tenons (or sockets and tails) as separate sketches. Build the positive shape (tenon/tail) as a body, CUT it into the receiving board, then JOIN it to the owning board. One shape guarantees perfect fit.
+
+## Design-First Planning
+
+Before writing code for any piece, produce a step-by-step modeling plan structured like this:
+
+```
+Components: Sides, Shelves, Top, Kick
+
+1. Sides component
+   - Extrude left side board (NewBody)
+   - Extrude right side board (NewBody)
+
+2. Shelves component
+   - Construction planes: YMid, XMid, shelf offset
+   - Extrude ONE shelf body (NewBody)
+   - Extrude ONE tenon (NewBody)
+   - Mirror tenon across YMid → back tenon
+   - Mirror [tenon + mirror] across XMid → right side tenons
+   - JOIN all 4 tenons into shelf body
+   - Body pattern shelf along Z (count=n_shelves, spacing=shelf_spacing)
+
+3. Shelf mortises (root, assembly proxies)
+   - CUT left side with ALL shelf proxies (keepTool=True)
+   - CUT right side with ALL shelf proxies (keepTool=True)
+
+4. ... (continue for each component)
+```
+
+Each step maps to exactly one Fusion 360 feature. No Python loops, no batch logic — just the sequence a designer would follow in the timeline.
 
 ## Fusion 360 API Rules
 
@@ -21,9 +56,10 @@ design.designType = adsk.fusion.DesignTypes.ParametricDesignType
 Set this BEFORE accessing `design.userParameters`. Without it: `RuntimeError: this is not a parametric design`.
 
 ### Do NOT Use
-- `TemporaryBRepManager` -- creates static geometry inside `BaseFeature` blocks. Parameters exist in Change Parameters but changing them does NOT update geometry.
-- `createByReal(value_in_cm)` for parameter creation -- shows confusing cm values in the UI.
-- Python `int()` at script time for pattern counts -- use `floor()` in parameter expressions instead.
+- `TemporaryBRepManager` — creates static geometry inside `BaseFeature` blocks. Parameters exist in Change Parameters but changing them does NOT update geometry.
+- `createByReal(value_in_cm)` for parameter creation — shows confusing cm values in the UI.
+- Python `int()` at script time for pattern counts — use `floor()` in parameter expressions instead.
+- **Python `for` loops for geometry replication** — use Rectangular Pattern or Mirror features instead. A `for` loop creates N independent features that don't update when count changes. A pattern is one parametric feature that recomputes automatically.
 
 ### User Parameters
 Create with `ValueInput.createByString("60 in")` so Change Parameters shows readable values:
@@ -119,15 +155,92 @@ Each side gets its own pattern feature. When the user changes dimensions, ALL pa
 - **Mirror bodies**: captures a fixed set of bodies at script time. If pattern count increases later, the mirror won't include new bodies. Use only for simple cases (legs, rails).
 - **Mirror features**: replicates the feature operations. Better for maintaining parametric behavior. Use for templates that will be patterned.
 
+### Typical Replication Sequence
+
+For a part with symmetric tenons/tails that repeats along an axis:
+
+1. **Extrude** ONE tenon/tail as NewBody
+2. **Mirror** across one midplane → 2 copies
+3. **Mirror** across perpendicular midplane → 4 copies
+4. **JOIN** all copies into the parent body → single merged body
+5. **Body Pattern** the merged body along the repetition axis
+
+Result: one parametric pattern feature replaces an entire Python `for` loop.
+
 ## Joinery Rules
 
+### Combine-Based Joinery (CRITICAL)
+
+**Never draw separate mortise/socket sketches.** Build the tenon/tail as a separate body, then use Fusion 360 **Combine** to cut the receiving board. The tenon body IS the cutting tool — one shape guarantees the mortise exactly matches.
+
+```python
+def combine(comp, target, tool_bodies, op, keep_tool, name="Comb"):
+    coll = adsk.core.ObjectCollection.create()
+    if isinstance(tool_bodies, list):
+        for b in tool_bodies:
+            coll.add(b)
+    else:
+        coll.add(tool_bodies)
+    inp = comp.features.combineFeatures.createInput(target, coll)
+    inp.operation = op
+    inp.isKeepToolBodies = keep_tool
+    f = comp.features.combineFeatures.add(inp)
+    f.name = name
+    return f
+```
+
+This applies to **all** joint types:
+- **Mortise & tenon**: tenon body cuts the mortise, then joins the shelf
+- **Dovetails**: tail body cuts the socket, then joins the top board
+- **Tongue & groove**: tongue body cuts the groove, then joins the slat
+
+### Cross-Component CUT via Assembly Proxies
+
+When tenons live in component A (e.g., Shelves) but need to cut mortises in component B (e.g., Sides), use **assembly context proxies** in root:
+
+```python
+# Get proxies for bodies in their assembly context
+shelf_proxy = shelf_body.createForAssemblyContext(shelves_occ)
+side_proxy  = left_side.createForAssemblyContext(sides_occ)
+
+# CUT in root component using proxies
+combine(root, side_proxy, [shelf_proxy], CUT, True, "ShelfMortise")
+```
+
+This keeps features in their owning components while performing cross-component boolean operations in root. The proxies are persistent — create them once and reuse across multiple CUT operations.
+
+### Bulk CUT (Preferred Over Per-Item CUT)
+
+When multiple tool bodies (e.g., all patterned shelves) need to cut the same target, pass **all tools in a single Combine** rather than looping:
+
+```python
+# Collect ALL shelf body proxies (template + pattern copies)
+all_shelf_proxies = [b.createForAssemblyContext(shelves_occ)
+                     for b in all_shelf_bodies]
+
+# ONE CUT feature creates ALL mortises at once
+combine(root, left_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortL")
+```
+
+This produces a single CUT feature in the timeline instead of N separate features. Cleaner, faster, and parametric — when the pattern count changes, the CUT automatically picks up new bodies.
+
+### Timeline Ordering for CUT + JOIN
+
+When the same body serves as both a CUT tool (to create a socket/mortise) and a JOIN target (to merge into its parent):
+
+1. **CUT first** (in root, via assembly proxies, `keepTool=True`) — the tool bodies survive
+2. **JOIN second** (in the owning component) — the tool bodies merge into the parent
+
+```python
+# Step 1: Tail bodies cut sockets in side boards (tails survive)
+combine(root, side_proxy, tail_proxies, CUT, True, "DT_Socket")
+
+# Step 2: Tail bodies join into top board (tails consumed)
+combine(top_comp, top_body, all_tails, JOIN, False, "DT_Join")
+```
+
 ### Mortise and Tenon
-- Mortise sketch profiles must be positioned INSIDE the target body. Drawing mortises outside causes "No target body found to cut" errors.
-- At corners where tenons from two directions enter the same post, STAGGER them in Z to prevent collision:
-  ```python
-  long_tenon_z  = "(rail_height - 2 * tenon_height) / 3"
-  short_tenon_z = "2 * (rail_height - 2 * tenon_height) / 3 + tenon_height"
-  ```
+- At corners where tenons from two directions enter the same post, stagger them in Z to prevent collision.
 
 ### Tongue and Groove
 - Frame grooves: centered on rail thickness, receive slat tongues
@@ -168,7 +281,15 @@ Root
   +-- ShortRails      (build side pair, mirror to opposite)
   +-- Panels/Slats    (template per orientation, mirror + independent patterns)
   +-- Top/Bottom      (single panel)
+  (root timeline)     bulk CUT features via assembly proxies
 ```
+
+### Feature Ownership
+
+| Where | What |
+|-------|------|
+| **Component** | Extrudes, mirrors, patterns, JOINs — features that build the part |
+| **Root** | Cross-component CUT features via assembly proxies |
 
 ## Construction Planes
 All positioned with parametric offset expressions. Common planes:
@@ -197,6 +318,54 @@ All positioned with parametric offset expressions. Common planes:
 | Cut/Join affects wrong body | No `participantBodies` specified | Use `ext_input.participantBodies = [body]` |
 | `TypeError` on participantBodies | Passed `ObjectCollection` instead of list | Use Python `[body]` list |
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
+
+## Incremental Build Strategy
+
+Complex furniture should be built in phases. Each phase is a complete standalone script that creates a new document and builds from scratch, adding one layer of complexity.
+
+### Phases
+
+| Phase | What to build |
+|-------|--------------|
+| 1. Structure | All boards/panels in correct positions, no joinery. Verify orientation and dimensions. |
+| 2. Joinery | Add tenons/tails as bodies, mirrors, patterns, JOINs. Add CUT operations for mortises/sockets. |
+| 3. Details | Chamfers, fillets, decorative elements. |
+
+### Rules
+
+1. **One phase per script execution.** Never combine all phases into one massive script.
+2. **Auto-proceed between phases.** After each phase succeeds and screenshot is verified, immediately update the script and execute the next phase. Do NOT wait for user approval between phases.
+3. **Each phase script is standalone.** It creates all parameters, helpers, and geometry from scratch. Phase 2 includes phase 1's structure plus joinery.
+4. **Same file, growing content.** Update the same `.py` file for each phase.
+5. **Show final result.** Take a screenshot after the last phase and present it to the user.
+6. **Design-first planning applies at every phase.** Before writing code for a new phase, write out the step list (see Design-First Planning).
+
+### Document Reuse Pattern
+
+Scripts close the existing unsaved document and create a fresh Fusion Design document. This is fast (no slow timeline clearing) and guarantees component support (Part Design can't have components).
+
+The MCP add-in handles document switches gracefully — it detects the document change and skips committing the old transaction.
+
+**IMPORTANT**: Do NOT try to clear the timeline feature-by-feature. Each deletion triggers a full model recompute, causing Fusion 360 to hang on complex models.
+
+```python
+def run(context):
+    app = adsk.core.Application.get()
+
+    # Close existing unsaved doc, create fresh Fusion Design doc
+    try:
+        if app.activeDocument and not app.activeDocument.isSaved:
+            app.activeDocument.close(False)
+    except:
+        pass
+    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    design.designType = adsk.fusion.DesignTypes.ParametricDesignType
+
+    root = design.rootComponent
+    params = design.userParameters
+    # ... build from scratch ...
+```
 
 ## MCP Live Execution
 
@@ -236,13 +405,17 @@ After generating the complete script, immediately run this loop:
 ### Example Flow
 
 ```
-Generate script
-  → execute_api_script
-  → ERROR: isError=true, "RuntimeError: No target body found to cut" (line 142)
-  → Fix: reposition mortise sketch inside the target body
-  → execute_api_script (attempt 2 for this error)
-  → SUCCESS
-  → get_screenshot → show user
+Phase 1: Structure
+  → write bookshelf.py (boards only)
+  → execute → screenshot → verify ✓ → auto-proceed
+
+Phase 2: Add joinery
+  → update bookshelf.py (structure + mortise & tenon)
+  → execute → screenshot → verify ✓ → auto-proceed
+
+Phase 3: Add dovetails
+  → update bookshelf.py (structure + M&T + dovetails)
+  → execute → screenshot → show user final result
 ```
 
 ### Important
@@ -250,5 +423,12 @@ Generate script
 - Always generate complete, standalone parametric scripts. MCP is the delivery mechanism — the script must also work when pasted into Fusion 360's script editor.
 - Never generate partial snippets that only work via MCP.
 - Scripts must NOT catch exceptions — let them propagate so Fusion 360 aborts the transaction and returns the full error to the agent.
+
+### MCP Timeout
+
+The MCP add-in's main-thread execution timeout is set in:
+`Fusion MCP Addin/server/mcp_server.py` → `_execute_on_main_thread` → `timeout = 300`
+
+Default was 30s (too short for complex scripts). Set to 300s (5 min). If scripts still time out, increase this value and restart Fusion 360.
 
 See `mcp/README.md` for setup instructions.
