@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "fusion360": {
-      "command": "python",
-      "args": ["-m", "fusion_mcp_client"]
+      "command": "npx",
+      "args": ["mcp-remote", "http://localhost:9100/"]
     }
   }
 }

@@ -59,17 +59,18 @@ Build a 48" x 18" coffee table with tapered legs and a slatted top
 
 The autofusion instructions are loaded automatically from `AGENTS.md`.
 
-## Models
+## Samples
 
-Each folder under `models/` contains a complete Fusion 360 project:
+Each folder under `samples/` contains a complete Fusion 360 project:
 
-| Model | Description |
-|-------|-------------|
-| [wood-planter](models/wood-planter/) | 60" x 20" parametric planter with frame construction and T&G slat infill |
+| Sample | Description |
+|--------|-------------|
+| [bookshelf](samples/bookshelf/) | 70"H x 30"W parametric bookshelf with through M&T shelves and through dovetail top |
+| [wood-planter](samples/wood-planter/) | 60" x 20" parametric planter with frame construction and T&G slat infill |
 
-### Adding a new model
+### Adding a new sample
 
-1. Create a folder under `models/` (e.g. `models/bookshelf/`)
+1. Create a folder under `samples/` (e.g. `samples/cabinet/`)
 2. Add an `INSTRUCTIONS.md` with the build spec
 3. Add the `.py` Fusion 360 script
 4. Commit
@@ -104,13 +105,13 @@ curl -sSL https://raw.githubusercontent.com/YLZha/autofusion/main/install.sh | b
 cd ~/.autofusion/repo && ./install.sh --mcp
 ```
 
-This installs [mycelia1/fusion360-mcp-server](https://github.com/mycelia1/fusion360-mcp-server) and auto-configures it for your detected tools. The MCP server provides `execute_api_script`, `get_screenshot`, and 11+ other tools.
+This installs [FusionMCPSample](https://github.com/AutodeskFusion360/FusionMCPSample) and auto-configures it for your detected tools. The MCP server provides `execute_api_script`, `get_screenshot`, and API documentation tools.
 
 After install, you still need to:
 1. Copy the Fusion 360 add-in (the installer prints the exact command)
-2. Enable it in Fusion 360: Tools > Add-Ins > Fusion360MCPAddin > Run
+2. Enable it in Fusion 360: Tools > Add-Ins > Fusion MCP Addin > Run
 
-See [mcp/README.md](mcp/README.md) for full details and an alternative [official Autodesk sample](https://github.com/AutodeskFusion360/FusionMCPSample).
+See [mcp/README.md](mcp/README.md) for full details.
 
 ## Updating
 

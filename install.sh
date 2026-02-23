@@ -11,8 +11,9 @@ set -e
 #   --claude-code   Install for Claude Code
 #   --codex         Install for OpenAI Codex CLI
 #   --mcp           Set up Fusion 360 MCP server + auto-configure tools
+#   --no-mcp        Skip MCP setup
 #   --all           All of the above
-#   (no flags)      Auto-detect installed tools, skip MCP
+#   (no flags)      Auto-detect installed tools + install MCP
 
 AUTOFUSION_HOME="$HOME/.autofusion"
 REPO_DIR="$AUTOFUSION_HOME/repo"
@@ -24,6 +25,7 @@ MCP_DIR="$AUTOFUSION_HOME/mcp-servers/FusionMCPSample"
 opt_claude_code=false
 opt_codex=false
 opt_mcp=false
+opt_no_mcp=false
 explicit_flags=false
 
 for arg in "$@"; do
@@ -31,6 +33,7 @@ for arg in "$@"; do
         --claude-code) opt_claude_code=true; explicit_flags=true ;;
         --codex)       opt_codex=true;       explicit_flags=true ;;
         --mcp)         opt_mcp=true;         explicit_flags=true ;;
+        --no-mcp)      opt_no_mcp=true;      explicit_flags=true ;;
         --all)         opt_claude_code=true; opt_codex=true; opt_mcp=true; explicit_flags=true ;;
         *)             echo "Unknown flag: $arg"; exit 1 ;;
     esac
@@ -85,7 +88,14 @@ if [ "$explicit_flags" = false ]; then
         echo "Continuing with Claude Code as default."
         opt_claude_code=true
     fi
+    opt_mcp=true
+    echo "MCP server will be installed (use --no-mcp to skip)"
     echo
+fi
+
+# Apply --no-mcp override (works with both explicit and auto-detect)
+if [ "$opt_no_mcp" = true ]; then
+    opt_mcp=false
 fi
 
 # --- Claude Code setup ---
@@ -176,24 +186,14 @@ fi
 if [ "$opt_mcp" = true ]; then
     echo "--- MCP (Fusion 360) ---"
 
-    # Check Python version
-    if ! command -v python3 &>/dev/null; then
-        echo "Error: python3 not found. Install Python 3.10+ first."
+    # Check Node.js (required for mcp-remote proxy)
+    if ! command -v npx &>/dev/null; then
+        echo "Error: npx not found. Install Node.js first: https://nodejs.org"
         exit 1
     fi
+    echo "Node.js $(node --version) OK"
 
-    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    PYTHON_MAJOR=$(python3 -c 'import sys; print(sys.version_info.major)')
-    PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
-
-    if [ "$PYTHON_MAJOR" -lt 3 ] || { [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]; }; then
-        echo "Error: Python 3.10+ required (found $PYTHON_VERSION)."
-        exit 1
-    fi
-
-    echo "Python $PYTHON_VERSION OK"
-
-    # Clone or update MCP server
+    # Clone or update MCP server repo
     if [ -d "$MCP_DIR" ]; then
         echo "MCP server repo exists, pulling latest..."
         git -C "$MCP_DIR" pull --ff-only
@@ -203,11 +203,29 @@ if [ "$opt_mcp" = true ]; then
         git clone "$MCP_REPO_URL" "$MCP_DIR"
     fi
 
-    echo "Installing FusionMCPSample..."
-    pip install -e "$MCP_DIR"
+    # Install the Fusion 360 add-in
+    # The add-in folder in the repo is "Fusion MCP Addin"
+    MCP_ADDIN_SRC="$MCP_DIR/Fusion MCP Addin"
+    if [ "$(uname)" = "Darwin" ]; then
+        ADDIN_DIR="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns"
+    else
+        ADDIN_DIR="$APPDATA/Autodesk/Autodesk Fusion 360/API/AddIns"
+    fi
+    ADDIN_DEST="$ADDIN_DIR/Fusion MCP Addin"
 
-    # Configure MCP for Claude Code
-    if [ "$opt_claude_code" = true ]; then
+    if [ -d "$ADDIN_DIR" ]; then
+        echo "Installing add-in to Fusion 360..."
+        rm -rf "$ADDIN_DEST"
+        cp -r "$MCP_ADDIN_SRC" "$ADDIN_DEST"
+        echo "Installed add-in to $ADDIN_DEST"
+    else
+        echo "Warning: Fusion 360 AddIns directory not found at $ADDIN_DIR"
+        echo "You may need to copy the add-in manually:"
+        echo "  cp -r \"$MCP_ADDIN_SRC\" \"<your AddIns dir>/Fusion MCP Addin\""
+    fi
+
+    # Configure MCP for Claude Code (uses npx mcp-remote to proxy HTTP)
+    if [ "$opt_claude_code" = true ] || [ "$explicit_flags" = false ]; then
         CLAUDE_SETTINGS="$HOME/.claude/settings.json"
         echo "Configuring MCP for Claude Code..."
 
@@ -222,8 +240,8 @@ if os.path.isfile(path):
 
 data.setdefault('mcpServers', {})
 data['mcpServers']['fusion360'] = {
-    'command': 'python',
-    'args': ['-m', 'fusion_mcp_client']
+    'command': 'npx',
+    'args': ['mcp-remote', 'http://localhost:9100/']
 }
 
 os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -246,23 +264,17 @@ with open(path, 'w') as f:
             cat >> "$CODEX_CONFIG" <<'TOML'
 
 [mcp_servers.fusion360]
-command = "python"
-args = ["-m", "fusion_mcp_client"]
+command = "npx"
+args = ["mcp-remote", "http://localhost:9100/"]
 TOML
             echo "Added fusion360 MCP server to $CODEX_CONFIG"
         fi
     fi
 
     echo
-    echo "MCP next steps:"
-    echo "  1. Copy the Fusion 360 add-in to your add-ins directory:"
-    if [ "$(uname)" = "Darwin" ]; then
-        ADDIN_DIR="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns"
-        echo "     cp -r $MCP_DIR/FusionMCPServer \"$ADDIN_DIR/FusionMCPServer\""
-    else
-        echo "     Copy $MCP_DIR/FusionMCPServer to %APPDATA%\\Autodesk\\Autodesk Fusion 360\\API\\AddIns\\FusionMCPServer"
-    fi
-    echo "  2. In Fusion 360: Tools > Add-Ins > FusionMCPServer > Run"
+    echo "MCP setup complete!"
+    echo "  Next: In Fusion 360, go to Tools > Add-Ins > Fusion MCP Addin > Run"
+    echo "  Then restart Claude Code to pick up the MCP config."
     echo
 fi
 

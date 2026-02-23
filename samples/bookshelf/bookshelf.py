@@ -138,20 +138,6 @@ def run(context):
         pat.name = name
         return pat
 
-    def sketch_dovetail(comp, plane, cy, bt, tw, nw, name):
-        sk = comp.sketches.add(plane)
-        sk.name = name
-        ln = sk.sketchCurves.sketchLines
-        ln.addByTwoPoints(adsk.core.Point3D.create(0, cy - tw/2, 0),
-                          adsk.core.Point3D.create(0, cy + tw/2, 0))
-        ln.addByTwoPoints(adsk.core.Point3D.create(0, cy + tw/2, 0),
-                          adsk.core.Point3D.create(bt, cy + nw/2, 0))
-        ln.addByTwoPoints(adsk.core.Point3D.create(bt, cy + nw/2, 0),
-                          adsk.core.Point3D.create(bt, cy - nw/2, 0))
-        ln.addByTwoPoints(adsk.core.Point3D.create(bt, cy - nw/2, 0),
-                          adsk.core.Point3D.create(0, cy - tw/2, 0))
-        return sk, sk.profiles.item(0)
-
     JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
     CUT  = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -300,22 +286,64 @@ def run(context):
     top_body = ext_new(top_c, pr, "board_thick", "TopBoard").bodies.item(0)
     top_body.name = "TopBoard"
 
-    # Evaluate dovetail dims for sketch geometry
-    bt = ev("board_thick")
-    tw = ev("dt_tail_w")
-    nw = ev("dt_narrow_w")
-    start_y = ev("dt_start_y")
-
     dt_pl = off_plane(top_c, top_c.xYConstructionPlane,
                       "total_height - board_thick", "DT_Plane")
 
-    # ONE left tail at dt_start_y
-    _, prof = sketch_dovetail(top_c, dt_pl, start_y, bt, tw, nw, "DT_Left_Sk")
-    ext_dt_l = ext_new(top_c, prof, "board_thick", "DT_Left")
+    # ONE left tail — parametric trapezoid sketch
+    # Wide end at X=0 (outside face), narrow at X=board_thick (inside)
+    bt = ev("board_thick")
+    hp = ev("dt_pin_w") / 2
+    delta = bt * math.tan(ev("dt_angle"))
+    tw = ev("dt_tail_w")
+
+    sk_dt = top_c.sketches.add(dt_pl)
+    sk_dt.name = "DT_Left_Sk"
+    dtl = sk_dt.sketchCurves.sketchLines
+
+    p1 = adsk.core.Point3D.create(0, hp, 0)
+    p2 = adsk.core.Point3D.create(0, hp + tw, 0)
+    p3 = adsk.core.Point3D.create(bt, hp + tw - delta, 0)
+    p4 = adsk.core.Point3D.create(bt, hp + delta, 0)
+
+    l1 = dtl.addByTwoPoints(p1, p2)                                   # wide side (X=0)
+    l2 = dtl.addByTwoPoints(l1.endSketchPoint, p3)                    # angled back
+    l3 = dtl.addByTwoPoints(l2.endSketchPoint, p4)                    # narrow side (X=bt)
+    l4 = dtl.addByTwoPoints(l3.endSketchPoint, l1.startSketchPoint)   # angled front
+
+    # 8 constraints for 8 DOF
+    sk_dt.geometricConstraints.addVertical(l1)
+    sk_dt.geometricConstraints.addVertical(l3)
+    d = sk_dt.sketchDimensions
+    d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
+        adsk.fusion.DimensionOrientations.VerticalDimensionOrientation,
+        adsk.core.Point3D.create(-1, hp + tw / 2, 0)
+    ).parameter.expression = "dt_tail_w"
+    d.addDistanceDimension(l3.startSketchPoint, l3.endSketchPoint,
+        adsk.fusion.DimensionOrientations.VerticalDimensionOrientation,
+        adsk.core.Point3D.create(bt + 1, hp + tw / 2, 0)
+    ).parameter.expression = "dt_narrow_w"
+    d.addDistanceDimension(l1.startSketchPoint, l3.endSketchPoint,
+        adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation,
+        adsk.core.Point3D.create(bt / 2, hp - 1, 0)
+    ).parameter.expression = "board_thick"
+    d.addDistanceDimension(sk_dt.originPoint, l1.startSketchPoint,
+        adsk.fusion.DimensionOrientations.VerticalDimensionOrientation,
+        adsk.core.Point3D.create(-1, hp / 2, 0)
+    ).parameter.expression = "dt_pin_w / 2"
+    d.addDistanceDimension(sk_dt.originPoint, l1.startSketchPoint,
+        adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation,
+        adsk.core.Point3D.create(0, hp - 2, 0)
+    ).parameter.expression = "0 in"
+    d.addDistanceDimension(sk_dt.originPoint, l3.endSketchPoint,
+        adsk.fusion.DimensionOrientations.VerticalDimensionOrientation,
+        adsk.core.Point3D.create(bt + 2, (hp + delta) / 2, 0)
+    ).parameter.expression = "dt_pin_w / 2 + board_thick * tan(dt_angle)"
+
+    ext_dt_l = ext_new(top_c, sk_dt.profiles.item(0), "board_thick", "DT_Left")
     left_tail = ext_dt_l.bodies.item(0)
     left_tail.name = "DT_Left"
 
-    # Mirror left tail across XMid → ONE right tail
+    # Mirror single extrude across XMid → right tail
     mir_dt = mirror_feat(top_c, [ext_dt_l], t_XMid, "DT_MirX")
     right_tail = mir_dt.bodies.item(0)
     right_tail.name = "DT_Right"
