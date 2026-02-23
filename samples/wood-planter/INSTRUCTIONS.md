@@ -33,6 +33,10 @@ All exposed as User Parameters (Modify > Change Parameters):
 | `slat_thickness` | 0.5 in | Slat body thickness |
 | `slat_tg_width` | 0.25 in | Slat-to-slat T&G width |
 | `slat_tg_depth` | 0.25 in | Slat-to-slat T&G depth |
+| `drainage_gap` | 0.25 in | Gap between bottom slats for drainage |
+| `dm_bt_w` | 0.25 in | Bottom domino narrow dimension |
+| `dm_bt_h` | 0.5 in | Bottom domino long dimension (spans Z interface) |
+| `dm_bt_d` | 0.75 in | Bottom domino total mortise depth |
 
 ---
 
@@ -47,9 +51,9 @@ Features live inside their respective components. Cross-component CUT operations
 | **Legs** | FL leg extrude, X-face groove CUT, Y-face groove CUT, midplanes, mirror FL→FR, mirror [FL,FR]→BL,BR |
 | **LongRails** | Front-lower rail + left tenon + mirror tenon + JOIN tenons + groove CUT, front-upper rail (same), midplane, mirror front pair→back pair |
 | **ShortRails** | Left-lower rail + front tenon + mirror tenon + JOIN tenons + groove CUT, left-upper rail (same), midplane, mirror left pair→right pair |
-| **Root** | 4 CUT features via assembly proxies (one per leg, using rail proxies as tools) |
+| **Root** | 4 leg mortise CUTs + 2 rail domino CUTs via assembly proxies |
 | **Slats** | Front template (body + T&G groove + T&G tongue + frame tongues), mirror→back, independent pattern front, independent pattern back, edge tongues + mirror, gap slats + mirror; same for left/right |
-| **Bottom** | Single panel extrude |
+| **Bottom** | Template slat (runs along Y) + domino voids (front + mirror→back) + CUT slat + pattern slat/voids along X + CUT front/back rails via proxies |
 
 ### Modeling Sequence
 
@@ -58,7 +62,7 @@ Features live inside their respective components. Cross-component CUT operations
 3. **Short rails** (ShortRails) — same as long rails but rotated 90°, staggered tenon Z offset, mirror left→right
 4. **Leg mortises** (root) — CUT each leg with its 4 adjacent rail proxies via Combine (tenon overlap creates mortise pockets automatically)
 5. **Slats** (Slats) — front template + mirror→back + independent patterns + edge tongues + gap slats; left template + mirror→right + independent patterns + edge tongues + gap slats
-6. **Bottom** (Bottom) — single panel on lower rails
+6. **Bottom** (Bottom) — template slat along Y + domino voids at front/back mating faces + CUT slat + pattern along X + CUT front/back lower rails via assembly proxies
 7. **Fit view**
 
 ### Key Techniques
@@ -68,6 +72,7 @@ Features live inside their respective components. Cross-component CUT operations
 - **Assembly proxies**: `body.createForAssemblyContext(occurrence)` enables cross-component CUT in root
 - **Mirror template + independent pattern**: Fusion 360 cannot mirror a RectangularPatternFeature; mirror only the template features, then create separate patterns per side
 - **Body patterns for slats**: parametric count via `floor(long_shoulder / slat_width)` expression — updates when dimensions change
+- **Domino void bodies**: stadium-shaped NewBody at mating interface, symmetric-extruded so it penetrates both pieces. CUT from each piece (keepTool=True). Pattern voids alongside the patterned slats, then CUT rails via assembly proxies in root
 
 ---
 
@@ -83,6 +88,9 @@ Change any parameter in Fusion 360's Change Parameters dialog. Key relationships
 - `short_t_zoff` = `2 * (rail_height - 2 * tenon_height) / 3 + tenon_height`
 - `body_z` = `leg_below_body + rail_height` (slat visible area bottom)
 - `body_h` = `total_height - 2 * rail_height - leg_below_body` (slat visible height)
+- `n_bottom_slats` = `floor((long_shoulder + drainage_gap) / (bottom_thickness + drainage_gap))` (auto-updates)
+- `bottom_slat_spacing` = `bottom_thickness + drainage_gap` (X-axis pattern spacing)
+- `bottom_slat_length` = `planter_width - 2 * rail_thickness` (slat span across width)
 
 ---
 
@@ -97,4 +105,5 @@ For the default 60"L x 20"W x 40"H planter:
 | Short rails | 4 | 14" x 2" x 3" (with tenons) |
 | Long slats | ~28 | 4" x 0.5" x 24" (with tongues) |
 | Short slats | ~8 | 4" x 0.5" x 24" (with tongues) |
-| Bottom panel | 1 | 54" x 14" x 0.75" |
+| Bottom slats | ~54 | 16" x 0.75" x 0.75" (with domino pockets) |
+| Bottom dominos | ~108 | 0.25" x 0.5" x 0.75" (loose tenons) |

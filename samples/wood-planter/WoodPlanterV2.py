@@ -5,7 +5,7 @@ Wood Planter V2 — Parametric with Combine-Based M&T Joinery
 Frame construction with vertical tongue-and-groove slat infill.
 
 Build approach:
-  - Features live inside their respective components (Legs, LongRails, ShortRails, Slats, Bottom)
+  - Features live inside their respective components (Legs, LongRails, ShortRails, Slats, BottomSlats)
   - Rail tenons built as NewBody, JOINed into rail, then CUT into legs via assembly proxies
   - Mirrors replicate legs, rails, and slat templates
   - Independent body patterns replicate slats per side
@@ -52,6 +52,10 @@ def run(context):
         ("slat_thickness",    "0.5 in",   "in"),
         ("slat_tg_width",     "0.25 in",  "in"),
         ("slat_tg_depth",     "0.25 in",  "in"),
+        ("drainage_gap",      "0.25 in",  "in"),
+        ("dm_bt_w",           "0.25 in",  "in"),
+        ("dm_bt_h",           "0.5 in",   "in"),
+        ("dm_bt_d",           "0.75 in",  "in"),
     ]:
         params.add(pname, adsk.core.ValueInput.createByString(expr), unit, "")
 
@@ -69,12 +73,15 @@ def run(context):
         ("groove_span",    "total_height - leg_below_body",                            "in"),
         ("mid_x",          "planter_length / 2",                                       "in"),
         ("mid_y",          "planter_width / 2",                                        "in"),
+        ("bottom_slat_spacing", "bottom_thickness + drainage_gap",                     "in"),
+        ("bottom_slat_length", "planter_width - 2 * rail_thickness",                  "in"),
     ]:
         params.add(pname, adsk.core.ValueInput.createByString(expr), unit, "")
 
     for pname, expr in [
-        ("n_long_slats",  "floor(long_shoulder / slat_width)"),
-        ("n_short_slats", "floor(short_shoulder / slat_width)"),
+        ("n_long_slats",    "floor(long_shoulder / slat_width)"),
+        ("n_short_slats",   "floor(short_shoulder / slat_width)"),
+        ("n_bottom_slats",  "floor((long_shoulder + drainage_gap) / (bottom_thickness + drainage_gap))"),
     ]:
         params.add(pname, adsk.core.ValueInput.createByString(expr), "", "")
 
@@ -107,6 +114,56 @@ def run(context):
             adsk.core.Point3D.create(x0-1, y0/2, 0)).parameter.expression = y0e
         return sk, sk.profiles.item(0)
 
+    def sketch_slot(comp, plane, cxe, cye, long_e, short_e, vertical=True, name="Sk"):
+        """Stadium profile: 2 semicircles + 2 lines, fully constrained.
+        Center at (cxe, cye), overall long_e × short_e.
+        vertical=True → long axis along sketch Y.
+        Returns (sketch, inner_profile)."""
+        sk = comp.sketches.add(plane)
+        sk.name = name
+        cx, cy = ev(cxe), ev(cye)
+        lv, sv = ev(long_e), ev(short_e)
+        r, s = sv / 2, (lv - sv) / 2
+        P = adsk.core.Point3D.create
+        arcs = sk.sketchCurves.sketchArcs
+        lns = sk.sketchCurves.sketchLines
+        if vertical:
+            a1 = arcs.addByCenterStartSweep(P(cx, cy+s, 0), P(cx+r, cy+s, 0), math.pi)
+            a2 = arcs.addByCenterStartSweep(P(cx, cy-s, 0), P(cx-r, cy-s, 0), math.pi)
+            lns.addByTwoPoints(P(cx-r, cy+s, 0), P(cx-r, cy-s, 0))
+            lns.addByTwoPoints(P(cx+r, cy-s, 0), P(cx+r, cy+s, 0))
+        else:
+            a1 = arcs.addByCenterStartSweep(P(cx+s, cy, 0), P(cx+s, cy+r, 0), math.pi)
+            a2 = arcs.addByCenterStartSweep(P(cx-s, cy, 0), P(cx-s, cy-r, 0), math.pi)
+            lns.addByTwoPoints(P(cx-s, cy+r, 0), P(cx+s, cy+r, 0))
+            lns.addByTwoPoints(P(cx+s, cy-r, 0), P(cx-s, cy-r, 0))
+        sk.geometricConstraints.addEqual(a1, a2)
+        d = sk.sketchDimensions
+        H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+        V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+        d.addRadialDimension(a1,
+            P(cx + r*0.7, cy + s + r*0.3, 0) if vertical
+            else P(cx + s + r*0.3, cy + r*0.7, 0)
+        ).parameter.expression = f"{short_e} / 2"
+        d.addDistanceDimension(a1.centerSketchPoint, a2.centerSketchPoint,
+            V if vertical else H, P(cx + r + 1, cy, 0)
+        ).parameter.expression = f"{long_e} - {short_e}"
+        d.addDistanceDimension(sk.originPoint, a1.centerSketchPoint,
+            H, P(cx/2, cy + s - 1, 0)).parameter.expression = cxe
+        d.addDistanceDimension(sk.originPoint, a1.centerSketchPoint,
+            V, P(cx - 1, (cy + s)/2, 0)
+        ).parameter.expression = (f"{cye} + ({long_e} - {short_e}) / 2"
+                                  if vertical else cye)
+        # Select inner profile (the slot, not the surrounding face region)
+        prof = sk.profiles.item(0)
+        if sk.profiles.count > 1:
+            for i in range(sk.profiles.count):
+                p = sk.profiles.item(i)
+                if p.profileLoops.count == 1:
+                    prof = p
+                    break
+        return sk, prof
+
     def ext_new(comp, prof, dist, name="Ext"):
         inp = comp.features.extrudeFeatures.createInput(
             prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
@@ -129,6 +186,14 @@ def run(context):
             prof, adsk.fusion.FeatureOperations.JoinFeatureOperation)
         inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist))
         inp.participantBodies = [body]
+        f = comp.features.extrudeFeatures.add(inp)
+        f.name = name
+        return f
+
+    def ext_new_sym(comp, prof, dist, name="Ext"):
+        inp = comp.features.extrudeFeatures.createInput(
+            prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+        inp.setSymmetricExtent(adsk.core.ValueInput.createByString(dist), True)
         f = comp.features.extrudeFeatures.add(inp)
         f.name = name
         return f
@@ -645,15 +710,69 @@ def run(context):
             mir_rgap.bodies.item(i).name = f"Slat_Right_{n_sp + 1}"
 
     # ==============================================================
-    #  6. BOTTOM PANEL  (Bottom component)
+    #  6. BOTTOM SLATS + DOMINO JOINERY  (Bottom component)
+    #
+    #  Slats run along Y (width), patterned along X (length).
+    #  Each slat butts against front/back lower rail inner face.
+    #  Domino voids at each mating face CUT both slat and rail.
     # ==============================================================
     bt_pl = off_plane(bt_c, bt_c.xYConstructionPlane,
-        "lo_z + rail_height", "Bottom_Pl")
+        "lo_z", "Bottom_Pl")
     _, pr = sketch_rect(bt_c, bt_pl,
-        "leg_size", "leg_size",
-        "long_shoulder", "short_shoulder", "Bottom_Sk")
-    ext_bt = ext_new(bt_c, pr, "bottom_thickness", "BottomPanel")
-    ext_bt.bodies.item(0).name = "BottomPanel"
+        "leg_size", "rail_thickness",
+        "bottom_thickness", "bottom_slat_length", "BottomSlat_Sk")
+    ext_bt = ext_new(bt_c, pr, "bottom_thickness", "BottomSlat_1")
+    bt_tmpl = ext_bt.bodies.item(0)
+    bt_tmpl.name = "BottomSlat_1"
+
+    # --- Domino voids (sketched on slat mating face, not origin) ---
+    # Find the front mating face of the template slat (min Y face)
+    bt_front_face = None
+    min_y = float('inf')
+    for i in range(bt_tmpl.faces.count):
+        f = bt_tmpl.faces.item(i)
+        if f.pointOnFace.y < min_y:
+            min_y = f.pointOnFace.y
+            bt_front_face = f
+
+    # Stadium slot on the slat's front face, centered on the face
+    _, pr = sketch_slot(bt_c, bt_front_face,
+        "leg_size + bottom_thickness / 2",
+        "lo_z + bottom_thickness / 2",
+        "dm_bt_h", "dm_bt_w", vertical=True, name="BtDm_Front_Sk")
+    ext_dm_f = ext_new_sym(bt_c, pr, "dm_bt_d", "BtDm_Front_Void")
+    dm_f_body = ext_dm_f.bodies.item(0)
+    dm_f_body.name = "BtDm_Front"
+
+    # Mirror front void → back void
+    bt_mid_xz = off_plane(bt_c, bt_c.xZConstructionPlane, "mid_y", "Bt_MidXZ")
+    mir_dm = mirror_feat(bt_c, [ext_dm_f], bt_mid_xz, "BtDm_MirBack")
+    dm_b_body = mir_dm.bodies.item(0)
+    dm_b_body.name = "BtDm_Back"
+
+    # CUT domino pockets from template slat (voids survive for rail CUT)
+    combine(bt_c, bt_tmpl, [dm_f_body, dm_b_body], CUT, True, "BtDm_CutSlat")
+
+    # Pattern slat + void bodies along X
+    pat_bt = body_pattern(bt_c, bt_tmpl, bt_c.xConstructionAxis,
+        "n_bottom_slats", "bottom_slat_spacing", "Pat_BottomSlats")
+    for i in range(pat_bt.bodies.count):
+        pat_bt.bodies.item(i).name = f"BottomSlat_{i + 2}"
+
+    pat_dm_f = body_pattern(bt_c, dm_f_body, bt_c.xConstructionAxis,
+        "n_bottom_slats", "bottom_slat_spacing", "Pat_BtDm_Front")
+    pat_dm_b = body_pattern(bt_c, dm_b_body, bt_c.xConstructionAxis,
+        "n_bottom_slats", "bottom_slat_spacing", "Pat_BtDm_Back")
+
+    # Collect all void bodies
+    dm_f_all = [dm_f_body] + [pat_dm_f.bodies.item(i) for i in range(pat_dm_f.bodies.count)]
+    dm_b_all = [dm_b_body] + [pat_dm_b.bodies.item(i) for i in range(pat_dm_b.bodies.count)]
+
+    # CUT front/back lower rails via assembly proxies
+    dm_f_proxies = [b.createForAssemblyContext(bt_occ) for b in dm_f_all]
+    dm_b_proxies = [b.createForAssemblyContext(bt_occ) for b in dm_b_all]
+    combine(root, flo_proxy, dm_f_proxies, CUT, True, "BtDm_CutFrontRail")
+    combine(root, blo_proxy, dm_b_proxies, CUT, True, "BtDm_CutBackRail")
 
     # ==============================================================
     #  7. FIT VIEW
