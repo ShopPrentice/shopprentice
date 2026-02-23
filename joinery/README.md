@@ -15,6 +15,7 @@ Reference files for parametric joinery in Fusion 360. Each file documents a join
 | Miter Joint | [miter-joint.md](miter-joint.md) | Low-Medium | Picture frames, trim, hidden end grain |
 | Dovetail | [dovetail.md](dovetail.md) | Very High | Drawer fronts, premium boxes, visible joints |
 | Pocket Hole | [pocket-hole.md](pocket-hole.md) | Medium | Face frames, quick assemblies, tabletops |
+| Domino Joint | [domino-joint.md](domino-joint.md) | High | Hidden structural connections, kick boards, shelf-to-back |
 
 ## Also in woodworking.md
 
@@ -44,6 +45,7 @@ All joinery files follow these conventions:
 | `mj_` | Miter Joint |
 | `dt_` | Dovetail |
 | `ph_` | Pocket Hole |
+| `dm_` | Domino Joint |
 
 ## How Claude Uses These Files
 

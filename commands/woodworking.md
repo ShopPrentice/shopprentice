@@ -97,6 +97,55 @@ params.add("n_slats", adsk.core.ValueInput.createByString("floor(shoulder_length
 ```
 These update automatically when referenced dimensions change.
 
+### Sketch Plane Selection (CRITICAL)
+
+**Always sketch on existing body surfaces, not constructed offset planes.** When creating a feature that relates to an existing body (joints, pockets, decorative details), find the relevant face on that body and sketch directly on it. Construction offset planes are fragile — they can have flipped sketch axes that silently reverse geometry positions.
+
+**How to find the right face:**
+```python
+# Find the back face of a shelf body (face at Y=shelf_depth, normal +Y)
+target_val = ev("shelf_depth")
+back_face = None
+for face in body.faces:
+    geom = face.geometry
+    if isinstance(geom, adsk.core.Plane):
+        if geom.normal.y > 0.99:
+            if abs(face.pointOnFace.y - target_val) < 0.01:
+                back_face = face
+                break
+sk = comp.sketches.add(back_face)  # sketch directly on the BRepFace
+```
+
+**Position relative to a face corner, not the origin.** Project a corner vertex of the face into the sketch and use it as the dimension reference. Offsets from a corner are always positive (going "into" the face), eliminating axis-direction ambiguity.
+
+```python
+# Find bottom-left corner of face (min X + min Z in model space)
+corner_v = min(back_face.vertices,
+    key=lambda v: v.geometry.x + v.geometry.z)
+
+# Project corner into sketch → reference point for dimensions
+ref = sk.project(corner_v).item(0)
+
+# Use modelToSketchSpace to compute correct geometry positions
+center_model = adsk.core.Point3D.create(x_model, y_face, z_model)
+center_ss = sk.modelToSketchSpace(center_model)
+
+# Dimension from projected corner with positive offset expressions
+# Swap point order if needed to keep dimension positive
+if center_ss.x >= ref.geometry.x:
+    h1, h2 = ref, sketch_point
+else:
+    h1, h2 = sketch_point, ref
+dims.addDistanceDimension(h1, h2,
+    HorizontalDimensionOrientation,
+    text_pos).parameter.expression = "offset_expr"  # always positive
+```
+
+**When to use construction planes instead:**
+- Midplanes for Mirror operations (`total_width / 2`)
+- Z-offset planes for shelf/rail positioning (no existing face yet)
+- Any case where no relevant body face exists
+
 ### Sketch + Extrude Workflow
 ```python
 # 1. Sketch with approximate geometry
@@ -285,6 +334,7 @@ For joints beyond M&T, T&G, and gap filling, read the corresponding reference fi
 | Miter Joint | `joinery/miter-joint.md` | `mj_` | Picture frames, trim, hidden end grain |
 | Dovetail | `joinery/dovetail.md` | `dt_` | Drawer fronts, premium boxes, visible joints |
 | Pocket Hole | `joinery/pocket-hole.md` | `ph_` | Face frames, quick assemblies, tabletops |
+| Domino Joint | `joinery/domino-joint.md` | `dm_` | Hidden structural connections, kick boards, shelf-to-back |
 
 Each file includes parameters, geometry workflow, replication strategy, pitfalls, and a code snippet. All follow the same conventions: `ValueInput.createByString`, Sketch > Extrude, `participantBodies = [body]` as Python list, 2-letter parameter prefixes.
 
