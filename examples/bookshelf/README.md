@@ -11,6 +11,18 @@ A parametric solid wood bookshelf modeled in Fusion 360 via Python script. 70"H 
   <img src="screenshots/right.png" width="49%" />
 </p>
 
+## Example Prompt
+
+```
+/woodworking
+Build a 70" tall x 30" wide x 20" deep solid wood bookshelf in 3/4" stock. Use through
+mortise-and-tenon joints for 5 adjustable shelves, hidden Festool Domino joints for the
+kick board, domino connections for a 1/2" plywood backboard, and through dovetails to
+attach the top. All joinery should be fully parametric.
+```
+
+---
+
 ## How to Run
 
 **Via MCP (recommended):** If you have the [Fusion 360 MCP add-in](../../mcp/README.md) configured, just ask Claude to run it.

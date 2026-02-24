@@ -59,19 +59,20 @@ Build a 48" x 18" coffee table with tapered legs and a slatted top
 
 The autofusion instructions are loaded automatically from `AGENTS.md`.
 
-## Samples
+## Examples
 
-Each folder under `samples/` contains a complete Fusion 360 project:
+Each folder under `examples/` contains a complete Fusion 360 project with screenshots, a README, and the parametric Python script:
 
-| Sample | Description |
-|--------|-------------|
-| [bookshelf](samples/bookshelf/) | 70"H x 30"W parametric bookshelf with through M&T shelves and through dovetail top |
-| [wood-planter](samples/wood-planter/) | 60" x 20" parametric planter with frame construction and T&G slat infill |
+| Example | Description |
+|---------|-------------|
+| [pencil-box](examples/pencil-box/) | 9" x 3" dovetailed pencil box with sliding lid and grooved bottom |
+| [bookshelf](examples/bookshelf/) | 70"H x 30"W parametric bookshelf with through M&T shelves and through dovetail top |
+| [wood-planter](examples/wood-planter/) | 60" x 20" parametric planter with frame construction and T&G slat infill |
 
-### Adding a new sample
+### Adding a new example
 
-1. Create a folder under `samples/` (e.g. `samples/cabinet/`)
-2. Add an `INSTRUCTIONS.md` with the build spec
+1. Create a folder under `examples/` (e.g. `examples/cabinet/`)
+2. Add a `README.md` with screenshots and build spec
 3. Add the `.py` Fusion 360 script
 4. Commit
 

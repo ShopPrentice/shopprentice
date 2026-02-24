@@ -11,6 +11,18 @@ A parametric wood planter modeled in Fusion 360 via Python script. 60"L x 20"W x
   <img src="screenshots/right.png" width="49%" />
 </p>
 
+## Example Prompt
+
+```
+/woodworking
+Build a 60" x 20" x 40" wood planter with 10" legs, 3" square posts, frame construction
+with mortise-and-tenon joinery, grooved rails, and vertical tongue-and-groove slat infill
+on all four sides. Add a slatted bottom with drainage gaps and Festool Domino connections
+to the lower rails.
+```
+
+---
+
 ## How to Run
 
 **Via MCP (recommended):** If you have the [Fusion 360 MCP add-in](../../mcp/README.md) configured, just ask Claude to run it.

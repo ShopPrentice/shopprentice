@@ -11,6 +11,18 @@ A parametric dovetailed pencil box modeled in Fusion 360 via Python script. 9"L 
   <img src="screenshots/right.png" width="49%" />
 </p>
 
+## Example Prompt
+
+```
+/woodworking
+Build a 9" x 3" x 2.5" pencil box in 1/4" stock with through dovetails at all four
+corners, a grooved bottom panel, and a sliding plywood lid that exits from the right
+side. Use 3 tails per corner. The bottom and lid should be 5/16" thick boards with
+rabbeted tongues that fit into the grooves.
+```
+
+---
+
 ## How to Run
 
 **Via MCP (recommended):** If you have the [Fusion 360 MCP add-in](../../mcp/README.md) configured, just ask Claude to run it.
