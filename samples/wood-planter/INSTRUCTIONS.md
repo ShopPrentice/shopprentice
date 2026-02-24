@@ -9,6 +9,17 @@ A parametric wood planter modeled in Fusion 360 via Python script. 60"L x 20"W x
 
 ---
 
+## Screenshots
+
+| View | |
+|------|-|
+| Iso top-right | ![iso-top-right](screenshots/iso-top-right.png) |
+| Iso top-left | ![iso-top-left](screenshots/iso-top-left.png) |
+| Front | ![front](screenshots/front.png) |
+| Right | ![right](screenshots/right.png) |
+
+---
+
 ## Dimensions
 
 All exposed as User Parameters (Modify > Change Parameters):
