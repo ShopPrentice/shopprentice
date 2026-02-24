@@ -611,7 +611,7 @@ Complex furniture (10+ bodies, 3+ joint systems) should be built in phases. Each
 
 Scripts close existing unsaved documents and create a fresh Fusion Design document. This is fast (no slow timeline clearing) and guarantees component support (Part Design can't have components).
 
-The MCP add-in handles document switches gracefully — it detects the document change and skips committing the old transaction.
+The AutoFusion add-in handles document switches gracefully — it detects the document change and skips committing the old transaction.
 
 **IMPORTANT**: Do NOT try to clear the timeline feature-by-feature. Each deletion triggers a full model recompute, causing Fusion 360 to hang on complex models.
 
@@ -662,22 +662,22 @@ app.activeViewport.camera = cam
 
 ## MCP Live Execution
 
-When an MCP connection to Fusion 360 is available (via FusionMCPSample), you MUST automatically execute the script after generating it. Do not wait for the user to ask — the full generate-execute-verify loop is the default workflow.
+When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), you MUST automatically execute the script after generating it. Do not wait for the user to ask — the full generate-execute-verify loop is the default workflow.
 
 ### Available MCP Tools
 
 | Tool | Purpose |
 |------|---------|
-| `execute_api_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. |
+| `capture_design` | Full design introspection: parameters, component tree with body geometry, timeline features. |
+| `get_timeline_state` | Roll timeline to any index, capture body geometry at that point, restore position. |
+| `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. |
 | `get_screenshot` | Capture the current Fusion 360 viewport. Use to verify results visually. |
-| `get_api_documentation` | Search Fusion 360 API docs by class/member name. Use when diagnosing API errors. |
-| `get_best_practices` | Retrieve Fusion 360 scripting best practices. |
 
 ### Automatic Execution Loop
 
 After generating the complete script, immediately run this loop:
 
-1. **Execute** — call `execute_api_script` to run the script in Fusion 360.
+1. **Execute** — call `execute_script` to run the script in Fusion 360.
 2. **Check result** — inspect the `isError` flag. On failure, the `content` field contains the full Python stack trace with line numbers and exception type.
 3. **On success** — take a screenshot with `get_screenshot` and present it to the user. Done.
 4. **On error** — analyze the stack trace, fix the script, and re-execute. Track each distinct error by its core message. If the **same error persists after 3 attempts**, stop and report the error to the user with your analysis of what went wrong. Do not keep retrying the same failure.
@@ -719,9 +719,9 @@ Phase 3: Add dovetails
 
 ### MCP Timeout
 
-The MCP add-in's main-thread execution timeout is set in:
-`Fusion MCP Addin/server/mcp_server.py` → `_execute_on_main_thread` → `timeout = 300`
+The AutoFusion add-in's main-thread execution timeout is set in:
+`addin/server/mcp_server.py` → `_execute_on_main_thread` → `timeout = 300`
 
-Default was 30s (too short for complex scripts). Set to 300s (5 min). If scripts still time out, increase this value and restart Fusion 360.
+Default is 300s (5 min). If scripts still time out, increase this value and restart the add-in.
 
 See `mcp/README.md` for setup instructions.

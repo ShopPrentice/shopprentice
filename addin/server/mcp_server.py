@@ -1,0 +1,438 @@
+"""
+MCP Server Module
+
+Simple MCP-compatible server implementation that runs within Fusion 360's
+Python environment. Implements MCP protocol over HTTP without external dependencies.
+"""
+
+import asyncio
+import json
+import threading
+import traceback
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+from typing import Any, Dict, Tuple, Optional
+from ..primitives.tool import Tool
+from ..primitives.resource import Resource
+from ..primitives.item import Item
+from .task_manager import TaskManager
+
+try:
+    import adsk.core
+    app = adsk.core.Application.get()
+except:
+    pass
+
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """HTTP server that handles requests in separate threads."""
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class SimpleMCPServer:
+    """Simple MCP-compatible server that can run in Fusion 360's Python environment."""
+
+    def __init__(self, name: str = "AutoFusion"):
+        self.name = name
+        self.tools: Dict[str, Item] = {}
+        self.resources: Dict[str, Item] = {}
+        self.server_info = {
+            "name": name,
+            "version": "1.0.0"
+        }
+
+    def register(self, item: Item):
+        """Register an Item (Tool, Resource, or Prompt) in the server."""
+        if not isinstance(item, Item):
+            raise ValueError("Can only register Item instances")
+
+        primitive = item.primitive
+        item_type = item.get_type()
+
+        if item_type == "tool":
+            self.tools[primitive.name] = item
+            if app:
+                app.log(f"Tool registered: {primitive.name}")
+        elif item_type == "resource":
+            self.resources[primitive.uri] = item
+            if app:
+                app.log(f"Resource registered: {primitive.uri}")
+        elif item_type == "prompt":
+            if app:
+                app.log(f"Prompt registered: {primitive.name} (not yet supported)")
+        else:
+            raise ValueError(f"Unknown item type: {item_type}")
+
+    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle MCP protocol requests."""
+        try:
+            method = request.get("method")
+            request_id = request.get("id")
+            params = request.get("params", {})
+
+            if method == "initialize":
+                return self._handle_initialize(request_id, params)
+            elif method == "tools/list":
+                return self._handle_tools_list(request_id)
+            elif method == "tools/call":
+                return await self._handle_tools_call(request_id, params)
+            elif method == "resources/list":
+                return self._handle_resources_list(request_id)
+            elif method == "resources/templates/list":
+                return self._handle_resources_templates_list(request_id)
+            elif method == "resources/read":
+                return await self._handle_resources_read(request_id, params)
+            else:
+                return self._create_error_response(request_id, -32601, f"Method not found: {method}")
+
+        except Exception as e:
+            return self._create_error_response(request.get("id"), -32603, str(e))
+
+    def _handle_initialize(self, request_id: Any, _params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle initialize request."""
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "tools": {},
+                    "resources": {
+                        "listChanged": False
+                    }
+                },
+                "serverInfo": self.server_info
+            }
+        }
+
+    def _handle_tools_list(self, request_id: Any) -> Dict[str, Any]:
+        """Handle tools/list request."""
+        tools = []
+        for name, tool_item in self.tools.items():
+            tools.append({
+                "name": name,
+                "description": tool_item.primitive.description,
+                "inputSchema": tool_item.primitive.input_schema
+            })
+
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {"tools": tools}
+        }
+
+    async def _handle_tools_call(self, request_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle tools/call request."""
+        tool_name = params.get("name")
+        arguments = params.get("arguments", {})
+
+        if tool_name not in self.tools:
+            return self._create_error_response(request_id, -32601, f"Tool not found: {tool_name}")
+
+        if app:
+            app.log(f"Calling tool: {tool_name}")
+
+        try:
+            tool_item = self.tools[tool_name]
+
+            if tool_item.run_on_main_thread:
+                result = await self._execute_on_main_thread(tool_item.handler, arguments, request_id, "tool")
+            else:
+                result = tool_item.handler(**arguments)
+
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": result
+            }
+        except Exception as e:
+            if app:
+                app.log(f"Tool execution error: {str(e)}")
+            return self._create_error_response(request_id, -32603, f"Tool execution error: {str(e)}")
+
+    async def _execute_on_main_thread(self, handler_func, arguments: Dict[str, Any], request_id: Any, operation_type: str = "operation") -> Any:
+        """Execute a handler function on the main thread using TaskManager."""
+        import threading
+        import time
+        import asyncio
+
+        result_container = {'result': None, 'exception': None, 'completed': False}
+        result_lock = threading.Lock()
+
+        def callback(data):
+            try:
+                result = handler_func(**data['arguments'])
+                with result_lock:
+                    result_container['result'] = result
+                    result_container['completed'] = True
+            except Exception as e:
+                with result_lock:
+                    result_container['exception'] = e
+                    result_container['completed'] = True
+
+        if not TaskManager.is_running():
+            if app:
+                app.log("TaskManager is not running, attempting to start it")
+            TaskManager.start()
+
+        task_id = TaskManager.post(
+            command=f"execute_{operation_type}",
+            callback=callback,
+            data={"arguments": arguments}
+        )
+
+        if not task_id:
+            raise Exception("Failed to post task to TaskManager")
+
+        if app:
+            app.log(f"Posted {operation_type} execution task {task_id} to main thread")
+
+        timeout = 300  # 5 minute timeout
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            with result_lock:
+                if result_container['completed']:
+                    if result_container['exception'] is not None:
+                        raise result_container['exception']
+                    return result_container['result']
+
+            await asyncio.sleep(0.01)
+
+        raise Exception(f"{operation_type.title()} execution timed out")
+
+    def _handle_resources_list(self, request_id: Any) -> Dict[str, Any]:
+        """Handle resources/list request."""
+        resources = []
+        for uri, resource_item in self.resources.items():
+            if resource_item.primitive.uri:
+                resource_dict = resource_item.primitive.to_dict()
+                resources.append(resource_dict)
+
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {"resources": resources}
+        }
+
+    def _handle_resources_templates_list(self, request_id: Any) -> Dict[str, Any]:
+        """Handle resources/templates/list request."""
+        resources = []
+        for uri, resource_item in self.resources.items():
+            if resource_item.primitive.uri_template:
+                resource_dict = resource_item.primitive.to_dict()
+                resources.append(resource_dict)
+
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "result": {"resources": resources}
+        }
+
+    def _find_resource_by_template(self, uri: str):
+        """Find a resource by matching URI templates."""
+        import re
+        from urllib.parse import urlparse, parse_qs
+
+        for resource_uri, resource_item in self.resources.items():
+            if resource_item.primitive.uri_template:
+                template = resource_item.primitive.uri_template
+
+                if '{?' in template:
+                    base_template = re.sub(r'\{[?]?[^}]+\}', '', template).rstrip('/')
+                    parsed_uri = urlparse(uri)
+                    base_uri = f"{parsed_uri.scheme}://{parsed_uri.netloc}{parsed_uri.path}"
+
+                    if base_template == base_uri:
+                        return resource_item
+                else:
+                    if self._match_template_path(template, uri):
+                        return resource_item
+
+        return None
+
+    def _match_template_path(self, template: str, uri: str) -> bool:
+        """Match a URI template path against a URI."""
+        import re
+
+        pattern = template
+        for var in re.findall(r'\{(\w+)\}', pattern):
+            pattern = pattern.replace(f'{{{var}}}', f'(?P<{var}>[^/]+)')
+
+        pattern = f'^{pattern}$'
+        match = re.match(pattern, uri)
+        return match is not None
+
+    async def _handle_resources_read(self, request_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle resources/read request."""
+        uri = params.get("uri")
+
+        resource_item = self.resources.get(uri)
+
+        if not resource_item:
+            resource_item = self._find_resource_by_template(uri)
+
+        if not resource_item:
+            return self._create_error_response(request_id, -32601, f"Resource not found: {uri}")
+
+        try:
+            handler_args = {k: v for k, v in params.items() if k != "uri"}
+
+            from urllib.parse import urlparse, parse_qs
+            parsed_uri = urlparse(uri)
+            if parsed_uri.query:
+                query_params = parse_qs(parsed_uri.query)
+                for key, value_list in query_params.items():
+                    handler_args[key] = value_list[0] if value_list else None
+
+            if resource_item.run_on_main_thread:
+                result = await self._execute_on_main_thread(resource_item.handler, handler_args, request_id, "resource")
+            else:
+                result = resource_item.handler(**handler_args)
+
+            return {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "result": {
+                    "contents": [
+                        {
+                            "uri": uri,
+                            "mimeType": resource_item.primitive.mime_type or "application/json",
+                            "text": result
+                        }
+                    ]
+                }
+            }
+        except Exception as e:
+            if app:
+                app.log(f"Resource execution error: {str(e)}")
+            return self._create_error_response(request_id, -32603, f"Resource read error: {str(e)}")
+
+    def _create_error_response(self, request_id: Any, code: int, message: str) -> Dict[str, Any]:
+        """Create an error response."""
+        return {
+            "jsonrpc": "2.0",
+            "id": request_id,
+            "error": {
+                "code": code,
+                "message": message
+            }
+        }
+
+
+class MCPHandler(BaseHTTPRequestHandler):
+    """HTTP request handler for MCP protocol over HTTP."""
+
+    def __init__(self, *args, mcp_server=None, **kwargs):
+        self.mcp_server = mcp_server
+        super().__init__(*args, **kwargs)
+
+    def do_POST(self):
+        """Handle MCP protocol requests"""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+
+            response = asyncio.run(self.mcp_server.handle_request(request_data))
+
+            self._send_json_response(response)
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def do_GET(self):
+        """Handle GET requests for health checks"""
+        if self.path == '/health':
+            self._send_json_response({"status": "healthy", "server": "AutoFusion"})
+        elif self.path == '/tools':
+            response = self.mcp_server._handle_tools_list(1)
+            self._send_json_response(response)
+        elif self.path == '/':
+            self._send_json_response({
+                "message": "AutoFusion MCP Server",
+                "endpoints": ["POST / (MCP protocol)", "GET /health", "GET /tools"]
+            })
+        else:
+            self.send_error(404, "Not Found")
+
+    def _send_json_response(self, data):
+        """Send JSON response"""
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+
+        response_json = json.dumps(data, indent=2)
+        self.wfile.write(response_json.encode())
+
+    def log_message(self, format, *args):
+        """Override to reduce logging noise"""
+        pass
+
+
+def start_mcp_server(
+    host: str = 'localhost',
+    port: int = 9100,
+    tools: Optional[Dict[str, Any]] = None,
+    resources: Optional[Dict[str, Any]] = None
+) -> Tuple[Optional[SimpleMCPServer], Optional[ThreadedHTTPServer], Optional[threading.Thread]]:
+    """Start the AutoFusion MCP server over HTTP."""
+    try:
+        mcp = SimpleMCPServer("AutoFusion")
+
+        if tools:
+            for tool in tools:
+                mcp.register(tool)
+
+        if resources:
+            for resource_item in resources:
+                mcp.register(resource_item)
+
+        server_address = (host, port)
+
+        class HandlerWithMCP(MCPHandler):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, mcp_server=mcp, **kwargs)
+
+        http_server = ThreadedHTTPServer(server_address, HandlerWithMCP)
+
+        server_thread = threading.Thread(
+            target=http_server.serve_forever,
+            daemon=True,
+            name=f"AutoFusion-Server-{host}:{port}"
+        )
+        server_thread.start()
+
+        print(f"AutoFusion server started on http://{host}:{port}")
+        if app:
+            app.log(f"AutoFusion server started on http://{host}:{port}")
+        return mcp, http_server, server_thread
+
+    except Exception as e:
+        print(f"Failed to start AutoFusion server: {str(e)}")
+        if app:
+            app.log(f"Failed to start AutoFusion server: {str(e)}\n{traceback.format_exc()}")
+        return None, None, None
+
+
+def stop_mcp_server(http_server, server_thread, timeout=5):
+    """Stop the AutoFusion MCP server."""
+    try:
+        if http_server:
+            http_server.shutdown()
+            http_server.server_close()
+
+        if server_thread and server_thread.is_alive():
+            server_thread.join(timeout=timeout)
+            return not server_thread.is_alive()
+
+        return True
+
+    except Exception as e:
+        print(f"Error stopping AutoFusion server: {str(e)}")
+        if app:
+            app.log(f"Error stopping AutoFusion server: {str(e)}")
+        return False

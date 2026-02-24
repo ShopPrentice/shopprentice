@@ -763,7 +763,11 @@ class Generator:
         plane_ref = self._resolve_sketch_plane(sk_data, comp_var) if sk_data else f"{comp_var}.xYConstructionPlane"
 
         # Determine if this is a BRepFace sketch
-        is_face_sketch = sk_data and str(sk_data.get("plane", "")).startswith("BRepFace")
+        plane = sk_data.get("plane", "") if sk_data else ""
+        if isinstance(plane, dict):
+            is_face_sketch = plane.get("type") == "BRepFace"
+        else:
+            is_face_sketch = str(plane).startswith("BRepFace")
 
         if is_face_sketch:
             self._gen_face_sketch_extrude(feat, sk_data, comp_var)
@@ -787,9 +791,16 @@ class Generator:
         """Get the plane reference for a sketch."""
         if not sk_data:
             return f"{comp_var}.xYConstructionPlane"
-        plane_str = sk_data.get("plane", "XY")
-        if plane_str.startswith("BRepFace"):
-            return None  # handled separately
+        plane = sk_data.get("plane", "XY")
+        # Handle structured dict from capture_design tool
+        if isinstance(plane, dict):
+            if plane.get("type") == "BRepFace":
+                return None  # handled separately
+            plane_str = plane.get("name", "XY")
+        else:
+            plane_str = plane
+            if plane_str.startswith("BRepFace"):
+                return None  # handled separately
         return self.sym.resolve_plane_ref(plane_str, comp_var)
 
     def _gen_rect_extrude(self, feat, sk_data, comp_var, plane_ref):
@@ -945,13 +956,17 @@ class Generator:
         name = feat["name"]
         sk_name = sk_data["name"]
         comp_name = feat.get("component", "")
-        plane_str = sk_data.get("plane", "")
-        normal = sk_data.get("faceNormal", [0, 0, 0])
-        point = sk_data.get("facePoint", [0, 0, 0])
-
-        # Extract body name from "BRepFace(body=BodyName)"
-        m = re.match(r'BRepFace\(body=(.+)\)', plane_str)
-        body_name = m.group(1) if m else ""
+        plane_data = sk_data.get("plane", "")
+        # Handle structured dict from capture_design tool
+        if isinstance(plane_data, dict):
+            body_name = plane_data.get("body", "")
+            normal = plane_data.get("normal", [0, 0, 0])
+            point = plane_data.get("origin", [0, 0, 0])
+        else:
+            normal = sk_data.get("faceNormal", [0, 0, 0])
+            point = sk_data.get("facePoint", [0, 0, 0])
+            m = re.match(r'BRepFace\(body=(.+)\)', str(plane_data))
+            body_name = m.group(1) if m else ""
         body_var = self.sym.resolve_body(body_name)
 
         if not body_var:
@@ -1188,7 +1203,12 @@ class Generator:
         name = feat["name"]
         comp_name = feat.get("component", "")
         comp_var, _ = self.sym.resolve_comp(comp_name)
-        mirror_plane = feat.get("mirrorPlane", "")
+        mirror_plane_raw = feat.get("mirrorPlane", "")
+        # Handle structured dict from capture_design tool
+        if isinstance(mirror_plane_raw, dict):
+            mirror_plane = mirror_plane_raw.get("name", "")
+        else:
+            mirror_plane = mirror_plane_raw
         bodies = feat.get("bodies", [])
 
         plane_ref = self.sym.resolve_plane_ref(mirror_plane, comp_var)

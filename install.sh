@@ -10,7 +10,7 @@ set -e
 # Flags:
 #   --claude-code   Install for Claude Code
 #   --codex         Install for OpenAI Codex CLI
-#   --mcp           Set up Fusion 360 MCP server + auto-configure tools
+#   --mcp           Install AutoFusion add-in + auto-configure MCP tools
 #   --no-mcp        Skip MCP setup
 #   --all           All of the above
 #   (no flags)      Auto-detect installed tools + install MCP
@@ -18,8 +18,6 @@ set -e
 AUTOFUSION_HOME="$HOME/.autofusion"
 REPO_DIR="$AUTOFUSION_HOME/repo"
 REPO_URL="https://github.com/YLZha/autofusion.git"
-MCP_REPO_URL="https://github.com/AutodeskFusion360/FusionMCPSample.git"
-MCP_DIR="$AUTOFUSION_HOME/mcp-servers/FusionMCPSample"
 
 # --- Parse flags ---
 opt_claude_code=false
@@ -182,9 +180,9 @@ with open('$AGENTS_FILE', 'w') as f:
     echo
 fi
 
-# --- MCP setup ---
+# --- MCP setup (AutoFusion add-in) ---
 if [ "$opt_mcp" = true ]; then
-    echo "--- MCP (Fusion 360) ---"
+    echo "--- MCP (AutoFusion Add-in) ---"
 
     # Check Node.js (required for mcp-remote proxy)
     if ! command -v npx &>/dev/null; then
@@ -193,35 +191,30 @@ if [ "$opt_mcp" = true ]; then
     fi
     echo "Node.js $(node --version) OK"
 
-    # Clone or update MCP server repo
-    if [ -d "$MCP_DIR" ]; then
-        echo "MCP server repo exists, pulling latest..."
-        git -C "$MCP_DIR" pull --ff-only
-    else
-        echo "Cloning FusionMCPSample..."
-        mkdir -p "$(dirname "$MCP_DIR")"
-        git clone "$MCP_REPO_URL" "$MCP_DIR"
-    fi
-
-    # Install the Fusion 360 add-in
-    # The add-in folder in the repo is "Fusion MCP Addin"
-    MCP_ADDIN_SRC="$MCP_DIR/Fusion MCP Addin"
+    # Install the AutoFusion add-in via symlink
+    ADDIN_SRC="$REPO_DIR/addin"
     if [ "$(uname)" = "Darwin" ]; then
         ADDIN_DIR="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns"
     else
         ADDIN_DIR="$APPDATA/Autodesk/Autodesk Fusion 360/API/AddIns"
     fi
-    ADDIN_DEST="$ADDIN_DIR/Fusion MCP Addin"
+    ADDIN_LINK="$ADDIN_DIR/AutoFusion"
 
     if [ -d "$ADDIN_DIR" ]; then
-        echo "Installing add-in to Fusion 360..."
-        rm -rf "$ADDIN_DEST"
-        cp -r "$MCP_ADDIN_SRC" "$ADDIN_DEST"
-        echo "Installed add-in to $ADDIN_DEST"
+        # Remove old Fusion MCP Addin if present
+        OLD_ADDIN="$ADDIN_DIR/Fusion MCP Addin"
+        if [ -d "$OLD_ADDIN" ] && [ ! -L "$OLD_ADDIN" ]; then
+            echo "Removing old Fusion MCP Addin..."
+            rm -rf "$OLD_ADDIN"
+        fi
+
+        echo "Symlinking AutoFusion add-in..."
+        ln -sf "$ADDIN_SRC" "$ADDIN_LINK"
+        echo "Installed: $ADDIN_LINK -> $ADDIN_SRC"
     else
         echo "Warning: Fusion 360 AddIns directory not found at $ADDIN_DIR"
-        echo "You may need to copy the add-in manually:"
-        echo "  cp -r \"$MCP_ADDIN_SRC\" \"<your AddIns dir>/Fusion MCP Addin\""
+        echo "Create a symlink manually:"
+        echo "  ln -sf \"$ADDIN_SRC\" \"<your AddIns dir>/AutoFusion\""
     fi
 
     # Configure MCP for Claude Code (uses npx mcp-remote to proxy HTTP)
@@ -273,7 +266,7 @@ TOML
 
     echo
     echo "MCP setup complete!"
-    echo "  Next: In Fusion 360, go to Tools > Add-Ins > Fusion MCP Addin > Run"
+    echo "  Next: In Fusion 360, go to Tools > Add-Ins > AutoFusion > Run"
     echo "  Then restart Claude Code to pick up the MCP config."
     echo
 fi

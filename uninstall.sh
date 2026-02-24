@@ -10,6 +10,17 @@ removed=()
 echo "=== autofusion uninstaller ==="
 echo
 
+# --- Remove AutoFusion add-in symlink ---
+if [ "$(uname)" = "Darwin" ]; then
+    ADDIN_LINK="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion"
+else
+    ADDIN_LINK="$APPDATA/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion"
+fi
+if [ -L "$ADDIN_LINK" ]; then
+    rm "$ADDIN_LINK"
+    removed+=("$ADDIN_LINK (symlink)")
+fi
+
 # --- Remove ~/.autofusion/ ---
 if [ -d "$AUTOFUSION_HOME" ]; then
     rm -rf "$AUTOFUSION_HOME"

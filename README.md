@@ -94,9 +94,9 @@ The `joinery/` directory contains parametric modeling guides for 9 joint types. 
 
 Mortise-and-tenon, tongue-and-groove, and gap filling rules remain inline in the skill. See [joinery/README.md](joinery/README.md) for the full selection guide and conventions.
 
-## MCP Integration
+## MCP Integration (AutoFusion Add-in)
 
-Connect your AI assistant to a running Fusion 360 instance to execute scripts live via the Model Context Protocol.
+Connect your AI assistant to a running Fusion 360 instance via the AutoFusion add-in — a built-in MCP-compatible JSON-RPC server.
 
 ```bash
 # Include --mcp during install
@@ -106,13 +106,25 @@ curl -sSL https://raw.githubusercontent.com/YLZha/autofusion/main/install.sh | b
 cd ~/.autofusion/repo && ./install.sh --mcp
 ```
 
-This installs [FusionMCPSample](https://github.com/AutodeskFusion360/FusionMCPSample) and auto-configures it for your detected tools. The MCP server provides `execute_api_script`, `get_screenshot`, and API documentation tools.
+The installer symlinks the `addin/` directory into Fusion 360's AddIns folder and configures MCP for your detected tools.
 
-After install, you still need to:
-1. Copy the Fusion 360 add-in (the installer prints the exact command)
-2. Enable it in Fusion 360: Tools > Add-Ins > Fusion MCP Addin > Run
+After install, enable it in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
 
-See [mcp/README.md](mcp/README.md) for full details.
+### Available Tools
+
+| Tool | Purpose |
+|------|---------|
+| `capture_design` | Full design introspection: parameters, component tree with body geometry, timeline features |
+| `get_timeline_state` | Roll timeline to any index, capture body geometry, restore position |
+| `execute_script` | Run a Python script in Fusion 360 with transaction wrapping |
+| `get_screenshot` | Capture the viewport with optional camera orientation |
+
+### Verify
+
+```bash
+curl http://localhost:9100/health          # {"status": "healthy", "server": "AutoFusion"}
+curl http://localhost:9100/tools           # lists all 4 tools
+```
 
 ## Updating
 
