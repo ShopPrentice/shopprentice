@@ -36,7 +36,7 @@ def run(context):
         })
 
     # ── 2. Component Tree ──
-    def dump_comp(comp, depth=0):
+    def dump_comp(comp, occ=None, depth=0):
         info = {
             "name": comp.name,
             "bodies": [b.name for b in comp.bRepBodies],
@@ -44,8 +44,22 @@ def run(context):
             "constructionPlanes": [p.name for p in comp.constructionPlanes],
             "children": [],
         }
-        for occ in comp.occurrences:
-            info["children"].append(dump_comp(occ.component, depth + 1))
+        # Occurrence transform (world position of this component)
+        if occ:
+            try:
+                t = occ.transform
+                info["transform"] = {
+                    "translation": [
+                        round(t.translation.x, 4),
+                        round(t.translation.y, 4),
+                        round(t.translation.z, 4),
+                    ],
+                }
+            except:
+                pass
+        for child_occ in comp.occurrences:
+            info["children"].append(
+                dump_comp(child_occ.component, child_occ, depth + 1))
         return info
 
     out["components"] = dump_comp(design.rootComponent)
@@ -352,6 +366,7 @@ def run(context):
             feat_info["type"] = "ConstructionPlane"
             feat_info["name"] = cp.name
 
+            # Try offset definition
             try:
                 defn = cp.definition
                 offset_def = adsk.fusion.ConstructionPlaneOffsetDefinition.cast(defn)
@@ -364,8 +379,24 @@ def run(context):
                         feat_info["basePlane"] = bcp.name
                     else:
                         feat_info["basePlane"] = str(base.objectType)
-            except:
-                pass
+            except Exception as e:
+                feat_info["definitionError"] = str(e)
+
+            # Always try to get the plane geometry (normal + origin)
+            try:
+                geom = cp.geometry
+                feat_info["normal"] = [
+                    round(geom.normal.x, 6),
+                    round(geom.normal.y, 6),
+                    round(geom.normal.z, 6),
+                ]
+                feat_info["origin"] = [
+                    round(geom.origin.x, 4),
+                    round(geom.origin.y, 4),
+                    round(geom.origin.z, 4),
+                ]
+            except Exception as e:
+                feat_info["geometryError"] = str(e)
 
             out["timeline"].append(feat_info)
             continue
@@ -381,6 +412,42 @@ def run(context):
                 bcp = adsk.fusion.ConstructionPlane.cast(mp)
                 if bcp:
                     feat_info["mirrorPlane"] = bcp.name
+                    # Get mirror plane geometry
+                    try:
+                        geom = bcp.geometry
+                        feat_info["planeNormal"] = [
+                            round(geom.normal.x, 6),
+                            round(geom.normal.y, 6),
+                            round(geom.normal.z, 6),
+                        ]
+                        feat_info["planeOrigin"] = [
+                            round(geom.origin.x, 4),
+                            round(geom.origin.y, 4),
+                            round(geom.origin.z, 4),
+                        ]
+                    except:
+                        pass
+                else:
+                    # Try BRepFace as mirror plane
+                    bf = adsk.fusion.BRepFace.cast(mp)
+                    if bf:
+                        feat_info["mirrorPlane"] = f"BRepFace(body={bf.body.name})"
+                        try:
+                            eva = bf.evaluator
+                            ok, pt, norm = eva.getNormalAtPoint(bf.pointOnFace)
+                            if ok:
+                                feat_info["planeNormal"] = [
+                                    round(norm.x, 6),
+                                    round(norm.y, 6),
+                                    round(norm.z, 6),
+                                ]
+                                feat_info["planeOrigin"] = [
+                                    round(bf.pointOnFace.x, 4),
+                                    round(bf.pointOnFace.y, 4),
+                                    round(bf.pointOnFace.z, 4),
+                                ]
+                        except:
+                            pass
             except:
                 pass
 
@@ -431,6 +498,31 @@ def run(context):
                 ca = adsk.fusion.ConstructionAxis.cast(axis)
                 if ca:
                     feat_info["axisOne"] = ca.name
+                    # Try to get axis direction vector
+                    try:
+                        line = ca.geometry
+                        feat_info["directionOne"] = [
+                            round(line.direction.x, 6),
+                            round(line.direction.y, 6),
+                            round(line.direction.z, 6),
+                        ]
+                    except:
+                        pass
+                else:
+                    # Could be a BRepEdge or other linear entity
+                    try:
+                        edge = adsk.fusion.BRepEdge.cast(axis)
+                        if edge:
+                            geom = edge.geometry
+                            line = adsk.core.Line3D.cast(geom)
+                            if line:
+                                feat_info["directionOne"] = [
+                                    round(line.direction.x, 6),
+                                    round(line.direction.y, 6),
+                                    round(line.direction.z, 6),
+                                ]
+                    except:
+                        pass
             except:
                 pass
 
@@ -473,16 +565,35 @@ def run(context):
             }
             feat_info["operation"] = op_map.get(comb.operation, str(comb.operation))
 
+            # Target body — may be a proxy in assembly context
             try:
-                feat_info["targetBody"] = comb.targetBody.name
-            except:
-                pass
+                tb = comb.targetBody
+                feat_info["targetBody"] = tb.name
+                try:
+                    feat_info["targetComponent"] = tb.parentComponent.name
+                except:
+                    pass
+            except Exception as e:
+                feat_info["targetBodyError"] = str(e)
 
+            # Tool bodies — may be proxies in assembly context
             try:
                 tools = comb.toolBodies
-                feat_info["toolBodies"] = [tools.item(i).name for i in range(tools.count)]
-            except:
-                pass
+                tool_info = []
+                for i in range(tools.count):
+                    t = tools.item(i)
+                    entry = {"name": t.name}
+                    try:
+                        entry["component"] = t.parentComponent.name
+                    except:
+                        pass
+                    tool_info.append(entry)
+                feat_info["toolBodies"] = [t["name"] for t in tool_info]
+                if any("component" in t for t in tool_info):
+                    feat_info["toolComponents"] = [
+                        t.get("component", "") for t in tool_info]
+            except Exception as e:
+                feat_info["toolBodiesError"] = str(e)
 
             try:
                 feat_info["isKeepToolBodies"] = comb.isKeepToolBodies

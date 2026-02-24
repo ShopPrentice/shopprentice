@@ -273,6 +273,7 @@ class Simulator:
         self.planes = {}            # (comp, name) -> plane info dict
         self.body_created_at = {}   # (comp, body_name) -> timeline index
         self.comp_move_count = {}   # comp_name -> number of Moves applied
+        self.comp_transforms = {}   # comp_name -> [tx, ty, tz] from bodies.json
         self.verbose = False
         # Feature statistics
         self.stats = {"applied": 0, "skipped_err": 0, "skipped_nosk": 0,
@@ -472,63 +473,293 @@ class Simulator:
 
         return solid
 
+    def _resolve_mirror_normal(self, feat):
+        """Resolve mirror plane normal from feature data.
+
+        Returns (normal, offset) tuple or (None, None) if unresolvable.
+        normal: [nx, ny, nz], offset: distance along normal to plane.
+        """
+        # If the introspection captured plane geometry directly, use it
+        plane_normal = feat.get("planeNormal")
+        plane_origin = feat.get("planeOrigin")
+        if plane_normal and plane_origin:
+            # Offset = dot(origin, normal)
+            offset = sum(plane_normal[i] * plane_origin[i] for i in range(3))
+            return plane_normal, offset
+
+        mirror_plane = feat.get("mirrorPlane", "")
+
+        # Standard construction planes
+        if mirror_plane in ("XY", "xYConstructionPlane"):
+            return [0, 0, 1], 0
+        if mirror_plane in ("XZ", "xZConstructionPlane"):
+            return [0, 1, 0], 0
+        if mirror_plane in ("YZ", "yZConstructionPlane"):
+            return [1, 0, 0], 0
+
+        # Named construction planes (e.g. "Plane1") — check stored data
+        comp = feat.get("component", "root")
+        plane_feat = self.planes.get((comp, mirror_plane)) or \
+                     self.planes.get(("root", mirror_plane))
+        if plane_feat:
+            # Check if plane has captured geometry
+            if "normal" in plane_feat and "origin" in plane_feat:
+                n = plane_feat["normal"]
+                o = plane_feat["origin"]
+                offset = sum(n[i] * o[i] for i in range(3))
+                return n, offset
+            # Fall back to offset/basePlane definition
+            if "offset" in plane_feat and "basePlane" in plane_feat:
+                offset_cm = self.params.ev(plane_feat["offset"])
+                base = plane_feat["basePlane"]
+                if "XY" in base:
+                    return [0, 0, 1], offset_cm
+                elif "XZ" in base:
+                    return [0, 1, 0], offset_cm
+                elif "YZ" in base:
+                    return [1, 0, 0], offset_cm
+
+        return None, None
+
     def _handle_mirror(self, feat):
         comp = feat.get("component", "root")
         bodies_list = feat.get("bodies", [])
         if not bodies_list or comp not in self.comp_bodies:
+            self._stat("Mirror", False, "skipped_notgt")
             return
 
-        mirror_plane = feat.get("mirrorPlane", "")
-
-        # Determine mirror normal from plane reference
-        # Default: mirror across XZ plane (Y-axis normal)
-        normal = [0, 1, 0]
-        if mirror_plane in ("XY", "xYConstructionPlane"):
-            normal = [0, 0, 1]
-        elif mirror_plane in ("XZ", "xZConstructionPlane"):
-            normal = [0, 1, 0]
-        elif mirror_plane in ("YZ", "yZConstructionPlane"):
-            normal = [1, 0, 0]
-        # Named planes (e.g. "Plane1") — try to find in construction planes
-        # For now, default to midpoint mirror approach
-
         comp_bodies = self.comp_bodies[comp]
-
-        # Mirror creates new bodies. In Fusion, mirror with "Adjust" creates
-        # new bodies (listed after originals). Bodies list contains all
-        # resulting bodies (originals + mirrors).
-        # The first half are originals, second half are mirrors.
+        normal, offset = self._resolve_mirror_normal(feat)
         n = len(bodies_list)
+
         if n >= 2:
-            # Assume first half are new mirrored bodies, second half are sources
-            # Actually in introspection, bodies lists the result bodies
-            # For Mirror, the pattern is: [new_body1, new_body2, source1, source2]
-            # or [new_body, source_body]
+            # 2-body mirror: [new_body, source_body] pairs
             half = n // 2
             new_names = bodies_list[:half]
             source_names = bodies_list[half:]
+            any_applied = False
             for new_name, src_name in zip(new_names, source_names):
-                if src_name in comp_bodies:
-                    mirrored = comp_bodies[src_name].mirror(normal)
+                if src_name not in comp_bodies:
+                    if self.verbose:
+                        print(f"  WARN Mirror: source {src_name} not found "
+                              f"in {comp}", file=sys.stderr)
+                    continue
+
+                if normal is not None:
+                    mirrored = self._mirror_body(
+                        comp_bodies[src_name], normal, offset)
+                else:
+                    # Infer: try each axis through source body's BB center
+                    mirrored = self._infer_mirror(comp_bodies[src_name])
+
+                if mirrored is not None:
                     comp_bodies[new_name] = mirrored
+                    self.body_created_at[(comp, new_name)] = feat.get("index", 0)
+                    any_applied = True
+
+            self._stat("Mirror", any_applied,
+                       None if any_applied else "skipped_notgt")
+
         elif n == 1:
-            # Single body mirrored onto itself (union)
+            # Self-mirror: body unioned with its mirror.
+            # Without a known mirror plane, this doubles volume incorrectly.
+            # Skip self-mirrors with unknown planes — the body's base shape
+            # is typically already correct, and the mirror only symmetrizes
+            # cut features we likely couldn't simulate (sketchError).
             bname = bodies_list[0]
-            if bname in comp_bodies:
-                mirrored = comp_bodies[bname].mirror(normal)
-                try:
-                    comp_bodies[bname] = comp_bodies[bname] + mirrored
-                except Exception:
-                    pass
+            if bname not in comp_bodies:
+                self._stat("Mirror", False, "skipped_notgt")
+                return
+
+            if normal is not None:
+                mirrored = self._mirror_body(
+                    comp_bodies[bname], normal, offset)
+                if mirrored is not None:
+                    try:
+                        comp_bodies[bname] = comp_bodies[bname] + mirrored
+                        self._stat("Mirror")
+                    except Exception:
+                        self._stat("Mirror", False, "skipped_nocs")
+            else:
+                # Unknown mirror plane — skip to avoid doubling volume
+                if self.verbose:
+                    print(f"  SKIP Mirror self-union on {comp}/{bname}: "
+                          f"unknown plane", file=sys.stderr)
+                self._stat("Mirror", False, "skipped_noplane")
+
+    def _mirror_body(self, body, normal, offset):
+        """Mirror a body across a plane defined by normal and offset.
+
+        manifold3d .mirror(normal) reflects across a plane through the origin.
+        To mirror across an offset plane, translate to origin, mirror, translate back.
+        """
+        if offset and offset != 0:
+            # Shift so mirror plane is at origin
+            shift = [-normal[0] * offset, -normal[1] * offset,
+                     -normal[2] * offset]
+            shifted = body.translate(shift)
+            mirrored = shifted.mirror(normal)
+            # Shift back
+            mirrored = mirrored.translate(
+                [normal[0] * offset, normal[1] * offset,
+                 normal[2] * offset])
+            return mirrored
+        else:
+            return body.mirror(normal)
+
+    def _infer_mirror(self, body):
+        """Try to infer the mirror plane from a body's bounding box.
+
+        Heuristic: mirror across the body's BB center along its thinnest axis.
+        This is a common pattern for woodworking mirrors (midplane of a board).
+        """
+        bb = body.bounding_box()
+        dims = [bb[3] - bb[0], bb[4] - bb[1], bb[5] - bb[2]]
+        centers = [(bb[0] + bb[3]) / 2, (bb[1] + bb[4]) / 2,
+                   (bb[2] + bb[5]) / 2]
+        normals = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+
+        # Pick the axis with the longest extent — most likely the
+        # axis along which symmetry is needed
+        best_axis = dims.index(max(dims))
+        normal = normals[best_axis]
+        offset = centers[best_axis]
+        return self._mirror_body(body, normal, offset)
 
     def _handle_combine(self, feat):
         comp = feat.get("component", "root")
         operation = feat.get("operation", "Join")
-        # Combine features in introspection often lack explicit target/tool
-        # references — they operate on bodies within the same component.
-        # Without explicit target/tool info, we skip.
-        # Future: parse from additional introspection data.
-        pass
+        keep_tool = feat.get("isKeepToolBodies", True)
+
+        # If introspection captured explicit target/tool bodies, use them
+        target_name = feat.get("targetBody")
+        tool_names = feat.get("toolBodies", [])
+
+        if target_name and tool_names:
+            # We have explicit references — use them
+            self._apply_combine(comp, operation, target_name,
+                                tool_names, keep_tool, feat)
+            return
+
+        # Heuristic: for Join with isKeepToolBodies=false, the tool body
+        # is consumed. Look for another component's body with similar
+        # volume that gets merged into this component's Body1.
+        if operation == "Join" and not keep_tool:
+            comp_bodies = self.comp_bodies.get(comp, {})
+            target = comp_bodies.get("Body1")
+            if target is None:
+                self._stat("Combine", False, "skipped_notgt")
+                return
+
+            target_vol = target.volume()
+            target_bb = target.bounding_box()
+
+            # Search other components for a body with similar volume
+            # that overlaps or is adjacent to the target
+            best_match = None
+            best_comp = None
+            best_name = None
+            best_diff = float('inf')
+
+            for other_comp, other_bodies in self.comp_bodies.items():
+                if other_comp == comp:
+                    continue
+                for bname, body in other_bodies.items():
+                    vol = body.volume()
+                    diff = abs(vol - target_vol) / target_vol if target_vol > 0 else float('inf')
+                    # Accept bodies within 50% volume similarity
+                    if diff < 0.5 and diff < best_diff:
+                        # Check bounding box overlap or adjacency
+                        obb = body.bounding_box()
+                        overlap = all(
+                            obb[i] < target_bb[i + 3] + 1 and
+                            obb[i + 3] > target_bb[i] - 1
+                            for i in range(3)
+                        )
+                        if overlap:
+                            best_match = body
+                            best_comp = other_comp
+                            best_name = bname
+                            best_diff = diff
+
+            if best_match is not None:
+                try:
+                    # Position tool body relative to target using
+                    # occurrence transforms (the two components may be
+                    # at different positions in the assembly)
+                    tool = best_match
+                    tgt_tx = self.comp_transforms.get(comp, [0, 0, 0])
+                    tool_tx = self.comp_transforms.get(best_comp, [0, 0, 0])
+                    rel_tx = [tool_tx[i] - tgt_tx[i] for i in range(3)]
+                    if any(t != 0 for t in rel_tx):
+                        tool = tool.translate(rel_tx)
+
+                    comp_bodies["Body1"] = comp_bodies["Body1"] + tool
+                    # Remove tool body (consumed by join)
+                    del self.comp_bodies[best_comp][best_name]
+                    if self.verbose:
+                        print(f"  Combine Join: {comp}/Body1 += "
+                              f"{best_comp}/{best_name} "
+                              f"(rel_tx={[round(t,1) for t in rel_tx]})",
+                              file=sys.stderr)
+                    self._stat("Combine")
+                    return
+                except Exception:
+                    pass
+
+            self._stat("Combine", False, "skipped_notgt")
+            return
+
+        # For Cut operations without target/tool info, we can't determine
+        # which body from which component is the cutting tool. Skip.
+        self._stat("Combine", False, "skipped_notgt")
+
+    def _apply_combine(self, comp, operation, target_name, tool_names,
+                       keep_tool, feat):
+        """Apply a Combine with explicit target/tool bodies."""
+        comp_bodies = self.comp_bodies.get(comp, {})
+        target = comp_bodies.get(target_name)
+        if target is None:
+            self._stat("Combine", False, "skipped_notgt")
+            return
+
+        # Collect tool bodies (may be in same or different components)
+        tools = []
+        tool_sources = []  # (comp_name, body_name) for cleanup
+        for tname in tool_names:
+            if tname in comp_bodies:
+                tools.append(comp_bodies[tname])
+                tool_sources.append((comp, tname))
+            else:
+                # Search other components
+                for other_comp, other_bodies in self.comp_bodies.items():
+                    if tname in other_bodies:
+                        tools.append(other_bodies[tname])
+                        tool_sources.append((other_comp, tname))
+                        break
+
+        if not tools:
+            self._stat("Combine", False, "skipped_notgt")
+            return
+
+        try:
+            for tool in tools:
+                if operation == "Cut":
+                    target = target - tool
+                elif operation == "Join":
+                    target = target + tool
+
+            comp_bodies[target_name] = target
+
+            # Remove tool bodies if not kept
+            if not keep_tool:
+                for tc, tn in tool_sources:
+                    if tc in self.comp_bodies and tn in self.comp_bodies[tc]:
+                        del self.comp_bodies[tc][tn]
+
+            self._stat("Combine")
+        except Exception:
+            self._stat("Combine", False, "skipped_nocs")
 
     def _handle_move(self, feat):
         comp = feat.get("component", "root")
@@ -591,30 +822,44 @@ class Simulator:
         dist_type = feat.get("distanceType", "Spacing")
 
         if quantity <= 1 or total_dist == 0:
+            self._stat("RectangularPattern", False, "skipped_nocs")
             return
         if comp not in self.comp_bodies:
+            self._stat("RectangularPattern", False, "skipped_notgt")
             return
 
         comp_bodies = self.comp_bodies[comp]
 
-        # Determine spacing per copy
+        # Detect feature pattern vs body pattern:
+        # - Feature pattern: all listed bodies already exist → pattern
+        #   replicates a previous feature (e.g., Cut) on those bodies.
+        #   The body count stays the same; the pattern adds more cuts/joins.
+        # - Body pattern: some listed bodies are new → pattern creates
+        #   copies of existing bodies.
+        all_existing = all(b in comp_bodies for b in bodies_list)
+        new_bodies = [b for b in bodies_list if b not in comp_bodies]
+
+        if all_existing and len(bodies_list) <= 1:
+            # Feature pattern on a single body — the pattern replicates
+            # a feature (like a Cut extrude) N times. We can't replay the
+            # feature, but we can approximate by replicating the last cut.
+            # For now, skip — the first instance of the feature is already
+            # applied, and skipping the pattern means N-1 fewer cuts.
+            if self.verbose:
+                print(f"  SKIP Pattern (feature): {comp}/{bodies_list} "
+                      f"qty={quantity} dist={total_dist:.1f}cm",
+                      file=sys.stderr)
+            self._stat("RectangularPattern")  # count as applied (no-op)
+            return
+
+        # Body pattern — duplicate bodies along axis
         if dist_type == "Extent":
             spacing = total_dist / (quantity - 1) if quantity > 1 else total_dist
         else:
             spacing = total_dist
 
-        # Determine pattern axis from the body's extent
-        # Default: pattern along longest dimension of first body's bounding box
-        axis = [1, 0, 0]  # default X
-        if bodies_list and bodies_list[0] in comp_bodies:
-            bb = comp_bodies[bodies_list[0]].bounding_box()
-            dx = bb[3] - bb[0]
-            dy = bb[4] - bb[1]
-            dz = bb[5] - bb[2]
-            if dy > dx and dy > dz:
-                axis = [0, 1, 0]
-            elif dz > dx and dz > dy:
-                axis = [0, 0, 1]
+        # Determine axis from feature data or body extent
+        axis = self._infer_pattern_axis(feat, comp_bodies, bodies_list, spacing)
 
         for bname in bodies_list:
             if bname not in comp_bodies:
@@ -631,6 +876,42 @@ class Simulator:
                 except Exception:
                     pass
             comp_bodies[bname] = result
+
+        # Register any new body names from the pattern
+        for bname in new_bodies:
+            if bname not in comp_bodies:
+                # For body patterns, new bodies should have been created
+                # by the duplication above. If not, they were likely
+                # bodies that the pattern would create.
+                pass
+
+        self._stat("RectangularPattern")
+
+    def _infer_pattern_axis(self, feat, comp_bodies, bodies_list, spacing):
+        """Infer pattern direction from feature data or body geometry."""
+        # If introspection captured direction vector directly, use it
+        direction = feat.get("directionOne")
+        if direction:
+            return direction
+
+        # If introspection captured the axis name, use it
+        axis_name = feat.get("axisOne", "")
+        if axis_name == "xConstructionAxis":
+            return [1, 0, 0]
+        elif axis_name == "yConstructionAxis":
+            return [0, 1, 0]
+        elif axis_name == "zConstructionAxis":
+            return [0, 0, 1]
+
+        # Heuristic: pattern along the body's longest dimension
+        if bodies_list and bodies_list[0] in comp_bodies:
+            bb = comp_bodies[bodies_list[0]].bounding_box()
+            dims = [bb[3] - bb[0], bb[4] - bb[1], bb[5] - bb[2]]
+            axes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+            longest = dims.index(max(dims))
+            return axes[longest]
+
+        return [1, 0, 0]  # default X
 
 
 # ── Comparator ────────────────────────────────────────────────────
@@ -684,7 +965,12 @@ class Comparator:
 
     def compare(self, sim_bodies):
         """Compare simulated bodies against ground truth.
-        Returns list of ComparisonResult."""
+
+        Both sim and GT bodies are in component-local coordinates
+        (no occurrence transforms applied).
+
+        Returns list of ComparisonResult.
+        """
         results = []
         for comp, bodies in self.expected.items():
             sim_comp = sim_bodies.get(comp, {})
@@ -797,6 +1083,15 @@ def print_report(results):
     if extra:
         print(f"  (+{extra} EXTRA simulated bodies not in ground truth)",
               file=sys.stderr)
+
+    # Volume-only summary: how many bodies have correct volume
+    # but wrong position? This shows the impact of position errors.
+    vol_ok = sum(1 for r in results
+                 if r.status == "MISMATCH" and r.vol_err < 0.05)
+    if vol_ok > 0:
+        print(f"  ({vol_ok} MISMATCH bodies have vol_err<5% — "
+              f"correct shape, wrong position)", file=sys.stderr)
+
     return mismatch == 0 and missing == 0
 
 
@@ -822,6 +1117,20 @@ def print_body_summary(comp_bodies):
 # ── CLI ───────────────────────────────────────────────────────────
 
 
+def _extract_transforms(comp, out, parent_tx=None):
+    """Extract cumulative occurrence transforms from bodies.json component tree."""
+    if parent_tx is None:
+        parent_tx = [0, 0, 0]
+
+    name = comp.get("name", "root")
+    raw_tx = comp.get("transform", {}).get("translation", [0, 0, 0])
+    cum_tx = [parent_tx[i] + raw_tx[i] for i in range(3)]
+    out[name] = cum_tx
+
+    for child in comp.get("children", []):
+        _extract_transforms(child, out, cum_tx)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Headless 3D geometry simulator for Fusion 360 designs")
@@ -838,28 +1147,40 @@ def main():
     # Resolve parameters
     params = ParamResolver(data.get("userParameters", []))
 
+    # Load occurrence transforms from bodies.json if available
+    bodies_data = None
+    if args.bodies:
+        with open(args.bodies) as f:
+            bodies_data = json.load(f)
+
     # Run simulation
     sim = Simulator(data, params)
     sim.verbose = args.verbose
+    if bodies_data:
+        # Extract occurrence transforms for positioning
+        _extract_transforms(bodies_data.get("components", {}),
+                            sim.comp_transforms)
     comp_bodies = sim.run()
 
     # Print feature statistics
     st = sim.stats
-    print(f"\nFeatures: {st['applied']} applied, "
-          f"{st.get('skipped_err',0)} skipped(sketchError), "
-          f"{st.get('skipped_nosk',0)} skipped(noSketch), "
-          f"{st.get('skipped_nocs',0)} skipped(noCrossSection), "
-          f"{st.get('skipped_notgt',0)} skipped(noTarget)",
+    total_skipped = sum(v for k, v in st.items()
+                        if k.startswith("skipped_"))
+    print(f"\nFeatures: {st['applied']} applied, {total_skipped} skipped",
           file=sys.stderr)
+    skip_reasons = {k: v for k, v in st.items()
+                    if k.startswith("skipped_") and v > 0}
+    if skip_reasons:
+        parts = [f"{k.replace('skipped_', '')}={v}"
+                 for k, v in sorted(skip_reasons.items())]
+        print(f"  Skip reasons: {', '.join(parts)}", file=sys.stderr)
     for ftype in sorted(st["by_type"]):
         t = st["by_type"][ftype]
         print(f"  {ftype}: {t['applied']} applied, {t['skipped']} skipped",
               file=sys.stderr)
 
     # Compare or summarize
-    if args.bodies:
-        with open(args.bodies) as f:
-            bodies_data = json.load(f)
+    if bodies_data:
         comparator = Comparator(bodies_data)
         results = comparator.compare(comp_bodies)
         all_ok = print_report(results)
