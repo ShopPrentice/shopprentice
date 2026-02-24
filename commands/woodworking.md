@@ -146,6 +146,40 @@ dims.addDistanceDimension(h1, h2,
 - Z-offset planes for shelf/rail positioning (no existing face yet)
 - Any case where no relevant body face exists
 
+### Model-Space Probing for Construction Planes
+
+When sketching on construction planes (XZ, YZ, XY, or offset planes), the mapping between model axes and sketch axes varies per plane and can swap or flip. Hard-coding `HorizontalDimensionOrientation` for one axis and `VerticalDimensionOrientation` for another produces flipped geometry on planes where the mapping differs.
+
+**Use `modelToSketchSpace` to probe the real mapping at runtime:**
+
+```python
+def probe_sketch_axes(sk):
+    """Discover which model axis maps to sketch-X (h) and sketch-Y (v)."""
+    o  = sk.modelToSketchSpace(Point3D.create(0, 0, 0))
+    ux = sk.modelToSketchSpace(Point3D.create(1, 0, 0))
+    uy = sk.modelToSketchSpace(Point3D.create(0, 1, 0))
+    uz = sk.modelToSketchSpace(Point3D.create(0, 0, 1))
+    deltas = {
+        "x": (ux.x - o.x, ux.y - o.y),
+        "y": (uy.x - o.x, uy.y - o.y),
+        "z": (uz.x - o.x, uz.y - o.y),
+    }
+    h_axis = max(deltas, key=lambda a: abs(deltas[a][0]))
+    v_axis = max(deltas, key=lambda a: abs(deltas[a][1]))
+    return h_axis, v_axis
+```
+
+Then use the probed axes to select dimension orientations:
+
+```python
+def orient_for(axis, h_axis):
+    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    return H if axis == h_axis else V
+```
+
+**Model-space rectangle helper:** Callers specify geometry in model coordinates — `model_origin = ("x_expr", "y_expr", "z_expr")` and `model_size = {"y": "width_expr", "z": "height_expr"}`. The helper converts corners through `modelToSketchSpace`, draws the rectangle, and assigns parametric dimensions using the probed H/V mapping. Works identically on XZ, YZ, XY, and offset planes. See `samples/pencil-box/pencil_box.py` for the full `sketch_rect_model` implementation.
+
 ### Sketch + Extrude Workflow
 ```python
 # 1. Sketch with approximate geometry
@@ -204,6 +238,35 @@ pat_input = pat_feats.createInput(body_coll,
     adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
 ```
 
+### Body Pattern + Bulk Combine (for CUT + JOIN chains)
+
+When patterned bodies participate in Combine (CUT/JOIN) operations, use **body patterns** to replicate the tail/tenon bodies, then **collect** all copies and pass them to a **single bulk Combine** feature.
+
+**Why not feature-pattern Combine features:** Feature-patterning a Combine replicates the boolean operation at the same tool-body positions — it does NOT offset the tool geometry. The result is one visible dovetail instead of N. Additionally, Fusion throws `MULTIPLE_TARGET_ERROR` if the pattern includes combines with different target bodies, and `IDENTICAL_TARGET_AND_TOOL_BODY` if the tool was consumed by JOIN.
+
+```python
+# 1. Body pattern each tail along the joint edge
+fl_pat = body_pattern(fl_body, root.zConstructionAxis,
+                      "dt_tail_count", "dt_pitch", "DT_PatFL")
+
+# 2. Collect template + all pattern copies
+def collect(template, pat):
+    bodies = [template]
+    for i in range(pat.bodies.count):
+        bodies.append(pat.bodies.item(i))
+    return bodies
+
+fl_all = collect(fl_body, fl_pat)
+
+# 3. Bulk CUT all tails into pin board (keepTool=True — tails survive)
+combine(front_body, fl_all + fr_all, CUT, True, "DT_SocketFront")
+
+# 4. Bulk JOIN all tails into tail board (keepTool=False — tails consumed)
+combine(left_body, fl_all + bl_all, JOIN, False, "DT_JoinLeft")
+```
+
+**Limitation:** When the user changes `dt_tail_count` via Change Parameters, the body pattern updates (new tail bodies appear) but the downstream Combine features have a fixed tool-body list and won't pick up the new bodies. To update dovetail count, re-run the script. This is acceptable for script-generated models where re-execution is fast.
+
 ### Mirror + Pattern Limitation (CRITICAL)
 Fusion 360 CANNOT properly mirror a `RectangularPatternFeature`. When you mirror features that include a pattern, only the template body gets mirrored -- pattern copies are lost.
 
@@ -221,7 +284,7 @@ Each side gets its own pattern feature. When the user changes dimensions, ALL pa
 
 ### Typical Replication Sequence
 
-For a part with symmetric tenons/tails that repeats along an axis:
+**For parts merged before patterning** (tenons merged into a rail, then rail patterned):
 
 1. **Extrude** ONE tenon/tail as NewBody
 2. **Mirror** across one midplane → 2 copies
@@ -229,7 +292,16 @@ For a part with symmetric tenons/tails that repeats along an axis:
 4. **JOIN** all copies into the parent body → single merged body
 5. **Body Pattern** the merged body along the repetition axis
 
-Result: one parametric pattern feature replaces an entire Python `for` loop.
+**For joinery where tails CUT one board and JOIN another** (dovetails, through tenons):
+
+1. **Extrude** ONE tail as NewBody
+2. **Mirror** across midplanes → all corners (3 mirrors)
+3. **Body Pattern** each tail along the repetition axis
+4. **Collect** template + pattern copies for each corner
+5. **Bulk CUT** all tails from pin boards (`keepTool=True`)
+6. **Bulk JOIN** all tails into tail boards (`keepTool=False`)
+
+Body pattern first, then bulk combine, ensures all tails at all offset positions participate in the boolean operations. Re-run the script to change tail count.
 
 ## Joinery Rules
 
@@ -383,6 +455,8 @@ All positioned with parametric offset expressions. Common planes:
 | Cut/Join affects wrong body | No `participantBodies` specified | Use `ext_input.participantBodies = [body]` |
 | `TypeError` on participantBodies | Passed `ObjectCollection` instead of list | Use Python `[body]` list |
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
+| New tails don't join when count increases | Body pattern + Combine(JOIN) — combine has a fixed tool body list | Re-run script; feature-patterning combines does NOT offset tool geometry |
+| Sketch geometry flipped on YZ or offset plane | Hard-coded H/V dimension orientations assume specific axis mapping | Use `probe_sketch_axes()` + `modelToSketchSpace` to discover real mapping at runtime |
 
 ## Incremental Build Strategy
 
