@@ -1,7 +1,7 @@
 """
 Dovetailed Pencil Box with Sliding Lid
 =======================================
-9"L x 3"W x 2"H, 1/4" board stock, 2 tails per corner.
+9"L x 3"W x 2.5"H, 1/4" board stock, 3 tails per corner.
 Through dovetail corners + grooved bottom + sliding plywood lid.
 
 Coordinate system:
@@ -9,27 +9,29 @@ Coordinate system:
 
 Design:
   - Side boards = tail boards, Front/Back = pin boards
-  - Back board shorter (back_height) — lid slides out from back
-  - Lid grooves in left, right, front
+  - Right side board shorter (open_height) — lid slides out from right (+X)
+  - Lid grooves in left, front, back (right side is the opening)
   - Bottom grooves in all 4 boards
-  - Through dovetails at all 4 corners (joint height = back_height)
+  - Through dovetails at all 4 corners (joint height = open_height)
+  - Flush bottom panel (Z=0) and lid panel (Z=box_height) with rabbeted edges
 
 Root-only build (no sub-components, no assembly proxies).
 Uses modelToSketchSpace probing for correct axis mapping on all planes.
 
 Build order (grooves BEFORE dovetails):
-  1. Front board
-  2. Back board
-  3. Left side + mirror → right side
-  4. Bottom grooves — all 4 boards
-  5. Lid grooves — left, right, front
-  6. Dovetail corners: for each corner, sketch trapezoid on YZ plane,
+  1. Front board (full height)
+  2. Back board (full height)
+  3. Left side board (full height, explicit extrusion)
+  4. Right side board (open_height, explicit extrusion)
+  5. Bottom grooves — all 4 boards
+  6. Lid grooves — left, front, back
+  7. Dovetail corners: for each corner, sketch trapezoid on YZ plane,
      extrude as CUT into pin board, extrude as JOIN into side board,
      feature pattern both extrudes along Z.
      No separate tail bodies, no Combine features.
      Fully parametric — changing dt_tail_count updates all corners.
-  7. Bottom panel
-  8. Lid panel
+  8. Bottom panel — board-first, rabbet cut (full board → rabbet → lip)
+  9. Lid panel — board-first, rabbet cut, no rabbet on right side
 
 Why grooves before dovetails:
   Side boards span Y=bt..box_width-bt before tails are joined.
@@ -63,28 +65,30 @@ def run(context):
     for pname, expr, unit in [
         ("box_length",    "9 in",     "in"),
         ("box_width",     "3 in",     "in"),
-        ("box_height",    "2 in",     "in"),
+        ("box_height",    "2.5 in",   "in"),
         ("board_thick",   "0.25 in",  "in"),
-        ("bottom_thick",  "0.1875 in","in"),
-        ("lid_thick",     "0.1875 in","in"),
+        ("bottom_thick",  "0.3125 in","in"),
+        ("lid_thick",     "0.3125 in","in"),
         ("groove_depth",  "0.125 in", "in"),
         ("groove_up",     "0.125 in", "in"),
         ("lid_down",      "0.125 in", "in"),
         ("dt_angle",      "8 deg",    "deg"),
         ("dt_tail_w",     "0.5 in",   "in"),
-        ("dt_tail_count", "2",        ""),
+        ("dt_tail_count", "3",        ""),
     ]:
         params.add(pname, adsk.core.ValueInput.createByString(expr), unit, "")
 
     for pname, expr, unit in [
-        ("back_height",    "box_height - lid_down - lid_thick",           "in"),
-        ("side_inner_len", "box_width - 2 * board_thick",                 "in"),
-        ("mid_x",          "box_length / 2",                              "in"),
-        ("dt_pin_w",       "back_height / dt_tail_count - dt_tail_w",     "in"),
-        ("dt_pitch",       "back_height / dt_tail_count",                 "in"),
-        ("dt_start_z",     "dt_pin_w / 2 + dt_tail_w / 2",               "in"),
-        ("dt_narrow_w",    "dt_tail_w - 2 * board_thick * tan(dt_angle)", "in"),
-        ("dt_half_pin",    "dt_pin_w / 2",                                "in"),
+        ("bottom_tongue",  "bottom_thick - groove_up",                       "in"),
+        ("lid_tongue",     "lid_thick - lid_down",                           "in"),
+        ("open_height",    "box_height - lid_thick",                         "in"),
+        ("side_inner_len", "box_width - 2 * board_thick",                    "in"),
+        ("lid_down_z",     "box_height - lid_down",                          "in"),
+        ("dt_pin_w",       "open_height / dt_tail_count - dt_tail_w",        "in"),
+        ("dt_pitch",       "open_height / dt_tail_count",                    "in"),
+        ("dt_start_z",     "dt_pin_w / 2 + dt_tail_w / 2",                  "in"),
+        ("dt_narrow_w",    "dt_tail_w - 2 * board_thick * tan(dt_angle)",    "in"),
+        ("dt_half_pin",    "dt_pin_w / 2",                                   "in"),
     ]:
         params.add(pname, adsk.core.ValueInput.createByString(expr), unit, "")
 
@@ -207,15 +211,6 @@ def run(context):
         f.name = name
         return f
 
-    def mirror_feat(features, plane, name="Mir"):
-        coll = adsk.core.ObjectCollection.create()
-        for f in features:
-            coll.add(f)
-        inp = root.features.mirrorFeatures.createInput(coll, plane)
-        m = root.features.mirrorFeatures.add(inp)
-        m.name = name
-        return m
-
     def ext_op(prof, dist_expr, op, body, name="Ext"):
         """Extrude a profile as CUT or JOIN into an existing body."""
         inp = root.features.extrudeFeatures.createInput(prof, op)
@@ -250,20 +245,20 @@ def run(context):
     front_body.name = "Front"
 
     # ==============================================================
-    #  2. BACK BOARD — offset XZ plane at Y=box_width-bt
+    #  2. BACK BOARD — offset XZ plane at Y=box_width-bt, full height
     # ==============================================================
     back_pl = off_plane(root.xZConstructionPlane,
                         "box_width - board_thick", "Back_Pl")
     _, pr = sketch_rect_model(back_pl,
         ("0 in", "box_width - board_thick", "0 in"),
-        {"x": "box_length", "z": "back_height"},
+        {"x": "box_length", "z": "box_height"},
         "Back_Sk")
     back_ext = ext_new(pr, "board_thick", "BackBoard")
     back_body = back_ext.bodies.item(0)
     back_body.name = "Back"
 
     # ==============================================================
-    #  3. SIDE BOARDS — YZ plane, extrude +X by board_thick
+    #  3. LEFT SIDE BOARD — YZ plane, full height
     # ==============================================================
     _, pr = sketch_rect_model(root.yZConstructionPlane,
         ("0 in", "board_thick", "0 in"),
@@ -273,14 +268,21 @@ def run(context):
     left_body = left_ext.bodies.item(0)
     left_body.name = "Side_Left"
 
-    xmid_pl = off_plane(root.yZConstructionPlane, "mid_x", "XMid_Pl")
-
-    mir_side = mirror_feat([left_ext], xmid_pl, "SideMirX")
-    right_body = mir_side.bodies.item(0)
+    # ==============================================================
+    #  4. RIGHT SIDE BOARD — offset YZ plane, open_height (shorter)
+    # ==============================================================
+    right_pl = off_plane(root.yZConstructionPlane,
+                         "box_length - board_thick", "Right_Pl")
+    _, pr = sketch_rect_model(right_pl,
+        ("box_length - board_thick", "board_thick", "0 in"),
+        {"y": "side_inner_len", "z": "open_height"},
+        "RightSide_Sk")
+    right_ext = ext_new(pr, "board_thick", "RightSide")
+    right_body = right_ext.bodies.item(0)
     right_body.name = "Side_Right"
 
     # ==============================================================
-    #  4. BOTTOM GROOVES — all 4 boards (BEFORE dovetails)
+    #  5. BOTTOM GROOVES — all 4 boards (BEFORE dovetails)
     # ==============================================================
     bg_pl = off_plane(root.xYConstructionPlane, "groove_up", "BG_Pl")
 
@@ -289,7 +291,7 @@ def run(context):
         ("board_thick - groove_depth", "0 in", "groove_up"),
         {"x": "groove_depth", "y": "box_width"},
         "BGL_Sk")
-    bg_l = ext_new(pr, "bottom_thick", "BGL")
+    bg_l = ext_new(pr, "bottom_tongue", "BGL")
     combine(left_body, bg_l.bodies.item(0), CUT, False, "BGL_Cut")
 
     # Right side bottom groove
@@ -297,56 +299,57 @@ def run(context):
         ("box_length - board_thick", "0 in", "groove_up"),
         {"x": "groove_depth", "y": "box_width"},
         "BGR_Sk")
-    bg_r = ext_new(pr, "bottom_thick", "BGR")
+    bg_r = ext_new(pr, "bottom_tongue", "BGR")
     combine(right_body, bg_r.bodies.item(0), CUT, False, "BGR_Cut")
 
-    # Front board bottom groove
+    # Front board bottom groove (stopped both sides — hidden behind side boards)
     _, pr = sketch_rect_model(bg_pl,
-        ("0 in", "board_thick - groove_depth", "groove_up"),
-        {"x": "box_length", "y": "groove_depth"},
+        ("board_thick", "board_thick - groove_depth", "groove_up"),
+        {"x": "box_length - 2 * board_thick", "y": "groove_depth"},
         "BGF_Sk")
-    bg_f = ext_new(pr, "bottom_thick", "BGF")
+    bg_f = ext_new(pr, "bottom_tongue", "BGF")
     combine(front_body, bg_f.bodies.item(0), CUT, False, "BGF_Cut")
 
-    # Back board bottom groove
+    # Back board bottom groove (stopped both sides — hidden behind side boards)
     _, pr = sketch_rect_model(bg_pl,
-        ("0 in", "box_width - board_thick", "groove_up"),
-        {"x": "box_length", "y": "groove_depth"},
+        ("board_thick", "box_width - board_thick", "groove_up"),
+        {"x": "box_length - 2 * board_thick", "y": "groove_depth"},
         "BGB_Sk")
-    bg_b = ext_new(pr, "bottom_thick", "BGB")
+    bg_b = ext_new(pr, "bottom_tongue", "BGB")
     combine(back_body, bg_b.bodies.item(0), CUT, False, "BGB_Cut")
 
     # ==============================================================
-    #  5. LID GROOVES — left, right, front (BEFORE dovetails)
+    #  6. LID GROOVES — left, front, back (BEFORE dovetails)
+    #     Right side is the lid opening — no groove there.
     # ==============================================================
-    lg_pl = off_plane(root.xYConstructionPlane, "back_height", "LG_Pl")
+    lg_pl = off_plane(root.xYConstructionPlane, "open_height", "LG_Pl")
 
     # Left side lid groove
     _, pr = sketch_rect_model(lg_pl,
-        ("board_thick - groove_depth", "0 in", "back_height"),
+        ("board_thick - groove_depth", "0 in", "open_height"),
         {"x": "groove_depth", "y": "box_width"},
         "LGL_Sk")
-    lg_l = ext_new(pr, "lid_thick", "LGL")
+    lg_l = ext_new(pr, "lid_tongue", "LGL")
     combine(left_body, lg_l.bodies.item(0), CUT, False, "LGL_Cut")
 
-    # Right side lid groove
+    # Front lid groove (stopped: starts at board_thick, open at right)
     _, pr = sketch_rect_model(lg_pl,
-        ("box_length - board_thick", "0 in", "back_height"),
-        {"x": "groove_depth", "y": "box_width"},
-        "LGR_Sk")
-    lg_r = ext_new(pr, "lid_thick", "LGR")
-    combine(right_body, lg_r.bodies.item(0), CUT, False, "LGR_Cut")
-
-    # Front lid groove
-    _, pr = sketch_rect_model(lg_pl,
-        ("0 in", "board_thick - groove_depth", "back_height"),
-        {"x": "box_length", "y": "groove_depth"},
+        ("board_thick", "board_thick - groove_depth", "open_height"),
+        {"x": "box_length - board_thick", "y": "groove_depth"},
         "LGF_Sk")
-    lg_f = ext_new(pr, "lid_thick", "LGF")
+    lg_f = ext_new(pr, "lid_tongue", "LGF")
     combine(front_body, lg_f.bodies.item(0), CUT, False, "LGF_Cut")
 
+    # Back lid groove (stopped: starts at board_thick, open at right)
+    _, pr = sketch_rect_model(lg_pl,
+        ("board_thick", "box_width - board_thick", "open_height"),
+        {"x": "box_length - board_thick", "y": "groove_depth"},
+        "LGB_Sk")
+    lg_b = ext_new(pr, "lid_tongue", "LGB")
+    combine(back_body, lg_b.bodies.item(0), CUT, False, "LGB_Cut")
+
     # ==============================================================
-    #  6. DOVETAIL CORNERS — direct extrude CUT/JOIN + feature pattern
+    #  7. DOVETAIL CORNERS — direct extrude CUT/JOIN + feature pattern
     #
     #  For each corner: sketch trapezoid → extrude as CUT into pin
     #  board → extrude same profile as JOIN into side board → feature
@@ -465,31 +468,82 @@ def run(context):
     dt_corner(dt_right_pl,             rx,  bw,     bw - bt,  "box_width", back_body,  right_body, "DT_BR")
 
     # ==============================================================
-    #  7. BOTTOM PANEL
+    #  8. BOTTOM PANEL — board-first, rabbet cut
+    #
+    #  Full board at tongue footprint → rabbet CUT removes groove_up
+    #  from bottom face → lip JOIN restores inner area at Z=0.
+    #  Net: tongue extends into grooves, lip is flush at Z=0.
     # ==============================================================
-    _, pr = sketch_rect_model(bg_pl,
+    # Full board (NewBody): tongue footprint, Z=0, height=bottom_thick
+    _, pr = sketch_rect_model(root.xYConstructionPlane,
         ("board_thick - groove_depth",
          "board_thick - groove_depth",
-         "groove_up"),
+         "0 in"),
         {"x": "box_length - 2 * board_thick + 2 * groove_depth",
          "y": "box_width - 2 * board_thick + 2 * groove_depth"},
         "Bottom_Sk")
-    ext_new(pr, "bottom_thick", "BottomPanel").bodies.item(0).name = "Bottom"
+    bot_ext = ext_new(pr, "bottom_thick", "Bottom")
+    bot_body = bot_ext.bodies.item(0)
+    bot_body.name = "Bottom"
+
+    # Rabbet CUT: removes groove_up from bottom face (entire tongue footprint)
+    _, pr = sketch_rect_model(root.xYConstructionPlane,
+        ("board_thick - groove_depth",
+         "board_thick - groove_depth",
+         "0 in"),
+        {"x": "box_length - 2 * board_thick + 2 * groove_depth",
+         "y": "box_width - 2 * board_thick + 2 * groove_depth"},
+        "BottomRabbet_Sk")
+    ext_op(pr, "groove_up", CUT, bot_body, "BottomRabbet")
+
+    # Lip JOIN: restores inner area at Z=0
+    _, pr = sketch_rect_model(root.xYConstructionPlane,
+        ("board_thick", "board_thick", "0 in"),
+        {"x": "box_length - 2 * board_thick",
+         "y": "box_width - 2 * board_thick"},
+        "BottomLip_Sk")
+    ext_op(pr, "groove_up", JOIN, bot_body, "BottomLip")
 
     # ==============================================================
-    #  8. LID PANEL
+    #  9. LID PANEL — board-first, rabbet cut, no rabbet on right side
     #
-    #  Slides in from the back. X extends into side grooves.
-    #  Y spans from back of front board to back edge (no front groove stop).
+    #  Full board at tongue footprint → rabbet CUT removes lid_down
+    #  from top face → lip JOIN restores inner area + right side at top.
+    #  Right edge has no rabbet — lid slides out from right (+X).
     # ==============================================================
+    # Full board (NewBody): tongue footprint, Z=open_height, height=lid_thick
     _, pr = sketch_rect_model(lg_pl,
         ("board_thick - groove_depth",
-         "board_thick",
-         "back_height"),
-        {"x": "box_length - 2 * board_thick + 2 * groove_depth",
-         "y": "side_inner_len"},
+         "board_thick - groove_depth",
+         "open_height"),
+        {"x": "box_length - board_thick + groove_depth",
+         "y": "box_width - 2 * board_thick + 2 * groove_depth"},
         "Lid_Sk")
-    ext_new(pr, "lid_thick", "LidPanel").bodies.item(0).name = "Lid"
+    lid_ext = ext_new(pr, "lid_thick", "Lid")
+    lid_body = lid_ext.bodies.item(0)
+    lid_body.name = "Lid"
+
+    # Rabbet CUT: removes lid_down from top face (entire tongue footprint)
+    ll_pl = off_plane(root.xYConstructionPlane,
+                      "box_height - lid_down", "LidLip_Pl")
+    _, pr = sketch_rect_model(ll_pl,
+        ("board_thick - groove_depth",
+         "board_thick - groove_depth",
+         "box_height - lid_down"),
+        {"x": "box_length - board_thick + groove_depth",
+         "y": "box_width - 2 * board_thick + 2 * groove_depth"},
+        "LidRabbet_Sk")
+    ext_op(pr, "lid_down", CUT, lid_body, "LidRabbet")
+
+    # Lip JOIN: restores inner area + right side at top (no rabbet on right)
+    _, pr = sketch_rect_model(ll_pl,
+        ("board_thick",
+         "board_thick",
+         "box_height - lid_down"),
+        {"x": "box_length - board_thick",
+         "y": "side_inner_len"},
+        "LidLip_Sk")
+    ext_op(pr, "lid_down", JOIN, lid_body, "LidLip")
 
     # ==============================================================
     #  HIDE CONSTRUCTION ELEMENTS
