@@ -1,22 +1,23 @@
 # Parametric Solid Wood Bookshelf
 
-## Overview
-
 A parametric solid wood bookshelf modeled in Fusion 360 via Python script. 70"H x 30"W x 20"D, 3/4" board stock with through mortise-and-tenon shelf joints, hidden Festool Domino kick joints, 1/2" plywood backboard with domino connections, and through dovetail top joints.
 
-**File:** `bookshelf.py`
-**Run:** Fusion 360 > Utilities > Scripts and Add-Ins > (+) > select folder > Run
+![Bookshelf — iso top-right](screenshots/iso-top-right.png)
 
----
+![Bookshelf — iso top-left](screenshots/iso-top-left.png)
 
-## Screenshots
+<p float="left">
+  <img src="screenshots/front.png" width="49%" />
+  <img src="screenshots/right.png" width="49%" />
+</p>
 
-| View | |
-|------|-|
-| Iso top-right | ![iso-top-right](screenshots/iso-top-right.png) |
-| Iso top-left | ![iso-top-left](screenshots/iso-top-left.png) |
-| Front | ![front](screenshots/front.png) |
-| Right | ![right](screenshots/right.png) |
+## How to Run
+
+**Via MCP (recommended):** If you have the [Fusion 360 MCP add-in](../../mcp/README.md) configured, just ask Claude to run it.
+
+**Manual:** Fusion 360 > Utilities > Scripts and Add-Ins > (+) > select this folder > Run
+
+**Script:** [`bookshelf.py`](bookshelf.py)
 
 ---
 
@@ -48,7 +49,7 @@ All exposed as User Parameters (Modify > Change Parameters):
 
 ---
 
-## Architecture
+## Design
 
 Features live inside their respective components. Cross-component CUT operations live in root via assembly proxies. No Python `for` loops — all replication uses Mirror and Rectangular Pattern features.
 
@@ -66,25 +67,24 @@ Features live inside their respective components. Cross-component CUT operations
 ### Modeling Sequence
 
 1. **Side boards** (Sides) — extrude left and right
-2. **Shelf template** (Shelves) — extrude shelf (depth=shelf_depth) + 1 tenon, mirror tenon across YMid and XMid, JOIN 4 tenons, domino voids for backboard, CUT voids from shelf, body pattern shelf along Z, body pattern voids along Z
+2. **Shelf template** (Shelves) — extrude shelf + 1 tenon, mirror tenon across YMid and XMid, JOIN 4 tenons, domino voids for backboard, CUT voids from shelf, body pattern shelf along Z, body pattern voids along Z
 3. **Shelf mortises** (root) — bulk CUT left side and right side with all shelf proxies
-4. **Kick board** (Kick) — extrude kick (flush front, Y=0), domino void extrude + pattern Z, JOIN left voids, mirror across XMid, JOIN right voids, CUT all voids from kick
+4. **Kick board** (Kick) — extrude kick (flush front), domino void extrude + pattern Z, JOIN left voids, mirror across XMid, JOIN right voids, CUT all voids from kick
 5. **Kick domino cuts** (root) — CUT left side and right side with kick domino void proxies
 6. **Backboard** (Back) — extrude 1/2" panel flush with back surface
 7. **Backboard domino cuts** (root) — CUT backboard with shelf domino void proxies
-8. **Top + dovetails** (Top) — extrude top (full total_depth) + 1 left tail, mirror across XMid for right tail, body pattern left tails along Y, body pattern right tails along Y
+8. **Top + dovetails** (Top) — extrude top + 1 left tail, mirror across XMid for right tail, body pattern left tails along Y, body pattern right tails along Y
 9. **Dovetail sockets** (root) — bulk CUT left side with left tail proxies, right side with right tail proxies
 10. **Join dovetails** (Top) — JOIN all left tails into top, JOIN all right tails into top
-11. **Fit view**
 
 ### Key Techniques
 
-- **Body pattern replaces `for` loop**: one shelf template + pattern creates all 5 shelves as a single parametric feature
-- **Tenon-as-tool joinery**: tenon bodies CUT mortises into side boards (keepTool=True), ensuring perfect fit
-- **Domino void bodies**: rectangular void spans the interface between two pieces, CUT from both for perfectly aligned mortise pockets
-- **Assembly proxies**: `body.createForAssemblyContext(occurrence)` enables cross-component CUT in root
-- **Bulk CUT**: all shelf proxies passed as tools in a single Combine, not one CUT per shelf
-- **Mirror before pattern**: for dovetails, mirror the template tail across XMid first, then create independent body patterns per side (Fusion 360 cannot mirror a pattern)
+- **Body pattern replaces `for` loop** — one shelf template + pattern creates all 5 shelves as a single parametric feature
+- **Tenon-as-tool joinery** — tenon bodies CUT mortises into side boards (keepTool=True), ensuring perfect fit
+- **Domino void bodies** — rectangular void spans the interface between two pieces, CUT from both for perfectly aligned mortise pockets
+- **Assembly proxies** — `body.createForAssemblyContext(occurrence)` enables cross-component CUT in root
+- **Bulk CUT** — all shelf proxies passed as tools in a single Combine, not one CUT per shelf
+- **Mirror before pattern** — for dovetails, mirror the template tail across XMid first, then create independent body patterns per side (Fusion 360 cannot mirror a pattern)
 
 ---
 
@@ -92,14 +92,14 @@ Features live inside their respective components. Cross-component CUT operations
 
 Change any parameter in Fusion 360's Change Parameters dialog. Key relationships:
 
-- `shelf_depth` = `total_depth - back_thick` (shelves recessed for backboard)
+- `shelf_depth` = `total_depth - back_thick` — shelves recessed for backboard
 - `back_height` = `total_height - board_thick - kick_height`
 - `shelf_spacing` = `(total_height - 2 * board_thick - kick_height) / n_shelves`
 - `inner_width` = `total_width - 2 * board_thick`
 - `mt_tenon_y1` = `(total_depth - back_thick) / 4 - mt_tenon_w / 2`
-- `dm_kick_zsp` = `kick_height / (dm_kick_count + 1)` (Z spacing for kick dominos)
-- `dm_back_xsp` = `inner_width / (dm_back_count + 1)` (X spacing for shelf-back dominos)
-- `dt_pin_w` = `total_depth / dt_tail_count - dt_tail_w` (derived from tail count)
+- `dm_kick_zsp` = `kick_height / (dm_kick_count + 1)` — Z spacing for kick dominos
+- `dm_back_xsp` = `inner_width / (dm_back_count + 1)` — X spacing for shelf-back dominos
+- `dt_pin_w` = `total_depth / dt_tail_count - dt_tail_w` — derived from tail count
 - `dt_pitch` = `total_depth / dt_tail_count`
 
 Changing `n_shelves` updates the shelf body pattern count, domino void pattern count, backboard domino CUT, and bulk shelf mortise CUT operations automatically.
