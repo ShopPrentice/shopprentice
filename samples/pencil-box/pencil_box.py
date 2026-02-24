@@ -23,12 +23,13 @@ Build order (grooves BEFORE dovetails):
   3. Left side + mirror → right side
   4. Bottom grooves — all 4 boards
   5. Lid grooves — left, right, front
-  6. Dovetail tails: 1 extrude + 3 mirrors (4 template tails)
-  7. Body pattern each tail along Z
-  8. CUT sockets (all tails into pin boards, keepTool=True)
-  9. JOIN tails into side boards (keepTool=False)
-  10. Bottom panel
-  11. Lid panel
+  6. Dovetail corners: for each corner, sketch trapezoid on YZ plane,
+     extrude as CUT into pin board, extrude as JOIN into side board,
+     feature pattern both extrudes along Z.
+     No separate tail bodies, no Combine features.
+     Fully parametric — changing dt_tail_count updates all corners.
+  7. Bottom panel
+  8. Lid panel
 
 Why grooves before dovetails:
   Side boards span Y=bt..box_width-bt before tails are joined.
@@ -79,7 +80,6 @@ def run(context):
         ("back_height",    "box_height - lid_down - lid_thick",           "in"),
         ("side_inner_len", "box_width - 2 * board_thick",                 "in"),
         ("mid_x",          "box_length / 2",                              "in"),
-        ("mid_y",          "box_width / 2",                               "in"),
         ("dt_pin_w",       "back_height / dt_tail_count - dt_tail_w",     "in"),
         ("dt_pitch",       "back_height / dt_tail_count",                 "in"),
         ("dt_start_z",     "dt_pin_w / 2 + dt_tail_w / 2",               "in"),
@@ -216,24 +216,27 @@ def run(context):
         m.name = name
         return m
 
-    def body_pattern(body, axis, count_expr, spacing_expr, name="Pat"):
-        coll = adsk.core.ObjectCollection.create()
-        coll.add(body)
-        inp = root.features.rectangularPatternFeatures.createInput(
-            coll, axis,
-            adsk.core.ValueInput.createByString(count_expr),
-            adsk.core.ValueInput.createByString(spacing_expr),
-            adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
-        pat = root.features.rectangularPatternFeatures.add(inp)
-        pat.name = name
-        return pat
+    def ext_op(prof, dist_expr, op, body, name="Ext"):
+        """Extrude a profile as CUT or JOIN into an existing body."""
+        inp = root.features.extrudeFeatures.createInput(prof, op)
+        inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist_expr))
+        inp.participantBodies = [body]
+        f = root.features.extrudeFeatures.add(inp)
+        f.name = name
+        return f
 
-    def collect(template, pat):
-        """Collect template body + all pattern-copy bodies."""
-        bodies = [template]
-        for i in range(pat.bodies.count):
-            bodies.append(pat.bodies.item(i))
-        return bodies
+    def feat_pattern(feat, name="Pat"):
+        """Feature pattern a single feature along Z by dt_tail_count / dt_pitch."""
+        coll = adsk.core.ObjectCollection.create()
+        coll.add(feat)
+        inp = root.features.rectangularPatternFeatures.createInput(
+            coll, root.zConstructionAxis,
+            adsk.core.ValueInput.createByString("dt_tail_count"),
+            adsk.core.ValueInput.createByString("dt_pitch"),
+            adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
+        p = root.features.rectangularPatternFeatures.add(inp)
+        p.name = name
+        return p
 
     # ==============================================================
     #  1. FRONT BOARD — XZ plane, extrude +Y by board_thick
@@ -271,7 +274,6 @@ def run(context):
     left_body.name = "Side_Left"
 
     xmid_pl = off_plane(root.yZConstructionPlane, "mid_x", "XMid_Pl")
-    ymid_pl = off_plane(root.xZConstructionPlane, "mid_y", "YMid_Pl")
 
     mir_side = mirror_feat([left_ext], xmid_pl, "SideMirX")
     right_body = mir_side.bodies.item(0)
@@ -344,146 +346,126 @@ def run(context):
     combine(front_body, lg_f.bodies.item(0), CUT, False, "LGF_Cut")
 
     # ==============================================================
-    #  6. DOVETAIL TAILS
+    #  6. DOVETAIL CORNERS — direct extrude CUT/JOIN + feature pattern
     #
-    #  Trapezoid on YZ plane using modelToSketchSpace probing.
-    #  Wide side at Y=0 (outer face of front board).
-    #  Narrow side at Y=bt (inner face of front board).
-    #  FL template → mirror Y → BL, mirror X → FR, mirror BL X → BR
-    #  CUT/JOIN templates, then feature-pattern the whole chain.
+    #  For each corner: sketch trapezoid → extrude as CUT into pin
+    #  board → extrude same profile as JOIN into side board → feature
+    #  pattern both extrudes along Z.
+    #
+    #  No separate tail bodies, no Combine features.
+    #  Fully parametric: changing dt_tail_count in Change Parameters
+    #  updates all corners automatically.
     # ==============================================================
-    sk_dt = root.sketches.add(root.yZConstructionPlane)
-    sk_dt.name = "DT_FL_Sk"
-    h_axis, v_axis = probe_sketch_axes(sk_dt)
+    dt_right_pl = off_plane(root.yZConstructionPlane,
+                            "box_length - board_thick", "DT_Right_Pl")
 
     bt    = ev("board_thick")
+    bw    = ev("box_width")
     hp    = ev("dt_half_pin")
     tw    = ev("dt_tail_w")
     delta = bt * math.tan(ev("dt_angle"))
+    rx    = ev("box_length - board_thick")
 
-    # Trapezoid in MODEL coordinates
-    m_p1 = Point3D.create(0, 0, hp)               # outer-bottom
-    m_p2 = Point3D.create(0, 0, hp + tw)           # outer-top
-    m_p3 = Point3D.create(0, bt, hp + tw - delta)  # inner-top
-    m_p4 = Point3D.create(0, bt, hp + delta)       # inner-bottom
+    def dt_corner(plane, mx, yw, yn, y_wide_expr, cut_body, join_body, prefix):
+        """
+        One dovetail corner: trapezoid sketch + CUT extrude into pin board
+        + JOIN extrude into side board + feature pattern both along Z.
 
-    # Convert to sketch space
-    s1 = sk_dt.modelToSketchSpace(m_p1)
-    s2 = sk_dt.modelToSketchSpace(m_p2)
-    s3 = sk_dt.modelToSketchSpace(m_p3)
-    s4 = sk_dt.modelToSketchSpace(m_p4)
+        mx: model X of sketch plane (cm)
+        yw: model Y of wide (outer) face (cm)
+        yn: model Y of narrow (inner) face (cm)
+        y_wide_expr: parametric expression for origin-to-wide-face Y distance
+        """
+        sk = root.sketches.add(plane)
+        sk.name = f"{prefix}_Sk"
+        ha, va = probe_sketch_axes(sk)
 
-    dtl = sk_dt.sketchCurves.sketchLines
-    l1 = dtl.addByTwoPoints(
-        Point3D.create(s1.x, s1.y, 0), Point3D.create(s2.x, s2.y, 0))
-    l2 = dtl.addByTwoPoints(l1.endSketchPoint, Point3D.create(s3.x, s3.y, 0))
-    l3 = dtl.addByTwoPoints(l2.endSketchPoint, Point3D.create(s4.x, s4.y, 0))
-    l4 = dtl.addByTwoPoints(l3.endSketchPoint, l1.startSketchPoint)
+        # Trapezoid in model coordinates
+        m1 = Point3D.create(mx, yw, hp)
+        m2 = Point3D.create(mx, yw, hp + tw)
+        m3 = Point3D.create(mx, yn, hp + tw - delta)
+        m4 = Point3D.create(mx, yn, hp + delta)
 
-    # Geometric constraints: parallel sides along model Z
-    if v_axis == "z":
-        sk_dt.geometricConstraints.addVertical(l1)
-        sk_dt.geometricConstraints.addVertical(l3)
-    else:
-        sk_dt.geometricConstraints.addHorizontal(l1)
-        sk_dt.geometricConstraints.addHorizontal(l3)
+        # Convert to sketch space
+        s1 = sk.modelToSketchSpace(m1)
+        s2 = sk.modelToSketchSpace(m2)
+        s3 = sk.modelToSketchSpace(m3)
+        s4 = sk.modelToSketchSpace(m4)
 
-    def orient_for(axis):
-        return H if axis == h_axis else V
+        ln = sk.sketchCurves.sketchLines
+        l1 = ln.addByTwoPoints(Point3D.create(s1.x, s1.y, 0),
+                               Point3D.create(s2.x, s2.y, 0))
+        l2 = ln.addByTwoPoints(l1.endSketchPoint,
+                               Point3D.create(s3.x, s3.y, 0))
+        l3 = ln.addByTwoPoints(l2.endSketchPoint,
+                               Point3D.create(s4.x, s4.y, 0))
+        l4 = ln.addByTwoPoints(l3.endSketchPoint, l1.startSketchPoint)
 
-    d = sk_dt.sketchDimensions
+        # Geometric: parallel sides along model Z
+        if va == "z":
+            sk.geometricConstraints.addVertical(l1)
+            sk.geometricConstraints.addVertical(l3)
+        else:
+            sk.geometricConstraints.addHorizontal(l1)
+            sk.geometricConstraints.addHorizontal(l3)
 
-    # dt_tail_w: wide side length (along Z)
-    d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
-        orient_for("z"),
-        Point3D.create(s1.x + (-1 if orient_for("z") == V else 0),
-                       s1.y + (0 if orient_for("z") == V else -1), 0)
-    ).parameter.expression = "dt_tail_w"
+        of = lambda a: H if a == ha else V
+        d = sk.sketchDimensions
 
-    # dt_narrow_w: narrow side length (along Z)
-    d.addDistanceDimension(l3.startSketchPoint, l3.endSketchPoint,
-        orient_for("z"),
-        Point3D.create(s3.x + (1 if orient_for("z") == V else 0),
-                       s3.y + (0 if orient_for("z") == V else 1), 0)
-    ).parameter.expression = "dt_narrow_w"
+        d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
+            of("z"),
+            Point3D.create(s1.x + (-1 if of("z") == V else 0),
+                           s1.y + (0 if of("z") == V else -1), 0)
+        ).parameter.expression = "dt_tail_w"
 
-    # board_thick: distance between wide and narrow sides (along Y)
-    d.addDistanceDimension(l1.startSketchPoint, l3.endSketchPoint,
-        orient_for("y"),
-        Point3D.create((s1.x + s4.x) / 2 + (0 if orient_for("y") == V else 0),
-                       (s1.y + s4.y) / 2 + (-1 if orient_for("y") == V else 0), 0)
-    ).parameter.expression = "board_thick"
+        d.addDistanceDimension(l3.startSketchPoint, l3.endSketchPoint,
+            of("z"),
+            Point3D.create(s3.x + (1 if of("z") == V else 0),
+                           s3.y + (0 if of("z") == V else 1), 0)
+        ).parameter.expression = "dt_narrow_w"
 
-    # Origin to l1.start along Z = dt_pin_w / 2
-    d.addDistanceDimension(sk_dt.originPoint, l1.startSketchPoint,
-        orient_for("z"),
-        Point3D.create(s1.x + (-1 if orient_for("z") == V else 0),
-                       s1.y / 2, 0)
-    ).parameter.expression = "dt_pin_w / 2"
+        d.addDistanceDimension(l1.startSketchPoint, l3.endSketchPoint,
+            of("y"),
+            Point3D.create((s1.x + s4.x) / 2,
+                           (s1.y + s4.y) / 2 + (-1 if of("y") == V else 0), 0)
+        ).parameter.expression = "board_thick"
 
-    # Origin to l1.start along Y = 0
-    d.addDistanceDimension(sk_dt.originPoint, l1.startSketchPoint,
-        orient_for("y"),
-        Point3D.create(s1.x / 2,
-                       s1.y + (-2 if orient_for("y") == V else 0), 0)
-    ).parameter.expression = "0 in"
+        d.addDistanceDimension(sk.originPoint, l1.startSketchPoint,
+            of("z"),
+            Point3D.create(s1.x + (-1 if of("z") == V else 0),
+                           s1.y / 2, 0)
+        ).parameter.expression = "dt_pin_w / 2"
 
-    # Origin to l3.end along Z = dt_pin_w/2 + board_thick*tan(dt_angle)
-    d.addDistanceDimension(sk_dt.originPoint, l3.endSketchPoint,
-        orient_for("z"),
-        Point3D.create(s4.x + (2 if orient_for("z") == V else 0),
-                       s4.y / 2, 0)
-    ).parameter.expression = "dt_pin_w / 2 + board_thick * tan(dt_angle)"
+        d.addDistanceDimension(sk.originPoint, l1.startSketchPoint,
+            of("y"),
+            Point3D.create(s1.x / 2,
+                           s1.y + (-2 if of("y") == V else 0), 0)
+        ).parameter.expression = y_wide_expr
 
-    ext_fl = ext_new(sk_dt.profiles.item(0), "board_thick", "DT_FL")
-    fl_body = ext_fl.bodies.item(0)
-    fl_body.name = "DT_FL"
+        d.addDistanceDimension(sk.originPoint, l3.endSketchPoint,
+            of("z"),
+            Point3D.create(s4.x + (2 if of("z") == V else 0),
+                           s4.y / 2, 0)
+        ).parameter.expression = "dt_pin_w / 2 + board_thick * tan(dt_angle)"
 
-    # Mirror FL → BL (across YMid)
-    mir_bl = mirror_feat([ext_fl], ymid_pl, "DT_MirBL")
-    bl_body = mir_bl.bodies.item(0)
-    bl_body.name = "DT_BL"
+        prof = sk.profiles.item(0)
 
-    # Mirror FL → FR (across XMid)
-    mir_fr = mirror_feat([ext_fl], xmid_pl, "DT_MirFR")
-    fr_body = mir_fr.bodies.item(0)
-    fr_body.name = "DT_FR"
+        # CUT pin board + JOIN side board from same profile
+        ec = ext_op(prof, "board_thick", CUT, cut_body, f"{prefix}_Cut")
+        ej = ext_op(prof, "board_thick", JOIN, join_body, f"{prefix}_Join")
 
-    # Mirror BL → BR (across XMid)
-    mir_br = mirror_feat([mir_bl], xmid_pl, "DT_MirBR")
-    br_body = mir_br.bodies.item(0)
-    br_body.name = "DT_BR"
+        # Feature pattern along Z — fully parametric
+        feat_pattern(ec, f"{prefix}_PatCut")
+        feat_pattern(ej, f"{prefix}_PatJoin")
 
-    # ==============================================================
-    #  7. BODY PATTERN each tail along Z
-    # ==============================================================
-    fl_pat = body_pattern(fl_body, root.zConstructionAxis,
-                          "dt_tail_count", "dt_pitch", "DT_PatFL")
-    bl_pat = body_pattern(bl_body, root.zConstructionAxis,
-                          "dt_tail_count", "dt_pitch", "DT_PatBL")
-    fr_pat = body_pattern(fr_body, root.zConstructionAxis,
-                          "dt_tail_count", "dt_pitch", "DT_PatFR")
-    br_pat = body_pattern(br_body, root.zConstructionAxis,
-                          "dt_tail_count", "dt_pitch", "DT_PatBR")
-
-    fl_all = collect(fl_body, fl_pat)
-    bl_all = collect(bl_body, bl_pat)
-    fr_all = collect(fr_body, fr_pat)
-    br_all = collect(br_body, br_pat)
+    # Four corners: (plane, model_x, y_wide, y_narrow, y_expr, cut_body, join_body)
+    dt_corner(root.yZConstructionPlane, 0,  0,      bt,       "0 in",      front_body, left_body,  "DT_FL")
+    dt_corner(root.yZConstructionPlane, 0,  bw,     bw - bt,  "box_width", back_body,  left_body,  "DT_BL")
+    dt_corner(dt_right_pl,             rx,  0,      bt,       "0 in",      front_body, right_body, "DT_FR")
+    dt_corner(dt_right_pl,             rx,  bw,     bw - bt,  "box_width", back_body,  right_body, "DT_BR")
 
     # ==============================================================
-    #  8. CUT SOCKETS + JOIN TAILS
-    #
-    #  CUT: tails cut sockets in pin boards (keepTool=True)
-    #  JOIN: tails merge into tail boards (keepTool=False)
-    # ==============================================================
-    combine(front_body, fl_all + fr_all, CUT,  True,  "DT_SocketFront")
-    combine(back_body,  bl_all + br_all, CUT,  True,  "DT_SocketBack")
-    combine(left_body,  fl_all + bl_all, JOIN, False, "DT_JoinLeft")
-    combine(right_body, fr_all + br_all, JOIN, False, "DT_JoinRight")
-
-    # ==============================================================
-    #  9. BOTTOM PANEL
+    #  7. BOTTOM PANEL
     # ==============================================================
     _, pr = sketch_rect_model(bg_pl,
         ("board_thick - groove_depth",
@@ -495,7 +477,7 @@ def run(context):
     ext_new(pr, "bottom_thick", "BottomPanel").bodies.item(0).name = "Bottom"
 
     # ==============================================================
-    #  10. LID PANEL
+    #  8. LID PANEL
     #
     #  Slides in from the back. X extends into side grooves.
     #  Y spans from back of front board to back edge (no front groove stop).
