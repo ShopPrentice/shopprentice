@@ -5,14 +5,23 @@ Provides MCP-compatible JSON-RPC tools for design introspection,
 timeline state capture, script execution, and viewport screenshots.
 """
 
+import os
+import sys
 import traceback
+
+# Ensure the addin directory is on sys.path so absolute imports resolve
+# when Fusion 360 loads this file directly (no parent package context).
+_addin_dir = os.path.dirname(os.path.abspath(__file__))
+if _addin_dir not in sys.path:
+    sys.path.insert(0, _addin_dir)
+
 import adsk.core
 import adsk.fusion
-from .server.mcp_server import start_mcp_server, stop_mcp_server
-from .primitives.registry import get_tools, get_resources
-from .server.task_manager import TaskManager
+from server.mcp_server import start_mcp_server, stop_mcp_server
+from primitives.registry import get_tools, get_resources
+from server.task_manager import TaskManager
 # Import tools to register them
-from . import tools
+import tools
 
 # Global variables
 app = adsk.core.Application.get()

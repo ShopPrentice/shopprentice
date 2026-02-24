@@ -11,9 +11,9 @@ Key improvements over introspect.py:
 """
 
 import traceback
-from ..primitives.tool import Tool
-from ..primitives.item import Item
-from ..primitives.registry import register
+from primitives.tool import Tool
+from primitives.item import Item
+from primitives.registry import register
 import adsk.core
 import adsk.fusion
 

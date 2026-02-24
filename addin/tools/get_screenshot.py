@@ -10,9 +10,9 @@ import traceback
 import time
 import tempfile
 import os
-from ..primitives.tool import Tool
-from ..primitives.item import Item
-from ..primitives.registry import register
+from primitives.tool import Tool
+from primitives.item import Item
+from primitives.registry import register
 import adsk.core
 from adsk.core import ViewOrientations
 

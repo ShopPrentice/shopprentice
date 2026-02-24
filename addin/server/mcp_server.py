@@ -12,9 +12,9 @@ import traceback
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from typing import Any, Dict, Tuple, Optional
-from ..primitives.tool import Tool
-from ..primitives.resource import Resource
-from ..primitives.item import Item
+from primitives.tool import Tool
+from primitives.resource import Resource
+from primitives.item import Item
 from .task_manager import TaskManager
 
 try:
