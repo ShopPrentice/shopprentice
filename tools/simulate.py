@@ -348,6 +348,46 @@ class Simulator:
         # Store plane info — offset, base plane, etc.
         self.planes[(comp, name)] = feat
 
+    def _resolve_plane(self, plane_str, comp):
+        """Resolve a sketch plane string to (plane_type, offset).
+
+        Returns:
+            plane_type: "XY", "XZ", or "YZ"
+            offset: [x, y, z] translation to apply after extrusion
+        """
+        if plane_str is None or plane_str in ("", "XY"):
+            return "XY", [0, 0, 0]
+        if plane_str == "XZ":
+            return "XZ", [0, 0, 0]
+        if plane_str == "YZ":
+            return "YZ", [0, 0, 0]
+        if plane_str.startswith("BRepFace"):
+            return "XY", [0, 0, 0]
+
+        # Named construction plane — look up geometry
+        plane_feat = (self.planes.get((comp, plane_str))
+                      or self.planes.get(("root", plane_str)))
+        if not plane_feat:
+            # Search all components
+            for (c, n), pf in self.planes.items():
+                if n == plane_str:
+                    plane_feat = pf
+                    break
+
+        if plane_feat and "normal" in plane_feat and "origin" in plane_feat:
+            n = plane_feat["normal"]
+            o = plane_feat["origin"]
+            abs_n = [abs(n[i]) for i in range(3)]
+            max_axis = abs_n.index(max(abs_n))
+            if max_axis == 2:  # normal along Z → XY-type
+                return "XY", [0, 0, o[2]]
+            elif max_axis == 1:  # normal along Y → XZ-type
+                return "XZ", [0, o[1], 0]
+            elif max_axis == 0:  # normal along X → YZ-type
+                return "YZ", [o[0], 0, 0]
+
+        return "XY", [0, 0, 0]
+
     def _resolve_target_body(self, feat, comp):
         """Resolve the target body name for an extrude operation.
         Uses feat['bodies'][0] if available, otherwise falls back to
@@ -398,10 +438,11 @@ class Simulator:
             self._stat("Extrude", False, "skipped_nocs")
             return
 
-        plane = sk_feat.get("plane", "XY")
+        plane_str = sk_feat.get("plane", "XY")
+        plane_type, plane_offset = self._resolve_plane(plane_str, comp)
 
         if operation == "NewBody":
-            solid = self._extrude_on_plane(cs, dist_cm, plane)
+            solid = self._extrude_on_plane(cs, dist_cm, plane_type, plane_offset)
             bodies = feat.get("bodies", [])
             body_name = bodies[0] if bodies else \
                 f"Body{len(self.comp_bodies.get(comp, {})) + 1}"
@@ -411,7 +452,8 @@ class Simulator:
 
         elif operation == "Cut":
             target_name = self._resolve_target_body(feat, comp)
-            tool = self._extrude_on_plane(cs, abs(dist_cm), plane)
+            tool = self._extrude_on_plane(cs, abs(dist_cm), plane_type,
+                                          plane_offset)
             if target_name and target_name in self.comp_bodies.get(comp, {}):
                 try:
                     self.comp_bodies[comp][target_name] -= tool
@@ -423,7 +465,8 @@ class Simulator:
 
         elif operation == "Join":
             target_name = self._resolve_target_body(feat, comp)
-            addition = self._extrude_on_plane(cs, abs(dist_cm), plane)
+            addition = self._extrude_on_plane(cs, abs(dist_cm), plane_type,
+                                              plane_offset)
             if target_name and target_name in self.comp_bodies.get(comp, {}):
                 try:
                     self.comp_bodies[comp][target_name] += addition
@@ -433,20 +476,27 @@ class Simulator:
             else:
                 self._stat("Extrude", False, "skipped_notgt")
 
-    def _extrude_on_plane(self, cs, dist, plane_str):
+    def _extrude_on_plane(self, cs, dist, plane_type, offset=None):
         """Extrude CrossSection on the given plane, return positioned Manifold.
 
         manifold3d builds in XY (cross section) extruded along +Z.
         We use 3x4 transform matrices to remap axes to world space.
 
-        XY plane: sketch X→world X, sketch Y→world Y, extrude→world Z
-        XZ plane: sketch X→world X, sketch Y→world Z, extrude→world Y
-        YZ plane: sketch X→world Y, sketch Y→world Z, extrude→world X
+        Fusion 360 sketch axis conventions:
+          XY plane: sketch X→world X,  sketch Y→world Y,  extrude→world +Z
+          XZ plane: sketch X→world X,  sketch Y→world Z,  extrude→world +Y
+          YZ plane: sketch X→world -Z, sketch Y→world Y,  extrude→world +X
+
+        Args:
+            cs: CrossSection to extrude
+            dist: extrude distance (cm, may be negative)
+            plane_type: "XY", "XZ", or "YZ"
+            offset: [x, y, z] construction plane origin offset
         """
         height = abs(dist)
         solid = cs.extrude(height)
 
-        if plane_str == "XZ":
+        if plane_type == "XZ":
             # manifold (X,Y,Z) → world (X, Z_extrude, Y_sketch)
             y_off = dist if dist < 0 else 0
             solid = solid.transform([
@@ -454,22 +504,23 @@ class Simulator:
                 [0, 0, 1, y_off],
                 [0, 1, 0, 0],
             ])
-        elif plane_str == "YZ":
-            # manifold (X,Y,Z) → world (Z_extrude, X_sketch, Y_sketch)
+        elif plane_type == "YZ":
+            # manifold (X,Y,Z) → world (Z_extrude, Y_sketch, -X_sketch)
+            # Fusion 360 YZ plane: sketch X maps to -Z, sketch Y to +Y
             x_off = dist if dist < 0 else 0
             solid = solid.transform([
                 [0, 0, 1, x_off],
-                [1, 0, 0, 0],
                 [0, 1, 0, 0],
+                [-1, 0, 0, 0],
             ])
-        elif plane_str and plane_str.startswith("BRepFace"):
-            # Can't fully resolve face geometry — leave as XY extrusion
-            if dist < 0:
-                solid = solid.translate([0, 0, dist])
         else:
-            # XY or unknown — extrude along +Z (default)
+            # XY — extrude along +Z (default)
             if dist < 0:
                 solid = solid.translate([0, 0, dist])
+
+        # Apply construction plane origin offset
+        if offset and any(o != 0 for o in offset):
+            solid = solid.translate(offset)
 
         return solid
 
