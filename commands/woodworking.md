@@ -238,34 +238,34 @@ pat_input = pat_feats.createInput(body_coll,
     adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
 ```
 
-### Body Pattern + Bulk Combine (for CUT + JOIN chains)
+### Direct Extrude CUT/JOIN + Feature Pattern (for dovetails and through tenons)
 
-When patterned bodies participate in Combine (CUT/JOIN) operations, use **body patterns** to replicate the tail/tenon bodies, then **collect** all copies and pass them to a **single bulk Combine** feature.
+When a joint shape must both CUT one board (socket/mortise) and JOIN another (tail/tenon), **extrude the profile directly as CUT and JOIN** instead of creating a separate body and using Combine. Then **feature-pattern each extrude** along the repetition axis. This is fully parametric — changing the count in Change Parameters updates all instances automatically.
 
-**Why not feature-pattern Combine features:** Feature-patterning a Combine replicates the boolean operation at the same tool-body positions — it does NOT offset the tool geometry. The result is one visible dovetail instead of N. Additionally, Fusion throws `MULTIPLE_TARGET_ERROR` if the pattern includes combines with different target bodies, and `IDENTICAL_TARGET_AND_TOOL_BODY` if the tool was consumed by JOIN.
+**Why not body pattern + Combine:** Combine features store a fixed tool-body list. When a body pattern's count increases, new bodies bypass existing Combine features, leaving orphan bodies. Feature-patterning a Combine doesn't help either — it replicates the boolean at the same position without offsetting. Feature-patterning an **extrude** correctly offsets the geometry.
 
 ```python
-# 1. Body pattern each tail along the joint edge
-fl_pat = body_pattern(fl_body, root.zConstructionAxis,
-                      "dt_tail_count", "dt_pitch", "DT_PatFL")
+# Per-corner: sketch trapezoid → extrude as CUT → extrude as JOIN → feature pattern both
+prof = sk.profiles.item(0)
 
-# 2. Collect template + all pattern copies
-def collect(template, pat):
-    bodies = [template]
-    for i in range(pat.bodies.count):
-        bodies.append(pat.bodies.item(i))
-    return bodies
+# CUT socket in pin board
+ext_cut = ext_op(prof, "board_thick", CUT, front_body, "DT_FL_Cut")
 
-fl_all = collect(fl_body, fl_pat)
+# JOIN tail into side board (same profile, no separate body)
+ext_join = ext_op(prof, "board_thick", JOIN, left_body, "DT_FL_Join")
 
-# 3. Bulk CUT all tails into pin board (keepTool=True — tails survive)
-combine(front_body, fl_all + fr_all, CUT, True, "DT_SocketFront")
-
-# 4. Bulk JOIN all tails into tail board (keepTool=False — tails consumed)
-combine(left_body, fl_all + bl_all, JOIN, False, "DT_JoinLeft")
+# Feature pattern along joint edge — fully parametric
+feat_pattern(ext_cut, root.zConstructionAxis, "dt_tail_count", "dt_pitch", "DT_FL_PatCut")
+feat_pattern(ext_join, root.zConstructionAxis, "dt_tail_count", "dt_pitch", "DT_FL_PatJoin")
 ```
 
-**Limitation:** When the user changes `dt_tail_count` via Change Parameters, the body pattern updates (new tail bodies appear) but the downstream Combine features have a fixed tool-body list and won't pick up the new bodies. To update dovetail count, re-run the script. This is acceptable for script-generated models where re-execution is fast.
+**Key advantages:**
+- No separate tail bodies — tails are part of the side board from the start
+- No Combine features — extrude directly as CUT/JOIN with `participantBodies`
+- Fully parametric — feature pattern of extrudes correctly offsets geometry
+- No orphan bodies when count changes
+
+**Per-corner approach:** Each corner gets its own sketch + 2 extrudes + 2 feature patterns. Mirrors don't work across corners because CUT/JOIN `participantBodies` references stay fixed to the original target body. For 4 corners: 4 sketches, 8 extrudes, 8 feature patterns.
 
 ### Mirror + Pattern Limitation (CRITICAL)
 Fusion 360 CANNOT properly mirror a `RectangularPatternFeature`. When you mirror features that include a pattern, only the template body gets mirrored -- pattern copies are lost.
@@ -294,14 +294,13 @@ Each side gets its own pattern feature. When the user changes dimensions, ALL pa
 
 **For joinery where tails CUT one board and JOIN another** (dovetails, through tenons):
 
-1. **Extrude** ONE tail as NewBody
-2. **Mirror** across midplanes → all corners (3 mirrors)
-3. **Body Pattern** each tail along the repetition axis
-4. **Collect** template + pattern copies for each corner
-5. **Bulk CUT** all tails from pin boards (`keepTool=True`)
-6. **Bulk JOIN** all tails into tail boards (`keepTool=False`)
+1. **Sketch** ONE trapezoid per corner on the appropriate plane
+2. **Extrude as CUT** the profile into the pin board (`participantBodies=[pin_board]`)
+3. **Extrude as JOIN** the same profile into the tail board (`participantBodies=[tail_board]`)
+4. **Feature pattern** each CUT extrude along the repetition axis
+5. **Feature pattern** each JOIN extrude along the repetition axis
 
-Body pattern first, then bulk combine, ensures all tails at all offset positions participate in the boolean operations. Re-run the script to change tail count.
+Each corner is independent (4 sketches, 8 extrudes, 8 feature patterns for a box). Fully parametric — changing the count in Change Parameters updates all corners automatically.
 
 ## Joinery Rules
 
@@ -455,7 +454,7 @@ All positioned with parametric offset expressions. Common planes:
 | Cut/Join affects wrong body | No `participantBodies` specified | Use `ext_input.participantBodies = [body]` |
 | `TypeError` on participantBodies | Passed `ObjectCollection` instead of list | Use Python `[body]` list |
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
-| New tails don't join when count increases | Body pattern + Combine(JOIN) — combine has a fixed tool body list | Re-run script; feature-patterning combines does NOT offset tool geometry |
+| New tails don't join when count increases | Body pattern + Combine(JOIN) — combine has a fixed tool body list | Extrude directly as CUT/JOIN + feature-pattern the extrudes; avoid body pattern + Combine for joinery |
 | Sketch geometry flipped on YZ or offset plane | Hard-coded H/V dimension orientations assume specific axis mapping | Use `probe_sketch_axes()` + `modelToSketchSpace` to discover real mapping at runtime |
 
 ## Incremental Build Strategy
