@@ -8,15 +8,17 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
 1. **Plan before building.** Before writing code, outline every modeling step in order: which component, which feature, which replication strategy. Think: "If I were clicking through the Fusion 360 UI, what would I do next?" Write the plan as a step list (see Design-First Planning below).
 
-2. **Build one, replicate the rest.** Never build every piece from scratch. Build one template, then use **Mirror** and **Rectangular Pattern** features for the rest. If you find yourself reaching for a Python `for` loop to create geometry, stop — use a Fusion 360 pattern instead.
+2. **Build one, replicate the rest.** Prefer building one template and using **Mirror** and **Rectangular Pattern** features for the rest. If you find yourself reaching for a Python `for` loop to create geometry, stop — use a Fusion 360 pattern instead. **Exception:** Per-corner joinery (dovetails, box joints) where CUT/JOIN targets differ per corner requires independent construction at each corner — mirrors of CUT/JOIN extrudes inherit the original `participantBodies` reference and fail.
 
 3. **Everything parametric.** When the user changes any dimension in Modify > Change Parameters, the entire model must recompute automatically — lengths, mirror positions, pattern counts, everything.
 
-4. **Organize with components.** Group related bodies into named components (e.g., Sides, Shelves, Top, Kick). Features live inside their respective components. Cross-component operations (like CUT) live in root via assembly proxies.
+4. **Organize with components — or don't.** For multi-assembly furniture (bookshelves, tables, dressers with 10+ bodies), group related bodies into named components (e.g., Sides, Shelves, Top, Kick). Features live inside their respective components; cross-component operations (like CUT) live in root via assembly proxies. **For small, single-piece items** (boxes, trays, small drawers with < ~8 bodies), use a **root-only build** — all bodies and features directly in root. This eliminates assembly-proxy complexity with no loss of parametric behavior.
 
 5. **Feature-based modeling only.** Every shape is: Sketch > Constrain dimensions parametrically > Extrude. This creates timeline features that recompute when parameters change.
 
 6. **Joinery = one shape, two operations.** Never draw mortises and tenons (or sockets and tails) as separate sketches. Build the positive shape (tenon/tail) as a body, CUT it into the receiving board, then JOIN it to the owning board. One shape guarantees perfect fit.
+
+7. **Build order matters.** Cut grooves and dados **before** joining corner joinery (dovetails, box joints). Side boards span only their initial footprint before tails are joined; groove tool bodies that extend beyond the board only CUT the material that exists at that moment. When tails are later joined, they attach ungrooved — producing clean, stopped grooves at corners with zero extra geometry. This "implicit stopped groove" technique eliminates manual stop calculations.
 
 ## Parameter Planning
 
@@ -97,11 +99,12 @@ params.add("n_slats", adsk.core.ValueInput.createByString("floor(shoulder_length
 ```
 These update automatically when referenced dimensions change.
 
-### Sketch Plane Selection (CRITICAL)
+### Sketch Plane Selection
 
-**Always sketch on existing body surfaces, not constructed offset planes.** When creating a feature that relates to an existing body (joints, pockets, decorative details), find the relevant face on that body and sketch directly on it. Construction offset planes are fragile — they can have flipped sketch axes that silently reverse geometry positions.
+Two valid approaches, depending on the project:
 
-**How to find the right face:**
+**Approach A: Sketch on body faces.** When creating a feature that relates to an existing body (joints, pockets, decorative details), find the relevant face on that body and sketch directly on it. Position relative to a projected face corner for positive offsets.
+
 ```python
 # Find the back face of a shelf body (face at Y=shelf_depth, normal +Y)
 target_val = ev("shelf_depth")
@@ -116,45 +119,12 @@ for face in body.faces:
 sk = comp.sketches.add(back_face)  # sketch directly on the BRepFace
 ```
 
-**Position relative to a face corner, not the origin.** Project a corner vertex of the face into the sketch and use it as the dimension reference. Offsets from a corner are always positive (going "into" the face), eliminating axis-direction ambiguity.
-
-```python
-# Find bottom-left corner of face (min X + min Z in model space)
-corner_v = min(back_face.vertices,
-    key=lambda v: v.geometry.x + v.geometry.z)
-
-# Project corner into sketch → reference point for dimensions
-ref = sk.project(corner_v).item(0)
-
-# Use modelToSketchSpace to compute correct geometry positions
-center_model = adsk.core.Point3D.create(x_model, y_face, z_model)
-center_ss = sk.modelToSketchSpace(center_model)
-
-# Dimension from projected corner with positive offset expressions
-# Swap point order if needed to keep dimension positive
-if center_ss.x >= ref.geometry.x:
-    h1, h2 = ref, sketch_point
-else:
-    h1, h2 = sketch_point, ref
-dims.addDistanceDimension(h1, h2,
-    HorizontalDimensionOrientation,
-    text_pos).parameter.expression = "offset_expr"  # always positive
-```
-
-**When to use construction planes instead:**
-- Midplanes for Mirror operations (`total_width / 2`)
-- Z-offset planes for shelf/rail positioning (no existing face yet)
-- Any case where no relevant body face exists
-
-### Model-Space Probing for Construction Planes
-
-When sketching on construction planes (XZ, YZ, XY, or offset planes), the mapping between model axes and sketch axes varies per plane and can swap or flip. Hard-coding `HorizontalDimensionOrientation` for one axis and `VerticalDimensionOrientation` for another produces flipped geometry on planes where the mapping differs.
-
-**Use `modelToSketchSpace` to probe the real mapping at runtime:**
+**Approach B: Construction planes + `probe_sketch_axes`.** Construction planes can have flipped sketch axes, but this is fully solved by probing. Use `modelToSketchSpace` to discover the real axis mapping at runtime, then assign H/V dimensions accordingly. This approach is simpler when the design is planned in model coordinates — no face-finding or vertex-projection needed. See `sketch_rect_model` in Standard Helpers below for the complete implementation.
 
 ```python
 def probe_sketch_axes(sk):
-    """Discover which model axis maps to sketch-X (h) and sketch-Y (v)."""
+    """Which model axis maps to sketch-X (h) and sketch-Y (v)."""
+    Point3D = adsk.core.Point3D
     o  = sk.modelToSketchSpace(Point3D.create(0, 0, 0))
     ux = sk.modelToSketchSpace(Point3D.create(1, 0, 0))
     uy = sk.modelToSketchSpace(Point3D.create(0, 1, 0))
@@ -169,16 +139,10 @@ def probe_sketch_axes(sk):
     return h_axis, v_axis
 ```
 
-Then use the probed axes to select dimension orientations:
-
-```python
-def orient_for(axis, h_axis):
-    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
-    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
-    return H if axis == h_axis else V
-```
-
-**Model-space rectangle helper:** Callers specify geometry in model coordinates — `model_origin = ("x_expr", "y_expr", "z_expr")` and `model_size = {"y": "width_expr", "z": "height_expr"}`. The helper converts corners through `modelToSketchSpace`, draws the rectangle, and assigns parametric dimensions using the probed H/V mapping. Works identically on XZ, YZ, XY, and offset planes. See `samples/pencil-box/pencil_box.py` for the full `sketch_rect_model` implementation.
+**When to use which:**
+- **Body faces** — best for component-based builds where faces already exist and you want corner-referenced positioning
+- **Construction planes + probing** — best for root-only builds, model-coordinate workflows, and when `sketch_rect_model` handles all sketching
+- **Construction planes always** — midplanes for Mirror operations, offset planes for positioning before bodies exist
 
 ### Sketch + Extrude Workflow
 ```python
@@ -209,6 +173,144 @@ ext_input.participantBodies = [target_body]  # Python list, NOT ObjectCollection
 ```
 Using `ObjectCollection` causes `TypeError`. Using no participant bodies causes accidental merging or cutting of adjacent bodies.
 
+## Standard Helpers
+
+These reusable helpers form the foundation of the model-coordinate workflow. The caller specifies everything in model coordinates using parameter expressions; the helpers handle all sketch-space complexity.
+
+### `ev()` — Dual-Mode Parameter Access
+```python
+def ev(e):
+    """Evaluate a parameter name or expression, returning value in cm."""
+    p = params.itemByName(e)
+    return p.value if p else design.unitsManager.evaluateExpression(e, "cm")
+```
+Use for computing approximate sketch positions. Actual parametric behavior comes from dimension expressions, not `ev()` values.
+
+### `sketch_rect_model()` — Parametric Rectangle in Model Coordinates
+```python
+def sketch_rect_model(plane, model_origin, model_size, name="Sk"):
+    """
+    Parametric rectangle in model coordinates.
+    model_origin: (x_expr, y_expr, z_expr) — parameter expressions
+    model_size:   {axis: expr, axis: expr} — 2 model-axis sizes
+    Returns: (sketch, profile)
+    """
+    sk = root.sketches.add(plane)
+    sk.name = name
+    h_axis, v_axis = probe_sketch_axes(sk)
+
+    # Evaluate model-space corners
+    ox, oy, oz = ev(model_origin[0]), ev(model_origin[1]), ev(model_origin[2])
+    corner = {"x": ox, "y": oy, "z": oz}
+    for a, expr in model_size.items():
+        corner[a] += ev(expr)
+
+    # Convert to sketch space
+    sk_o = sk.modelToSketchSpace(Point3D.create(ox, oy, oz))
+    sk_f = sk.modelToSketchSpace(
+        Point3D.create(corner["x"], corner["y"], corner["z"]))
+
+    # Draw rectangle
+    rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
+        Point3D.create(sk_o.x, sk_o.y, 0),
+        Point3D.create(sk_f.x, sk_f.y, 0))
+
+    # Parametric dimensions
+    d = sk.sketchDimensions
+    axis_to_origin = {
+        "x": model_origin[0], "y": model_origin[1], "z": model_origin[2]}
+    mid_x = (sk_o.x + sk_f.x) / 2
+    mid_y = (sk_o.y + sk_f.y) / 2
+    dy = -1 if sk_f.y >= sk_o.y else 1
+    dx = -1 if sk_f.x >= sk_o.x else 1
+
+    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+
+    # Width (sketch-X) → h_axis model size
+    d.addDistanceDimension(
+        rect[0].startSketchPoint, rect[0].endSketchPoint,
+        H, Point3D.create(mid_x, sk_o.y + dy, 0)
+    ).parameter.expression = model_size[h_axis]
+
+    # Height (sketch-Y) → v_axis model size
+    d.addDistanceDimension(
+        rect[1].startSketchPoint, rect[1].endSketchPoint,
+        V, Point3D.create(sk_f.x - dx, mid_y, 0)
+    ).parameter.expression = model_size[v_axis]
+
+    # H origin offset
+    d.addDistanceDimension(
+        sk.originPoint, rect[0].startSketchPoint,
+        H, Point3D.create(sk_o.x / 2, sk_o.y + 2 * dy, 0)
+    ).parameter.expression = axis_to_origin[h_axis]
+
+    # V origin offset
+    d.addDistanceDimension(
+        sk.originPoint, rect[0].startSketchPoint,
+        V, Point3D.create(sk_o.x + dx, sk_o.y / 2, 0)
+    ).parameter.expression = axis_to_origin[v_axis]
+
+    return sk, sk.profiles.item(0)
+```
+
+### Other Standard Helpers
+```python
+def ext_new(prof, dist, name="Ext"):
+    """Extrude a profile as a new body."""
+    inp = root.features.extrudeFeatures.createInput(
+        prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+    inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist))
+    f = root.features.extrudeFeatures.add(inp)
+    f.name = name
+    return f
+
+def ext_op(prof, dist_expr, op, body, name="Ext"):
+    """Extrude a profile as CUT or JOIN into an existing body."""
+    inp = root.features.extrudeFeatures.createInput(prof, op)
+    inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist_expr))
+    inp.participantBodies = [body]
+    f = root.features.extrudeFeatures.add(inp)
+    f.name = name
+    return f
+
+def off_plane(base, expr, name="Pl"):
+    """Create an offset construction plane."""
+    inp = root.constructionPlanes.createInput()
+    inp.setByOffset(base, adsk.core.ValueInput.createByString(expr))
+    p = root.constructionPlanes.add(inp)
+    p.name = name
+    return p
+
+def combine(target, tool_bodies, op, keep_tool, name="Comb"):
+    """Combine (CUT/JOIN) tool bodies into a target body."""
+    coll = adsk.core.ObjectCollection.create()
+    if isinstance(tool_bodies, list):
+        for b in tool_bodies:
+            coll.add(b)
+    else:
+        coll.add(tool_bodies)
+    inp = root.features.combineFeatures.createInput(target, coll)
+    inp.operation = op
+    inp.isKeepToolBodies = keep_tool
+    f = root.features.combineFeatures.add(inp)
+    f.name = name
+    return f
+
+def feat_pattern(feat, axis, count_expr, spacing_expr, name="Pat"):
+    """Feature pattern a single feature along an axis."""
+    coll = adsk.core.ObjectCollection.create()
+    coll.add(feat)
+    inp = root.features.rectangularPatternFeatures.createInput(
+        coll, axis,
+        adsk.core.ValueInput.createByString(count_expr),
+        adsk.core.ValueInput.createByString(spacing_expr),
+        adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
+    p = root.features.rectangularPatternFeatures.add(inp)
+    p.name = name
+    return p
+```
+
 ## Replication Strategy
 
 ### Mirror
@@ -238,35 +340,6 @@ pat_input = pat_feats.createInput(body_coll,
     adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
 ```
 
-### Direct Extrude CUT/JOIN + Feature Pattern (for dovetails and through tenons)
-
-When a joint shape must both CUT one board (socket/mortise) and JOIN another (tail/tenon), **extrude the profile directly as CUT and JOIN** instead of creating a separate body and using Combine. Then **feature-pattern each extrude** along the repetition axis. This is fully parametric — changing the count in Change Parameters updates all instances automatically.
-
-**Why not body pattern + Combine:** Combine features store a fixed tool-body list. When a body pattern's count increases, new bodies bypass existing Combine features, leaving orphan bodies. Feature-patterning a Combine doesn't help either — it replicates the boolean at the same position without offsetting. Feature-patterning an **extrude** correctly offsets the geometry.
-
-```python
-# Per-corner: sketch trapezoid → extrude as CUT → extrude as JOIN → feature pattern both
-prof = sk.profiles.item(0)
-
-# CUT socket in pin board
-ext_cut = ext_op(prof, "board_thick", CUT, front_body, "DT_FL_Cut")
-
-# JOIN tail into side board (same profile, no separate body)
-ext_join = ext_op(prof, "board_thick", JOIN, left_body, "DT_FL_Join")
-
-# Feature pattern along joint edge — fully parametric
-feat_pattern(ext_cut, root.zConstructionAxis, "dt_tail_count", "dt_pitch", "DT_FL_PatCut")
-feat_pattern(ext_join, root.zConstructionAxis, "dt_tail_count", "dt_pitch", "DT_FL_PatJoin")
-```
-
-**Key advantages:**
-- No separate tail bodies — tails are part of the side board from the start
-- No Combine features — extrude directly as CUT/JOIN with `participantBodies`
-- Fully parametric — feature pattern of extrudes correctly offsets geometry
-- No orphan bodies when count changes
-
-**Per-corner approach:** Each corner gets its own sketch + 2 extrudes + 2 feature patterns. Mirrors don't work across corners because CUT/JOIN `participantBodies` references stay fixed to the original target body. For 4 corners: 4 sketches, 8 extrudes, 8 feature patterns.
-
 ### Mirror + Pattern Limitation (CRITICAL)
 Fusion 360 CANNOT properly mirror a `RectangularPatternFeature`. When you mirror features that include a pattern, only the template body gets mirrored -- pattern copies are lost.
 
@@ -284,7 +357,7 @@ Each side gets its own pattern feature. When the user changes dimensions, ALL pa
 
 ### Typical Replication Sequence
 
-**For parts merged before patterning** (tenons merged into a rail, then rail patterned):
+For a part with symmetric tenons/tails that repeats along an axis:
 
 1. **Extrude** ONE tenon/tail as NewBody
 2. **Mirror** across one midplane → 2 copies
@@ -292,15 +365,7 @@ Each side gets its own pattern feature. When the user changes dimensions, ALL pa
 4. **JOIN** all copies into the parent body → single merged body
 5. **Body Pattern** the merged body along the repetition axis
 
-**For joinery where tails CUT one board and JOIN another** (dovetails, through tenons):
-
-1. **Sketch** ONE trapezoid per corner on the appropriate plane
-2. **Extrude as CUT** the profile into the pin board (`participantBodies=[pin_board]`)
-3. **Extrude as JOIN** the same profile into the tail board (`participantBodies=[tail_board]`)
-4. **Feature pattern** each CUT extrude along the repetition axis
-5. **Feature pattern** each JOIN extrude along the repetition axis
-
-Each corner is independent (4 sketches, 8 extrudes, 8 feature patterns for a box). Fully parametric — changing the count in Change Parameters updates all corners automatically.
+Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 ## Joinery Rules
 
@@ -308,26 +373,77 @@ Each corner is independent (4 sketches, 8 extrudes, 8 feature patterns for a box
 
 **Never draw separate mortise/socket sketches.** Build the tenon/tail as a separate body, then use Fusion 360 **Combine** to cut the receiving board. The tenon body IS the cutting tool — one shape guarantees the mortise exactly matches.
 
-```python
-def combine(comp, target, tool_bodies, op, keep_tool, name="Comb"):
-    coll = adsk.core.ObjectCollection.create()
-    if isinstance(tool_bodies, list):
-        for b in tool_bodies:
-            coll.add(b)
-    else:
-        coll.add(tool_bodies)
-    inp = comp.features.combineFeatures.createInput(target, coll)
-    inp.operation = op
-    inp.isKeepToolBodies = keep_tool
-    f = comp.features.combineFeatures.add(inp)
-    f.name = name
-    return f
-```
-
 This applies to **all** joint types:
 - **Mortise & tenon**: tenon body cuts the mortise, then joins the shelf
 - **Dovetails**: tail body cuts the socket, then joins the top board
 - **Tongue & groove**: tongue body cuts the groove, then joins the slat
+
+### Tooling Body Pattern for Grooves
+
+For grooves, dados, and rabbets, use a **tooling body** — a NewBody extrude that represents the material to remove:
+
+1. Extrude a tooling body (NewBody) that spans the full groove path — intentionally extending beyond the target board's boundaries
+2. Combine CUT the tooling body into the target board (`keep_tool=False`)
+3. Only the intersection is removed — the board's edges act as implicit stops
+
+```python
+# Groove tooling body spans full width — only cuts where board exists
+_, pr = sketch_rect_model(groove_plane,
+    ("board_thick - groove_depth", "0 in", "groove_up"),
+    {"x": "groove_depth", "y": "box_width"},
+    "BGL_Sk")
+groove_tool = ext_new(pr, "bottom_tongue", "BGL")
+combine(left_body, groove_tool.bodies.item(0), CUT, False, "BGL_Cut")
+```
+
+**Why this works:** The tooling body extends beyond the board edges, but Combine CUT only removes the intersection. Combined with the "grooves before joinery" build order (design philosophy point 7), this produces perfectly stopped grooves at corners without calculating stop positions.
+
+**Stopped grooves for through-prevention:** When a groove must NOT be visible from the board's end (e.g., front/back bottom grooves hidden behind side boards), explicitly stop the groove by shortening its X span:
+```python
+# Stopped both sides — starts at board_thick, ends at box_length - board_thick
+("board_thick", "board_thick - groove_depth", "groove_up"),
+{"x": "box_length - 2 * board_thick", "y": "groove_depth"},
+```
+
+### Board-First Rabbet Pattern for Floating Panels
+
+For bottom panels, lids, and drawer bottoms that sit in grooves with a rabbeted edge, use a three-step **board-first** approach that models how a woodworker actually builds — start with a full board, then cut the rabbet:
+
+1. **Full board (NewBody):** Extrude at the tongue footprint (extends into groove area), full panel thickness
+2. **Rabbet CUT:** Remove the lip offset from one face across the entire footprint
+3. **Lip JOIN:** Restore the inner area (between board inner faces) at the lip height
+
+```python
+# 1. Full board at tongue footprint, Z=0, height=bottom_thick
+_, pr = sketch_rect_model(root.xYConstructionPlane,
+    ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
+    {"x": "box_length - 2*board_thick + 2*groove_depth",
+     "y": "box_width - 2*board_thick + 2*groove_depth"},
+    "Bottom_Sk")
+bot_ext = ext_new(pr, "bottom_thick", "Bottom")
+bot_body = bot_ext.bodies.item(0)
+bot_body.name = "Bottom"
+
+# 2. Rabbet CUT: removes groove_up from bottom face
+_, pr = sketch_rect_model(root.xYConstructionPlane,
+    ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
+    {"x": "box_length - 2*board_thick + 2*groove_depth",
+     "y": "box_width - 2*board_thick + 2*groove_depth"},
+    "BottomRabbet_Sk")
+ext_op(pr, "groove_up", CUT, bot_body, "BottomRabbet")
+
+# 3. Lip JOIN: restores inner area at Z=0
+_, pr = sketch_rect_model(root.xYConstructionPlane,
+    ("board_thick", "board_thick", "0 in"),
+    {"x": "box_length - 2*board_thick",
+     "y": "box_width - 2*board_thick"},
+    "BottomLip_Sk")
+ext_op(pr, "groove_up", JOIN, bot_body, "BottomLip")
+```
+
+**Net result:** Tongue extends into grooves on all sides, lip is flush at Z=0. Panel thickness params (`bottom_thick`, `lid_thick`) represent the total board thickness — not just the tongue.
+
+**Asymmetric variation (sliding lids):** For a lid that slides out one side, skip the rabbet on that edge by making the lip JOIN footprint extend to the opening edge. The full-thickness board remains on the sliding side — no rabbet step interferes with sliding.
 
 ### Cross-Component CUT via Assembly Proxies
 
@@ -434,13 +550,28 @@ All positioned with parametric offset expressions. Common planes:
 - Tongue planes (rail height minus groove depth)
 - Midplanes for X and Y mirror operations
 
+## Naming Convention
+
+Name every feature and body for a readable timeline and easy debugging:
+
+| Element | Pattern | Example |
+|---------|---------|---------|
+| Bodies | `Part` | `Front`, `Side_Left`, `Bottom`, `Lid` |
+| Sketches | `Part_Sk` or `Feature_Sk` | `Front_Sk`, `BGL_Sk`, `DT_FL_Sk` |
+| Extrudes | `PartBoard` or `Feature` | `FrontBoard`, `BGL`, `BottomLip` |
+| Patterns | `Feature_Pat` | `DT_FL_PatCut`, `DT_FL_PatJoin` |
+| Planes | `Part_Pl` or `Feature_Pl` | `Back_Pl`, `BG_Pl`, `LidLip_Pl` |
+| Combines | `Feature_Cut` | `BGL_Cut`, `BGF_Cut` |
+| Joinery | `JointType_Corner_Op` | `DT_FL_Cut`, `DT_BR_Join` |
+
 ## Verification Checklist
-1. Component tree shows logical grouping
+1. Component tree shows logical grouping (or root-only for small pieces)
 2. Timeline shows: build features > mirror, template > mirror > pattern
 3. Change a major dimension > verify ALL sides update correctly
 4. Change element width > verify counts increase/decrease on all sides
 5. Section Analysis > verify joinery alignment
 6. Verify no overlapping joints at corners
+7. Body count matches expected (diagnostic print confirms no accidental merges or orphans)
 
 ## Common Errors and Fixes
 | Error | Cause | Fix |
@@ -454,12 +585,10 @@ All positioned with parametric offset expressions. Common planes:
 | Cut/Join affects wrong body | No `participantBodies` specified | Use `ext_input.participantBodies = [body]` |
 | `TypeError` on participantBodies | Passed `ObjectCollection` instead of list | Use Python `[body]` list |
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
-| New tails don't join when count increases | Body pattern + Combine(JOIN) — combine has a fixed tool body list | Extrude directly as CUT/JOIN + feature-pattern the extrudes; avoid body pattern + Combine for joinery |
-| Sketch geometry flipped on YZ or offset plane | Hard-coded H/V dimension orientations assume specific axis mapping | Use `probe_sketch_axes()` + `modelToSketchSpace` to discover real mapping at runtime |
 
 ## Incremental Build Strategy
 
-Complex furniture should be built in phases. Each phase is a complete standalone script that creates a new document and builds from scratch, adding one layer of complexity.
+Complex furniture (10+ bodies, 3+ joint systems) should be built in phases. Each phase is a complete standalone script that creates a new document and builds from scratch, adding one layer of complexity. **Small pieces** (boxes, trays — < ~8 bodies, 1-2 joint types) can be built in a single monolithic script.
 
 ### Phases
 
@@ -480,7 +609,7 @@ Complex furniture should be built in phases. Each phase is a complete standalone
 
 ### Document Reuse Pattern
 
-Scripts close the existing unsaved document and create a fresh Fusion Design document. This is fast (no slow timeline clearing) and guarantees component support (Part Design can't have components).
+Scripts close existing unsaved documents and create a fresh Fusion Design document. This is fast (no slow timeline clearing) and guarantees component support (Part Design can't have components).
 
 The MCP add-in handles document switches gracefully — it detects the document change and skips committing the old transaction.
 
@@ -490,19 +619,45 @@ The MCP add-in handles document switches gracefully — it detects the document 
 def run(context):
     app = adsk.core.Application.get()
 
-    # Close existing unsaved doc, create fresh Fusion Design doc
-    try:
-        if app.activeDocument and not app.activeDocument.isSaved:
-            app.activeDocument.close(False)
-    except:
-        pass
+    # Close ALL unsaved documents (handles stacked failed runs)
+    while True:
+        doc = app.activeDocument
+        if doc and not doc.isSaved:
+            doc.close(False)
+        else:
+            break
     app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
 
     root = design.rootComponent
     params = design.userParameters
+    Point3D = adsk.core.Point3D
     # ... build from scratch ...
+```
+
+### Script Epilogue
+
+Every script should end with three standard steps:
+
+```python
+# 1. Hide construction elements (clean viewport)
+for sk in root.sketches:
+    sk.isVisible = False
+for cp in root.constructionPlanes:
+    cp.isLightBulbOn = False
+for ca in root.constructionAxes:
+    ca.isLightBulbOn = False
+
+# 2. Diagnostic body count (appears in MCP execution result)
+names = [root.bRepBodies.item(i).name
+         for i in range(root.bRepBodies.count)]
+print(f"Root: {len(names)} bodies -> {names}")
+
+# 3. Fit view (ensures screenshot captures complete model)
+cam = app.activeViewport.camera
+cam.isFitView = True
+app.activeViewport.camera = cam
 ```
 
 ## MCP Live Execution
