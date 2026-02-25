@@ -129,8 +129,7 @@ TOOL_DESCRIPTION = \
 """Get a screenshot of the current Fusion view.
 Use the `view` param to get a specific view orientation.
 
-DO take a screenshot before editing an existing document to understand the current state.
-DO take a screenshot after executing a script to make changes to ensure the changes are what you expect."""
+Workflow: Use screenshots sparingly — they are slower than capture_design. For intermediate phase validation, prefer capture_design (structured data). Use get_screenshot at the end of the final phase to present the finished model to the user visually."""
 
 tool = Tool.create_simple(
     name="get_screenshot",

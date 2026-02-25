@@ -826,7 +826,9 @@ Returns structured JSON with:
 - components: recursive tree with inline body volumes and bounding boxes
 - timeline: every feature (Extrude, Sketch, Mirror, Pattern, Combine, Move, etc.) with full detail
 
-Use this instead of running introspect.py via execute_script."""
+Workflow: Call this after every successful execute_script to validate the result. Compare body count, names, positions (bounding boxes), and volumes against what the script intended. If the model state is unexpected, use get_timeline_state to bisect the timeline and find the broken feature.
+
+Also call this before modifying an existing design to understand its current state."""
 
 tool = Tool.create_simple(
     name="capture_design",

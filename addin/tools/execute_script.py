@@ -117,8 +117,6 @@ f"""Execute Fusion API Python script source code.
 
 IMPORTANT! DO NOT present any UI with a `messageBox`.
 IMPORTANT! DO NOT catch any errors unless you want to ignore an error. Or use a `print()` statment with the specific error so you can determine what the error is.
-DO take a screenshot before editing an existing document to understand the model.
-DO take a screenshot after making changes to ensure the changes worked as expected.
 DO use `print()` statements to return any information or values from the script through the `result` field in the response.
 
 MAKE SURE the script defines a "run" function that will be run. For example:
@@ -130,6 +128,8 @@ MAKE SURE the script defines a "run" function that will be run. For example:
 IMPORTANT! DO NOT handle exceptions. Let them be raised to Fusion so that changes already made in the script are aborted, and so the error message and location is returned to the agent.
 
 DO refer to the documentation of the Fusion API by searching in the Python module files located in the "{def_file_path}" folder.
+
+Workflow: Build complex models in phases (Structure → Joinery → Details). After each successful execution, call capture_design to validate body count and positions before proceeding to the next phase. On error, analyze the stack trace, fix the script, and re-execute (max 3 retries per distinct error). Failed scripts are automatically rolled back.
 """
 
 tool = Tool.create_with_string_input(

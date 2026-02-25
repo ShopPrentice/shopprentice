@@ -138,12 +138,12 @@ def handler(index: int) -> dict:
 TOOL_DESCRIPTION = \
 """Roll the design timeline to a specific index and capture all body geometry (volume + bounding box) at that point, then restore the original position.
 
-Use this to inspect intermediate build states without the headless simulator.
-
 Parameters:
 - index: 0-based timeline index. Use -1 for end of timeline (fully computed state).
 
-Returns the component tree with per-body volume and bounding box at the specified timeline point."""
+Returns the component tree with per-body volume and bounding box at the specified timeline point.
+
+Workflow: This is a diagnostic tool. When capture_design reveals unexpected state (wrong body count, bad positions, missing bodies), use this to binary-search the timeline and pinpoint which feature went wrong. Call at the midpoint, check body count, narrow forward or backward until you find the exact feature that broke the model."""
 
 tool = Tool.create_simple(
     name="get_timeline_state",

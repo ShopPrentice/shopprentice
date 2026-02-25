@@ -109,6 +109,18 @@ if [ "$opt_claude_code" = true ]; then
         > "$CLAUDE_CMD_DIR/woodworking.md"
 
     echo "Installed /woodworking skill to $CLAUDE_CMD_DIR/woodworking.md"
+
+    # Add global hint so agents know /woodworking exists
+    CLAUDE_MD="$HOME/.claude/CLAUDE.md"
+    HINT_MARKER="<!-- autofusion -->"
+    HINT_LINE="$HINT_MARKER For Fusion 360 furniture modeling, invoke the \`/woodworking\` skill."
+    if [ -f "$CLAUDE_MD" ] && grep -q "$HINT_MARKER" "$CLAUDE_MD"; then
+        echo "Global /woodworking hint already in $CLAUDE_MD"
+    else
+        echo "" >> "$CLAUDE_MD"
+        echo "$HINT_LINE" >> "$CLAUDE_MD"
+        echo "Added /woodworking hint to $CLAUDE_MD"
+    fi
     echo
 fi
 

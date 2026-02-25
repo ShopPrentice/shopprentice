@@ -34,6 +34,21 @@ if [ -f "$CLAUDE_SKILL" ]; then
     removed+=("$CLAUDE_SKILL")
 fi
 
+# --- Remove /woodworking hint from global CLAUDE.md ---
+CLAUDE_MD="$HOME/.claude/CLAUDE.md"
+HINT_MARKER="<!-- autofusion -->"
+if [ -f "$CLAUDE_MD" ] && grep -q "$HINT_MARKER" "$CLAUDE_MD"; then
+    grep -v "$HINT_MARKER" "$CLAUDE_MD" > "$CLAUDE_MD.tmp"
+    mv "$CLAUDE_MD.tmp" "$CLAUDE_MD"
+    # Remove file if empty
+    if [ ! -s "$CLAUDE_MD" ] || ! grep -q '[^[:space:]]' "$CLAUDE_MD"; then
+        rm "$CLAUDE_MD"
+        removed+=("$CLAUDE_MD (empty, removed)")
+    else
+        removed+=("autofusion hint from $CLAUDE_MD")
+    fi
+fi
+
 # --- Remove fusion360 MCP from Claude Code settings ---
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 if [ -f "$CLAUDE_SETTINGS" ] && grep -q '"fusion360"' "$CLAUDE_SETTINGS"; then
