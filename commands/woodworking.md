@@ -601,10 +601,10 @@ Complex furniture (10+ bodies, 3+ joint systems) should be built in phases. Each
 ### Rules
 
 1. **One phase per script execution.** Never combine all phases into one massive script.
-2. **Auto-proceed between phases.** After each phase succeeds and screenshot is verified, immediately update the script and execute the next phase. Do NOT wait for user approval between phases.
+2. **Validate and auto-proceed.** After each phase, validate with `capture_design` (see Execution + Validation Loop). If validation passes, immediately proceed to the next phase. Do NOT wait for user approval between phases.
 3. **Each phase script is standalone.** It creates all parameters, helpers, and geometry from scratch. Phase 2 includes phase 1's structure plus joinery.
 4. **Same file, growing content.** Update the same `.py` file for each phase.
-5. **Show final result.** Take a screenshot after the last phase and present it to the user.
+5. **Show final result.** Take a screenshot only after the last phase and present it to the user.
 6. **Design-first planning applies at every phase.** Before writing code for a new phase, write out the step list (see Design-First Planning).
 
 ### Document Reuse Pattern
@@ -673,14 +673,32 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 | `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. |
 | `get_screenshot` | Capture the current Fusion 360 viewport. Use to verify results visually. |
 
-### Automatic Execution Loop
+### Execution + Validation Loop
 
-After generating the complete script, immediately run this loop:
+After generating each phase's script, run this loop:
 
 1. **Execute** — call `execute_script` to run the script in Fusion 360.
-2. **Check result** — inspect the `isError` flag. On failure, the `content` field contains the full Python stack trace with line numbers and exception type.
-3. **On success** — take a screenshot with `get_screenshot` and present it to the user. Done.
-4. **On error** — analyze the stack trace, fix the script, and re-execute. Track each distinct error by its core message. If the **same error persists after 3 attempts**, stop and report the error to the user with your analysis of what went wrong. Do not keep retrying the same failure.
+2. **On error** — the `content` field contains the full Python stack trace. Analyze, fix the script, and re-execute (see Error Retry Rules below).
+3. **On success — validate with `capture_design`:**
+   - Call `capture_design` to get the actual model state.
+   - Compare body count and names against what the phase intended. Flag unexpected merges, missing bodies, or orphan bodies.
+   - Check bounding boxes — are bodies in the right positions and orientations?
+   - Check volumes — are they reasonable for the given dimensions?
+   - Report a brief summary: `"Phase 1 OK: 6 bodies [Front, Back, Left, Right, Top, Bottom], all bounding boxes correct."`
+4. **If validation fails** — use `get_timeline_state` to bisect the timeline and pinpoint the problem feature (see Diagnosing with Timeline Rollback below). Fix and re-execute.
+5. **Auto-proceed** to the next phase if validation passes.
+6. **Screenshot only at the end** — after the final phase succeeds and validates, take one screenshot with `get_screenshot` and present it to the user.
+
+### Diagnosing with Timeline Rollback
+
+When `capture_design` reveals unexpected state (wrong body count, bad positions), use `get_timeline_state` to narrow down which feature went wrong:
+
+1. Call `get_timeline_state` at the midpoint of the timeline.
+2. Check body count — is it correct for that point in the build?
+3. Binary search forward or backward to find the exact feature where the model diverges from the plan.
+4. Correlate with the `timeline` array from `capture_design` to identify the feature by name and type.
+
+This is like `git bisect` for the modeling timeline — fast, cheap, and precise.
 
 ### Error Retry Rules
 
@@ -690,25 +708,30 @@ After generating the complete script, immediately run this loop:
 - After each failed attempt, explain what error occurred and what you changed before retrying.
 - Failed scripts are automatically rolled back (transaction abort), so each retry starts from a clean state.
 
-### Project Handling
+### Modifying an Existing Design
 
-- If the user is starting a new piece, create a new Fusion 360 document before executing.
-- If this is an incremental update to an existing design, execute against the current active document. Use `get_screenshot` first to confirm the current state before modifying.
+When the user asks to change an existing design (e.g., "make the shelves wider"):
+
+1. Call `capture_design` to understand the current model state — parameters, bodies, timeline.
+2. Identify which parameters or features need to change.
+3. Update the script, re-execute, and validate with `capture_design` as usual.
 
 ### Example Flow
 
 ```
 Phase 1: Structure
   → write bookshelf.py (boards only)
-  → execute → screenshot → verify ✓ → auto-proceed
+  → execute → capture_design → validate 6 bodies, positions OK → auto-proceed
 
 Phase 2: Add joinery
   → update bookshelf.py (structure + mortise & tenon)
-  → execute → screenshot → verify ✓ → auto-proceed
+  → execute → capture_design → validate body count (tenons joined), mortises cut
+  → body count wrong? → get_timeline_state to bisect → find bad feature → fix → retry
+  → validation OK → auto-proceed
 
-Phase 3: Add dovetails
-  → update bookshelf.py (structure + M&T + dovetails)
-  → execute → screenshot → show user final result
+Phase 3: Add details
+  → update bookshelf.py (structure + M&T + chamfers)
+  → execute → capture_design → validate → screenshot → present to user
 ```
 
 ### Important
