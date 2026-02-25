@@ -14,6 +14,11 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 | `capture_design` | After every `execute_script` — validate body count, positions, volumes |
 | `get_timeline_state` | When `capture_design` shows unexpected state — bisect timeline to find the bad feature |
 | `get_screenshot` | Once at the end — present the final result to the user |
+| `get_selection` | Read what the user has selected in the Fusion 360 UI |
+| `set_selection` | Highlight entities for the user (after identifying a problem body, etc.) |
+| `modify_parameters` | Change parameter values without re-running the script — for iterative tuning |
+| `check_interference` | Detect body collisions — validate joinery fits correctly |
+| `suppress_features` | Toggle timeline features on/off for "what if" diagnostics |
 
 ### Workflow
 

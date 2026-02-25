@@ -672,6 +672,11 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 | `get_timeline_state` | Roll timeline to any index, capture body geometry at that point, restore position. |
 | `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. |
 | `get_screenshot` | Capture the current Fusion 360 viewport. Use to verify results visually. |
+| `get_selection` | Read the user's current UI selection. Returns structured info per entity type (body, face, edge, occurrence, etc.). Use when the user says "what is this?" or "make this thicker". |
+| `set_selection` | Highlight entities in the UI by name or token. Use after `capture_design` identifies a problem body — select it so the user sees which one. |
+| `modify_parameters` | Change parameter expressions with incremental recompute. Much faster than re-running the script. Use for iterative tuning ("make shelves deeper"). |
+| `check_interference` | Detect body collisions. Use to validate joinery — confirm tenons fit, no unintended overlaps. Clean designs have zero interferences. |
+| `suppress_features` | Toggle timeline features on/off. Diagnostic tool — suppress a suspicious feature, check if it fixes the problem, unsuppress to restore. |
 
 ### Execution + Validation Loop
 
@@ -712,9 +717,25 @@ This is like `git bisect` for the modeling timeline — fast, cheap, and precise
 
 When the user asks to change an existing design (e.g., "make the shelves wider"):
 
+**For dimension changes** (most common) — use `modify_parameters` for fast incremental tuning:
+
 1. Call `capture_design` to understand the current model state — parameters, bodies, timeline.
-2. Identify which parameters or features need to change.
-3. Update the script, re-execute, and validate with `capture_design` as usual.
+2. Call `modify_parameters` to change the relevant parameter expression(s).
+3. Fusion does **incremental recomputation** — only affected features recompute.
+4. Validate with `capture_design`.
+5. **Good** → update the `.py` source file to match the new expression.
+6. **Bad** → revert via `modify_parameters` with the old expression.
+
+**For structural changes** (add a component, change joinery type) — re-run via `execute_script`.
+
+### Selection-Driven Interaction
+
+When the user points at something in Fusion 360 and asks about it:
+
+1. Call `get_selection` to read what they've selected.
+2. Use the structured entity info (type, name, dimensions) to understand their intent.
+3. If they want a change, use `modify_parameters` for dimension tweaks or `execute_script` for structural changes.
+4. Use `set_selection` to highlight the result or related entities.
 
 ### Example Flow
 

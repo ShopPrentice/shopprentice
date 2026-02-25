@@ -29,6 +29,11 @@ Then in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
 | `get_timeline_state` | Roll timeline to any index, capture all body geometry at that point, restore position |
 | `execute_script` | Run a Python script in Fusion 360 with automatic transaction wrapping |
 | `get_screenshot` | Capture the viewport with optional camera orientation |
+| `get_selection` | Read the user's current selection — returns structured info per entity type |
+| `set_selection` | Programmatically select/highlight entities by name or token |
+| `modify_parameters` | Change parameter expressions with incremental recompute (no script re-run) |
+| `check_interference` | Detect body intersections/collisions for joinery validation |
+| `suppress_features` | Toggle timeline features on/off for "what if" diagnostics |
 
 ## Claude Code / Codex Config
 
@@ -65,7 +70,7 @@ args = ["mcp-remote", "http://localhost:9100/"]
 
 ```bash
 curl http://localhost:9100/health    # {"status": "healthy", "server": "AutoFusion"}
-curl http://localhost:9100/tools     # lists all 4 tools
+curl http://localhost:9100/tools     # lists all 9 tools
 ```
 
 ## Troubleshooting
