@@ -338,10 +338,10 @@ def run(context):
     bot_body = bot_ext.bodies.item(0)
     bot_body.name = "Bottom"
 
-    # 7. FRONT EDGE RABBET (stopped: X = board_thick to box_length - board_thick)
+    # 7. FRONT EDGE RABBET (through: full X extent)
     _, pr = sketch_rect_model(bot_c, bot_c.xYConstructionPlane,
-        ("board_thick", "board_thick - groove_depth", "0 in"),
-        {"x": "box_length - 2 * board_thick",
+        ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
+        {"x": "box_length - 2 * board_thick + 2 * groove_depth",
          "y": "groove_depth"},
         "BotRab_F_Sk")
     rab_f = ext_op(bot_c, pr, "groove_up", CUT, bot_body, "BotRab_F")
@@ -353,9 +353,9 @@ def run(context):
 
     # 9. LEFT EDGE RABBET (through: full Y extent)
     _, pr = sketch_rect_model(bot_c, bot_c.xYConstructionPlane,
-        ("board_thick - groove_depth", "0 in", "0 in"),
+        ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
         {"x": "groove_depth",
-         "y": "box_width"},
+         "y": "box_width - 2 * board_thick + 2 * groove_depth"},
         "BotRab_L_Sk")
     rab_l = ext_op(bot_c, pr, "groove_up", CUT, bot_body, "BotRab_L")
 
@@ -386,21 +386,21 @@ def run(context):
     lid_body = lid_ext.bodies.item(0)
     lid_body.name = "Lid"
 
-    # 12. BACK EDGE RABBET (stopped, tongue into lip inner face)
+    # 12. BACK EDGE RABBET (through: full X extent of lid)
     _, pr = sketch_rect_model(lid_c, lid_rab_pl,
-        ("board_thick",
+        ("board_thick - groove_depth",
          "box_width - board_thick - cutter_lip_depth",
          "box_height - lid_down"),
-        {"x": "box_length - 2 * board_thick",
+        {"x": "box_length - 2 * board_thick + 2 * groove_depth",
          "y": "groove_depth"},
         "LidRab_B_Sk")
     ext_op(lid_c, pr, "lid_down", CUT, lid_body, "LidRab_B")
 
-    # 13. LEFT EDGE RABBET (through: full Y extent)
+    # 13. LEFT EDGE RABBET (through: full Y extent of lid)
     _, pr = sketch_rect_model(lid_c, lid_rab_pl,
         ("board_thick - groove_depth", "0 in", "box_height - lid_down"),
         {"x": "groove_depth",
-         "y": "box_width"},
+         "y": "box_width - board_thick - cutter_lip_depth + groove_depth"},
         "LidRab_L_Sk")
     lid_rab_l = ext_op(lid_c, pr, "lid_down", CUT, lid_body, "LidRab_L")
 

@@ -467,7 +467,7 @@ combine(left_body, groove_tool.bodies.item(0), CUT, False, "BGL_Cut")
 For bottom panels, lids, and drawer bottoms that sit in grooves with a rabbeted edge, use a pure subtractive **edge rabbet** approach — start with a full board, then cut each edge:
 
 1. **Full board (NewBody):** Extrude at tongue footprint (extends into groove area), full panel thickness
-2. **Edge rabbet CUTs:** One per edge direction — removes `groove_up` from one face of the tongue strip
+2. **Edge rabbet CUTs:** One per edge direction — **always through cuts** (full board length). Removes `groove_up` from one face of the tongue strip.
 3. **Mirror** symmetric edges (front↔back, left↔right) across midplanes
 
 ```python
@@ -481,10 +481,10 @@ bot_ext = ext_new(comp, pr, "bottom_thick", "Bottom")
 bot_body = bot_ext.bodies.item(0)
 bot_body.name = "Bottom"
 
-# 2a. Front edge rabbet CUT (stopped: X = board_thick to box_length - board_thick)
+# 2a. Front edge rabbet CUT (through: full X extent of board)
 _, pr = sketch_rect_model(comp, root.xYConstructionPlane,
-    ("board_thick", "board_thick - groove_depth", "0 in"),
-    {"x": "box_length - 2*board_thick",
+    ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
+    {"x": "box_length - 2*board_thick + 2*groove_depth",
      "y": "groove_depth"},
     "BotRab_F_Sk")
 rab_f = ext_op(comp, pr, "groove_up", CUT, bot_body, "BotRab_F")
@@ -492,11 +492,11 @@ rab_f = ext_op(comp, pr, "groove_up", CUT, bot_body, "BotRab_F")
 # 2b. Mirror front → back across Y midplane
 mirror_feats(comp, [rab_f], y_mid_pl, "BotRab_MirrorY")
 
-# 2c. Left edge rabbet CUT (through: Y = 0 to box_width)
+# 2c. Left edge rabbet CUT (through: full Y extent of board)
 _, pr = sketch_rect_model(comp, root.xYConstructionPlane,
-    ("board_thick - groove_depth", "0 in", "0 in"),
+    ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
     {"x": "groove_depth",
-     "y": "box_width"},
+     "y": "box_width - 2*board_thick + 2*groove_depth"},
     "BotRab_L_Sk")
 rab_l = ext_op(comp, pr, "groove_up", CUT, bot_body, "BotRab_L")
 
@@ -506,9 +506,7 @@ mirror_feats(comp, [rab_l], x_mid_pl, "BotRab_MirrorX")
 
 **Pure subtractive — no JOIN step.** Woodworkers never add material back; they only remove it. Corner notches where two rabbets intersect are naturally handled — the double-cut IS the corner notch.
 
-**Through vs stopped** is controlled by the rabbet CUT span:
-- **Through rabbet:** CUT runs full board length (groove will be visible at board ends)
-- **Stopped rabbet:** CUT runs inner length only (groove hidden behind perpendicular boards)
+**Rabbets are always through cuts.** With hand tools, a through rabbet is a single pass with a rabbet plane — stopping the cut mid-board is unnecessary extra work. The "stopped" concept applies to **grooves in case boards** (so the groove slot doesn't show on the board's end face), NOT to rabbets on panels. See "Stopped grooves for through-prevention" above.
 
 **Asymmetric variation (sliding lids):** For a lid that slides out one side, skip the rabbet on the open edge — the full-thickness board slides freely in the groove.
 
