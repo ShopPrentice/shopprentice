@@ -165,10 +165,17 @@ offset_expr = v_center_expr + op + "half_length"
 
 `sketch_rect_model` already handles this internally (it converts two model-space corners via `modelToSketchSpace`, so signs are implicit). You only need explicit sign detection for custom sketch geometry like stadium shapes (slots, arcs) where you build offset expressions manually.
 
-**When to use which:**
-- **Body faces** — best for component-based builds where faces already exist and you want corner-referenced positioning
-- **Construction planes + probing** — best for root-only builds, model-coordinate workflows, and when `sketch_rect_model` handles all sketching
-- **Construction planes always** — midplanes for Mirror operations, offset planes for positioning before bodies exist
+**Sketch plane preference (follow this order):**
+
+1. **Existing body face (preferred).** If a planar face already exists at the needed location, sketch on it. This is how a designer works in the UI — click the face, start sketching. No construction plane needed. Use `sketch_rect_model` with the face as the plane argument; it works on BRepFaces the same as on construction planes.
+
+2. **Construction plane (only when required).** Use only when one of these applies:
+   - **No body exists yet** — first body in a component has no face to sketch on.
+   - **Midplane for Mirror or Pattern** — no face exists at the midpoint.
+   - **Sketch will be mirrored** — face-based sketches CANNOT be mirrored. MirrorFeature fails with NO_TARGET_BODY because the mirror can't find an equivalent face on the mirrored side.
+   - **Root-level sketch on a component body** — assembly proxy faces CANNOT host sketches. `comp.sketches.add(proxy_face)` throws `RuntimeError: invalid argument planarEntity`. Root-level cross-component operations must use construction planes.
+
+**During design-first planning, audit every sketch plane:** for each sketch in the plan, ask "does a body face already exist here?" If yes, use it. Only reach for a construction plane if one of the four exceptions above applies. Fewer construction planes = cleaner timeline, faster recompute, and geometry that moves parametrically with the body it belongs to.
 
 ### Sketch + Extrude Workflow
 ```python

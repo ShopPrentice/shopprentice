@@ -10,8 +10,8 @@ Coordinate system:
 
 Design:
   - End boards (Left/Right) = tail boards, Front/Back = pin boards
+  - Front board built once, mirrored across Y mid to create back board
   - Left end board built with corner block; right end mirrored after groove CUTs
-  - Front corners are part of end boards (above dispensing slot)
   - Lid slides in from front — no front tongue, grooves in back + both ends
   - Bottom grooves in all 4 boards (stopped front/back, through sides)
   - Through dovetails at all 4 corners (joint height = open_height)
@@ -21,7 +21,7 @@ Design:
 
 Component structure:
   Root
-    +-- Case    (Front, Back with cutter lip, End_Left + corner block)
+    +-- Case    (Front, Back=mirror(Front), End_Left + corner block, cutter lip+groove on Back)
     +-- Bottom  (bottom panel with edge rabbets)
     +-- Lid     (lid panel with edge rabbets, no back tongue)
     (root)      End_Right (mirror of left after groove CUTs)
@@ -30,26 +30,27 @@ Component structure:
 Build order:
   Case component:
     1. Front board
-    2. Back board (height = box_height, flush with top)
-    3. Left end board + corner block (ext_op JOIN)
-    4. Cutter lip JOIN to back board (inward thickening at top, within box height)
-    5. Cutter groove CUT into top surface of thickened section
+    2. Mirror front -> back across Y midplane
+    3. Left end board
+    4. Corner block JOIN on End_Left top face (no construction plane)
+    5. Cutter lip JOIN on Back top face (no construction plane)
+    6. Cutter groove CUT on Back top face (no construction plane)
   Bottom component:
-    6. Full board at tongue footprint
-    7. Front edge rabbet CUT (stopped)
-    8. Mirror front -> back rabbet
-    9. Left edge rabbet CUT (through)
-    10. Mirror left -> right rabbet
+    7. Full board at tongue footprint
+    8. Front edge rabbet CUT (stopped)
+    9. Mirror front -> back rabbet
+    10. Left edge rabbet CUT (through)
+    11. Mirror left -> right rabbet
   Lid component:
-    11. Full board (narrower — no front or back tongue, clears cutter lip)
-    12. Left edge rabbet CUT (through)
-    13. Mirror left -> right rabbet
+    12. Full board (narrower — no front or back tongue, clears cutter lip)
+    13. Left edge rabbet CUT (through)
+    14. Mirror left -> right rabbet
   Root timeline:
-    14. Bottom panel CUTs -> front, back, left case boards (3)
-    15. Lid panel CUTs -> left case board only (1)
-    16. Mirror left end -> right end (carries grooves)
-    17. Dovetails — 4 corners (sketch + CUT + JOIN + pattern)
-    18. Dispensing slot — CUT front
+    15. Bottom panel CUTs -> front, back, left case boards (3)
+    16. Lid panel CUTs -> left case board only (1)
+    17. Mirror left end -> right end (carries grooves)
+    18. Dovetails — 4 corners (sketch + CUT + JOIN + pattern)
+    19. Dispensing slot — CUT front
 """
 import adsk.core, adsk.fusion, math
 
@@ -192,13 +193,29 @@ def run(context):
         p.name = name
         return p
 
-    def ext_op(comp, prof, dist_expr, op, body, name="Ext"):
+    def ext_op(comp, prof, dist_expr, op, body, name="Ext", flip=False):
         inp = comp.features.extrudeFeatures.createInput(prof, op)
-        inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist_expr))
+        if flip:
+            inp.setOneSideExtent(
+                adsk.fusion.DistanceExtentDefinition.create(
+                    adsk.core.ValueInput.createByString(dist_expr)),
+                adsk.fusion.ExtentDirections.NegativeExtentDirection)
+        else:
+            inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist_expr))
         inp.participantBodies = [body]
         f = comp.features.extrudeFeatures.add(inp)
         f.name = name
         return f
+
+    def find_top_face(body, z_expr):
+        """Find the +Z face of a body at the given Z height."""
+        target_z = ev(z_expr)
+        for face in body.faces:
+            geom = face.geometry
+            if isinstance(geom, adsk.core.Plane) and geom.normal.z > 0.99:
+                if abs(face.pointOnFace.z - target_z) < 0.01:
+                    return face
+        return None
 
     def mirror_body(comp, body, plane, name="Mirror"):
         coll = adsk.core.ObjectCollection.create()
@@ -260,18 +277,14 @@ def run(context):
     front_body = front_ext.bodies.item(0)
     front_body.name = "Front"
 
-    # 2. BACK BOARD — flush at box_height (thickened section added later)
-    back_pl = off_plane(case_c, case_c.xZConstructionPlane,
-                        "box_width - board_thick", "Back_Pl")
-    _, pr = sketch_rect_model(case_c, back_pl,
-        ("0 in", "box_width - board_thick", "0 in"),
-        {"x": "box_length", "z": "box_height"},
-        "Back_Sk")
-    back_ext = ext_new(case_c, pr, "board_thick", "BackBoard")
-    back_body = back_ext.bodies.item(0)
+    # 2. BACK BOARD — mirror of front across Y midplane
+    y_mid_pl = off_plane(case_c, case_c.xZConstructionPlane,
+                         "box_width / 2", "YMid_Pl")
+    back_mirror = mirror_body(case_c, front_body, y_mid_pl, "Back_Mirror")
+    back_body = back_mirror.bodies.item(0)
     back_body.name = "Back"
 
-    # 3. LEFT END BOARD + CORNER BLOCK
+    # 3. LEFT END BOARD
     _, pr = sketch_rect_model(case_c, case_c.yZConstructionPlane,
         ("0 in", "board_thick", "0 in"),
         {"y": "side_inner_len", "z": "box_height"},
@@ -280,34 +293,32 @@ def run(context):
     left_body = left_ext.bodies.item(0)
     left_body.name = "End_Left"
 
-    # Corner block JOINed directly — fills lid-groove corner area
-    lg_pl = off_plane(case_c, case_c.xYConstructionPlane, "open_height", "LG_Pl")
-    _, pr = sketch_rect_model(case_c, lg_pl,
-        ("0 in", "0 in", "open_height"),
+    # 4. CORNER BLOCK — sketch on top face of End_Left, extrude down
+    left_top = find_top_face(left_body, "box_height")
+    _, pr = sketch_rect_model(case_c, left_top,
+        ("0 in", "0 in", "box_height"),
         {"x": "board_thick", "y": "board_thick"},
         "CornerL_Sk")
-    ext_op(case_c, pr, "lid_thick", JOIN, left_body, "CornerL_Join")
+    ext_op(case_c, pr, "lid_thick", JOIN, left_body, "CornerL_Join", flip=True)
 
-    # 4. CUTTER LIP — inward thickening at top of back board (within box height)
-    lip_pl = off_plane(case_c, case_c.xYConstructionPlane,
-                       "box_height - cutter_lip_h", "CutterLip_Pl")
-    _, pr = sketch_rect_model(case_c, lip_pl,
+    # 5. CUTTER LIP — sketch on top face of Back, extrude down
+    back_top = find_top_face(back_body, "box_height")
+    _, pr = sketch_rect_model(case_c, back_top,
         ("board_thick", "box_width - board_thick - cutter_lip_depth",
-         "box_height - cutter_lip_h"),
+         "box_height"),
         {"x": "box_length - 2 * board_thick", "y": "cutter_lip_depth"},
         "CutterLip_Sk")
-    ext_op(case_c, pr, "cutter_lip_h", JOIN, back_body, "CutterLip_Join")
+    ext_op(case_c, pr, "cutter_lip_h", JOIN, back_body, "CutterLip_Join", flip=True)
 
-    # 5. CUTTER GROOVE — CUT into top surface of thickened section (stopped at end boards)
-    cutter_groove_pl = off_plane(case_c, case_c.xYConstructionPlane,
-                                 "box_height - cutter_size", "CutterGroove_Pl")
-    _, pr = sketch_rect_model(case_c, cutter_groove_pl,
+    # 6. CUTTER GROOVE — sketch on top face of Back (after lip JOIN), extrude down
+    back_top2 = find_top_face(back_body, "box_height")
+    _, pr = sketch_rect_model(case_c, back_top2,
         ("board_thick",
          "box_width - board_thick",
-         "box_height - cutter_size"),
+         "box_height"),
         {"x": "box_length - 2 * board_thick", "y": "cutter_size"},
         "CutterGroove_Sk")
-    ext_op(case_c, pr, "cutter_size", CUT, back_body, "CutterGroove")
+    ext_op(case_c, pr, "cutter_size", CUT, back_body, "CutterGroove", flip=True)
 
     # NO end mirror here — deferred to root after groove CUTs
 
