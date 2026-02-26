@@ -24,11 +24,16 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
    **Recognition rule:** if you're about to sketch a void that matches an existing body's shape, stop — CUT the body instead (`keepTool=True`). If the fitting body also joins a parent, CUT first, then JOIN.
 
-7. **Build order matters.** Cut grooves and dados **before** joining corner joinery (dovetails, box joints). Side boards span only their initial footprint before tails are joined; groove tool bodies that extend beyond the board only CUT the material that exists at that moment. When tails are later joined, they attach ungrooved — producing clean, stopped grooves at corners with zero extra geometry. This "implicit stopped groove" technique eliminates manual stop calculations.
+7. **No overlapping bodies.** Two physical bodies can never occupy the same space. When bodies share volume, one must CUT the other (rule 6). This must hold not just at script time but **across all valid parameter changes** — if the user increases `lid_thick`, the lid must not collide with the case boards. Achieve this by defining body positions and sizes in terms of shared parameters so they stay in agreement:
+   - **Derive, don't hardcode boundaries.** A lid at Z = `open_height` with thickness `lid_thick` means `open_height` must equal `box_height - lid_thick`. If both are independent parameters, the user can set values that overlap.
+   - **Use CUT to enforce fit.** When body A fits inside body B, CUT A into B (rule 6). The void updates automatically when A's dimensions change — no overlap possible.
+   - **Validate with `check_interference`** after every phase. Clean designs have zero interferences at any parameter value, not just the defaults.
+
+8. **Build order matters.** Cut grooves and dados **before** joining corner joinery (dovetails, box joints). Side boards span only their initial footprint before tails are joined; groove tool bodies that extend beyond the board only CUT the material that exists at that moment. When tails are later joined, they attach ungrooved — producing clean, stopped grooves at corners with zero extra geometry. This "implicit stopped groove" technique eliminates manual stop calculations.
 
 ## Parameter Planning
 
-Choosing which values are user parameters vs. derived is critical. The goal: adjusting any single parameter always produces a clean, valid model — no broken geometry, no asymmetric gaps.
+Choosing which values are user parameters vs. derived is critical. The goal: adjusting any single parameter always produces a clean, valid model — no broken geometry, no asymmetric gaps, no overlapping bodies.
 
 **Principle: define count, derive spacing.** When elements repeat across a dimension (tails, slats, fingers), make the *count* a user parameter and derive the *spacing* from `board_dimension / count`. This guarantees elements always fill the space exactly. The alternative — defining element width + gap width independently and using `floor()` to compute count — leaves uneven remainders that break symmetry.
 
