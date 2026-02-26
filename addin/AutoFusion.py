@@ -17,11 +17,6 @@ if _addin_dir not in sys.path:
 
 import adsk.core
 import adsk.fusion
-from server.mcp_server import start_mcp_server, stop_mcp_server
-from primitives.registry import get_tools, get_resources
-from server.task_manager import TaskManager
-# Import tools to register them
-import tools
 
 # Global variables
 app = adsk.core.Application.get()
@@ -34,16 +29,48 @@ HOST = 'localhost'
 PORT = 9100
 
 
+def _reload_modules():
+    """Flush and re-import tools, primitives, and server modules.
+
+    Ensures a clean slate on every run(), even if a previous stop()
+    corrupted module state by partially flushing sys.modules.
+    """
+    # Flush tools, primitives, server (children first, then parents)
+    prefixes = ('tools', 'primitives', 'server')
+    to_remove = sorted(
+        [k for k in sys.modules
+         if any(k == p or k.startswith(p + '.') for p in prefixes)],
+        key=lambda k: k.count('.'), reverse=True)
+    for mod_name in to_remove:
+        sys.modules.pop(mod_name, None)
+
+    # Re-import primitives first (creates fresh singleton registry)
+    import primitives.registry  # noqa: F811
+
+    # Re-import tools (triggers module-level register() calls)
+    import tools  # noqa: F811
+
+    # Return fresh references from the newly imported modules
+    return (
+        primitives.registry.get_tools(),
+        primitives.registry.get_resources(),
+    )
+
+
 def run(context):
     """Called when add-in starts"""
 
     try:
         global app, mcp, server, thread, ui
 
+        registered_tools, registered_resources = _reload_modules()
+
+        # Re-import server modules (also flushed above)
+        from server.mcp_server import start_mcp_server
+        from server.task_manager import TaskManager
+
         TaskManager.start()
 
-        registered_tools = get_tools()
-        registered_resources = get_resources()
         mcp, server, thread = start_mcp_server(
             host=HOST,
             port=PORT,
@@ -70,6 +97,9 @@ def stop(context):
     """Called when add-in stops"""
 
     try:
+        from server.task_manager import TaskManager
+        from server.mcp_server import stop_mcp_server
+
         TaskManager.stop()
 
         if stop_mcp_server(server, thread):

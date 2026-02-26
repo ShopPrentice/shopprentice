@@ -12,7 +12,7 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
 3. **Everything parametric.** When the user changes any dimension in Modify > Change Parameters, the entire model must recompute automatically — lengths, mirror positions, pattern counts, everything.
 
-4. **Organize with components — or don't.** For multi-assembly furniture (bookshelves, tables, dressers with 10+ bodies), group related bodies into named components (e.g., Sides, Shelves, Top, Kick). Features live inside their respective components; cross-component operations (like CUT) live in root via assembly proxies. **For small, single-piece items** (boxes, trays, small drawers with < ~8 bodies), use a **root-only build** — all bodies and features directly in root. This eliminates assembly-proxy complexity with no loss of parametric behavior.
+4. **Always organize with components.** Group related bodies into named components (e.g., Sides, Shelves, Top, Kick — or Case, Bottom, Lid for boxes). Features live inside their respective components; cross-component operations (like CUT) live in root via assembly proxies. Even small boxes benefit from component structure — clearer timeline, feature isolation, and reusable assembly patterns.
 
 5. **Feature-based modeling only.** Every shape is: Sketch > Constrain dimensions parametrically > Extrude. This creates timeline features that recompute when parameters change.
 
@@ -76,7 +76,7 @@ Set this BEFORE accessing `design.userParameters`. Without it: `RuntimeError: th
 - `TemporaryBRepManager` — creates static geometry inside `BaseFeature` blocks. Parameters exist in Change Parameters but changing them does NOT update geometry.
 - `createByReal(value_in_cm)` for parameter creation — shows confusing cm values in the UI.
 - Python `int()` at script time for pattern counts — use `floor()` in parameter expressions instead.
-- **Python `for` loops for geometry replication** — use Rectangular Pattern or Mirror features instead. A `for` loop creates N independent features that don't update when count changes. A pattern is one parametric feature that recomputes automatically.
+- **Python `for` loops for geometry replication** — use Rectangular Pattern or Mirror features instead. A `for` loop creates N independent features that don't update when count changes. A pattern is one parametric feature that recomputes automatically. **Exception:** Bodies with CUT/JOIN in their timeline history MUST use `for` loops — body patterns replay those operations, creating ghost bodies (see Body Pattern Ghost Bodies under Replication Strategy).
 
 ### User Parameters
 Create with `ValueInput.createByString("60 in")` so Change Parameters shows readable values:
@@ -138,6 +138,32 @@ def probe_sketch_axes(sk):
     v_axis = max(deltas, key=lambda a: abs(deltas[a][1]))
     return h_axis, v_axis
 ```
+
+**CRITICAL: `probe_sketch_axes` returns axis names but NOT signs.** On non-XY construction planes, a model axis can map to the *negative* sketch direction. For example, on an XZ-offset plane, model +Z maps to sketch -Y. If you build dimension expressions assuming positive mapping, geometry lands at mirrored positions.
+
+**Fix — probe signs with a delta point:**
+```python
+def probe_sketch_signs(sk):
+    """Return (h_axis, v_axis, h_sign, v_sign) for a sketch.
+    h/v_sign is +1 if increasing model coordinate → increasing sketch coordinate, else -1."""
+    h_axis, v_axis = probe_sketch_axes(sk)
+    P = adsk.core.Point3D
+    sc = sk.modelToSketchSpace(P.create(0, 0, 0))
+    delta = {"x": P.create(1, 0, 0), "y": P.create(0, 1, 0), "z": P.create(0, 0, 1)}
+    sd_h = sk.modelToSketchSpace(delta[h_axis])
+    sd_v = sk.modelToSketchSpace(delta[v_axis])
+    h_sign = 1 if (sd_h.x - sc.x) > 0 else -1
+    v_sign = 1 if (sd_v.y - sc.y) > 0 else -1
+    return h_axis, v_axis, h_sign, v_sign
+```
+
+Use the sign when building offset expressions. If `v_sign` is negative, an expression like `center - half_length` must become `center + half_length` in sketch space:
+```python
+op = " - " if v_sign > 0 else " + "
+offset_expr = v_center_expr + op + "half_length"
+```
+
+`sketch_rect_model` already handles this internally (it converts two model-space corners via `modelToSketchSpace`, so signs are implicit). You only need explicit sign detection for custom sketch geometry like stadium shapes (slots, arcs) where you build offset expressions manually.
 
 **When to use which:**
 - **Body faces** — best for component-based builds where faces already exist and you want corner-referenced positioning
@@ -340,6 +366,27 @@ pat_input = pat_feats.createInput(body_coll,
     adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
 ```
 
+### Body Pattern Ghost Bodies (CRITICAL)
+
+`RectangularPatternFeature` replays the **entire feature history** of the template body — including CUT and JOIN operations that reference it. When a CUT uses `keepTool=True`, each pattern instance creates a duplicate tool body ("ghost body"), inflating the body count (e.g., 3× per instance instead of 1×).
+
+**When body_pattern is safe:** Bodies with only NewBody extrudes and Mirror (no CUT/JOIN in their history). Example: plain shelf boards before mortise CUTs.
+
+**When body_pattern creates ghosts:** Any body that has been used as a CUT tool with `keepTool=True`, or that has had CUT/JOIN operations applied to it. Example: domino loose tenons that CUT two boards.
+
+**Fix:** For complex parts with CUT/JOIN in their history, use a Python `for` loop to create each instance independently. All dimensions stay parametric via parameter expressions; only the count is evaluated at script time with `int(ev("count_param"))`.
+
+```python
+# WRONG — ghost bodies from keepTool=True CUTs in template history
+body_pattern(domino_body, axis, "dm_count", "dm_spacing")
+
+# RIGHT — independent instances, no ghost bodies
+for i in range(int(ev("dm_count"))):
+    offset = f"dm_start + {i} * dm_spacing"
+    _, pr = sketch_slot_model(comp, plane, (offset, cy, cz), ...)
+    ext_new(pr, "dm_depth", f"DM_{i}")
+```
+
 ### Mirror + Pattern Limitation (CRITICAL)
 Fusion 360 CANNOT properly mirror a `RectangularPatternFeature`. When you mirror features that include a pattern, only the template body gets mirrored -- pattern copies are lost.
 
@@ -377,8 +424,11 @@ This applies to **all** joint types:
 - **Mortise & tenon**: tenon body cuts the mortise, then joins the shelf
 - **Dovetails**: tail body cuts the socket, then joins the top board
 - **Tongue & groove**: tongue body cuts the groove, then joins the slat
+- **Panel grooves**: panel body (with tongues from edge rabbets) cuts the groove in each receiving board via Combine CUT (`keepTool=True`). The tongue-board overlap IS the groove — guaranteed perfect fit. Through tongues produce through grooves; stopped tongues produce stopped grooves. No separate groove sketches needed.
 
 ### Tooling Body Pattern for Grooves
+
+> **When a groove receives a paneled body with tongues** (bottoms, lids, drawer bottoms), use the panel body itself as the cutting tool instead (see **Panel grooves** under Combine-Based Joinery above). The tooling body approach below is for standalone grooves that don't receive a panel — dados for fixed shelves, rabbets for backs, etc.
 
 For grooves, dados, and rabbets, use a **tooling body** — a NewBody extrude that represents the material to remove:
 
@@ -405,45 +455,55 @@ combine(left_body, groove_tool.bodies.item(0), CUT, False, "BGL_Cut")
 {"x": "box_length - 2 * board_thick", "y": "groove_depth"},
 ```
 
-### Board-First Rabbet Pattern for Floating Panels
+### Edge Rabbet Pattern for Floating Panels
 
-For bottom panels, lids, and drawer bottoms that sit in grooves with a rabbeted edge, use a three-step **board-first** approach that models how a woodworker actually builds — start with a full board, then cut the rabbet:
+For bottom panels, lids, and drawer bottoms that sit in grooves with a rabbeted edge, use a pure subtractive **edge rabbet** approach — start with a full board, then cut each edge:
 
-1. **Full board (NewBody):** Extrude at the tongue footprint (extends into groove area), full panel thickness
-2. **Rabbet CUT:** Remove the lip offset from one face across the entire footprint
-3. **Lip JOIN:** Restore the inner area (between board inner faces) at the lip height
+1. **Full board (NewBody):** Extrude at tongue footprint (extends into groove area), full panel thickness
+2. **Edge rabbet CUTs:** One per edge direction — removes `groove_up` from one face of the tongue strip
+3. **Mirror** symmetric edges (front↔back, left↔right) across midplanes
 
 ```python
-# 1. Full board at tongue footprint, Z=0, height=bottom_thick
-_, pr = sketch_rect_model(root.xYConstructionPlane,
+# 1. Full board at tongue footprint, full bottom_thick
+_, pr = sketch_rect_model(comp, root.xYConstructionPlane,
     ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
     {"x": "box_length - 2*board_thick + 2*groove_depth",
      "y": "box_width - 2*board_thick + 2*groove_depth"},
     "Bottom_Sk")
-bot_ext = ext_new(pr, "bottom_thick", "Bottom")
+bot_ext = ext_new(comp, pr, "bottom_thick", "Bottom")
 bot_body = bot_ext.bodies.item(0)
 bot_body.name = "Bottom"
 
-# 2. Rabbet CUT: removes groove_up from bottom face
-_, pr = sketch_rect_model(root.xYConstructionPlane,
-    ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
-    {"x": "box_length - 2*board_thick + 2*groove_depth",
-     "y": "box_width - 2*board_thick + 2*groove_depth"},
-    "BottomRabbet_Sk")
-ext_op(pr, "groove_up", CUT, bot_body, "BottomRabbet")
-
-# 3. Lip JOIN: restores inner area at Z=0
-_, pr = sketch_rect_model(root.xYConstructionPlane,
-    ("board_thick", "board_thick", "0 in"),
+# 2a. Front edge rabbet CUT (stopped: X = board_thick to box_length - board_thick)
+_, pr = sketch_rect_model(comp, root.xYConstructionPlane,
+    ("board_thick", "board_thick - groove_depth", "0 in"),
     {"x": "box_length - 2*board_thick",
-     "y": "box_width - 2*board_thick"},
-    "BottomLip_Sk")
-ext_op(pr, "groove_up", JOIN, bot_body, "BottomLip")
+     "y": "groove_depth"},
+    "BotRab_F_Sk")
+rab_f = ext_op(comp, pr, "groove_up", CUT, bot_body, "BotRab_F")
+
+# 2b. Mirror front → back across Y midplane
+mirror_feats(comp, [rab_f], y_mid_pl, "BotRab_MirrorY")
+
+# 2c. Left edge rabbet CUT (through: Y = 0 to box_width)
+_, pr = sketch_rect_model(comp, root.xYConstructionPlane,
+    ("board_thick - groove_depth", "0 in", "0 in"),
+    {"x": "groove_depth",
+     "y": "box_width"},
+    "BotRab_L_Sk")
+rab_l = ext_op(comp, pr, "groove_up", CUT, bot_body, "BotRab_L")
+
+# 2d. Mirror left → right across X midplane
+mirror_feats(comp, [rab_l], x_mid_pl, "BotRab_MirrorX")
 ```
 
-**Net result:** Tongue extends into grooves on all sides, lip is flush at Z=0. Panel thickness params (`bottom_thick`, `lid_thick`) represent the total board thickness — not just the tongue.
+**Pure subtractive — no JOIN step.** Woodworkers never add material back; they only remove it. Corner notches where two rabbets intersect are naturally handled — the double-cut IS the corner notch.
 
-**Asymmetric variation (sliding lids):** For a lid that slides out one side, skip the rabbet on that edge by making the lip JOIN footprint extend to the opening edge. The full-thickness board remains on the sliding side — no rabbet step interferes with sliding.
+**Through vs stopped** is controlled by the rabbet CUT span:
+- **Through rabbet:** CUT runs full board length (groove will be visible at board ends)
+- **Stopped rabbet:** CUT runs inner length only (groove hidden behind perpendicular boards)
+
+**Asymmetric variation (sliding lids):** For a lid that slides out one side, skip the rabbet on the open edge — the full-thickness board slides freely in the groove.
 
 ### Cross-Component CUT via Assembly Proxies
 
@@ -490,6 +550,21 @@ combine(root, side_proxy, tail_proxies, CUT, True, "DT_Socket")
 combine(top_comp, top_body, all_tails, JOIN, False, "DT_Join")
 ```
 
+### keepTool for Visible Loose Tenons (Dominos, Dowels)
+
+Loose tenon joints (dominos, dowels) have a **separate body** that remains visible after assembly — unlike integral tenons which JOIN into their parent board. When a loose tenon CUTs mortises in two boards:
+
+- **Both CUTs must use `keepTool=True`** so the tenon body survives.
+- If either CUT uses `keepTool=False`, the tenon body is consumed — only invisible mortise pockets remain.
+
+```python
+# Domino cuts mortise in board A (tenon survives)
+combine(board_a, domino_body, CUT, True, "DM_CutA")
+# Domino cuts mortise in board B (tenon STILL survives)
+combine(board_b, domino_body, CUT, True, "DM_CutB")
+# Result: both mortises cut, domino body visible between boards
+```
+
 ### Mortise and Tenon
 - At corners where tenons from two directions enter the same post, stagger them in Z to prevent collision.
 
@@ -526,6 +601,8 @@ For joints beyond M&T, T&G, and gap filling, read the corresponding reference fi
 Each file includes parameters, geometry workflow, replication strategy, pitfalls, and a code snippet. All follow the same conventions: `ValueInput.createByString`, Sketch > Extrude, `participantBodies = [body]` as Python list, 2-letter parameter prefixes.
 
 ## Component Structure Template
+
+Table / Bookshelf:
 ```
 Root
   +-- Posts/Legs      (build 1, mirror to all corners)
@@ -534,6 +611,15 @@ Root
   +-- Panels/Slats    (template per orientation, mirror + independent patterns)
   +-- Top/Bottom      (single panel)
   (root timeline)     bulk CUT features via assembly proxies
+```
+
+Box / Case:
+```
+Root
+  +-- Case    (Front, Back, End_Left, End_Right)
+  +-- Bottom  (bottom panel with edge rabbets)
+  +-- Lid     (lid panel with edge rabbets)
+  (root timeline)  panel-body groove CUTs, dovetails, dispensing slot
 ```
 
 ### Feature Ownership
@@ -585,6 +671,9 @@ Name every feature and body for a readable timeline and easy debugging:
 | Cut/Join affects wrong body | No `participantBodies` specified | Use `ext_input.participantBodies = [body]` |
 | `TypeError` on participantBodies | Passed `ObjectCollection` instead of list | Use Python `[body]` list |
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
+| Body pattern creates 2-3× expected bodies | `keepTool=True` CUTs in template history create ghost duplicates at each pattern instance | Use Python `for` loop for bodies with CUT/JOIN history (see Body Pattern Ghost Bodies) |
+| Sketch geometry at mirrored/wrong position on non-XY plane | `probe_sketch_axes` gives axis name but not sign; model +Z → sketch -Y on XZ planes | Use `probe_sketch_signs` or `modelToSketchSpace` for approximate positions, flip offset operator based on sign |
+| Loose tenon (domino) bodies disappear | Second CUT used `keepTool=False`, consuming the body | Use `keepTool=True` on ALL CUTs for visible loose tenon joints |
 
 ## Incremental Build Strategy
 
