@@ -47,10 +47,10 @@ Build order:
     14. Mirror left -> right rabbet
   Root timeline:
     15. Bottom panel CUTs -> front, back, left case boards (3)
-    16. Lid panel CUTs -> left case board only (1)
+    16. Lid panel CUTs -> back, left, front (front = dispensing slot)
     17. Mirror left end -> right end (carries grooves)
-    18. Dovetails — 4 corners (sketch + CUT + JOIN + pattern)
-    19. Dispensing slot — CUT front
+    18. Dovetails — 4 independent corners (sketch + pattern + CUT + JOIN)
+    19. Film gap CUT
 """
 import adsk.core, adsk.fusion, math
 
@@ -413,11 +413,9 @@ def run(context):
     #  ROOT TIMELINE — cross-component operations
     # ==============================================================
 
-    # Construction planes (root needs planes — proxy faces can't host sketches)
+    # Construction planes
     x_mid_pl = off_plane(root, root.yZConstructionPlane,
                          "box_length / 2", "XMid_Pl")
-    root_lg_pl = off_plane(root, root.xYConstructionPlane,
-                           "open_height", "LG_Pl")
     right_pl = off_plane(root, root.yZConstructionPlane,
                          "box_length - board_thick", "Right_Pl")
 
@@ -429,27 +427,28 @@ def run(context):
     lid_proxy   = lid_body.createForAssemblyContext(lid_occ)
 
     # ----------------------------------------------------------
-    #  14. BOTTOM PANEL GROOVE CUTs — left only (right from mirror)
+    #  BOTTOM PANEL GROOVE CUTs (right from end mirror)
     # ----------------------------------------------------------
     combine(root, front_proxy, bot_proxy, CUT, True, "BotGroove_Front")
     combine(root, back_proxy,  bot_proxy, CUT, True, "BotGroove_Back")
     combine(root, left_proxy,  bot_proxy, CUT, True, "BotGroove_Left")
 
     # ----------------------------------------------------------
-    #  15. LID PANEL GROOVE CUTs — back + left (right from mirror)
+    #  LID PANEL CUTs — grooves in back + left, dispensing slot in front
     # ----------------------------------------------------------
     combine(root, back_proxy,  lid_proxy, CUT, True, "LidGroove_Back")
     combine(root, left_proxy,  lid_proxy, CUT, True, "LidGroove_Left")
+    combine(root, front_proxy, lid_proxy, CUT, True, "LidSlot_Front")
 
     # ----------------------------------------------------------
-    #  16. MIRROR LEFT END -> RIGHT END (carries grooves)
+    #  MIRROR LEFT END -> RIGHT END (carries grooves)
     # ----------------------------------------------------------
     end_mirror = mirror_body(root, left_proxy, x_mid_pl, "EndRight_Mirror")
     right_body = end_mirror.bodies.item(0)
     right_body.name = "End_Right"
 
     # ----------------------------------------------------------
-    #  17. DOVETAIL CORNERS
+    #  DOVETAILS — 4 independent corners (can't mirror: count not parametric)
     # ----------------------------------------------------------
     bt    = ev("board_thick")
     bw    = ev("box_width")
@@ -530,12 +529,10 @@ def run(context):
 
         prof = sk.profiles.item(0)
 
-        # Tail as NewBody — safe to pattern (no cross-component refs)
         tail_ext = ext_new(root, prof, "board_thick", f"{prefix}_Tail")
         tail_body = tail_ext.bodies.item(0)
         tail_body.name = prefix
 
-        # Pattern along Z
         coll = adsk.core.ObjectCollection.create()
         coll.add(tail_ext)
         inp = root.features.rectangularPatternFeatures.createInput(
@@ -546,12 +543,10 @@ def run(context):
         pat = root.features.rectangularPatternFeatures.add(inp)
         pat.name = f"{prefix}_Pat"
 
-        # Collect all tail bodies (template + pattern copies)
         all_tails = [tail_body]
         for i in range(pat.bodies.count):
             all_tails.append(pat.bodies.item(i))
 
-        # Bulk CUT into pin board, then JOIN into tail board
         combine(root, cut_body, all_tails, CUT, True, f"{prefix}_Cut")
         combine(root, join_body, all_tails, JOIN, False, f"{prefix}_Join")
 
@@ -565,16 +560,8 @@ def run(context):
               "box_width", back_proxy,  right_body, "DT_BR")
 
     # ----------------------------------------------------------
-    #  18. DISPENSING SLOT (full length) + FILM GAP (stopped at sides)
+    #  FILM GAP — 1/64" below lid, only between side boards
     # ----------------------------------------------------------
-    # Full-length slot removes front board above open_height
-    _, pr = sketch_rect_model(root, root_lg_pl,
-        ("0 in", "0 in", "open_height"),
-        {"x": "box_length", "y": "board_thick"},
-        "Slot_Sk")
-    ext_op(root, pr, "box_height - open_height", CUT, front_proxy, "SlotCut")
-
-    # Stopped film gap — 1/64" below lid, only between side boards
     gap_pl = off_plane(root, root.xYConstructionPlane,
                        "open_height - film_gap", "FilmGap_Pl")
     _, pr = sketch_rect_model(root, gap_pl,
