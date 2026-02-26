@@ -16,7 +16,13 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
 5. **Feature-based modeling only.** Every shape is: Sketch > Constrain dimensions parametrically > Extrude. This creates timeline features that recompute when parameters change.
 
-6. **Joinery = one shape, two operations.** Never draw mortises and tenons (or sockets and tails) as separate sketches. Build the positive shape (tenon/tail) as a body, CUT it into the receiving board, then JOIN it to the owning board. One shape guarantees perfect fit.
+6. **If it fits, it cuts.** When body A sits inside body B, use A as a CUT tool to create its void in B — never draw the void as a separate sketch. The body IS the perfect-fit shape: one source of truth, zero redundant geometry. This applies to any mechanical mate, not just joinery:
+   - **Joinery:** tenon CUTs mortise, tail CUTs socket, tongue CUTs groove. Then JOIN the tenon/tail to its owning board.
+   - **Panels:** lid CUTs its slot in the front board, bottom panel CUTs its groove in each case board.
+   - **Openings:** door CUTs its frame opening, drawer front CUTs its cavity, sliding panel CUTs its track.
+   - **Hardware/inserts:** wedge CUTs its socket, hinge leaf CUTs its recess, inlay CUTs its pocket.
+
+   **Recognition rule:** if you're about to sketch a void that matches an existing body's shape, stop — CUT the body instead (`keepTool=True`). If the fitting body also joins a parent, CUT first, then JOIN.
 
 7. **Build order matters.** Cut grooves and dados **before** joining corner joinery (dovetails, box joints). Side boards span only their initial footprint before tails are joined; groove tool bodies that extend beyond the board only CUT the material that exists at that moment. When tails are later joined, they attach ungrooved — producing clean, stopped grooves at corners with zero extra geometry. This "implicit stopped groove" technique eliminates manual stop calculations.
 
