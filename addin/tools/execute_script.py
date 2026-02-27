@@ -17,7 +17,101 @@ import adsk.core
 app = adsk.core.Application.get()
 
 
-def handler(script: str) -> dict:
+def _execute_sandbox(script):
+    """Run script in a throwaway document and return a design snapshot."""
+    import adsk.fusion
+    from server.action_log import ActionLog
+    from tools.get_changes import _capture_snapshot
+
+    temp_file = None
+    temp_doc = None
+    original_doc = None
+    transaction_started = False
+
+    try:
+        ActionLog._suppress = True
+
+        original_doc = app.activeDocument
+
+        # Create throwaway document
+        temp_doc = app.documents.add(
+            adsk.core.DocumentTypes.FusionDesignDocumentType)
+        design = adsk.fusion.Design.cast(app.activeProduct)
+        design.designType = adsk.fusion.DesignTypes.ParametricDesignType
+
+        app.executeTextCommand('PTransaction.Start "Sandbox Script"')
+        transaction_started = True
+
+        script += "\nrun(None)"
+        with tempfile.NamedTemporaryFile(
+                mode='w', prefix='sandbox_', suffix='.py',
+                delete=False) as f:
+            f.write(script)
+            temp_file = f.name
+
+        res = app.executeTextCommand(f'Python.Run "{temp_file}"')
+
+        # Commit so geometry computes before snapshotting
+        app.executeTextCommand('PTransaction.Commit')
+        transaction_started = False
+
+        snapshot = _capture_snapshot(design)
+
+        # Close temp doc without saving
+        temp_doc.close(False)
+        temp_doc = None
+
+        # Restore original document
+        if original_doc and original_doc.isValid:
+            original_doc.activate()
+
+        result = {
+            "sandbox": True,
+            "snapshot": snapshot,
+            "isError": False,
+            "message": "Sandbox script executed successfully"
+        }
+        if res:
+            result["content"] = [{"type": "text", "text": res}]
+        return result
+
+    except Exception as e:
+        if transaction_started:
+            try:
+                app.executeTextCommand('PTransaction.Abort')
+            except Exception:
+                pass
+
+        if temp_doc and temp_doc.isValid:
+            try:
+                temp_doc.close(False)
+            except Exception:
+                pass
+
+        if original_doc and original_doc.isValid:
+            try:
+                original_doc.activate()
+            except Exception:
+                pass
+
+        tb = traceback.format_exc()
+        app.log(f"Sandbox error: {e}:\n{tb}")
+        return {
+            "sandbox": True,
+            "content": [{"type": "text", "text": tb}],
+            "isError": True,
+            "message": "Sandbox script execution failed"
+        }
+    finally:
+        ActionLog._suppress = False
+        if temp_file and os.path.exists(temp_file):
+            try:
+                os.unlink(temp_file)
+            except Exception:
+                pass
+
+
+def handler(script: str, sandbox: bool = False) -> dict:
     """Execute a Fusion API Python script."""
 
     run_function_match = re.search(r'def\s+run\s*\(\s*(\w+)\s*\):', script)
@@ -32,6 +126,9 @@ def handler(script: str) -> dict:
             "isError": True,
             "message": "Script does not have a run function that takes a single argument",
         }
+
+    if sandbox:
+        return _execute_sandbox(script)
 
     temp_file = None
     transaction_started = False
@@ -137,14 +234,30 @@ IMPORTANT! DO NOT handle exceptions. Let them be raised to Fusion so that change
 DO refer to the documentation of the Fusion API by searching in the Python module files located in the "{def_file_path}" folder.
 
 Workflow: Build complex models in phases (Structure → Joinery → Details). After each successful execution, call capture_design to validate body count and positions before proceeding to the next phase. On error, analyze the stack trace, fix the script, and re-execute (max 3 retries per distinct error). Failed scripts are automatically rolled back.
+
+Helper library: Scripts can `from helpers import af` to use shared utilities:
+- `af.DesignContext()` — replaces app/design/root/params/ev boilerplate
+- `af.find_face(body, axis, direction)` — outermost planar face along axis
+- `af.find_face_at(body, axis, position)` — planar face at specific coordinate
+- `af.sketch_rect(comp, plane, ...)` — parametric rectangle with H/V constraints
+- `af.sketch_rect_model(comp, plane, ...)` — parametric rectangle on any plane
+- `af.probe_sketch_axes(sk)` — detect model axis → sketch H/V mapping
+- `af.smallest_profile(sk)` — smallest-area profile in a sketch
+
+Sandbox mode: Set sandbox=true to run the script in a temporary document. Returns a design snapshot without modifying the user's active document. Useful for validating scripts before committing to the real design.
 """
 
-tool = Tool.create_with_string_input(
+tool = Tool.create_simple(
     name="execute_script",
-    description=TOOL_DESCRIPTION,
-    input_param_name="script",
-    input_param_description="Fusion API Python script source code to execute."
-)
+    description=TOOL_DESCRIPTION
+).add_input_property(
+    "script", {"type": "string", "description": "Fusion API Python script source code to execute."}
+).add_input_property(
+    "sandbox", {
+        "type": "boolean",
+        "description": "Run in a temporary document. Returns design snapshot without modifying the user's active document."
+    }
+).add_required_input("script").strict_schema()
 
 item = Item.create_tool_item(
     tool=tool,

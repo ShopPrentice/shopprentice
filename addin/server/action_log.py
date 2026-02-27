@@ -49,11 +49,13 @@ class ActionLog:
     """
 
     _is_running = False
+    _suppress = False  # Set True during sandbox to ignore doc-switch events
     _event_handler = None
     _entries = []
     _baseline = None
     _last_timeline_count = None
     _last_param_hash = None
+    _last_read_cursor = None  # auto-advances on each get_changes call
     _log_dir = None
     _log_file = None
 
@@ -103,6 +105,7 @@ class ActionLog:
             cls._baseline = None
             cls._last_timeline_count = None
             cls._last_param_hash = None
+            cls._last_read_cursor = None
             cls._log_file = None
             cls._is_running = False
 
@@ -134,6 +137,7 @@ class ActionLog:
                     pass
 
             cls._entries = []
+            cls._last_read_cursor = None
             cls._log_file = None
 
             if app:
@@ -162,6 +166,15 @@ class ActionLog:
         if cls._entries:
             return cls._entries[-1]["id"]
         return None
+
+    @classmethod
+    def advance_cursor(cls):
+        """Advance the auto-read cursor to the latest entry.
+
+        Called by get_changes after returning entries, so the next call
+        without `since` only returns new entries.
+        """
+        cls._last_read_cursor = cls.get_latest_cursor()
 
     @classmethod
     def get_compacted_diff(cls, since=None):
@@ -270,6 +283,9 @@ class ActionLog:
     def _on_command_terminated(cls, command_id, termination_reason):
         """Process a commandTerminated event. Called on the main thread."""
         try:
+            if cls._suppress:
+                return
+
             # Gate 1: Only completed commands
             # CompletedTerminationReason = 0
             if termination_reason != 0:
