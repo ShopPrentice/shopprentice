@@ -63,6 +63,13 @@ def handler(script: str) -> dict:
                 app.executeTextCommand('PTransaction.Commit')
                 current_doc.activate()
 
+        # Reset ActionLog so future get_changes calls start from a clean baseline
+        try:
+            from server.action_log import ActionLog
+            ActionLog.reset()
+        except Exception:
+            pass
+
         result = {
             "isError": False,
             "message": "Script executed successfully"

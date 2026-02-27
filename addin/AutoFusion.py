@@ -71,6 +71,9 @@ def run(context):
 
         TaskManager.start()
 
+        from server.action_log import ActionLog
+        ActionLog.start()
+
         mcp, server, thread = start_mcp_server(
             host=HOST,
             port=PORT,
@@ -97,9 +100,11 @@ def stop(context):
     """Called when add-in stops"""
 
     try:
+        from server.action_log import ActionLog
         from server.task_manager import TaskManager
         from server.mcp_server import stop_mcp_server
 
+        ActionLog.stop()
         TaskManager.stop()
 
         if stop_mcp_server(server, thread):
