@@ -35,14 +35,35 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
 Choosing which values are user parameters vs. derived is critical. The goal: adjusting any single parameter always produces a clean, valid model — no broken geometry, no asymmetric gaps, no overlapping bodies.
 
+**Principle: parameterize the envelope and the parts; derive the fit.** Furniture dimensions form constraint chains — for example, `table_h = leg_h + top_thick + gap`. When multiple dimensions are linked by a sum, make the physically meaningful ones user parameters and derive the leftover:
+
+1. **Envelope dimensions** (overall height, width, depth) — always user parameters. These are what the customer specifies or the maker measures in the room.
+2. **Part dimensions** (leg height, rail width, stock thickness) — user parameters when they represent a design choice the maker controls ("I want 26-inch legs", "I'm using 3/4-inch stock").
+3. **Fit dimensions** (gaps, clearances, internal offsets) — derived. These are whatever is left over after the envelope and parts are placed.
+
+When a constraint chain has N terms, at most N-1 can be independent. Choose the least meaningful dimension to derive — typically an internal gap or clearance that the maker doesn't independently decide.
+
+**Example — table height chain:**
+- User params: `table_h` (overall height), `leg_h` (leg length), `top_thick` (stock choice)
+- Derived: `top_gap = table_h - leg_h - top_thick` (clearance between leg top and tabletop underside)
+- The maker decides the table height, leg length, and stock. The gap is a consequence — not a design choice.
+
+**Example — box height chain:**
+- User params: `box_height` (overall), `board_thick` (stock), `lid_thick` (stock), `bottom_thick` (stock)
+- Derived: `open_height = box_height - board_thick - lid_thick - bottom_thick` (usable interior)
+- Or alternatively: `open_height` is the user param and `box_height` is derived — whichever the maker thinks in terms of.
+
 **Principle: define count, derive spacing.** When elements repeat across a dimension (tails, slats, fingers), make the *count* a user parameter and derive the *spacing* from `board_dimension / count`. This guarantees elements always fill the space exactly. The alternative — defining element width + gap width independently and using `floor()` to compute count — leaves uneven remainders that break symmetry.
 
 **Principle: every sketch position must be parametric.** Evaluating a parameter at script time (`ev("param")`) bakes the current value into the sketch geometry. If the user later changes the parameter in Change Parameters, the sketch doesn't move. Always add a sketch dimension linked to the parameter expression so Fusion recomputes the position automatically.
+
+**Principle: sketch positions are relative to the features they interact with.** When a sketch CUTs or modifies a body (e.g., an arch CUT on a rail), its position must be defined relative to that body's features — not as an absolute coordinate. For example, an arch baseline should be dimensioned with `leg_h - front_rail_h` (the rail's bottom Z), not drawn at an `ev()` position. When the user changes `front_rail_h`, the arch follows the rail. This applies to all sketches: use `modelToSketchSpace` for approximate positions, then add parametric dimensions with expressions that reference the parent body's parameters.
 
 **How to decide:**
 1. Ask: "If the user changes this value, does the model stay valid?" If increasing a width could overflow available space, that width should be derived from a count instead.
 2. Ask: "Does changing this parameter require other values to adjust?" If yes, those other values must be derived expressions, not independent parameters.
 3. Ask: "Is any geometry positioned using a value computed at script time?" If yes, add a sketch dimension with a parameter expression so it updates live.
+4. Ask: "Would a maker write this dimension on a cut list or sketch?" If yes, it should be a user parameter. If it's just "whatever's left over" after other dimensions are placed, derive it.
 
 **Example — dovetails:** `dt_tail_w` (tail width) + `dt_tail_count` are user parameters. `dt_pin_w = board_h / dt_tail_count - dt_tail_w` is derived. Changing count or tail width always produces evenly-spaced tails with symmetric half-pins. If `dt_pin_w` were an independent parameter instead, the user could easily set values where tails don't fit the board.
 
@@ -114,21 +135,34 @@ These update automatically when referenced dimensions change.
 
 Two valid approaches, depending on the project:
 
-**Approach A: Sketch on body faces.** When creating a feature that relates to an existing body (joints, pockets, decorative details), find the relevant face on that body and sketch directly on it. Position relative to a projected face corner for positive offsets.
+**Approach A: Sketch on body faces.** When creating a feature that relates to an existing body (joints, pockets, decorative details), find the relevant face on that body and sketch directly on it. The sketch plane inherits the body's position — no construction plane offset to keep in sync.
 
 ```python
-# Find the back face of a shelf body (face at Y=shelf_depth, normal +Y)
-target_val = ev("shelf_depth")
-back_face = None
-for face in body.faces:
-    geom = face.geometry
-    if isinstance(geom, adsk.core.Plane):
-        if geom.normal.y > 0.99:
-            if abs(face.pointOnFace.y - target_val) < 0.01:
-                back_face = face
-                break
-sk = comp.sketches.add(back_face)  # sketch directly on the BRepFace
+def find_face(body, axis, direction):
+    """Find outermost planar face along axis in direction (+1=max, -1=min).
+    Uses abs(normal) because face.geometry.normal doesn't always match
+    the outward normal — it's the mathematical plane normal."""
+    best = None
+    best_val = -1e10 if direction > 0 else 1e10
+    for i in range(body.faces.count):
+        face = body.faces.item(i)
+        geom = face.geometry
+        if isinstance(geom, adsk.core.Plane):
+            if abs(getattr(geom.normal, axis)) > 0.9:
+                fv = getattr(face.pointOnFace, axis)
+                if (direction > 0 and fv > best_val) or (direction < 0 and fv < best_val):
+                    best_val = fv
+                    best = face
+    return best
+
+# Example: sketch on the front face (min-Y) of a rail body
+front_face = find_face(rail_body, "y", -1)
+sk = comp.sketches.add(front_face)
 ```
+
+**Extrude direction on body faces:** The default (positive) extrude direction on a face sketch follows `face.evaluator.getNormalAtPoint()` — the true outward normal, pointing AWAY from the body. Use `flip=True` (NegativeExtentDirection) for CUT extrudes on body faces so the cut goes INTO the body.
+
+**Coincident geometry on body-face sketches:** When sketch lines fully coincide with face boundary edges (e.g., an arch baseline at the face corner), Fusion merges them and fails to create separate profiles. Fix: project the face edge via `sk.project(edge)`, then draw the arc from the projected line's sketch points. The projected edge + arc properly split the face. Position dimensions become unnecessary since the projection is already parametric.
 
 **Approach B: Construction planes + `probe_sketch_axes`.** Construction planes can have flipped sketch axes, but this is fully solved by probing. Use `modelToSketchSpace` to discover the real axis mapping at runtime, then assign H/V dimensions accordingly. This approach is simpler when the design is planned in model coordinates — no face-finding or vertex-projection needed. See `sketch_rect_model` in Standard Helpers below for the complete implementation.
 
@@ -194,13 +228,66 @@ offset_expr = v_center_expr + op + "half_length"
 sk = comp.sketches.add(plane)
 rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(p1, p2)
 
-# 2. Constrain dimensions parametrically
+# 2. Add geometric constraints FIRST — H/V constraints lock line orientation
+gc = sk.geometricConstraints
+gc.addHorizontal(rect[0])
+gc.addHorizontal(rect[2])
+gc.addVertical(rect[1])
+gc.addVertical(rect[3])
+
+# 3. Constrain dimensions parametrically
 d_w = sk.sketchDimensions.addDistanceDimension(...)
 d_w.parameter.expression = "slat_width"  # linked to user parameter
 
-# 3. Extrude with parametric distance
+# 4. Extrude with parametric distance
 ext_input = comp.features.extrudeFeatures.createInput(profile, operation)
 ext_input.setDistanceExtent(False, adsk.core.ValueInput.createByString("body_height"))
+```
+
+### Geometric Constraints on Sketch Lines (CRITICAL)
+
+**Every sketch line that should be horizontal or vertical MUST have an explicit geometric constraint.** `addTwoPointRectangle` and `addByTwoPoints` create lines at the correct positions initially, but without explicit `addHorizontal`/`addVertical` constraints, lines can skew when parameters change — rectangles become parallelograms, horizontal edges tilt.
+
+**Rule:** After creating any sketch line, ask: "Should this line stay horizontal or vertical when parameters change?" If yes, add the constraint. Omit H/V constraints on:
+- Intentionally angled lines (tapers, chamfer profiles, etc.)
+- Arch baselines where both endpoints share the same model Z (already horizontal by construction). On offset planes, `addHorizontal` can perturb arc geometry enough to split thin bodies via CUT.
+
+```python
+# Rectangle — constrain all 4 sides
+rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(p1, p2)
+gc = sk.geometricConstraints
+gc.addHorizontal(rect[0])  # bottom
+gc.addHorizontal(rect[2])  # top
+gc.addVertical(rect[1])    # right
+gc.addVertical(rect[3])    # left
+
+# Arch baseline — DO NOT constrain. Both endpoints share the same Z
+# (model coordinate), so the line is already horizontal. Adding addHorizontal
+# on offset planes can perturb the arc geometry, causing the CUT to split
+# thin bodies. The arc's shared sketch points (endSketchPoint/startSketchPoint)
+# keep the profile closed without constraints.
+arch_line = sk.sketchCurves.sketchLines.addByTwoPoints(p1, p2)
+sk.sketchCurves.sketchArcs.addByThreePoints(
+    arch_line.endSketchPoint, mid_pt, arch_line.startSketchPoint)
+
+# Taper triangle — constrain the H and V edges, leave the angled line free
+# IMPORTANT: H/V constraints are in SKETCH space, not model space.
+# On XZ planes: model-X → sketch-H, model-Z → sketch-V (inverted)
+# On YZ planes: model-Z → sketch-H (inverted), model-Y → sketch-V
+# A line that is "horizontal in model" (same Z, varying X or Y) may be
+# VERTICAL in sketch space on YZ planes. Always check probe_sketch_axes
+# or modelToSketchSpace to determine the correct constraint direction.
+bot = lines.addByTwoPoints(sa, sb)     # same Z, varies in X or Y
+lines.addByTwoPoints(sb, sc)           # angled taper — NO constraint
+vert = lines.addByTwoPoints(sc, sa)    # same X or Y, varies in Z
+
+# XZ plane example (model-X → sketch-H, model-Z → sketch-V):
+sk.geometricConstraints.addHorizontal(bot)   # bot varies in model-X → sketch-H
+sk.geometricConstraints.addVertical(vert)    # vert varies in model-Z → sketch-V
+
+# YZ plane example (model-Y → sketch-V, model-Z → sketch-H):
+sk.geometricConstraints.addVertical(bot)     # bot varies in model-Y → sketch-V
+sk.geometricConstraints.addHorizontal(vert)  # vert varies in model-Z → sketch-H
 ```
 
 ### Extrude Operations
@@ -254,10 +341,15 @@ def sketch_rect_model(plane, model_origin, model_size, name="Sk"):
     sk_f = sk.modelToSketchSpace(
         Point3D.create(corner["x"], corner["y"], corner["z"]))
 
-    # Draw rectangle
+    # Draw rectangle + lock orientation
     rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
         Point3D.create(sk_o.x, sk_o.y, 0),
         Point3D.create(sk_f.x, sk_f.y, 0))
+    gc = sk.geometricConstraints
+    gc.addHorizontal(rect[0])
+    gc.addHorizontal(rect[2])
+    gc.addVertical(rect[1])
+    gc.addVertical(rect[3])
 
     # Parametric dimensions
     d = sk.sketchDimensions
@@ -690,6 +782,8 @@ Name every feature and body for a readable timeline and easy debugging:
 | Body pattern creates 2-3× expected bodies | `keepTool=True` CUTs in template history create ghost duplicates at each pattern instance | Use Python `for` loop for bodies with CUT/JOIN history (see Body Pattern Ghost Bodies) |
 | Sketch geometry at mirrored/wrong position on non-XY plane | `probe_sketch_axes` gives axis name but not sign; model +Z → sketch -Y on XZ planes | Use `probe_sketch_signs` or `modelToSketchSpace` for approximate positions, flip offset operator based on sign |
 | Loose tenon (domino) bodies disappear | Second CUT used `keepTool=False`, consuming the body | Use `keepTool=True` on ALL CUTs for visible loose tenon joints |
+| Rectangle deforms when parameter changes | `addTwoPointRectangle` lacks explicit H/V geometric constraints | Add `addHorizontal`/`addVertical` on all 4 lines after creation. Apply same rule to any sketch line that should stay H or V. |
+| H/V constraint distorts triangle on YZ plane | On YZ planes, model-Y maps to sketch-V and model-Z to sketch-H — opposite of XZ planes. Using `addHorizontal` on a model-horizontal (same-Z) line that's sketch-vertical destroys the profile. | Always check sketch axis mapping via `modelToSketchSpace` before assigning H/V constraints. Swap H↔V for YZ planes. |
 
 ## Incremental Build Strategy
 
@@ -773,15 +867,16 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 
 | Tool | Purpose |
 |------|---------|
-| `capture_design` | Full design introspection: parameters, component tree with body geometry, timeline features. |
+| `capture_design` | Full design introspection: parameters, component tree with body geometry and sketch dimension details, timeline features (including chamfers and fillets). |
 | `get_timeline_state` | Roll timeline to any index, capture body geometry at that point, restore position. |
 | `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. |
 | `get_screenshot` | Capture the current Fusion 360 viewport. Use to verify results visually. |
-| `get_selection` | Read the user's current UI selection. Returns structured info per entity type (body, face, edge, occurrence, etc.). Use when the user says "what is this?" or "make this thicker". |
+| `get_selection` | Read the user's current UI selection. Returns structured info per entity type (body, face, edge, occurrence) AND full feature details when a feature is selected (Sketch with curves/dimensions/constraints, Extrude with operation/distance/sketch, Combine with target/tool bodies, Mirror, Pattern, Move, Chamfer, Fillet). Use when the user says "what is this?" or "make this thicker". |
 | `set_selection` | Highlight entities in the UI by name or token. Use after `capture_design` identifies a problem body — select it so the user sees which one. |
 | `modify_parameters` | Change parameter expressions with incremental recompute. Much faster than re-running the script. Use for iterative tuning ("make shelves deeper"). |
 | `check_interference` | Detect body collisions. Use to validate joinery — confirm tenons fit, no unintended overlaps. Clean designs have zero interferences. |
 | `suppress_features` | Toggle timeline features on/off. Diagnostic tool — suppress a suspicious feature, check if it fixes the problem, unsuppress to restore. |
+| `get_changes` | Snapshot & diff. First call captures a baseline; subsequent calls return what changed — parameter expression changes, sketch dimension changes, body additions/removals, feature count delta. Use between iterations or when the user says "I changed something". |
 
 ### Execution + Validation Loop
 
@@ -841,6 +936,17 @@ When the user points at something in Fusion 360 and asks about it:
 2. Use the structured entity info (type, name, dimensions) to understand their intent.
 3. If they want a change, use `modify_parameters` for dimension tweaks or `execute_script` for structural changes.
 4. Use `set_selection` to highlight the result or related entities.
+
+### Change Detection
+
+When iterating on a design with the user making manual changes in Fusion 360:
+
+1. Call `get_changes` once at the start (or after a script run) to capture a baseline.
+2. When the user says "I changed something" or between iterations, call `get_changes` again.
+3. The diff tells you exactly what moved — parameter expression changes, sketch dimension edits, body additions/removals, and timeline feature count delta.
+4. Use the diff to decide next steps: `modify_parameters` to adjust related dimensions, or `execute_script` if structural changes are needed.
+
+This avoids re-reading the full design with `capture_design` when you only need to know what changed.
 
 ### Example Flow
 

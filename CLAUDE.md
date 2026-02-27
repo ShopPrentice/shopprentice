@@ -19,6 +19,7 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 | `modify_parameters` | Change parameter values without re-running the script — for iterative tuning |
 | `check_interference` | Detect body collisions — validate joinery fits correctly |
 | `suppress_features` | Toggle timeline features on/off for "what if" diagnostics |
+| `get_changes` | Detect what changed since last call — snapshot & diff parameters, dimensions, bodies |
 
 ### Workflow
 

@@ -34,6 +34,7 @@ Then in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
 | `modify_parameters` | Change parameter expressions with incremental recompute (no script re-run) |
 | `check_interference` | Detect body intersections/collisions for joinery validation |
 | `suppress_features` | Toggle timeline features on/off for "what if" diagnostics |
+| `get_changes` | Snapshot & diff — detect parameter, dimension, body, and feature count changes since last call |
 
 ## Claude Code / Codex Config
 
@@ -70,7 +71,7 @@ args = ["mcp-remote", "http://localhost:9100/"]
 
 ```bash
 curl http://localhost:9100/health    # {"status": "healthy", "server": "AutoFusion"}
-curl http://localhost:9100/tools     # lists all 9 tools
+curl http://localhost:9100/tools     # lists all 10 tools
 ```
 
 ## Troubleshooting

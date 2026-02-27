@@ -2,7 +2,7 @@
 Get Selection Tool
 
 Read the user's current selection in Fusion 360 and return structured info
-about each selected entity (bodies, faces, edges, occurrences, etc.).
+about each selected entity (bodies, faces, edges, occurrences, features, etc.).
 """
 
 import traceback
@@ -11,6 +11,18 @@ from primitives.item import Item
 from primitives.registry import register
 import adsk.core
 import adsk.fusion
+
+from ._capture_helpers import (
+    _capture_sketch as _capture_sketch_full,
+    _capture_extrude,
+    _capture_combine,
+    _capture_mirror,
+    _capture_rectangular_pattern,
+    _capture_move,
+    _capture_chamfer,
+    _capture_fillet,
+    _capture_construction_plane as _capture_construction_plane_full,
+)
 
 app = adsk.core.Application.get()
 
@@ -203,18 +215,6 @@ def _capture_sketch_entity(entity):
     return info
 
 
-def _capture_construction_plane(cp):
-    """Extract info from a ConstructionPlane."""
-    info = {"type": "ConstructionPlane", "name": cp.name}
-    try:
-        geom = cp.geometry
-        info["normal"] = _round3([geom.normal.x, geom.normal.y, geom.normal.z])
-        info["origin"] = _round3([geom.origin.x, geom.origin.y, geom.origin.z])
-    except:
-        pass
-    return info
-
-
 def _capture_entity(entity):
     """Route entity to the appropriate capture function."""
     body = adsk.fusion.BRepBody.cast(entity)
@@ -235,7 +235,40 @@ def _capture_entity(entity):
 
     cp = adsk.fusion.ConstructionPlane.cast(entity)
     if cp:
-        return _capture_construction_plane(cp)
+        return _capture_construction_plane_full(cp)
+
+    # Feature types — rich detail via shared helpers
+    sk = adsk.fusion.Sketch.cast(entity)
+    if sk:
+        return _capture_sketch_full(sk)
+
+    ext = adsk.fusion.ExtrudeFeature.cast(entity)
+    if ext:
+        return _capture_extrude(ext, None, None)
+
+    comb = adsk.fusion.CombineFeature.cast(entity)
+    if comb:
+        return _capture_combine(comb, None, None)
+
+    mir = adsk.fusion.MirrorFeature.cast(entity)
+    if mir:
+        return _capture_mirror(mir)
+
+    pat = adsk.fusion.RectangularPatternFeature.cast(entity)
+    if pat:
+        return _capture_rectangular_pattern(pat)
+
+    mv = adsk.fusion.MoveFeature.cast(entity)
+    if mv:
+        return _capture_move(mv)
+
+    chamfer = adsk.fusion.ChamferFeature.cast(entity)
+    if chamfer:
+        return _capture_chamfer(chamfer)
+
+    fillet = adsk.fusion.FilletFeature.cast(entity)
+    if fillet:
+        return _capture_fillet(fillet)
 
     tl_obj = adsk.fusion.TimelineObject.cast(entity)
     if tl_obj:
@@ -293,7 +326,7 @@ def handler() -> dict:
 TOOL_DESCRIPTION = \
 """Read the user's current selection in the Fusion 360 UI.
 
-Returns structured info for each selected entity: bodies (name, volume, bounding box), faces (geometry type, normal, area), edges (geometry type, length), occurrences, timeline objects, sketch entities, and construction planes.
+Returns structured info for each selected entity: bodies (name, volume, bounding box), faces (geometry type, normal, area), edges (geometry type, length), occurrences, timeline objects, sketch entities, construction planes, and full feature details (Sketch with curves/dimensions/constraints, Extrude with operation/distance/sketch, Combine with target/tool bodies, Mirror, Pattern, Move, Chamfer, Fillet).
 
 Use this when the user says "what is this?" or "make this thicker" — read their selection to understand what they're pointing at."""
 

@@ -114,16 +114,22 @@ After install, enable it in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
 
 | Tool | Purpose |
 |------|---------|
-| `capture_design` | Full design introspection: parameters, component tree with body geometry, timeline features |
+| `capture_design` | Full design introspection: parameters, component tree with body geometry and sketch dimensions, timeline features |
 | `get_timeline_state` | Roll timeline to any index, capture body geometry, restore position |
 | `execute_script` | Run a Python script in Fusion 360 with transaction wrapping |
 | `get_screenshot` | Capture the viewport with optional camera orientation |
+| `get_selection` | Read the user's current selection — structured info for bodies, faces, edges, features (sketches, extrudes, combines, etc.) |
+| `set_selection` | Highlight entities in the UI by name or token |
+| `modify_parameters` | Change parameter expressions with incremental recompute |
+| `check_interference` | Detect body collisions for joinery validation |
+| `suppress_features` | Toggle timeline features on/off for diagnostics |
+| `get_changes` | Snapshot & diff — detect parameter, dimension, body, and feature count changes since last call |
 
 ### Verify
 
 ```bash
 curl http://localhost:9100/health          # {"status": "healthy", "server": "AutoFusion"}
-curl http://localhost:9100/tools           # lists all 4 tools
+curl http://localhost:9100/tools           # lists all 10 tools
 ```
 
 ## Updating
