@@ -99,9 +99,16 @@ def find_edges(body, axis):
         edge = body.edges.item(i)
         geom = edge.geometry
         if isinstance(geom, adsk.core.Line3D):
-            d = geom.direction
-            if abs(getattr(d, axis)) > 0.9:
-                result.append(edge)
+            sp = geom.startPoint
+            ep = geom.endPoint
+            dx = ep.x - sp.x
+            dy = ep.y - sp.y
+            dz = ep.z - sp.z
+            length = math.sqrt(dx*dx + dy*dy + dz*dz)
+            if length > 1e-10:
+                norm = {"x": dx/length, "y": dy/length, "z": dz/length}
+                if abs(norm[axis]) > 0.9:
+                    result.append(edge)
     return result
 
 
