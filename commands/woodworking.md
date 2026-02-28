@@ -308,6 +308,43 @@ Using `ObjectCollection` causes `TypeError`. Using no participant bodies causes 
 
 These reusable helpers form the foundation of the model-coordinate workflow. The caller specifies everything in model coordinates using parameter expressions; the helpers handle all sketch-space complexity.
 
+### Helper Library (`from helpers import af`)
+
+The `af` helper library provides these functions as importable utilities, eliminating per-script boilerplate. Scripts can `from helpers import af` and use them directly:
+
+```python
+from helpers import af
+
+def run(context):
+    ctx = af.DesignContext()          # app, design, root, params, units, ev()
+    depth = ctx.ev("shelf_depth")     # evaluate parameter or expression → cm
+    shelf = ctx.find_body("shelf_top")  # recursive body search by name
+    shelves = ctx.find_bodies("shelf_*")  # glob pattern match
+
+    top = af.find_face(shelf, "z", +1)   # outermost planar face along axis
+    at = af.find_face_at(shelf, "z", 3.0)  # face at specific coordinate
+    edges = af.find_edges(shelf, "z")    # linear edges aligned with axis
+
+    sk, prof = af.sketch_rect(ctx.root, ctx.root.xYConstructionPlane,
+                               "0 cm", "0 cm", "width", "depth",
+                               name="Sk", ev=ctx.ev)
+    sk2, prof2 = af.sketch_rect_model(ctx.root, plane,
+                                       ("x0", "y0", "z0"),
+                                       {"x": "width", "z": "height"},
+                                       name="Sk2", ev=ctx.ev)
+    h, v = af.probe_sketch_axes(sk2)   # model axis → sketch H/V
+    p = af.smallest_profile(sk)        # smallest-area profile in sketch
+```
+
+All helpers accept explicit objects (body, component, sketch) rather than relying on module globals, so they work in both normal and sandbox mode. The `ev` parameter falls back to creating one from the active design when omitted.
+
+**Key improvements over inline versions:**
+- `sketch_rect` and `sketch_rect_model` always add explicit H/V geometric constraints (some older scripts omitted these)
+- `find_face` uses `pointOnFace` coordinate, not normal sign (handles both-direction normals correctly)
+- `DesignContext.find_body/find_bodies` walks all descendant components recursively
+
+When a helper doesn't exist for what you need (feature builders, combine, mirror), write those inline — the helpers only cover query and sketch boilerplate.
+
 ### `ev()` — Dual-Mode Parameter Access
 ```python
 def ev(e):
@@ -315,7 +352,7 @@ def ev(e):
     p = params.itemByName(e)
     return p.value if p else design.unitsManager.evaluateExpression(e, "cm")
 ```
-Use for computing approximate sketch positions. Actual parametric behavior comes from dimension expressions, not `ev()` values.
+Use for computing approximate sketch positions. Actual parametric behavior comes from dimension expressions, not `ev()` values. Available as `ctx.ev()` from the helper library, or define inline as shown above.
 
 ### `sketch_rect_model()` — Parametric Rectangle in Model Coordinates
 ```python
@@ -869,7 +906,7 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 |------|---------|
 | `capture_design` | Full design introspection: parameters, component tree with body geometry and sketch dimension details, timeline features (including chamfers and fillets). |
 | `get_timeline_state` | Roll timeline to any index, capture body geometry at that point, restore position. |
-| `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. |
+| `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. Set `sandbox=true` to run in a throwaway document — returns a design snapshot without touching the user's active document. |
 | `get_screenshot` | Capture the current Fusion 360 viewport. Use to verify results visually. |
 | `get_selection` | Read the user's current UI selection. Returns structured info per entity type (body, face, edge, occurrence) AND full feature details when a feature is selected (Sketch with curves/dimensions/constraints, Extrude with operation/distance/sketch, Combine with target/tool bodies, Mirror, Pattern, Move, Chamfer, Fillet). Use when the user says "what is this?" or "make this thicker". |
 | `set_selection` | Highlight entities in the UI by name or token. Use after `capture_design` identifies a problem body — select it so the user sees which one. |
@@ -877,6 +914,7 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 | `check_interference` | Detect body collisions. Use to validate joinery — confirm tenons fit, no unintended overlaps. Clean designs have zero interferences. |
 | `suppress_features` | Toggle timeline features on/off. Diagnostic tool — suppress a suspicious feature, check if it fixes the problem, unsuppress to restore. |
 | `get_changes` | Snapshot & diff. First call captures a baseline; subsequent calls return what changed — parameter expression changes, sketch dimension changes, body additions/removals, feature count delta. Use between iterations or when the user says "I changed something". |
+| `sync_script` | Auto-sync UI changes back to a script. Pass the original script source — auto-patches user parameter expression changes, reports feature-level param edits, feature additions, and feature removals with script context for the agent to apply. Requires a `get_changes` baseline. |
 
 ### Execution + Validation Loop
 
@@ -948,6 +986,20 @@ When iterating on a design with the user making manual changes in Fusion 360:
 
 This avoids re-reading the full design with `capture_design` when you only need to know what changed.
 
+### Script Sync (after UI tweaks)
+
+When the user tweaks a design in the Fusion UI and you need to update the `.py` script to match:
+
+1. Call `get_changes` after the initial script run to capture a baseline (if not already done).
+2. After the user makes changes, call `sync_script` with the original script source.
+3. The tool auto-patches user parameter expression changes (e.g., `tt_shoulder` from `"0.375 in"` to `"0.3 in"`) and returns the patched script.
+4. For changes that need agent help (`needsAgent`), apply each one to the patched script:
+   - `featureParameterChanged` — update hardcoded expressions near the feature's `.name = "..."` line (scriptContext shows where).
+   - `featureRemoved` — delete the code block that created the feature (scriptContext shows the code).
+   - `featureAdded` — generate new code from the capture data and insert it at the appropriate timeline position.
+5. Write the updated script to the file.
+6. Re-execute via `execute_script` to verify the model matches.
+
 ### Example Flow
 
 ```
@@ -965,6 +1017,23 @@ Phase 3: Add details
   → update bookshelf.py (structure + M&T + chamfers)
   → execute → capture_design → validate → screenshot → present to user
 ```
+
+### Sandbox Mode
+
+Use `execute_script` with `sandbox=true` to run a script in a throwaway document. The script executes in a fresh temporary document; on completion, a design snapshot (parameters, bodies, dimensions, feature count) is returned and the temp document is discarded. The user's active document is never modified.
+
+**When to use sandbox:**
+- Validating a script before committing to the real design (especially complex joinery phases)
+- Testing helper imports or sketch logic without risk
+- Exploring "what if" variations without polluting the undo history
+
+**Behavior:**
+- ActionLog events are suppressed during the sandbox run — the user's `get_changes` baseline is unaffected
+- The sandbox document has no user parameters from the real design — scripts that reference existing parameters will fail unless they create their own
+- Returns `{sandbox: true, snapshot: {...}}` on success
+- On error, the temp document is closed and the original document is restored automatically
+
+**Not a substitute for the real execution loop.** Sandbox validates that a script runs without errors and produces expected geometry, but the real design's parameter expressions and timeline context may differ. Always follow sandbox validation with a real `execute_script` run.
 
 ### Important
 
