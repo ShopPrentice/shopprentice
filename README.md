@@ -63,11 +63,18 @@ The autofusion instructions are loaded automatically from `AGENTS.md`.
 
 Each folder under `examples/` contains a complete Fusion 360 project with screenshots, a README, and the parametric Python script:
 
-| Example | Description |
-|---------|-------------|
-| [pencil-box](examples/pencil-box/) | 9" x 3" dovetailed pencil box with sliding lid and grooved bottom |
-| [bookshelf](examples/bookshelf/) | 70"H x 30"W parametric bookshelf with through M&T shelves and through dovetail top |
-| [wood-planter](examples/wood-planter/) | 60" x 20" parametric planter with frame construction and T&G slat infill |
+<table>
+<tr>
+<td align="center"><a href="examples/pencil-box/"><img src="examples/pencil-box/screenshots/iso-top-right.png" width="200" /><br /><b>Pencil Box</b></a><br />Dovetailed box with sliding lid</td>
+<td align="center"><a href="examples/bookshelf/"><img src="examples/bookshelf/screenshots/iso-top-right.png" width="200" /><br /><b>Bookshelf</b></a><br />Through M&T shelves, dovetail top</td>
+<td align="center"><a href="examples/wood-planter/"><img src="examples/wood-planter/screenshots/iso-top-right.png" width="200" /><br /><b>Wood Planter</b></a><br />Frame construction, T&G slat infill</td>
+</tr>
+<tr>
+<td align="center"><a href="examples/dresser/"><img src="examples/dresser/screenshots/iso-top-right.png" width="200" /><br /><b>Dresser</b></a><br />3-drawer, through dovetail case</td>
+<td align="center"><a href="examples/wrap-box/"><img src="examples/wrap-box/screenshots/iso-top-right.png" width="200" /><br /><b>Wrap Box</b></a><br />Dovetailed dispenser with cutter slot</td>
+<td align="center"><a href="examples/rachels-table/"><img src="examples/rachels-table/screenshots/iso-top-right.png" width="200" /><br /><b>Rachel's Table</b></a><br />Bridle joints, arched rails, tapered legs</td>
+</tr>
+</table>
 
 ### Adding a new example
 
