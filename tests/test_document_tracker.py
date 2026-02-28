@@ -489,5 +489,26 @@ class TestDocumentTracker(unittest.TestCase):
         self.assertNotIn("needsSync", status)
 
 
+    # ── 12. Different wrapper, same document ──
+
+    def test_different_wrapper_same_doc_stays_tracked(self):
+        """Fusion returns different Python objects for the same document.
+        get_status must compare by name, not identity."""
+        script = 'def run(ctx):\n    pass'
+        doc = self._make_doc("MyBox")
+        mock_app.activeDocument = doc
+
+        DocumentTracker.on_script_executed(script, doc)
+
+        # Simulate Fusion returning a different wrapper for the same doc
+        wrapper2 = self._make_doc("MyBox")
+        mock_app.activeDocument = wrapper2
+        self.assertIsNot(wrapper2, doc)  # different Python object
+
+        status = DocumentTracker.get_status()
+        self.assertTrue(status["tracked"])
+        self.assertNotIn("needsSync", status)  # NOT restored from disk
+
+
 if __name__ == "__main__":
     unittest.main()

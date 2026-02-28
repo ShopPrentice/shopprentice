@@ -83,7 +83,7 @@ class DocumentTracker:
         if cls._doc_ref is not None:
             try:
                 active_doc = app.activeDocument
-                if active_doc is not cls._doc_ref or not cls._doc_ref.isValid:
+                if not cls._doc_ref.isValid or cls._doc_key(active_doc) != cls._doc_key(cls._doc_ref):
                     # Active doc changed — try to restore from disk
                     cls._clear_memory()
                     if cls._try_restore():
