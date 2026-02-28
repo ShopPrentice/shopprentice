@@ -180,9 +180,23 @@ def _capture_feature(entity, idx, tl):
     return info
 
 
-def handler(script: str, lastSyncedId: str = None) -> dict:
+def handler(script: str = None, lastSyncedId: str = None) -> dict:
     """Sync a script against the live Fusion 360 state."""
     try:
+        # If script not provided, read from DocumentTracker
+        if script is None:
+            from server.document_tracker import DocumentTracker
+            script = DocumentTracker.get_script()
+            if script is None:
+                return {
+                    "content": [{"type": "text", "text": "No script provided and no tracked script"}],
+                    "isError": True,
+                    "message": "No script provided and no tracked script"
+                }
+            # Also use tracker's cursor if lastSyncedId not provided
+            if lastSyncedId is None:
+                lastSyncedId = DocumentTracker._sync_cursor
+
         design = adsk.fusion.Design.cast(app.activeProduct)
         if not design:
             return {
@@ -350,6 +364,14 @@ def handler(script: str, lastSyncedId: str = None) -> dict:
         if action_log_entries is not None:
             result["actionLog"] = action_log_entries
 
+        # Update provenance tracking
+        try:
+            from server.document_tracker import DocumentTracker
+            if DocumentTracker.get_script() is not None:
+                DocumentTracker.on_sync_complete(patched, action_log_cursor)
+        except Exception:
+            pass
+
         # Summary message
         parts = []
         if applied:
@@ -379,7 +401,7 @@ def handler(script: str, lastSyncedId: str = None) -> dict:
 TOOL_DESCRIPTION = \
 """Sync a Python script against the live Fusion 360 design state.
 
-Pass the original script source. The tool diffs it against the current Fusion state and returns:
+Pass the original script source, or omit it to use the tracked script from the last execute_script run. The tool diffs it against the current Fusion state and returns:
 
 - **patchedScript** — the script with user parameter expression changes auto-applied (e.g., `tt_shoulder` changed from `"0.375 in"` to `"0.3 in"`)
 - **applied** — list of auto-patched parameter changes
@@ -410,9 +432,9 @@ tool = Tool.create_simple(
     "script",
     {
         "type": "string",
-        "description": "The Python script source code to sync against the live Fusion 360 state."
+        "description": "The Python script source code to sync against the live Fusion 360 state. Optional — omit to use the tracked script from the last execute_script run."
     }
-).add_required_input("script").add_input_property(
+).add_input_property(
     "lastSyncedId",
     {
         "type": "string",

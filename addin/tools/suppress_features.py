@@ -110,6 +110,20 @@ def handler(features: list) -> dict:
 
         body_count = _count_bodies(design.rootComponent)
 
+        # Reset ActionLog baseline (API-driven changes don't fire commandTerminated)
+        try:
+            from server.action_log import ActionLog
+            ActionLog.reset()
+        except Exception:
+            pass
+
+        # Advance provenance cursor past API-driven changes
+        try:
+            from server.document_tracker import DocumentTracker
+            DocumentTracker.advance_cursor(ActionLog.get_latest_cursor())
+        except Exception:
+            pass
+
         result = {
             "updated": results,
             "updatedCount": len(results),

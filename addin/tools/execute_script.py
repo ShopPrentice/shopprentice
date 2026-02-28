@@ -111,7 +111,34 @@ def _execute_sandbox(script):
                 pass
 
 
-def handler(script: str, sandbox: bool = False) -> dict:
+def _clean_design():
+    """Delete all timeline features and user parameters from the active design."""
+    import adsk.fusion
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    if not design:
+        return
+
+    # Delete timeline features in reverse order (later features depend on earlier ones)
+    tl = design.timeline
+    for i in range(tl.count - 1, -1, -1):
+        try:
+            item = tl.item(i)
+            entity = item.entity
+            if entity and hasattr(entity, 'deleteMe'):
+                entity.deleteMe()
+        except Exception:
+            pass
+
+    # Delete user parameters
+    params = design.userParameters
+    for i in range(params.count - 1, -1, -1):
+        try:
+            params.item(i).deleteMe()
+        except Exception:
+            pass
+
+
+def handler(script: str, sandbox: bool = False, clean: bool = False) -> dict:
     """Execute a Fusion API Python script."""
 
     run_function_match = re.search(r'def\s+run\s*\(\s*(\w+)\s*\):', script)
@@ -133,6 +160,7 @@ def handler(script: str, sandbox: bool = False) -> dict:
     temp_file = None
     transaction_started = False
     transacted_doc = None
+    original_script = script  # preserve before appending run(None)
     try:
         script += "\nrun(None)"
 
@@ -147,6 +175,10 @@ def handler(script: str, sandbox: bool = False) -> dict:
         if transacted_doc:
             app.executeTextCommand('PTransaction.Start "Execute Prompt Script"')
             transaction_started = True
+
+        # Clean existing model before rebuilding (all in one transaction for Ctrl+Z revert)
+        if clean and transaction_started:
+            _clean_design()
 
         res = app.executeTextCommand(f'Python.Run "{temp_file}"')
 
@@ -164,6 +196,13 @@ def handler(script: str, sandbox: bool = False) -> dict:
         try:
             from server.action_log import ActionLog
             ActionLog.reset()
+        except Exception:
+            pass
+
+        # Track document provenance
+        try:
+            from server.document_tracker import DocumentTracker
+            DocumentTracker.on_script_executed(original_script, app.activeDocument)
         except Exception:
             pass
 
@@ -245,6 +284,8 @@ Helper library: Scripts can `from helpers import af` to use shared utilities:
 - `af.smallest_profile(sk)` — smallest-area profile in a sketch
 
 Sandbox mode: Set sandbox=true to run the script in a temporary document. Returns a design snapshot without modifying the user's active document. Useful for validating scripts before committing to the real design.
+
+Clean rebuild: Set clean=true to delete all existing timeline features and user parameters before running the script. The clean step and script execution are wrapped in a single transaction — the user can Ctrl+Z to revert the entire operation back to the previous model state. Use this when re-executing a modified script on a document that already has a model.
 """
 
 tool = Tool.create_simple(
@@ -256,6 +297,11 @@ tool = Tool.create_simple(
     "sandbox", {
         "type": "boolean",
         "description": "Run in a temporary document. Returns design snapshot without modifying the user's active document."
+    }
+).add_input_property(
+    "clean", {
+        "type": "boolean",
+        "description": "Delete all existing features and parameters before running. Enables clean rebuild of an existing model. Ctrl+Z reverts the entire operation."
     }
 ).add_required_input("script").strict_schema()
 

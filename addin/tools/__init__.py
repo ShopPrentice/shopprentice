@@ -14,3 +14,5 @@ from . import modify_parameters
 from . import check_interference
 from . import suppress_features
 from . import get_changes
+from . import sync_script
+from . import get_document_status

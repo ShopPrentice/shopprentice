@@ -906,7 +906,7 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 |------|---------|
 | `capture_design` | Full design introspection: parameters, component tree with body geometry and sketch dimension details, timeline features (including chamfers and fillets). |
 | `get_timeline_state` | Roll timeline to any index, capture body geometry at that point, restore position. |
-| `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. Set `sandbox=true` to run in a throwaway document — returns a design snapshot without touching the user's active document. |
+| `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. Set `sandbox=true` to run in a throwaway document. Set `clean=true` to delete all existing features before running — enables clean rebuild of an existing model. The entire clean+execute is one transaction: Ctrl+Z reverts to the previous state. |
 | `get_screenshot` | Capture the current Fusion 360 viewport. Use to verify results visually. |
 | `get_selection` | Read the user's current UI selection. Returns structured info per entity type (body, face, edge, occurrence) AND full feature details when a feature is selected (Sketch with curves/dimensions/constraints, Extrude with operation/distance/sketch, Combine with target/tool bodies, Mirror, Pattern, Move, Chamfer, Fillet). Use when the user says "what is this?" or "make this thicker". |
 | `set_selection` | Highlight entities in the UI by name or token. Use after `capture_design` identifies a problem body — select it so the user sees which one. |
@@ -914,7 +914,8 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 | `check_interference` | Detect body collisions. Use to validate joinery — confirm tenons fit, no unintended overlaps. Clean designs have zero interferences. |
 | `suppress_features` | Toggle timeline features on/off. Diagnostic tool — suppress a suspicious feature, check if it fixes the problem, unsuppress to restore. |
 | `get_changes` | Snapshot & diff. First call captures a baseline; subsequent calls return what changed — parameter expression changes, sketch dimension changes, body additions/removals, feature count delta. Use between iterations or when the user says "I changed something". |
-| `sync_script` | Auto-sync UI changes back to a script. Pass the original script source — auto-patches user parameter expression changes, reports feature-level param edits, feature additions, and feature removals with script context for the agent to apply. Requires a `get_changes` baseline. |
+| `sync_script` | Auto-sync UI changes back to a script. Pass the original script source (or omit to use the tracked script from the last execute_script run) — auto-patches user parameter expression changes, reports feature-level param edits, feature additions, and feature removals with script context for the agent to apply. |
+| `get_document_status` | Check if the active document was built by a known script. Returns `tracked` (true/false), `pendingChanges` count, and `canUpdate` flag. Call before attempting incremental updates. |
 
 ### Execution + Validation Loop
 
@@ -955,6 +956,15 @@ This is like `git bisect` for the modeling timeline — fast, cheap, and precise
 
 When the user asks to change an existing design (e.g., "make the shelves wider"):
 
+**Step 1: Check provenance** — call `get_document_status` first:
+
+- `tracked=false` → The agent can't safely modify this design incrementally. It wasn't built by a known script in this session. Ask the user: "I can't safely modify this design incrementally. Would you like me to create a new script for it?"
+- `tracked=true`, `needsSync=true` → Provenance was restored from disk (e.g. after add-in restart or document reopen). The script and model may have diverged. Call `sync_script` (no `script` arg needed) to reconcile before proceeding.
+- `tracked=true`, `pendingChanges > 0` → The user made UI changes since the last sync. Call `sync_script` (no `script` arg needed) to reconcile, then proceed.
+- `tracked=true`, `pendingChanges == 0` → Proceed directly.
+
+**Step 2: Apply the change:**
+
 **For dimension changes** (most common) — use `modify_parameters` for fast incremental tuning:
 
 1. Call `capture_design` to understand the current model state — parameters, bodies, timeline.
@@ -964,7 +974,7 @@ When the user asks to change an existing design (e.g., "make the shelves wider")
 5. **Good** → update the `.py` source file to match the new expression.
 6. **Bad** → revert via `modify_parameters` with the old expression.
 
-**For structural changes** (add a component, change joinery type) — re-run via `execute_script`.
+**For structural changes** (add a component, change joinery type) — read the tracked script, make targeted changes, and re-run with `execute_script(clean=true)`. This deletes the existing model and rebuilds from the modified script. The entire operation is one transaction — **the user can Ctrl+Z to revert to the previous state**.
 
 ### Selection-Driven Interaction
 
