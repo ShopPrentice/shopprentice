@@ -648,15 +648,38 @@ def _capture_chamfer(chamfer):
     except:
         pass
 
+    # Extract parameters from edge sets (works for all chamfer types)
     try:
-        info["size"] = chamfer.parameter.expression
+        edge_sets = chamfer.chamferEdgeSets
+        total_edges = 0
+        for si in range(edge_sets.count):
+            es = edge_sets.item(si)
+            total_edges += es.edges.count
+            eq = adsk.fusion.ChamferEdgeSetEqualDistanceInput.cast(es)
+            if eq:
+                info["distance"] = eq.distance.expression
+                continue
+            two = adsk.fusion.ChamferEdgeSetTwoDistancesInput.cast(es)
+            if two:
+                info["distanceOne"] = two.distanceOne.expression
+                info["distanceTwo"] = two.distanceTwo.expression
+                continue
+            da = adsk.fusion.ChamferEdgeSetDistanceAndAngleInput.cast(es)
+            if da:
+                info["distance"] = da.distance.expression
+                info["angle"] = da.angle.expression
+                continue
+        info["edgeCount"] = total_edges
     except:
-        pass
-
-    try:
-        info["edgeCount"] = chamfer.edges.count
-    except:
-        pass
+        # Fallback: try the simple .parameter property
+        try:
+            info["size"] = chamfer.parameter.expression
+        except:
+            pass
+        try:
+            info["edgeCount"] = chamfer.edges.count
+        except:
+            pass
 
     info["bodies"] = [b.name for b in chamfer.bodies]
 

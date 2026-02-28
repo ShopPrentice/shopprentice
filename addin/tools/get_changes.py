@@ -188,10 +188,12 @@ def handler(since: str = None) -> dict:
             action_log_available = False
 
         if action_log_available:
-            entries = ActionLog.get_entries(since=since)
+            # Use explicit `since` if provided, otherwise auto-advance cursor
+            effective_since = since if since is not None else ActionLog._last_read_cursor
+            entries = ActionLog.get_entries(since=effective_since)
             cursor = ActionLog.get_latest_cursor()
 
-            if not entries and since is None and ActionLog._baseline is None:
+            if not entries and effective_since is None and ActionLog._baseline is None:
                 # First call ever — capture baseline via ActionLog
                 ActionLog.reset()
                 current = _capture_snapshot(design)
@@ -222,7 +224,8 @@ def handler(since: str = None) -> dict:
                     }
                     entry_summaries.append(summary)
 
-                compacted = ActionLog.get_compacted_diff(since=since)
+                compacted = ActionLog.get_compacted_diff(since=effective_since)
+                ActionLog.advance_cursor()
                 result = {
                     "cursor": cursor,
                     "entryCount": len(entries),
@@ -236,6 +239,7 @@ def handler(since: str = None) -> dict:
                 }
 
             # No new entries since cursor
+            ActionLog.advance_cursor()
             result = {
                 "cursor": cursor,
                 "entryCount": 0,

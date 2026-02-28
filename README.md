@@ -124,12 +124,13 @@ After install, enable it in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
 | `check_interference` | Detect body collisions for joinery validation |
 | `suppress_features` | Toggle timeline features on/off for diagnostics |
 | `get_changes` | Snapshot & diff — detect parameter, dimension, body, and feature count changes since last call |
+| `sync_script` | Auto-sync Fusion UI changes back to a Python script — patches parameter expressions, reports feature-level changes |
 
 ### Verify
 
 ```bash
 curl http://localhost:9100/health          # {"status": "healthy", "server": "AutoFusion"}
-curl http://localhost:9100/tools           # lists all 10 tools
+curl http://localhost:9100/tools           # lists all 11 tools
 ```
 
 ## Updating
