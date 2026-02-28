@@ -286,6 +286,192 @@ def smallest_profile(sk):
     return best
 
 
+# ── Feature Builders ───────────────────────────────────────────────
+
+def ext_new(comp, prof, dist, name="Ext"):
+    """Extrude a profile as a new body.
+
+    Returns the ExtrudeFeature. Access the body via ``f.bodies.item(0)``.
+    """
+    inp = comp.features.extrudeFeatures.createInput(
+        prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+    inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist))
+    f = comp.features.extrudeFeatures.add(inp)
+    f.name = name
+    return f
+
+
+def ext_new_sym(comp, prof, dist, name="Ext"):
+    """Extrude a profile as a new body, symmetric about the sketch plane.
+
+    Returns the ExtrudeFeature.
+    """
+    inp = comp.features.extrudeFeatures.createInput(
+        prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+    inp.setDistanceExtent(True, adsk.core.ValueInput.createByString(dist))
+    f = comp.features.extrudeFeatures.add(inp)
+    f.name = name
+    return f
+
+
+def ext_op(comp, prof, dist_expr, op, body, name="Ext", flip=False):
+    """Extrude a profile as CUT or JOIN into an existing body.
+
+    Args:
+        comp: Component owning the extrude feature.
+        prof: Sketch profile.
+        dist_expr: Distance expression string (e.g. "board_thick").
+        op: FeatureOperations enum (CutFeatureOperation or JoinFeatureOperation).
+        body: Target body for participantBodies.
+        name: Feature name.
+        flip: If True, extrude in negative direction (into the body on
+              face-based sketches where default direction points outward).
+    """
+    inp = comp.features.extrudeFeatures.createInput(prof, op)
+    if flip:
+        inp.setOneSideExtent(
+            adsk.fusion.DistanceExtentDefinition.create(
+                adsk.core.ValueInput.createByString(dist_expr)),
+            adsk.fusion.ExtentDirections.NegativeExtentDirection)
+    else:
+        inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist_expr))
+    inp.participantBodies = [body]
+    f = comp.features.extrudeFeatures.add(inp)
+    f.name = name
+    return f
+
+
+def off_plane(comp, base, expr, name="Pl"):
+    """Create an offset construction plane.
+
+    Returns the ConstructionPlane.
+    """
+    inp = comp.constructionPlanes.createInput()
+    inp.setByOffset(base, adsk.core.ValueInput.createByString(expr))
+    p = comp.constructionPlanes.add(inp)
+    p.name = name
+    return p
+
+
+def combine(comp, target, tool_bodies, op, keep_tool, name="Comb"):
+    """Combine (CUT/JOIN) tool bodies into a target body.
+
+    Args:
+        comp: Component owning the combine feature.
+        target: Target BRepBody.
+        tool_bodies: Single BRepBody or list of BRepBody.
+        op: FeatureOperations enum (CutFeatureOperation or JoinFeatureOperation).
+        keep_tool: Whether to keep tool bodies after the operation.
+        name: Feature name.
+    """
+    coll = adsk.core.ObjectCollection.create()
+    if isinstance(tool_bodies, list):
+        for b in tool_bodies:
+            coll.add(b)
+    else:
+        coll.add(tool_bodies)
+    inp = comp.features.combineFeatures.createInput(target, coll)
+    inp.operation = op
+    inp.isKeepToolBodies = keep_tool
+    f = comp.features.combineFeatures.add(inp)
+    f.name = name
+    return f
+
+
+def mirror_body(comp, body, plane, name="Mirror"):
+    """Mirror a single body across a plane.
+
+    Returns the MirrorFeature. Access the mirrored body via
+    ``m.bodies.item(0)``.
+    """
+    coll = adsk.core.ObjectCollection.create()
+    coll.add(body)
+    inp = comp.features.mirrorFeatures.createInput(coll, plane)
+    m = comp.features.mirrorFeatures.add(inp)
+    m.name = name
+    return m
+
+
+def mirror_bodies(comp, bodies, plane, name="Mirror"):
+    """Mirror multiple bodies across a plane.
+
+    Returns the MirrorFeature.
+    """
+    coll = adsk.core.ObjectCollection.create()
+    for b in bodies:
+        coll.add(b)
+    inp = comp.features.mirrorFeatures.createInput(coll, plane)
+    m = comp.features.mirrorFeatures.add(inp)
+    m.name = name
+    return m
+
+
+def mirror_feats(comp, features, plane, name="Mirror"):
+    """Mirror features (extrudes, combines, etc.) across a plane.
+
+    Use this instead of ``mirror_body`` when the mirrored side needs to
+    replay the feature operations (e.g., extrude + JOIN into a target that
+    spans both sides).
+    """
+    coll = adsk.core.ObjectCollection.create()
+    for f in features:
+        coll.add(f)
+    inp = comp.features.mirrorFeatures.createInput(coll, plane)
+    m = comp.features.mirrorFeatures.add(inp)
+    m.name = name
+    return m
+
+
+def make_comp(root_comp, name):
+    """Create a new component under root_comp.
+
+    Returns the Occurrence (access component via ``occ.component``).
+    """
+    occ = root_comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    occ.component.name = name
+    return occ
+
+
+def feat_pattern(comp, feat, axis, count_expr, spacing_expr, name="Pat"):
+    """Rectangular pattern of a single feature along an axis.
+
+    Returns the RectangularPatternFeature.
+    """
+    coll = adsk.core.ObjectCollection.create()
+    coll.add(feat)
+    inp = comp.features.rectangularPatternFeatures.createInput(
+        coll, axis,
+        adsk.core.ValueInput.createByString(count_expr),
+        adsk.core.ValueInput.createByString(spacing_expr),
+        adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
+    p = comp.features.rectangularPatternFeatures.add(inp)
+    p.name = name
+    return p
+
+
+def body_pattern(comp, body, axis, count_expr, spacing_expr, name="Pat"):
+    """Rectangular pattern of a body along an axis.
+
+    WARNING: body_pattern replays the full feature tree of the template body.
+    If the body has CUT/JOIN operations in its timeline history (including
+    CUTs added AFTER the pattern), each pattern instance creates ghost
+    duplicate bodies. Use a Python ``for`` loop instead for bodies with
+    CUT/JOIN history. Safe for simple bodies (NewBody extrude + Mirror only).
+
+    Returns the RectangularPatternFeature.
+    """
+    coll = adsk.core.ObjectCollection.create()
+    coll.add(body)
+    inp = comp.features.rectangularPatternFeatures.createInput(
+        coll, axis,
+        adsk.core.ValueInput.createByString(count_expr),
+        adsk.core.ValueInput.createByString(spacing_expr),
+        adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
+    p = comp.features.rectangularPatternFeatures.add(inp)
+    p.name = name
+    return p
+
+
 # ── Internal Helpers ────────────────────────────────────────────────
 
 def _make_ev():

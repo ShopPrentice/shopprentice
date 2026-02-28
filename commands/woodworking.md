@@ -69,7 +69,12 @@ When a constraint chain has N terms, at most N-1 can be independent. Choose the 
 
 ## Design-First Planning
 
-Before writing code for any piece, produce a step-by-step modeling plan structured like this:
+Before writing any code, output the modeling plan as a **text-only response**. Do NOT write the script in the same response as the plan.
+
+1. **Plan response** — output the step list as text. No file writes, no code blocks longer than 5 lines.
+2. **Build response** — in the NEXT response, write the script to a file and execute it.
+
+Structure the plan like this:
 
 ```
 Components: Sides, Shelves, Top, Kick
@@ -159,6 +164,7 @@ def find_face(body, axis, direction):
 front_face = find_face(rail_body, "y", -1)
 sk = comp.sketches.add(front_face)
 ```
+Also available as `af.find_face(body, axis, direction)`.
 
 **Extrude direction on body faces:** The default (positive) extrude direction on a face sketch follows `face.evaluator.getNormalAtPoint()` — the true outward normal, pointing AWAY from the body. Use `flip=True` (NegativeExtentDirection) for CUT extrudes on body faces so the cut goes INTO the body.
 
@@ -183,6 +189,7 @@ def probe_sketch_axes(sk):
     v_axis = max(deltas, key=lambda a: abs(deltas[a][1]))
     return h_axis, v_axis
 ```
+Also available as `af.probe_sketch_axes(sk)`.
 
 **CRITICAL: `probe_sketch_axes` returns axis names but NOT signs.** On non-XY construction planes, a model axis can map to the *negative* sketch direction. For example, on an XZ-offset plane, model +Z maps to sketch -Y. If you build dimension expressions assuming positive mapping, geometry lands at mirrored positions.
 
@@ -321,19 +328,33 @@ def run(context):
     shelf = ctx.find_body("shelf_top")  # recursive body search by name
     shelves = ctx.find_bodies("shelf_*")  # glob pattern match
 
+    # Queries
     top = af.find_face(shelf, "z", +1)   # outermost planar face along axis
     at = af.find_face_at(shelf, "z", 3.0)  # face at specific coordinate
     edges = af.find_edges(shelf, "z")    # linear edges aligned with axis
+    h, v = af.probe_sketch_axes(sk)      # model axis → sketch H/V
+    p = af.smallest_profile(sk)          # smallest-area profile in sketch
 
-    sk, prof = af.sketch_rect(ctx.root, ctx.root.xYConstructionPlane,
-                               "0 cm", "0 cm", "width", "depth",
+    # Sketches
+    sk, prof = af.sketch_rect(comp, plane, "0 cm", "0 cm", "w", "d",
                                name="Sk", ev=ctx.ev)
-    sk2, prof2 = af.sketch_rect_model(ctx.root, plane,
+    sk2, prof2 = af.sketch_rect_model(comp, plane,
                                        ("x0", "y0", "z0"),
                                        {"x": "width", "z": "height"},
                                        name="Sk2", ev=ctx.ev)
-    h, v = af.probe_sketch_axes(sk2)   # model axis → sketch H/V
-    p = af.smallest_profile(sk)        # smallest-area profile in sketch
+
+    # Feature builders
+    f = af.ext_new(comp, prof, "board_thick", "FrontBoard")
+    f = af.ext_new_sym(comp, prof, "board_thick", "Rail")
+    f = af.ext_op(comp, prof, "groove_depth", CUT, body, "Groove", flip=True)
+    pl = af.off_plane(comp, base_plane, "box_width / 2", "YMid")
+    af.combine(comp, target, [tool1, tool2], CUT, True, "Mortise")
+    m = af.mirror_body(comp, body, mid_plane, "BackMirror")
+    m = af.mirror_bodies(comp, [b1, b2], mid_plane, "Mirror")
+    m = af.mirror_feats(comp, [ext_feat], mid_plane, "RabMirror")
+    occ = af.make_comp(root, "Shelves")
+    pat = af.feat_pattern(comp, feat, axis, "n_slats", "slat_pitch", "Pat")
+    pat = af.body_pattern(comp, body, axis, "n_shelves", "shelf_pitch", "Pat")
 ```
 
 All helpers accept explicit objects (body, component, sketch) rather than relying on module globals, so they work in both normal and sandbox mode. The `ev` parameter falls back to creating one from the active design when omitted.
@@ -343,146 +364,53 @@ All helpers accept explicit objects (body, component, sketch) rather than relyin
 - `find_face` uses `pointOnFace` coordinate, not normal sign (handles both-direction normals correctly)
 - `DesignContext.find_body/find_bodies` walks all descendant components recursively
 
-When a helper doesn't exist for what you need (feature builders, combine, mirror), write those inline — the helpers only cover query and sketch boilerplate.
+**What's NOT in af.py** (write these inline when needed): `sketch_slot`, `probe_sketch_signs`, project-specific face finders (e.g., `find_top_face`).
 
 ### `ev()` — Dual-Mode Parameter Access
+
+Evaluates a parameter name or expression string → float in cm. Use for computing approximate sketch positions; actual parametric behavior comes from dimension expressions, not `ev()` values.
+
+**Preferred:** `ctx.ev("shelf_depth")` via `af.DesignContext`. **Inline fallback** (when not using af):
 ```python
 def ev(e):
-    """Evaluate a parameter name or expression, returning value in cm."""
     p = params.itemByName(e)
     return p.value if p else design.unitsManager.evaluateExpression(e, "cm")
 ```
-Use for computing approximate sketch positions. Actual parametric behavior comes from dimension expressions, not `ev()` values. Available as `ctx.ev()` from the helper library, or define inline as shown above.
 
 ### `sketch_rect_model()` — Parametric Rectangle in Model Coordinates
+
+Available as `af.sketch_rect_model(comp, plane, model_origin, model_size, name, ev)`.
+
+Creates a fully parametric rectangle on ANY plane (including non-XY construction planes and BRepFaces). Internally uses `modelToSketchSpace` to convert model coordinates to sketch space, adds explicit H/V geometric constraints, and creates 4 parametric dimensions (width, height, x-offset, y-offset).
+
 ```python
-def sketch_rect_model(plane, model_origin, model_size, name="Sk"):
-    """
-    Parametric rectangle in model coordinates.
-    model_origin: (x_expr, y_expr, z_expr) — parameter expressions
-    model_size:   {axis: expr, axis: expr} — 2 model-axis sizes
-    Returns: (sketch, profile)
-    """
-    sk = root.sketches.add(plane)
-    sk.name = name
-    h_axis, v_axis = probe_sketch_axes(sk)
-
-    # Evaluate model-space corners
-    ox, oy, oz = ev(model_origin[0]), ev(model_origin[1]), ev(model_origin[2])
-    corner = {"x": ox, "y": oy, "z": oz}
-    for a, expr in model_size.items():
-        corner[a] += ev(expr)
-
-    # Convert to sketch space
-    sk_o = sk.modelToSketchSpace(Point3D.create(ox, oy, oz))
-    sk_f = sk.modelToSketchSpace(
-        Point3D.create(corner["x"], corner["y"], corner["z"]))
-
-    # Draw rectangle + lock orientation
-    rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
-        Point3D.create(sk_o.x, sk_o.y, 0),
-        Point3D.create(sk_f.x, sk_f.y, 0))
-    gc = sk.geometricConstraints
-    gc.addHorizontal(rect[0])
-    gc.addHorizontal(rect[2])
-    gc.addVertical(rect[1])
-    gc.addVertical(rect[3])
-
-    # Parametric dimensions
-    d = sk.sketchDimensions
-    axis_to_origin = {
-        "x": model_origin[0], "y": model_origin[1], "z": model_origin[2]}
-    mid_x = (sk_o.x + sk_f.x) / 2
-    mid_y = (sk_o.y + sk_f.y) / 2
-    dy = -1 if sk_f.y >= sk_o.y else 1
-    dx = -1 if sk_f.x >= sk_o.x else 1
-
-    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
-    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
-
-    # Width (sketch-X) → h_axis model size
-    d.addDistanceDimension(
-        rect[0].startSketchPoint, rect[0].endSketchPoint,
-        H, Point3D.create(mid_x, sk_o.y + dy, 0)
-    ).parameter.expression = model_size[h_axis]
-
-    # Height (sketch-Y) → v_axis model size
-    d.addDistanceDimension(
-        rect[1].startSketchPoint, rect[1].endSketchPoint,
-        V, Point3D.create(sk_f.x - dx, mid_y, 0)
-    ).parameter.expression = model_size[v_axis]
-
-    # H origin offset
-    d.addDistanceDimension(
-        sk.originPoint, rect[0].startSketchPoint,
-        H, Point3D.create(sk_o.x / 2, sk_o.y + 2 * dy, 0)
-    ).parameter.expression = axis_to_origin[h_axis]
-
-    # V origin offset
-    d.addDistanceDimension(
-        sk.originPoint, rect[0].startSketchPoint,
-        V, Point3D.create(sk_o.x + dx, sk_o.y / 2, 0)
-    ).parameter.expression = axis_to_origin[v_axis]
-
-    return sk, sk.profiles.item(0)
+sk, prof = af.sketch_rect_model(comp, comp.xZConstructionPlane,
+    ("0 in", "0 in", "0 in"),
+    {"x": "box_length", "z": "box_height"},
+    "Front_Sk", ev=ctx.ev)
 ```
 
-### Other Standard Helpers
-```python
-def ext_new(prof, dist, name="Ext"):
-    """Extrude a profile as a new body."""
-    inp = root.features.extrudeFeatures.createInput(
-        prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
-    inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist))
-    f = root.features.extrudeFeatures.add(inp)
-    f.name = name
-    return f
+- `model_origin`: `(x_expr, y_expr, z_expr)` — model-space corner expressions
+- `model_size`: `{axis: expr, axis: expr}` — 2 model-axis size expressions
+- Returns: `(sketch, profile)`
 
-def ext_op(prof, dist_expr, op, body, name="Ext"):
-    """Extrude a profile as CUT or JOIN into an existing body."""
-    inp = root.features.extrudeFeatures.createInput(prof, op)
-    inp.setDistanceExtent(False, adsk.core.ValueInput.createByString(dist_expr))
-    inp.participantBodies = [body]
-    f = root.features.extrudeFeatures.add(inp)
-    f.name = name
-    return f
+### Feature Builder Reference (`af.*`)
 
-def off_plane(base, expr, name="Pl"):
-    """Create an offset construction plane."""
-    inp = root.constructionPlanes.createInput()
-    inp.setByOffset(base, adsk.core.ValueInput.createByString(expr))
-    p = root.constructionPlanes.add(inp)
-    p.name = name
-    return p
+All feature builders take `comp` as first arg. Available via `from helpers import af`.
 
-def combine(target, tool_bodies, op, keep_tool, name="Comb"):
-    """Combine (CUT/JOIN) tool bodies into a target body."""
-    coll = adsk.core.ObjectCollection.create()
-    if isinstance(tool_bodies, list):
-        for b in tool_bodies:
-            coll.add(b)
-    else:
-        coll.add(tool_bodies)
-    inp = root.features.combineFeatures.createInput(target, coll)
-    inp.operation = op
-    inp.isKeepToolBodies = keep_tool
-    f = root.features.combineFeatures.add(inp)
-    f.name = name
-    return f
-
-def feat_pattern(feat, axis, count_expr, spacing_expr, name="Pat"):
-    """Feature pattern a single feature along an axis."""
-    coll = adsk.core.ObjectCollection.create()
-    coll.add(feat)
-    inp = root.features.rectangularPatternFeatures.createInput(
-        coll, axis,
-        adsk.core.ValueInput.createByString(count_expr),
-        adsk.core.ValueInput.createByString(spacing_expr),
-        adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
-    p = root.features.rectangularPatternFeatures.add(inp)
-    p.name = name
-    return p
-```
+| Function | Signature | Returns | Notes |
+|----------|-----------|---------|-------|
+| `ext_new` | `(comp, prof, dist, name)` | ExtrudeFeature | Body via `f.bodies.item(0)` |
+| `ext_new_sym` | `(comp, prof, dist, name)` | ExtrudeFeature | Symmetric about sketch plane |
+| `ext_op` | `(comp, prof, dist_expr, op, body, name, flip)` | ExtrudeFeature | `flip=True` for NegativeExtentDirection (CUT into body on face sketches) |
+| `off_plane` | `(comp, base, expr, name)` | ConstructionPlane | Offset construction plane |
+| `combine` | `(comp, target, tool_bodies, op, keep_tool, name)` | CombineFeature | `tool_bodies` accepts single body or list |
+| `mirror_body` | `(comp, body, plane, name)` | MirrorFeature | Mirrored body via `m.bodies.item(0)` |
+| `mirror_bodies` | `(comp, bodies, plane, name)` | MirrorFeature | Multiple bodies at once |
+| `mirror_feats` | `(comp, features, plane, name)` | MirrorFeature | Replays feature operations on mirrored side |
+| `make_comp` | `(root_comp, name)` | Occurrence | Component via `occ.component` |
+| `feat_pattern` | `(comp, feat, axis, count_expr, spacing_expr, name)` | RectangularPatternFeature | Feature pattern along axis |
+| `body_pattern` | `(comp, body, axis, count_expr, spacing_expr, name)` | RectangularPatternFeature | **WARNING:** replays full feature tree — creates ghost bodies if template has CUT/JOIN history. Use Python `for` loop instead for complex bodies. |
 
 ## Replication Strategy
 
@@ -841,7 +769,7 @@ Complex furniture (10+ bodies, 3+ joint systems) should be built in phases. Each
 3. **Each phase script is standalone.** It creates all parameters, helpers, and geometry from scratch. Phase 2 includes phase 1's structure plus joinery.
 4. **Same file, growing content.** Update the same `.py` file for each phase.
 5. **Show final result.** Take a screenshot only after the last phase and present it to the user.
-6. **Design-first planning applies at every phase.** Before writing code for a new phase, write out the step list (see Design-First Planning).
+6. **Plan before code, always in separate responses.** Before each phase, output the step list as text. Then write the script and execute in the next response. Never combine plan + full script in one response.
 
 ### Document Reuse Pattern
 
@@ -1012,18 +940,18 @@ When the user tweaks a design in the Fusion UI and you need to update the `.py` 
 ### Example Flow
 
 ```
-Phase 1: Structure
-  → write bookshelf.py (boards only)
+Response 1 (plan): Phase 1 step list — components, boards, positions
+Response 2 (build): write bookshelf.py (boards only)
   → execute → capture_design → validate 6 bodies, positions OK → auto-proceed
 
-Phase 2: Add joinery
-  → update bookshelf.py (structure + mortise & tenon)
+Response 3 (plan): Phase 2 step list — tenons, mirrors, CUTs
+Response 4 (build): update bookshelf.py (structure + mortise & tenon)
   → execute → capture_design → validate body count (tenons joined), mortises cut
   → body count wrong? → get_timeline_state to bisect → find bad feature → fix → retry
   → validation OK → auto-proceed
 
-Phase 3: Add details
-  → update bookshelf.py (structure + M&T + chamfers)
+Response 5 (plan): Phase 3 step list — chamfers, fillets
+Response 6 (build): update bookshelf.py (structure + M&T + chamfers)
   → execute → capture_design → validate → screenshot → present to user
 ```
 
@@ -1047,6 +975,7 @@ Use `execute_script` with `sandbox=true` to run a script in a throwaway document
 ### Important
 
 - Always generate complete, standalone parametric scripts. MCP is the delivery mechanism — the script must also work when pasted into Fusion 360's script editor.
+- Scripts using `from helpers import af` need the addin's `helpers/` directory on the Python path (automatic when run via `execute_script`). For standalone use outside MCP, copy `addin/helpers/` alongside the script.
 - Never generate partial snippets that only work via MCP.
 - Scripts must NOT catch exceptions — let them propagate so Fusion 360 aborts the transaction and returns the full error to the agent.
 
