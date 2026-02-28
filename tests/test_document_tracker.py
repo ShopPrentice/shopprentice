@@ -25,8 +25,15 @@ def _setup_mocks():
     mock_app = MagicMock()
     adsk.core.Application = MagicMock()
     adsk.core.Application.get.return_value = mock_app
+    # Mock adsk.fusion (needed by _capture_model_params)
+    adsk.fusion = types.ModuleType("adsk.fusion")
+    mock_design_cls = MagicMock()
+    # Default: Design.cast() returns None (no active design)
+    mock_design_cls.cast.return_value = None
+    adsk.fusion.Design = mock_design_cls
     sys.modules["adsk"] = adsk
     sys.modules["adsk.core"] = adsk.core
+    sys.modules["adsk.fusion"] = adsk.fusion
 
     # Mock ActionLog as a class with classmethods
     class MockActionLog:
@@ -204,7 +211,7 @@ class TestDocumentTracker(unittest.TestCase):
 
     # ── 5. Sync complete ──
 
-    def test_on_sync_complete_updates_script_and_cursor(self):
+    def test_on_sync_complete_updates_script(self):
         script = 'def run(ctx):\n    pass'
         doc = self._make_doc()
         mock_app.activeDocument = doc
@@ -212,14 +219,13 @@ class TestDocumentTracker(unittest.TestCase):
         DocumentTracker.on_script_executed(script, doc)
 
         patched = 'def run(ctx):\n    print("patched")'
-        DocumentTracker.on_sync_complete(patched, "cursor-2")
+        DocumentTracker.on_sync_complete(patched)
 
         self.assertEqual(DocumentTracker.get_script(), patched)
         self.assertEqual(
             DocumentTracker._script_hash,
             hashlib.sha256(patched.encode()).hexdigest()
         )
-        self.assertEqual(DocumentTracker._sync_cursor, "cursor-2")
 
     # ── 6. Advance cursor ──
 
@@ -360,7 +366,7 @@ class TestDocumentTracker(unittest.TestCase):
         DocumentTracker.on_script_executed(script, doc)
 
         patched = 'def run(ctx):\n    print("patched")'
-        DocumentTracker.on_sync_complete(patched, "cursor-2")
+        DocumentTracker.on_sync_complete(patched)
 
         with open(mod._PROVENANCE_FILE, "r") as f:
             data = json.load(f)
@@ -464,7 +470,7 @@ class TestDocumentTracker(unittest.TestCase):
         self.assertTrue(status["needsSync"])
 
         # Sync clears the flag
-        DocumentTracker.on_sync_complete(script, "cursor-x")
+        DocumentTracker.on_sync_complete(script)
         status = DocumentTracker.get_status()
         self.assertNotIn("needsSync", status)
 
@@ -508,6 +514,119 @@ class TestDocumentTracker(unittest.TestCase):
         status = DocumentTracker.get_status()
         self.assertTrue(status["tracked"])
         self.assertNotIn("needsSync", status)  # NOT restored from disk
+
+
+    # ── 13. Reference model parameters ──
+
+    def test_reference_captured_on_script_executed(self):
+        """on_script_executed captures reference model params."""
+        script = 'def run(ctx):\n    pass'
+        doc = self._make_doc()
+        mock_app.activeDocument = doc
+
+        fake_params = {"Extrude1.d0": "10 mm", "Extrude1.d1": "20 mm"}
+        with unittest.mock.patch.object(
+            DocumentTracker, '_capture_model_params', return_value=fake_params
+        ):
+            DocumentTracker.on_script_executed(script, doc)
+
+        self.assertEqual(DocumentTracker._reference_model_params, fake_params)
+
+    def test_reference_updated_on_sync_complete(self):
+        """on_sync_complete recaptures reference model params."""
+        script = 'def run(ctx):\n    pass'
+        doc = self._make_doc()
+        mock_app.activeDocument = doc
+
+        with unittest.mock.patch.object(
+            DocumentTracker, '_capture_model_params', return_value={"a.b": "1 mm"}
+        ):
+            DocumentTracker.on_script_executed(script, doc)
+
+        new_params = {"a.b": "2 mm", "c.d": "5 mm"}
+        patched = 'def run(ctx):\n    print("v2")'
+        with unittest.mock.patch.object(
+            DocumentTracker, '_capture_model_params', return_value=new_params
+        ):
+            DocumentTracker.on_sync_complete(patched)
+
+        self.assertEqual(DocumentTracker._reference_model_params, new_params)
+
+    def test_update_reference_recaptures(self):
+        """update_reference() recaptures current model params."""
+        script = 'def run(ctx):\n    pass'
+        doc = self._make_doc()
+        mock_app.activeDocument = doc
+
+        with unittest.mock.patch.object(
+            DocumentTracker, '_capture_model_params', return_value={"x.y": "1 in"}
+        ):
+            DocumentTracker.on_script_executed(script, doc)
+
+        self.assertEqual(DocumentTracker._reference_model_params, {"x.y": "1 in"})
+
+        with unittest.mock.patch.object(
+            DocumentTracker, '_capture_model_params', return_value={"x.y": "2 in"}
+        ):
+            DocumentTracker.update_reference()
+
+        self.assertEqual(DocumentTracker._reference_model_params, {"x.y": "2 in"})
+
+    def test_reference_persists_to_disk_and_restores(self):
+        """Reference model params are saved to provenance.json and restored."""
+        script = 'def run(ctx):\n    pass'
+        doc = self._make_doc("RefDoc")
+        mock_app.activeDocument = doc
+
+        fake_params = {"Ext1.d0": "5 mm", "Fillet1.radius": "2 mm"}
+        with unittest.mock.patch.object(
+            DocumentTracker, '_capture_model_params', return_value=fake_params
+        ):
+            DocumentTracker.on_script_executed(script, doc)
+
+        # Verify written to disk
+        with open(mod._PROVENANCE_FILE, "r") as f:
+            data = json.load(f)
+        self.assertEqual(data["RefDoc"]["referenceModelParams"], fake_params)
+
+        # Clear memory, restore
+        DocumentTracker._clear_memory()
+        new_doc = self._make_doc("RefDoc")
+        mock_app.activeDocument = new_doc
+
+        status = DocumentTracker.get_status()
+        self.assertTrue(status["tracked"])
+        self.assertEqual(DocumentTracker._reference_model_params, fake_params)
+
+    def test_old_provenance_without_reference_restores_gracefully(self):
+        """Old provenance.json without referenceModelParams restores with None."""
+        # Write old-format provenance manually
+        old_data = {
+            "OldDoc": {
+                "scriptSource": 'def run(ctx):\n    pass',
+                "scriptHash": hashlib.sha256(b'def run(ctx):\n    pass').hexdigest(),
+            }
+        }
+        os.makedirs(mod._PROVENANCE_DIR, exist_ok=True)
+        with open(mod._PROVENANCE_FILE, "w") as f:
+            json.dump(old_data, f)
+
+        doc = self._make_doc("OldDoc")
+        mock_app.activeDocument = doc
+
+        status = DocumentTracker.get_status()
+        self.assertTrue(status["tracked"])
+        self.assertIsNone(DocumentTracker._reference_model_params)
+
+    def test_get_reference_model_params_returns_none_initially(self):
+        """No reference when nothing has been executed."""
+        self.assertIsNone(DocumentTracker.get_reference_model_params())
+
+    def test_clear_memory_clears_reference(self):
+        """_clear_memory resets reference model params."""
+        DocumentTracker._reference_model_params = {"a.b": "1 mm"}
+        DocumentTracker._clear_memory()
+        self.assertIsNone(DocumentTracker._reference_model_params)
 
 
 if __name__ == "__main__":

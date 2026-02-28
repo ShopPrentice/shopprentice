@@ -180,7 +180,7 @@ def _capture_feature(entity, idx, tl):
     return info
 
 
-def handler(script: str = None, lastSyncedId: str = None) -> dict:
+def handler(script: str = None) -> dict:
     """Sync a script against the live Fusion 360 state."""
     try:
         # If script not provided, read from DocumentTracker
@@ -193,9 +193,6 @@ def handler(script: str = None, lastSyncedId: str = None) -> dict:
                     "isError": True,
                     "message": "No script provided and no tracked script"
                 }
-            # Also use tracker's cursor if lastSyncedId not provided
-            if lastSyncedId is None:
-                lastSyncedId = DocumentTracker._sync_cursor
 
         design = adsk.fusion.Design.cast(app.activeProduct)
         if not design:
@@ -235,43 +232,28 @@ def handler(script: str = None, lastSyncedId: str = None) -> dict:
         tl_features = _get_timeline_feature_names(design)
         tl = design.timeline
 
-        # ── 5. Model parameter changes (feature-level params) ──
-        # Try ActionLog compacted diff first, fall back to baseline comparison
-        model_param_diff = None
-        action_log_entries = None
-        action_log_cursor = None
-
-        try:
-            from server.action_log import ActionLog
-            if ActionLog._is_running:
-                compacted = ActionLog.get_compacted_diff(since=lastSyncedId)
-                if compacted is not None:
-                    model_param_diff = compacted.get("modelParameterChanges", [])
-                action_log_cursor = ActionLog.get_latest_cursor()
-                raw_entries = ActionLog.get_entries(since=lastSyncedId)
-                action_log_entries = [
-                    {"commandId": e["commandId"], "timestamp": e["timestamp"]}
-                    for e in raw_entries
-                ]
-        except Exception:
-            pass
-
-        if model_param_diff is not None:
-            # Use ActionLog compacted diff
+        # ── 5. Model parameter changes (state-diff against reference snapshot) ──
+        from server.document_tracker import DocumentTracker
+        ref_params = DocumentTracker.get_reference_model_params()
+        if ref_params is not None:
+            current_params = DocumentTracker._capture_model_params() or {}
+            all_keys = set(ref_params.keys()) | set(current_params.keys())
             feature_param_changes = {}
-            for mc in model_param_diff:
-                key = mc["name"]
-                parts = key.split(".", 1)
-                feat_name = parts[0] if len(parts) == 2 else ""
-                param_name = parts[1] if len(parts) == 2 else key
-                if feat_name not in feature_param_changes:
-                    feature_param_changes[feat_name] = []
-                entry = {"paramName": param_name}
-                if "old" in mc:
-                    entry["old"] = mc["old"]
-                if "new" in mc:
-                    entry["new"] = mc["new"]
-                feature_param_changes[feat_name].append(entry)
+            for key in sorted(all_keys):
+                old_val = ref_params.get(key)
+                new_val = current_params.get(key)
+                if old_val != new_val:
+                    parts = key.split(".", 1)
+                    feat_name = parts[0] if len(parts) == 2 else ""
+                    param_name = parts[1] if len(parts) == 2 else key
+                    if feat_name not in feature_param_changes:
+                        feature_param_changes[feat_name] = []
+                    entry = {"paramName": param_name}
+                    if old_val is not None:
+                        entry["old"] = old_val
+                    if new_val is not None:
+                        entry["new"] = new_val
+                    feature_param_changes[feat_name].append(entry)
 
             for feat_name, params in feature_param_changes.items():
                 if feat_name in script_features and feat_name in tl_features:
@@ -285,45 +267,6 @@ def handler(script: str = None, lastSyncedId: str = None) -> dict:
                     if ctx:
                         entry["scriptContext"] = ctx
                     needs_agent.append(entry)
-        else:
-            # Fallback: baseline-based comparison
-            from . import get_changes
-            baseline = get_changes._baseline
-
-            if baseline is not None:
-                current_snapshot = get_changes._capture_snapshot(design)
-                old_mp = baseline.get("modelParameters", {})
-                new_mp = current_snapshot.get("modelParameters", {})
-                all_mp_keys = set(old_mp.keys()) | set(new_mp.keys())
-                feature_param_changes = {}
-                for key in sorted(all_mp_keys):
-                    old_val = old_mp.get(key)
-                    new_val = new_mp.get(key)
-                    if old_val != new_val:
-                        parts = key.split(".", 1)
-                        feat_name = parts[0] if len(parts) == 2 else ""
-                        param_name = parts[1] if len(parts) == 2 else key
-                        if feat_name not in feature_param_changes:
-                            feature_param_changes[feat_name] = []
-                        entry = {"paramName": param_name}
-                        if old_val is not None:
-                            entry["old"] = old_val
-                        if new_val is not None:
-                            entry["new"] = new_val
-                        feature_param_changes[feat_name].append(entry)
-
-                for feat_name, params in feature_param_changes.items():
-                    if feat_name in script_features and feat_name in tl_features:
-                        entry = {
-                            "type": "featureParameterChanged",
-                            "feature": feat_name,
-                            "featureType": tl_features[feat_name]["type"],
-                            "params": params,
-                        }
-                        ctx = _find_feature_context(script, feat_name)
-                        if ctx:
-                            entry["scriptContext"] = ctx
-                        needs_agent.append(entry)
 
         # ── 6. Features removed (in script but not in timeline) ──
         # Skip sketch names — sketches are implicit, not typically named in timeline
@@ -359,16 +302,11 @@ def handler(script: str = None, lastSyncedId: str = None) -> dict:
             "applied": applied,
             "needsAgent": needs_agent,
         }
-        if action_log_cursor is not None:
-            result["cursor"] = action_log_cursor
-        if action_log_entries is not None:
-            result["actionLog"] = action_log_entries
 
         # Update provenance tracking
         try:
-            from server.document_tracker import DocumentTracker
             if DocumentTracker.get_script() is not None:
-                DocumentTracker.on_sync_complete(patched, action_log_cursor)
+                DocumentTracker.on_sync_complete(patched)
         except Exception:
             pass
 
@@ -410,20 +348,15 @@ Pass the original script source, or omit it to use the tracked script from the l
   - `featureRemoved` — a feature from the script was deleted in the UI. Includes the script code block to remove.
   - `featureAdded` — a new feature was added in the UI. Includes full capture data so the agent can generate code.
 
-When the action log is active, pass `lastSyncedId` (cursor from a previous `get_changes` or `sync_script` call) to compare only changes since that point. Without it, compares against the full baseline.
-
-Returns additional fields when action log is active:
-- **cursor** — latest action log cursor, pass back as `lastSyncedId` next time
-- **actionLog** — list of {commandId, timestamp} for each user UI action
+Model parameter changes are detected via state-diff: a reference snapshot is captured when the script executes and compared against the current model state. No cursor threading required.
 
 Workflow:
 1. Run script via `execute_script`
-2. Call `get_changes` to capture baseline → save cursor
-3. User tweaks design in Fusion UI
-4. Call `sync_script` with the original script source + lastSyncedId=cursor
-5. Write `patchedScript` to the file
-6. Apply `needsAgent` changes to the script
-7. Re-execute to verify"""
+2. User tweaks design in Fusion UI
+3. Call `sync_script` (no arguments needed)
+4. Write `patchedScript` to the file
+5. Apply `needsAgent` changes to the script
+6. Re-execute to verify"""
 
 tool = Tool.create_simple(
     name="sync_script",
@@ -433,12 +366,6 @@ tool = Tool.create_simple(
     {
         "type": "string",
         "description": "The Python script source code to sync against the live Fusion 360 state. Optional — omit to use the tracked script from the last execute_script run."
-    }
-).add_input_property(
-    "lastSyncedId",
-    {
-        "type": "string",
-        "description": "Cursor UUID from a previous get_changes or sync_script call. Only compares changes since this cursor. Omit to compare against full baseline."
     }
 ).strict_schema()
 

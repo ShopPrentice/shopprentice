@@ -2,12 +2,13 @@
 Document Tracker Module
 
 Provenance tracking for the active Fusion 360 document.
-Remembers which script built the current model and tracks the ActionLog
-sync cursor so the agent can detect pending UI changes.
+Remembers which script built the current model, tracks the ActionLog
+sync cursor, and stores a reference snapshot of model parameters for
+state-diff based change detection in sync_script.
 
 In-memory state is authoritative during a session. A JSON sidecar file
-at ~/.autofusion/provenance.json persists script source and hash across
-add-in restarts, keyed by document name.
+at ~/.autofusion/provenance.json persists script source, hash, and
+reference model parameters across add-in restarts, keyed by document name.
 """
 
 import hashlib
@@ -33,10 +34,11 @@ class DocumentTracker:
     - The full script source from the last execute_script (non-sandbox)
     - A SHA-256 hash of that script
     - The ActionLog cursor after the last script execution or sync
+    - A reference snapshot of model parameters for state-diff detection
     - A reference to the Fusion Document for identity checking
 
     Persists (to JSON file):
-    - Script source and hash, keyed by document name
+    - Script source, hash, and reference model parameters, keyed by document name
     - Restored automatically when get_status finds no in-memory state
       but a matching entry exists on disk
     """
@@ -44,6 +46,7 @@ class DocumentTracker:
     _script_source = None     # str: full script text from last execute_script
     _script_hash = None       # str: SHA-256 of script_source
     _sync_cursor = None       # str: ActionLog cursor UUID after last script/sync
+    _reference_model_params = None  # dict: {featureName.paramName: expression}
     _doc_ref = None           # Fusion Document reference (for identity check)
     _restored = False         # True when state was loaded from disk (needs sync)
 
@@ -60,21 +63,70 @@ class DocumentTracker:
             cls._sync_cursor = ActionLog.get_latest_cursor()
         except Exception:
             cls._sync_cursor = None
+        # Capture reference snapshot of model parameters for state-diff
+        cls._reference_model_params = cls._capture_model_params()
         cls._save(doc)
 
     @classmethod
-    def on_sync_complete(cls, patched_script, cursor):
+    def on_sync_complete(cls, patched_script):
         """Called by sync_script after successful sync."""
         cls._script_source = patched_script
         cls._script_hash = hashlib.sha256(patched_script.encode()).hexdigest()
-        cls._sync_cursor = cursor
+        # Obtain cursor internally
+        try:
+            from server.action_log import ActionLog
+            cls._sync_cursor = ActionLog.get_latest_cursor()
+        except Exception:
+            pass
         cls._restored = False
+        # Capture reference snapshot of model parameters for state-diff
+        cls._reference_model_params = cls._capture_model_params()
         cls._save(cls._doc_ref)
 
     @classmethod
     def advance_cursor(cls, cursor):
         """Advance sync cursor after modify_parameters/suppress_features."""
         cls._sync_cursor = cursor
+
+    # ── Reference model parameters (state-diff) ──
+
+    @classmethod
+    def _capture_model_params(cls):
+        """Capture current model parameter expressions (excluding user params).
+
+        Returns dict: {featureName.paramName: expression}, or None if no design.
+        """
+        import adsk.fusion
+        design = adsk.fusion.Design.cast(app.activeProduct)
+        if not design:
+            return None
+        user_names = set()
+        for i in range(design.userParameters.count):
+            user_names.add(design.userParameters.item(i).name)
+        result = {}
+        for i in range(design.allParameters.count):
+            p = design.allParameters.item(i)
+            if p.name not in user_names:
+                try:
+                    parent = p.createdBy
+                    key = f"{parent.name}.{p.name}" if parent else p.name
+                except Exception:
+                    key = p.name
+                result[key] = p.expression
+        return result
+
+    @classmethod
+    def update_reference(cls):
+        """Recapture reference model params after API-driven changes."""
+        cls._reference_model_params = cls._capture_model_params()
+        cls._save(cls._doc_ref)
+
+    @classmethod
+    def get_reference_model_params(cls):
+        """Return the reference model params, attempting restore if None."""
+        if cls._reference_model_params is None and cls._script_source is None:
+            cls._try_restore()
+        return cls._reference_model_params
 
     @classmethod
     def get_status(cls):
@@ -140,6 +192,7 @@ class DocumentTracker:
         cls._script_source = None
         cls._script_hash = None
         cls._sync_cursor = None
+        cls._reference_model_params = None
         cls._doc_ref = None
         cls._restored = False
 
@@ -163,10 +216,13 @@ class DocumentTracker:
             return
         try:
             data = cls._load_file()
-            data[key] = {
+            entry = {
                 "scriptSource": cls._script_source,
                 "scriptHash": cls._script_hash,
             }
+            if cls._reference_model_params is not None:
+                entry["referenceModelParams"] = cls._reference_model_params
+            data[key] = entry
             os.makedirs(_PROVENANCE_DIR, exist_ok=True)
             with open(_PROVENANCE_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, separators=(",", ":"))
@@ -193,6 +249,7 @@ class DocumentTracker:
                 return False
             cls._script_source = entry["scriptSource"]
             cls._script_hash = entry["scriptHash"]
+            cls._reference_model_params = entry.get("referenceModelParams")  # graceful if missing
             cls._doc_ref = doc
             cls._sync_cursor = None  # cursor is session-only, can't restore
             cls._restored = True     # signal that sync is needed

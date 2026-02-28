@@ -117,10 +117,11 @@ def handler(features: list) -> dict:
         except Exception:
             pass
 
-        # Advance provenance cursor past API-driven changes
+        # Advance provenance cursor and update reference snapshot
         try:
             from server.document_tracker import DocumentTracker
             DocumentTracker.advance_cursor(ActionLog.get_latest_cursor())
+            DocumentTracker.update_reference()
         except Exception:
             pass
 

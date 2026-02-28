@@ -959,8 +959,8 @@ When the user asks to change an existing design (e.g., "make the shelves wider")
 **Step 1: Check provenance** — call `get_document_status` first:
 
 - `tracked=false` → The agent can't safely modify this design incrementally. It wasn't built by a known script in this session. Ask the user: "I can't safely modify this design incrementally. Would you like me to create a new script for it?"
-- `tracked=true`, `needsSync=true` → Provenance was restored from disk (e.g. after add-in restart or document reopen). The script and model may have diverged. Call `sync_script` (no `script` arg needed) to reconcile before proceeding.
-- `tracked=true`, `pendingChanges > 0` → The user made UI changes since the last sync. Call `sync_script` (no `script` arg needed) to reconcile, then proceed.
+- `tracked=true`, `needsSync=true` → Provenance was restored from disk (e.g. after add-in restart or document reopen). The script and model may have diverged. Call `sync_script` to reconcile before proceeding.
+- `tracked=true`, `pendingChanges > 0` → The user made UI changes since the last sync. Call `sync_script` to reconcile, then proceed.
 - `tracked=true`, `pendingChanges == 0` → Proceed directly.
 
 **Step 2: Apply the change:**
@@ -1000,7 +1000,7 @@ This avoids re-reading the full design with `capture_design` when you only need 
 
 When the user tweaks a design in the Fusion UI and you need to update the `.py` script to match:
 
-1. Call `sync_script` — no arguments needed. It reads the tracked script and cursor from the DocumentTracker automatically.
+1. Call `sync_script` — no arguments needed. It reads the tracked script from the DocumentTracker and diffs the reference model parameter snapshot against the current state automatically.
 2. The tool auto-patches user parameter expression changes (e.g., `tt_shoulder` from `"0.375 in"` to `"0.3 in"`) and returns the patched script.
 3. For changes that need agent help (`needsAgent`), apply each one to the patched script:
    - `featureParameterChanged` — update hardcoded expressions near the feature's `.name = "..."` line (scriptContext shows where).
