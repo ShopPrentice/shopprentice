@@ -1000,15 +1000,14 @@ This avoids re-reading the full design with `capture_design` when you only need 
 
 When the user tweaks a design in the Fusion UI and you need to update the `.py` script to match:
 
-1. Call `get_changes` after the initial script run to capture a baseline (if not already done).
-2. After the user makes changes, call `sync_script` with the original script source.
-3. The tool auto-patches user parameter expression changes (e.g., `tt_shoulder` from `"0.375 in"` to `"0.3 in"`) and returns the patched script.
-4. For changes that need agent help (`needsAgent`), apply each one to the patched script:
+1. Call `sync_script` — no arguments needed. It reads the tracked script and cursor from the DocumentTracker automatically.
+2. The tool auto-patches user parameter expression changes (e.g., `tt_shoulder` from `"0.375 in"` to `"0.3 in"`) and returns the patched script.
+3. For changes that need agent help (`needsAgent`), apply each one to the patched script:
    - `featureParameterChanged` — update hardcoded expressions near the feature's `.name = "..."` line (scriptContext shows where).
    - `featureRemoved` — delete the code block that created the feature (scriptContext shows the code).
    - `featureAdded` — generate new code from the capture data and insert it at the appropriate timeline position.
-5. Write the updated script to the file.
-6. Re-execute via `execute_script` to verify the model matches.
+4. Write the updated script to the file.
+5. Re-execute via `execute_script(clean=true)` to verify the model matches.
 
 ### Example Flow
 
