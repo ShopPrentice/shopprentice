@@ -299,33 +299,33 @@ class _Generator:
         dims = f.get("dimensions", [])
         plane_info = f.get("plane", {})
 
-        # BRepFace sketches: check if we should use find_face (simpler, works for CUTs)
-        # or construction plane (avoids boundary interference for complex profiles)
+        # BRepFace sketches: use find_face directly when auto-projected boundary
+        # curves are present. This avoids cplane boundary coincidence issues with CUTs.
+        # Filter out reference curves — Fusion auto-projects them when sketching on a face.
+        is_on_face = False
         if (plane_info.get("type") == "BRepFace"
                 and "sketchOrigin" in f
                 and "sketchXDir" in f
                 and "sketchYDir" in f):
-            # Count non-reference curves to decide strategy
             non_ref = [c for c in curves if not c.get("isReference")]
             ref_count = len(curves) - len(non_ref)
-            # Simple case: reference curves are just face boundary + drawn geometry is a rect
-            # → use find_face directly (works for CUTs, avoids cplane boundary issues)
-            if ref_count > 0 and self._is_rect(non_ref):
+            self._brep_face_sketches[name] = plane_info
+            if ref_count > 0:
+                # Has auto-projected boundary → use find_face, filter out refs
                 plane_code = self._resolve_plane(plane_info)
-                # Filter out reference curves; rect emitter will handle the rest
                 curves = non_ref
-                self._brep_face_sketches[name] = plane_info
+                is_on_face = True
             else:
+                # No boundary refs (e.g., projected individual edges only)
+                # → use cplane to avoid boundary interference
                 plane_code, curves = self._brep_face_to_cplane(f, curves)
-                self._brep_face_sketches[name] = plane_info
         else:
             plane_code = self._resolve_plane(plane_info)
 
-        is_on_face = name in self._brep_face_sketches and plane_info.get("type") == "BRepFace"
         if self._is_rect(curves):
             self._emit_rect_sketch(var, name, plane_code, curves, dims, on_face=is_on_face)
         else:
-            self._emit_raw_sketch(var, name, plane_code, curves, dims, f)
+            self._emit_raw_sketch(var, name, plane_code, curves, dims, f, on_face=is_on_face)
 
     def _feat_extrude(self, f):
         name = f.get("name", "Extrude")
@@ -914,7 +914,7 @@ class _Generator:
             self._w(f"{prof} = {var}.profiles.item(0)")
         self.profiles[name] = prof
 
-    def _emit_raw_sketch(self, var, name, plane_code, curves, dims, feat):
+    def _emit_raw_sketch(self, var, name, plane_code, curves, dims, feat, on_face=False):
         """Emit raw sketch geometry with parametric dimensions and constraints."""
         self._w(f"{var} = root.sketches.add({plane_code})")
         self._w(f'{var}.name = "{name}"')
@@ -1109,10 +1109,20 @@ class _Generator:
                         self._w(f"gc.addEqual({c1}, {c2})")
 
         # Profile
-        pidx = 0
-        prof_count = feat.get("profileCount", 1)
         prof = f"{var}_prof"
-        self._w(f"{prof} = {var}.profiles.item({pidx})  # {prof_count} profile(s)")
+        if on_face:
+            # BRepFace auto-projects boundary → multiple profiles. Select smallest.
+            self._w(f"_best_pi, _best_a = 0, float('inf')")
+            self._w(f"for _pi in range({var}.profiles.count):")
+            self.ind += 1
+            self._w(f"_bb = {var}.profiles.item(_pi).boundingBox")
+            self._w(f"_a = abs(_bb.maxPoint.x-_bb.minPoint.x)*abs(_bb.maxPoint.y-_bb.minPoint.y)")
+            self._w(f"if _a < _best_a: _best_a, _best_pi = _a, _pi")
+            self.ind -= 1
+            self._w(f"{prof} = {var}.profiles.item(_best_pi)")
+        else:
+            prof_count = feat.get("profileCount", 1)
+            self._w(f"{prof} = {var}.profiles.item(0)  # {prof_count} profile(s)")
         self.profiles[name] = prof
 
     def _resolve_sketch_entity_ref(self, ref, curve_vars, sk_var):
