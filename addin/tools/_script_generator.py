@@ -701,14 +701,25 @@ class _Generator:
             return
 
         self._w("fillet_inp = root.features.filletFeatures.createInput()")
+        any_edges = False
         for si, es in enumerate(edge_sets):
             radius = es.get("radius", "0.1 cm")
             edges = es.get("edges", [])
+            if not edges:
+                self._c(f"TODO: edge set {si} has no captured vertices")
+                continue
+            any_edges = True
             self._emit_edge_finder(f"fillet_edges_{si}", edges, f.get("bodies", []))
+            self._w(f"if fillet_edges_{si}.count > 0:")
+            self.ind += 1
             self._w(f"fillet_inp.addConstantRadiusEdgeSet(fillet_edges_{si}, "
                     f'adsk.core.ValueInput.createByString("{radius}"), True)')
-        self._w(f'fillet_feat = root.features.filletFeatures.add(fillet_inp)')
-        self._w(f'fillet_feat.name = "{name}"')
+            self.ind -= 1
+        if any_edges:
+            self._w(f'fillet_feat = root.features.filletFeatures.add(fillet_inp)')
+            self._w(f'fillet_feat.name = "{name}"')
+        else:
+            self._c(f"TODO: Fillet '{name}' skipped — no edges captured")
 
     def _feat_chamfer(self, f):
         name = f.get("name", "Chamfer")
@@ -719,8 +730,13 @@ class _Generator:
             return
 
         self._w("chamfer_inp = root.features.chamferFeatures.createInput2()")
+        any_edges = False
         for si, es in enumerate(edge_sets):
             edges = es.get("edges", [])
+            if not edges:
+                self._c(f"TODO: edge set {si} has no captured vertices")
+                continue
+            any_edges = True
             ctype = es.get("chamferType", "EqualDistance")
             self._emit_edge_finder(f"chamfer_edges_{si}", edges, f.get("bodies", []))
 
@@ -741,8 +757,11 @@ class _Generator:
                         f'chamfer_edges_{si}, adsk.core.ValueInput.createByString("{dist}"), '
                         f'adsk.core.ValueInput.createByString("{angle}"), True)')
 
-        self._w(f'chamfer_feat = root.features.chamferFeatures.add(chamfer_inp)')
-        self._w(f'chamfer_feat.name = "{name}"')
+        if any_edges:
+            self._w(f'chamfer_feat = root.features.chamferFeatures.add(chamfer_inp)')
+            self._w(f'chamfer_feat.name = "{name}"')
+        else:
+            self._c(f"TODO: Chamfer '{name}' skipped — no edges captured")
 
     def _emit_edge_finder(self, var, edges, body_names):
         """Emit code that finds edges by matching vertex positions."""
@@ -989,9 +1008,10 @@ class _Generator:
         arc_vars = {}
         circle_vars = {}
 
-        # Pre-scan: collect BRepBody projections and emit one sk.project(body) each
-        _body_proj_done = set()  # body names already projected
-        _body_proj_var = {}  # body name → projected ObjectCollection var
+        # Pre-scan: collect BRepBody projections and emit one sk.project(body) each.
+        # Build a runtime point lookup so drawn lines can snap to projected endpoints.
+        _body_proj_done = set()
+        _has_body_projs = False
         for i, c in enumerate(curves):
             if c.get("isReference"):
                 pf = c.get("projectedFrom", {})
@@ -999,11 +1019,36 @@ class _Generator:
                     bname = pf["body"]
                     if bname not in _body_proj_done:
                         _body_proj_done.add(bname)
+                        _has_body_projs = True
                         bv = self._body_ref(bname)
                         pvar = f"_proj_body_{self._var(bname)}"
                         self._c(f"Project body '{bname}'")
                         self._w(f"{pvar} = {var}.project({bv})")
-                        _body_proj_var[bname] = pvar
+
+        if _has_body_projs:
+            # Build runtime lookup of all projected sketch points
+            self._w(f"_proj_pts = []  # [(x, y, sketchPoint), ...]")
+            self._w(f"for _ci in range({var}.sketchCurves.count):")
+            self.ind += 1
+            self._w(f"_c = {var}.sketchCurves.item(_ci)")
+            self._w(f"if _c.isReference:")
+            self.ind += 1
+            self._w(f"for _sp in [_c.startSketchPoint, _c.endSketchPoint]:")
+            self.ind += 1
+            self._w(f"_g = _sp.geometry")
+            self._w(f"_proj_pts.append((_g.x, _g.y, _sp))")
+            self.ind -= 3
+            self._w()
+            self._w(f"def _nearest_proj(x, y):")
+            self.ind += 1
+            self._w(f"best, best_d = None, 0.5")
+            self._w(f"for _px, _py, _sp in _proj_pts:")
+            self.ind += 1
+            self._w(f"_d = abs(_px - x) + abs(_py - y)")
+            self._w(f"if _d < best_d: best, best_d = _sp, _d")
+            self.ind -= 1
+            self._w(f"return best")
+            self.ind -= 1
 
         for i, c in enumerate(curves):
             ctype = c.get("type", "")
@@ -1050,8 +1095,20 @@ class _Generator:
                 ex, ey = c["end"]
                 s_ref, s_key = _pt_ref(sx, sy)
                 e_ref, e_key = _pt_ref(ex, ey)
-                s_code = s_ref if s_ref else f"P({sx}, {sy}, 0)"
-                e_code = e_ref if e_ref else f"P({ex}, {ey}, 0)"
+                if _has_body_projs:
+                    # Use runtime nearest-projected-point lookup for endpoints
+                    # that might connect to projected body curves
+                    if not s_ref:
+                        s_code = f"(_nearest_proj({sx}, {sy}) or P({sx}, {sy}, 0))"
+                    else:
+                        s_code = s_ref
+                    if not e_ref:
+                        e_code = f"(_nearest_proj({ex}, {ey}) or P({ex}, {ey}, 0))"
+                    else:
+                        e_code = e_ref
+                else:
+                    s_code = s_ref if s_ref else f"P({sx}, {sy}, 0)"
+                    e_code = e_ref if e_ref else f"P({ex}, {ey}, 0)"
                 self._w(f"ln{i} = lns.addByTwoPoints({s_code}, {e_code})")
                 _register_pt(s_key, f"ln{i}.startSketchPoint")
                 _register_pt(e_key, f"ln{i}.endSketchPoint")
@@ -1146,9 +1203,17 @@ class _Generator:
                 elif ctype == "CoincidentConstraint":
                     pt_ref = c.get("point")
                     ent_ref = c.get("entity")
+                    # Skip if either entity references a body-projected curve
+                    # (those connections are handled by _nearest_proj at runtime)
+                    pt_ci = pt_ref.get("curveIndex") if pt_ref else None
+                    ent_ci = ent_ref.get("curveIndex") if ent_ref else None
+                    if _has_body_projs and (
+                        (pt_ci is not None and pt_ci not in curve_vars) or
+                        (ent_ci is not None and ent_ci not in curve_vars)):
+                        continue
                     pt_code = self._resolve_sketch_entity_ref(pt_ref, curve_vars, var)
                     ent_code = self._resolve_sketch_entity_ref(ent_ref, curve_vars, var)
-                    if pt_code and ent_code:
+                    if pt_code and ent_code and pt_code != ent_code:
                         self._w(f"gc.addCoincident({pt_code}, {ent_code})")
 
                 elif ctype == "ParallelConstraint":
