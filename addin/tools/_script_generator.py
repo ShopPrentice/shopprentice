@@ -593,6 +593,11 @@ class _Generator:
                 self._w(f"break")
                 self.ind -= 2
                 self._w(f"sweep_path = root.features.createPath(sweep_edge)")
+                # Detect path direction: check which end is closer to the
+                # captured startVertex. If reversed, swap distance1/distance2.
+                self._w(f"_psv = sweep_edge.startVertex.geometry")
+                self._w(f"_path_fwd = (abs(_psv.x - {sv[0]:.4f}) + abs(_psv.y - {sv[1]:.4f}) + abs(_psv.z - {sv[2]:.4f}) < 0.1)")
+                self._c("_path_fwd=True means edge direction matches capture")
             elif pe.get("source") == "SketchCurve":
                 sk_name = pe.get("parentSketch", "")
                 self._c(f"Path: SketchCurve from '{sk_name}'")
@@ -615,11 +620,24 @@ class _Generator:
             self._w(f"sweep_inp.orientation = {orient_map[orientation]}")
 
         # Distance extent (default is full path; distanceOne/Two are 0-1 fractions)
+        # If path direction is reversed, swap distanceOne and distanceTwo
         dist1 = f.get("distanceOne")
         dist2 = f.get("distanceTwo")
         if dist1 and dist2:
-            self._w(f'sweep_inp.distanceTwo = adsk.core.ValueInput.createByString("{dist2}")')
-            self._w(f'sweep_inp.distanceOne = adsk.core.ValueInput.createByString("{dist1}")')
+            if path_ents and path_ents[0].get("source") == "BRepEdge":
+                self._w(f"if _path_fwd:")
+                self.ind += 1
+                self._w(f'sweep_inp.distanceTwo = adsk.core.ValueInput.createByString("{dist2}")')
+                self._w(f'sweep_inp.distanceOne = adsk.core.ValueInput.createByString("{dist1}")')
+                self.ind -= 1
+                self._w(f"else:")
+                self.ind += 1
+                self._w(f'sweep_inp.distanceTwo = adsk.core.ValueInput.createByString("{dist1}")')
+                self._w(f'sweep_inp.distanceOne = adsk.core.ValueInput.createByString("{dist2}")')
+                self.ind -= 1
+            else:
+                self._w(f'sweep_inp.distanceTwo = adsk.core.ValueInput.createByString("{dist2}")')
+                self._w(f'sweep_inp.distanceOne = adsk.core.ValueInput.createByString("{dist1}")')
         elif dist1:
             self._w(f'sweep_inp.distanceOne = adsk.core.ValueInput.createByString("{dist1}")')
 
@@ -1313,14 +1331,6 @@ class _Generator:
                 elif ctype == "CoincidentConstraint":
                     pt_ref = c.get("point")
                     ent_ref = c.get("entity")
-                    # Skip if either entity references a body-projected curve
-                    # (those connections are handled by _nearest_proj at runtime)
-                    pt_ci = pt_ref.get("curveIndex") if pt_ref else None
-                    ent_ci = ent_ref.get("curveIndex") if ent_ref else None
-                    if _has_body_projs and (
-                        (pt_ci is not None and pt_ci not in curve_vars) or
-                        (ent_ci is not None and ent_ci not in curve_vars)):
-                        continue
                     pt_code = self._resolve_sketch_entity_ref(pt_ref, curve_vars, var)
                     ent_code = self._resolve_sketch_entity_ref(ent_ref, curve_vars, var)
                     if pt_code and ent_code and pt_code != ent_code:
