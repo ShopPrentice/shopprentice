@@ -1129,18 +1129,35 @@ class _Generator:
                     # curves in the original sketch (detected by _proj_connected).
                     # Use _origIdx to map back to original curve index.
                     oi = c.get("_origIdx", i)
-                    if not s_ref and (oi, "start") in _proj_connected:
+                    s_is_proj = not s_ref and (oi, "start") in _proj_connected
+                    e_is_proj = not e_ref and (oi, "end") in _proj_connected
+
+                    if s_is_proj:
                         s_code = f"_nearest_proj({sx}, {sy})"
                     elif s_ref:
                         s_code = s_ref
                     else:
                         s_code = f"P({sx}, {sy}, 0)"
-                    if not e_ref and (oi, "end") in _proj_connected:
+
+                    if e_is_proj:
                         e_code = f"_nearest_proj({ex}, {ey})"
                     elif e_ref:
                         e_code = e_ref
+                    elif s_is_proj:
+                        # Non-projected end with projected start: position at
+                        # the projected X + original X offset, keeping Y from
+                        # hardcoded value. The dimension will correct the Y.
+                        dx = round(ex - sx, 6)
+                        self._w(f"_ps_{i} = _nearest_proj({sx}, {sy}).geometry")
+                        e_code = f"P(_ps_{i}.x + {dx}, {ey}, 0)"
                     else:
                         e_code = f"P({ex}, {ey}, 0)"
+
+                    # Same for non-projected start with projected end
+                    if not s_is_proj and not s_ref and e_is_proj:
+                        dx = round(sx - ex, 6)
+                        self._w(f"_pe_{i} = _nearest_proj({ex}, {ey}).geometry")
+                        s_code = f"P(_pe_{i}.x + {dx}, {sy}, 0)"
                 else:
                     s_code = s_ref if s_ref else f"P({sx}, {sy}, 0)"
                     e_code = e_ref if e_ref else f"P({ex}, {ey}, 0)"
@@ -1198,6 +1215,7 @@ class _Generator:
                     e2 = d.get("entityTwo")
                     orient = d.get("orientation", "Horizontal")
                     orient_code = "H" if orient == "Horizontal" else "V"
+
                     e1_code = self._resolve_sketch_entity_ref(e1, curve_vars, var, _proj_curve_pts)
                     e2_code = self._resolve_sketch_entity_ref(e2, curve_vars, var, _proj_curve_pts)
                     if e1_code and e2_code:
