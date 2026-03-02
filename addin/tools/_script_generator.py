@@ -1038,7 +1038,7 @@ class _Generator:
                 if (round(ex, 3), round(ey, 3)) in _proj_endpoints:
                     _proj_connected.add((i, "end"))
 
-        # Pass 3: emit sk.project(body) calls
+        # Pass 3: emit sk.project(body) or sk.intersectWithSketchPlane([body])
         for i, c in enumerate(curves):
             if c.get("isReference"):
                 pf = c.get("projectedFrom", {})
@@ -1049,8 +1049,13 @@ class _Generator:
                         _has_body_projs = True
                         bv = self._body_ref(bname)
                         pvar = f"_proj_body_{self._var(bname)}"
-                        self._c(f"Project body '{bname}'")
-                        self._w(f"{pvar} = {var}.project({bv})")
+                        method = pf.get("method", "project")
+                        if method == "intersect":
+                            self._c(f"Intersect body '{bname}' with sketch plane")
+                            self._w(f"{pvar} = {var}.intersectWithSketchPlane([{bv}])")
+                        else:
+                            self._c(f"Project body '{bname}'")
+                            self._w(f"{pvar} = {var}.project({bv})")
 
         if _has_body_projs:
             # Build runtime lookup of all projected sketch points (no threshold —
@@ -1145,17 +1150,20 @@ class _Generator:
                     elif e_ref:
                         e_code = e_ref
                     elif s_is_proj:
-                        # Non-projected end with projected start: use projected X
-                        # + original dx. Keep hardcoded Y — dimension will correct.
+                        # Non-projected end with projected start: use projected
+                        # position + original offset vector. With intersect, the
+                        # positions are exact so no dimension needed.
                         dx = round(ex - sx, 6)
-                        e_code = f"P(_pp_{i}s.x + {dx}, {ey}, 0)"
+                        dy = round(ey - sy, 6)
+                        e_code = f"P(_pp_{i}s.x + {dx}, _pp_{i}s.y + {dy}, 0)"
                     else:
                         e_code = f"P({ex}, {ey}, 0)"
 
                     # Same for non-projected start with projected end
                     if not s_is_proj and not s_ref and e_is_proj:
                         dx = round(sx - ex, 6)
-                        s_code = f"P(_pp_{i}e.x + {dx}, {sy}, 0)"
+                        dy = round(sy - ey, 6)
+                        s_code = f"P(_pp_{i}e.x + {dx}, _pp_{i}e.y + {dy}, 0)"
                 else:
                     s_code = s_ref if s_ref else f"P({sx}, {sy}, 0)"
                     e_code = e_ref if e_ref else f"P({ex}, {ey}, 0)"
@@ -1216,6 +1224,11 @@ class _Generator:
 
                     e1_code = self._resolve_sketch_entity_ref(e1, curve_vars, var, _proj_curve_pts)
                     e2_code = self._resolve_sketch_entity_ref(e2, curve_vars, var, _proj_curve_pts)
+                    # Skip dimensions referencing projected points when using
+                    # intersect (offset geometry is exact, dimension over-constrains)
+                    if _has_body_projs and e1_code and "_nearest_proj" in str(e1_code):
+                        self._c(f"dim[{di}]: {expr} (encoded in intersect offset)")
+                        continue
                     if e1_code and e2_code:
                         val = d.get("value", 0)
                         self._w(f"d.addDistanceDimension({e1_code}, {e2_code},")

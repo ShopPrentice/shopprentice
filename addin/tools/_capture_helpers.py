@@ -265,7 +265,28 @@ def _capture_sketch(sk, design=None):
                             else:
                                 body = adsk.fusion.BRepBody.cast(ref)
                                 if body:
-                                    curve_info["projectedFrom"] = {"type": "BRepBody", "body": body.name}
+                                    pf = {"type": "BRepBody", "body": body.name}
+                                    # Detect intersect vs project: if body bbox
+                                    # spans the sketch plane, it's an intersection
+                                    try:
+                                        bb = body.boundingBox
+                                        plane_origin = sk.origin
+                                        normal = adsk.core.Vector3D.create(
+                                            sk.xDirection.y * sk.yDirection.z - sk.xDirection.z * sk.yDirection.y,
+                                            sk.xDirection.z * sk.yDirection.x - sk.xDirection.x * sk.yDirection.z,
+                                            sk.xDirection.x * sk.yDirection.y - sk.xDirection.y * sk.yDirection.x)
+                                        # Project bbox corners onto normal to get extent
+                                        n = normal
+                                        plane_d = n.x * plane_origin.x + n.y * plane_origin.y + n.z * plane_origin.z
+                                        min_d = n.x * bb.minPoint.x + n.y * bb.minPoint.y + n.z * bb.minPoint.z
+                                        max_d = n.x * bb.maxPoint.x + n.y * bb.maxPoint.y + n.z * bb.maxPoint.z
+                                        if min(min_d, max_d) < plane_d < max(min_d, max_d):
+                                            pf["method"] = "intersect"
+                                        else:
+                                            pf["method"] = "project"
+                                    except:
+                                        pass
+                                    curve_info["projectedFrom"] = pf
                                 else:
                                     face = adsk.fusion.BRepFace.cast(ref)
                                     if face:
@@ -318,7 +339,21 @@ def _capture_sketch(sk, design=None):
                             else:
                                 body = adsk.fusion.BRepBody.cast(ref)
                                 if body:
-                                    arc_info["projectedFrom"] = {"type": "BRepBody", "body": body.name}
+                                    pf = {"type": "BRepBody", "body": body.name}
+                                    try:
+                                        bb = body.boundingBox
+                                        po = sk.origin
+                                        n = adsk.core.Vector3D.create(
+                                            sk.xDirection.y * sk.yDirection.z - sk.xDirection.z * sk.yDirection.y,
+                                            sk.xDirection.z * sk.yDirection.x - sk.xDirection.x * sk.yDirection.z,
+                                            sk.xDirection.x * sk.yDirection.y - sk.xDirection.y * sk.yDirection.x)
+                                        pd = n.x*po.x + n.y*po.y + n.z*po.z
+                                        min_d = n.x*bb.minPoint.x + n.y*bb.minPoint.y + n.z*bb.minPoint.z
+                                        max_d = n.x*bb.maxPoint.x + n.y*bb.maxPoint.y + n.z*bb.maxPoint.z
+                                        pf["method"] = "intersect" if min(min_d,max_d) < pd < max(min_d,max_d) else "project"
+                                    except:
+                                        pass
+                                    arc_info["projectedFrom"] = pf
                                 else:
                                     face = adsk.fusion.BRepFace.cast(ref)
                                     if face:
