@@ -299,25 +299,32 @@ class _Generator:
         dims = f.get("dimensions", [])
         plane_info = f.get("plane", {})
 
-        # BRepFace sketches: use find_face directly when auto-projected boundary
-        # curves are present. This avoids cplane boundary coincidence issues with CUTs.
-        # Filter out reference curves — Fusion auto-projects them when sketching on a face.
+        # BRepFace sketches: strategy depends on geometry.
+        # - Has auto-projected boundary + no explicit projections → find_face
+        #   (avoids cplane CUT boundary issues, works for rect and non-rect)
+        # - Has explicit projections (body edges) → cplane
+        #   (avoids boundary coincidence, projections need sk.project)
         is_on_face = False
         if (plane_info.get("type") == "BRepFace"
                 and "sketchOrigin" in f
                 and "sketchXDir" in f
                 and "sketchYDir" in f):
             non_ref = [c for c in curves if not c.get("isReference")]
-            ref_count = len(curves) - len(non_ref)
+            refs = [c for c in curves if c.get("isReference")]
+            # Check if any ref has a projectedFrom with captured vertices
+            # (= explicit projection, not just auto-boundary)
+            has_explicit_proj = any(
+                c.get("projectedFrom", {}).get("startVertex")
+                for c in refs
+            )
             self._brep_face_sketches[name] = plane_info
-            if ref_count > 0:
-                # Has auto-projected boundary → use find_face, filter out refs
+            if refs and not has_explicit_proj:
+                # Only auto-boundary refs → use find_face + filter refs
                 plane_code = self._resolve_plane(plane_info)
                 curves = non_ref
                 is_on_face = True
             else:
-                # No boundary refs (e.g., projected individual edges only)
-                # → use cplane to avoid boundary interference
+                # Explicit projections or no refs → use cplane
                 plane_code, curves = self._brep_face_to_cplane(f, curves)
         else:
             plane_code = self._resolve_plane(plane_info)
@@ -433,7 +440,7 @@ class _Generator:
         self._w("move_coll = adsk.core.ObjectCollection.create()")
         if inputs:
             for inp_name in inputs:
-                bv = self.bodies.get(inp_name, f'find_body("{inp_name}")')
+                bv = self._body_ref(inp_name)
                 self._w(f"move_coll.add({bv})")
         else:
             self._c("TODO: No input entities captured — add the body to move")
@@ -498,7 +505,7 @@ class _Generator:
                 body_name = pe.get("body", "")
                 sv = pe.get("startVertex", [0, 0, 0])
                 ev = pe.get("endVertex", [0, 0, 0])
-                bv = self.bodies.get(body_name, f'find_body("{body_name}")')
+                bv = self._body_ref(body_name)
                 self._c(f"Path: edge on '{body_name}' from ~{_fmt_pt(sv)} to ~{_fmt_pt(ev)}")
                 self._w(f"sweep_edge = None")
                 self._w(f"for i in range({bv}.edges.count):")
@@ -631,7 +638,7 @@ class _Generator:
         op_code = op_map.get(op, "JOIN")
 
         if target:
-            tc = self.bodies.get(target, f'find_body("{target}")')
+            tc = self._body_ref(target)
         else:
             err = f.get("targetBodyError", "not captured")
             self._c(f"TODO: target body not captured ({err})")
@@ -779,7 +786,7 @@ class _Generator:
         self._w("pat_coll = adsk.core.ObjectCollection.create()")
         if inputs:
             for inp_name in inputs:
-                bv = self.bodies.get(inp_name, f'find_body("{inp_name}")')
+                bv = self._body_ref(inp_name)
                 self._w(f"pat_coll.add({bv})")
         else:
             self._c("TODO: pattern input bodies not captured")
@@ -952,7 +959,7 @@ class _Generator:
                     body_name = pf["body"]
                     sv = pf["startVertex"]
                     ev_pt = pf["endVertex"]
-                    bv = self.bodies.get(body_name, f'find_body("{body_name}")')
+                    bv = self._body_ref(body_name)
                     self._c(f"Project edge from '{body_name}'")
                     self._w(f"_proj_edge_{i} = None")
                     self._w(f"for _ei in range({bv}.edges.count):")
@@ -1183,7 +1190,7 @@ class _Generator:
         if ptype == "BRepFace":
             body_name = plane_info.get("body", "")
             normal = plane_info.get("normal")
-            bv = self.bodies.get(body_name, f'find_body("{body_name}")')
+            bv = self._body_ref(body_name)
             if normal:
                 axis, direction = self._normal_to_axis(normal)
             else:
@@ -1289,13 +1296,18 @@ class _Generator:
     # ── Body reference helpers ──
 
     def _body_ref(self, name):
-        """Get variable reference for a body name, with fallback for split-renamed bodies."""
+        """Get variable reference for a body name, with fallback for renamed bodies."""
         if name in self.bodies:
             return self.bodies[name]
         # Strip parenthesized suffix: "Leg_NL (1)" → "Leg_NL"
         base = re.sub(r'\s*\(\d+\)\s*$', '', name)
         if base != name and base in self.bodies:
             return self.bodies[base]
+        # Try adding suffix: "Leg_NL" → "Leg_NL (1)", "Leg_NL (2)", ...
+        for suffix in range(1, 5):
+            candidate = f"{name} ({suffix})"
+            if candidate in self.bodies:
+                return self.bodies[candidate]
         return f'find_body("{name}")'
 
     def _body_list(self, names):
