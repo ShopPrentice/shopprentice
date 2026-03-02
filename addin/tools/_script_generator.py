@@ -311,20 +311,59 @@ class _Generator:
                 and "sketchYDir" in f):
             non_ref = [c for c in curves if not c.get("isReference")]
             refs = [c for c in curves if c.get("isReference")]
-            # Check if any ref has a projectedFrom with captured vertices
-            # (= explicit projection, not just auto-boundary)
-            has_explicit_proj = any(
-                c.get("projectedFrom", {}).get("startVertex")
+            self._brep_face_sketches[name] = plane_info
+            # Check if any ref is an explicit body/edge projection
+            has_body_proj = any(
+                c.get("projectedFrom", {}).get("type") == "BRepBody"
                 for c in refs
             )
-            self._brep_face_sketches[name] = plane_info
-            if refs and not has_explicit_proj:
+            has_edge_proj = any(
+                c.get("projectedFrom", {}).get("type") == "BRepEdge"
+                for c in refs
+            )
+            if has_body_proj:
+                # Body projections depend on the exact face geometry (bevel, taper).
+                # Must use find_face — cplane gives wrong projection coordinates.
+                plane_code = self._resolve_plane(plane_info)
+                # Filter only the auto-boundary refs (BRepFace type), keep body proj refs
+                curves = [c for c in curves if not (
+                    c.get("isReference") and
+                    c.get("projectedFrom", {}).get("type") == "BRepFace"
+                )]
+                # Fix Y-flip: captured sketch may have yDir=(0,-1,0) but find_face
+                # creates yDir=(0,1,0). Negate Y for all non-reference curve coords.
+                ydir = f.get("sketchYDir", [0, 1, 0])
+                xdir = f.get("sketchXDir", [1, 0, 0])
+                # Check if sketch Y or X is flipped vs standard orientation
+                # Standard for Z-normal: xDir=(1,0,0), yDir=(0,1,0)
+                # Standard for Y-normal: xDir=(1,0,0), yDir=(0,0,1)
+                # Standard for X-normal: xDir=(0,1,0), yDir=(0,0,1)
+                flip_y = False
+                normal = plane_info.get("normal", [0, 0, 1])
+                ax, ay, az = abs(normal[0]), abs(normal[1]), abs(normal[2])
+                if az > 0.9 and ydir[1] < 0:
+                    flip_y = True  # Z-normal: standard yDir is +Y
+                elif ay > 0.9 and ydir[2] < 0:
+                    flip_y = True  # Y-normal: standard yDir is +Z
+                elif ax > 0.9 and ydir[2] < 0:
+                    flip_y = True  # X-normal: standard yDir is +Z
+                if flip_y:
+                    for c in curves:
+                        if not c.get("isReference"):
+                            if "start" in c:
+                                c["start"] = [c["start"][0], -c["start"][1]]
+                            if "end" in c:
+                                c["end"] = [c["end"][0], -c["end"][1]]
+                            if "center" in c:
+                                c["center"] = [c["center"][0], -c["center"][1]]
+                is_on_face = True
+            elif refs and not has_edge_proj:
                 # Only auto-boundary refs → use find_face + filter refs
                 plane_code = self._resolve_plane(plane_info)
                 curves = non_ref
                 is_on_face = True
             else:
-                # Explicit projections or no refs → use cplane
+                # Edge projections or no refs → use cplane
                 plane_code, curves = self._brep_face_to_cplane(f, curves)
         else:
             plane_code = self._resolve_plane(plane_info)
@@ -950,12 +989,33 @@ class _Generator:
         arc_vars = {}
         circle_vars = {}
 
+        # Pre-scan: collect BRepBody projections and emit one sk.project(body) each
+        _body_proj_done = set()  # body names already projected
+        _body_proj_var = {}  # body name → projected ObjectCollection var
         for i, c in enumerate(curves):
-            ctype = c.get("type", "")
-            # Projected/reference curves: emit sk.project(edge) to recreate
             if c.get("isReference"):
                 pf = c.get("projectedFrom", {})
-                if pf.get("type") == "BRepEdge" and "startVertex" in pf and "endVertex" in pf:
+                if pf.get("type") == "BRepBody" and pf.get("body"):
+                    bname = pf["body"]
+                    if bname not in _body_proj_done:
+                        _body_proj_done.add(bname)
+                        bv = self._body_ref(bname)
+                        pvar = f"_proj_body_{self._var(bname)}"
+                        self._c(f"Project body '{bname}'")
+                        self._w(f"{pvar} = {var}.project({bv})")
+                        _body_proj_var[bname] = pvar
+
+        for i, c in enumerate(curves):
+            ctype = c.get("type", "")
+            # Projected/reference curves: emit sk.project(edge/body) to recreate
+            if c.get("isReference"):
+                pf = c.get("projectedFrom", {})
+                if pf.get("type") == "BRepBody" and pf.get("body"):
+                    # Body projection emitted above. Skip individual curve —
+                    # sk.project(body) creates all projected curves at once.
+                    # Drawn curves connect via shared sketch points (coincident).
+                    continue
+                elif pf.get("type") == "BRepEdge" and "startVertex" in pf and "endVertex" in pf:
                     body_name = pf["body"]
                     sv = pf["startVertex"]
                     ev_pt = pf["endVertex"]

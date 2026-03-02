@@ -263,9 +263,17 @@ def _capture_sketch(sk, design=None):
                                     pass
                                 curve_info["projectedFrom"] = pf
                             else:
-                                ca = adsk.fusion.ConstructionAxis.cast(ref)
-                                if ca:
-                                    curve_info["projectedFrom"] = {"type": "ConstructionAxis", "name": ca.name}
+                                body = adsk.fusion.BRepBody.cast(ref)
+                                if body:
+                                    curve_info["projectedFrom"] = {"type": "BRepBody", "body": body.name}
+                                else:
+                                    face = adsk.fusion.BRepFace.cast(ref)
+                                    if face:
+                                        curve_info["projectedFrom"] = {"type": "BRepFace", "body": face.body.name}
+                                    else:
+                                        ca = adsk.fusion.ConstructionAxis.cast(ref)
+                                        if ca:
+                                            curve_info["projectedFrom"] = {"type": "ConstructionAxis", "name": ca.name}
                     except:
                         pass
             except:
@@ -307,6 +315,14 @@ def _capture_sketch(sk, design=None):
                                 except:
                                     pass
                                 arc_info["projectedFrom"] = pf
+                            else:
+                                body = adsk.fusion.BRepBody.cast(ref)
+                                if body:
+                                    arc_info["projectedFrom"] = {"type": "BRepBody", "body": body.name}
+                                else:
+                                    face = adsk.fusion.BRepFace.cast(ref)
+                                    if face:
+                                        arc_info["projectedFrom"] = {"type": "BRepFace", "body": face.body.name}
                     except:
                         pass
             except:

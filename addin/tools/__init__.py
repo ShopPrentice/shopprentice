@@ -16,3 +16,6 @@ from . import suppress_features
 from . import get_changes
 from . import sync_script
 from . import get_document_status
+from . import export_script
+from . import reload_addin
+from . import manage_documents
