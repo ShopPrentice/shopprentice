@@ -1083,10 +1083,11 @@ class _Generator:
             # Projected/reference curves: emit sk.project(edge/body) to recreate
             if c.get("isReference"):
                 pf = c.get("projectedFrom", {})
-                if pf.get("type") == "BRepBody" and pf.get("body"):
-                    # Body projection emitted above. Skip individual curve —
-                    # sk.project(body) creates all projected curves at once.
-                    # Drawn curves connect via shared sketch points (coincident).
+                if pf.get("type") == "BRepBody":
+                    # Body projection emitted above. Skip individual curve.
+                    continue
+                elif pf.get("type") == "BRepFace":
+                    # Auto-boundary — skip (handled by find_face)
                     continue
                 elif pf.get("type") == "BRepEdge" and "startVertex" in pf and "endVertex" in pf:
                     body_name = pf["body"]
@@ -1125,8 +1126,6 @@ class _Generator:
                 s_ref, s_key = _pt_ref(sx, sy)
                 e_ref, e_key = _pt_ref(ex, ey)
                 if _has_body_projs:
-                    # Only snap endpoints that were coincident with projected
-                    # curves in the original sketch (detected by _proj_connected).
                     # Use _origIdx to map back to original curve index.
                     oi = c.get("_origIdx", i)
                     s_is_proj = not s_ref and (oi, "start") in _proj_connected
@@ -1134,6 +1133,7 @@ class _Generator:
 
                     if s_is_proj:
                         s_code = f"_nearest_proj({sx}, {sy})"
+                        self._w(f"_pp_{i}s = _nearest_proj({sx}, {sy}).geometry")
                     elif s_ref:
                         s_code = s_ref
                     else:
@@ -1141,23 +1141,21 @@ class _Generator:
 
                     if e_is_proj:
                         e_code = f"_nearest_proj({ex}, {ey})"
+                        self._w(f"_pp_{i}e = _nearest_proj({ex}, {ey}).geometry")
                     elif e_ref:
                         e_code = e_ref
                     elif s_is_proj:
-                        # Non-projected end with projected start: position at
-                        # the projected X + original X offset, keeping Y from
-                        # hardcoded value. The dimension will correct the Y.
+                        # Non-projected end with projected start: use projected X
+                        # + original dx. Keep hardcoded Y — dimension will correct.
                         dx = round(ex - sx, 6)
-                        self._w(f"_ps_{i} = _nearest_proj({sx}, {sy}).geometry")
-                        e_code = f"P(_ps_{i}.x + {dx}, {ey}, 0)"
+                        e_code = f"P(_pp_{i}s.x + {dx}, {ey}, 0)"
                     else:
                         e_code = f"P({ex}, {ey}, 0)"
 
                     # Same for non-projected start with projected end
                     if not s_is_proj and not s_ref and e_is_proj:
                         dx = round(sx - ex, 6)
-                        self._w(f"_pe_{i} = _nearest_proj({ex}, {ey}).geometry")
-                        s_code = f"P(_pe_{i}.x + {dx}, {sy}, 0)"
+                        s_code = f"P(_pp_{i}e.x + {dx}, {sy}, 0)"
                 else:
                     s_code = s_ref if s_ref else f"P({sx}, {sy}, 0)"
                     e_code = e_ref if e_ref else f"P({ex}, {ey}, 0)"

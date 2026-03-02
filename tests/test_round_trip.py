@@ -70,12 +70,25 @@ def get_timeline_features(capture_result):
 
 
 def _ensure_scratch_doc():
-    """Ensure we're on a scratch (unsaved) document, never a saved one."""
-    docs = json.loads(mcp("manage_documents", action="list")["content"][0]["text"])
+    """Ensure we're on a scratch (unsaved) document, never a saved one.
+    Reuses an existing unsaved doc if available instead of creating new ones."""
+    try:
+        docs = json.loads(mcp("manage_documents", action="list")["content"][0]["text"])
+    except Exception:
+        return  # manage_documents not available, proceed without check
+
     active = next((d for d in docs if d["isActive"]), None)
-    if active and active["isSaved"]:
-        # Active doc is saved — create a new scratch doc to protect it
-        mcp("manage_documents", action="new")
+    if active and not active["isSaved"]:
+        return  # already on an unsaved doc, reuse it
+
+    # Try to activate an existing unsaved doc
+    for d in docs:
+        if not d["isSaved"] and not d["isActive"]:
+            mcp("manage_documents", action="activate", index=d["index"])
+            return
+
+    # No unsaved doc exists — create one
+    mcp("manage_documents", action="new")
     # If active is unsaved, reuse it (clean=True will wipe it anyway)
 
 
