@@ -69,6 +69,16 @@ def get_timeline_features(capture_result):
     return data.get("timeline", [])
 
 
+def _ensure_scratch_doc():
+    """Ensure we're on a scratch (unsaved) document, never a saved one."""
+    docs = json.loads(mcp("manage_documents", action="list")["content"][0]["text"])
+    active = next((d for d in docs if d["isActive"]), None)
+    if active and active["isSaved"]:
+        # Active doc is saved — create a new scratch doc to protect it
+        mcp("manage_documents", action="new")
+    # If active is unsaved, reuse it (clean=True will wipe it anyway)
+
+
 def run_fixture(name, fixture_path, verbose=False):
     """Run round-trip test for one fixture.
 
@@ -77,6 +87,9 @@ def run_fixture(name, fixture_path, verbose=False):
     print(f"\n{'='*60}")
     print(f"  {name}")
     print(f"{'='*60}")
+
+    # Safety: never run fixtures on a saved document
+    _ensure_scratch_doc()
 
     with open(fixture_path) as f:
         fixture_script = f.read()

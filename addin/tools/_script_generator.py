@@ -325,8 +325,12 @@ class _Generator:
                 # Body projections depend on the exact face geometry (bevel, taper).
                 # Must use find_face — cplane gives wrong projection coordinates.
                 plane_code = self._resolve_plane(plane_info)
-                # Filter only the auto-boundary refs (BRepFace type), keep body proj refs
-                curves = [c for c in curves if not (
+                # Tag curves with original index before filtering
+                for ci, c in enumerate(curves):
+                    c["_origIdx"] = ci
+                # Filter only the auto-boundary refs (BRepFace type), keep body proj refs.
+                # Deep-copy dicts so Y-flip doesn't mutate feat["curves"].
+                curves = [dict(c) for c in curves if not (
                     c.get("isReference") and
                     c.get("projectedFrom", {}).get("type") == "BRepFace"
                 )]
@@ -356,6 +360,7 @@ class _Generator:
                                 c["end"] = [c["end"][0], -c["end"][1]]
                             if "center" in c:
                                 c["center"] = [c["center"][0], -c["center"][1]]
+                    f["_yflipped"] = True
                 is_on_face = True
             elif refs and not has_edge_proj:
                 # Only auto-boundary refs → use find_face + filter refs
@@ -1008,10 +1013,32 @@ class _Generator:
         arc_vars = {}
         circle_vars = {}
 
-        # Pre-scan: collect BRepBody projections and emit one sk.project(body) each.
-        # Build a runtime point lookup so drawn lines can snap to projected endpoints.
+        # Pre-scan: collect BRepBody projections and detect which drawn line
+        # endpoints coincide with projected curve endpoints (in original capture space).
         _body_proj_done = set()
         _has_body_projs = False
+        _proj_endpoints = set()  # (round_x, round_y) of projected curve endpoints
+        _proj_connected = set()  # (curve_idx, "start"/"end") pairs that should snap to projections
+
+        # Pass 1: collect all projected curve endpoint positions (pre-flip coordinates)
+        for i, c in enumerate(feat.get("curves", [])):
+            if c.get("isReference") and c.get("projectedFrom", {}).get("type") == "BRepBody":
+                sx, sy = c["start"]
+                ex, ey = c["end"]
+                _proj_endpoints.add((round(sx, 3), round(sy, 3)))
+                _proj_endpoints.add((round(ex, 3), round(ey, 3)))
+
+        # Pass 2: check which drawn line endpoints match projected endpoints
+        for i, c in enumerate(feat.get("curves", [])):
+            if not c.get("isReference"):
+                sx, sy = c.get("start", [0, 0])
+                ex, ey = c.get("end", [0, 0])
+                if (round(sx, 3), round(sy, 3)) in _proj_endpoints:
+                    _proj_connected.add((i, "start"))
+                if (round(ex, 3), round(ey, 3)) in _proj_endpoints:
+                    _proj_connected.add((i, "end"))
+
+        # Pass 3: emit sk.project(body) calls
         for i, c in enumerate(curves):
             if c.get("isReference"):
                 pf = c.get("projectedFrom", {})
@@ -1026,7 +1053,8 @@ class _Generator:
                         self._w(f"{pvar} = {var}.project({bv})")
 
         if _has_body_projs:
-            # Build runtime lookup of all projected sketch points
+            # Build runtime lookup of all projected sketch points (no threshold —
+            # _proj_connected gates which endpoints use this)
             self._w(f"_proj_pts = []  # [(x, y, sketchPoint), ...]")
             self._w(f"for _ci in range({var}.sketchCurves.count):")
             self.ind += 1
@@ -1041,7 +1069,7 @@ class _Generator:
             self._w()
             self._w(f"def _nearest_proj(x, y):")
             self.ind += 1
-            self._w(f"best, best_d = None, 0.5")
+            self._w(f"best, best_d = None, 1e10")
             self._w(f"for _px, _py, _sp in _proj_pts:")
             self.ind += 1
             self._w(f"_d = abs(_px - x) + abs(_py - y)")
@@ -1096,16 +1124,22 @@ class _Generator:
                 s_ref, s_key = _pt_ref(sx, sy)
                 e_ref, e_key = _pt_ref(ex, ey)
                 if _has_body_projs:
-                    # Use runtime nearest-projected-point lookup for endpoints
-                    # that might connect to projected body curves
-                    if not s_ref:
-                        s_code = f"(_nearest_proj({sx}, {sy}) or P({sx}, {sy}, 0))"
-                    else:
+                    # Only snap endpoints that were coincident with projected
+                    # curves in the original sketch (detected by _proj_connected).
+                    # Use _origIdx to map back to original curve index.
+                    oi = c.get("_origIdx", i)
+                    if not s_ref and (oi, "start") in _proj_connected:
+                        s_code = f"_nearest_proj({sx}, {sy})"
+                    elif s_ref:
                         s_code = s_ref
-                    if not e_ref:
-                        e_code = f"(_nearest_proj({ex}, {ey}) or P({ex}, {ey}, 0))"
                     else:
+                        s_code = f"P({sx}, {sy}, 0)"
+                    if not e_ref and (oi, "end") in _proj_connected:
+                        e_code = f"_nearest_proj({ex}, {ey})"
+                    elif e_ref:
                         e_code = e_ref
+                    else:
+                        e_code = f"P({ex}, {ey}, 0)"
                 else:
                     s_code = s_ref if s_ref else f"P({sx}, {sy}, 0)"
                     e_code = e_ref if e_ref else f"P({ex}, {ey}, 0)"
