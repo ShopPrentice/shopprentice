@@ -520,24 +520,53 @@ class _Generator:
             self._c(f"TODO: sketch '{sketch_name}' not tracked")
             prof_code = "None"
         elif pcoll_count > 1:
-            # Multi-profile sweep: select N smallest non-trivial profiles by bbox area.
-            # This handles BRepFace→construction plane conversion where T-junctions
-            # change profile count/ordering. Shoulder profiles (smallest meaningful
-            # regions) are reliably the smallest by bounding box area.
+            # Multi-profile sweep: match profiles by bounding box dimensions
+            # from the capture data. This handles profile count/ordering changes
+            # from BRepFace→find_face conversion.
+            pdims = f.get("profileDims", [])
             self._w("sweep_profs = adsk.core.ObjectCollection.create()")
-            self._w("_areas = []")
-            self._w(f"for _pi in range({sk_var}.profiles.count):")
-            self.ind += 1
-            self._w(f"_bb = {sk_var}.profiles.item(_pi).boundingBox")
-            self._w(f"_a = abs(_bb.maxPoint.x - _bb.minPoint.x) * abs(_bb.maxPoint.y - _bb.minPoint.y)")
-            self._w(f"_areas.append((_a, _pi))")
-            self.ind -= 1
-            self._w("_max_a = max(a for a, _ in _areas) if _areas else 1")
-            self._w("_cands = sorted((a, i) for a, i in _areas if a > _max_a * 0.001)")
-            self._w(f"for _a, _pi in _cands[:{pcoll_count}]:")
-            self.ind += 1
-            self._w(f"sweep_profs.add({sk_var}.profiles.item(_pi))")
-            self.ind -= 1
+            if pdims:
+                # Match by target dimensions
+                self._w("_target_dims = [")
+                self.ind += 1
+                for pd in pdims:
+                    self._w(f"({pd[0]}, {pd[1]}),")
+                self.ind -= 1
+                self._w("]")
+                self._w("_used = set()")
+                self._w("for _tw, _th in _target_dims:")
+                self.ind += 1
+                self._w("_best_pi, _best_d = -1, 1e10")
+                self._w(f"for _pi in range({sk_var}.profiles.count):")
+                self.ind += 1
+                self._w("if _pi not in _used:")
+                self.ind += 1
+                self._w(f"_bb = {sk_var}.profiles.item(_pi).boundingBox")
+                self._w(f"_w = abs(_bb.maxPoint.x - _bb.minPoint.x)")
+                self._w(f"_h = abs(_bb.maxPoint.y - _bb.minPoint.y)")
+                self._w(f"_d = abs(_w - _tw) + abs(_h - _th)")
+                self._w(f"if _d < _best_d: _best_pi, _best_d = _pi, _d")
+                self.ind -= 2
+                self._w(f"if _best_pi >= 0:")
+                self.ind += 1
+                self._w(f"sweep_profs.add({sk_var}.profiles.item(_best_pi))")
+                self._w(f"_used.add(_best_pi)")
+                self.ind -= 2
+            else:
+                # Fallback: N smallest non-trivial profiles
+                self._w("_areas = []")
+                self._w(f"for _pi in range({sk_var}.profiles.count):")
+                self.ind += 1
+                self._w(f"_bb = {sk_var}.profiles.item(_pi).boundingBox")
+                self._w(f"_a = abs(_bb.maxPoint.x - _bb.minPoint.x) * abs(_bb.maxPoint.y - _bb.minPoint.y)")
+                self._w(f"_areas.append((_a, _pi))")
+                self.ind -= 1
+                self._w("_max_a = max(a for a, _ in _areas) if _areas else 1")
+                self._w("_cands = sorted((a, i) for a, i in _areas if a > _max_a * 0.001)")
+                self._w(f"for _a, _pi in _cands[:{pcoll_count}]:")
+                self.ind += 1
+                self._w(f"sweep_profs.add({sk_var}.profiles.item(_pi))")
+                self.ind -= 1
             prof_code = "sweep_profs"
         else:
             prof_code = f"{sk_var}.profiles.item({indices[0]})"
