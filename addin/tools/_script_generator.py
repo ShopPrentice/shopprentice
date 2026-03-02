@@ -1110,7 +1110,8 @@ class _Generator:
                     self._w(f"_proj_curves_{i} = {var}.project(_proj_edge_{i})")
                     # The projected result is a collection; find the matching curve
                     self._w(f"proj{i} = _proj_curves_{i}.item(0)")
-                    curve_vars[i] = f"proj{i}"
+                    _oi = c.get("_origIdx", i)
+                    curve_vars[_oi] = f"proj{i}"
                     sx, sy = c["start"]
                     ex, ey = c["end"]
                     _register_pt((round(sx, 3), round(sy, 3)), f"proj{i}.startSketchPoint")
@@ -1146,7 +1147,8 @@ class _Generator:
                 self._w(f"ln{i} = lns.addByTwoPoints({s_code}, {e_code})")
                 _register_pt(s_key, f"ln{i}.startSketchPoint")
                 _register_pt(e_key, f"ln{i}.endSketchPoint")
-                curve_vars[i] = f"ln{i}"
+                _oi = c.get("_origIdx", i)
+                curve_vars[_oi] = f"ln{i}"
                 if c.get("isConstruction"):
                     self._w(f"ln{i}.isConstruction = True")
             elif ctype == "Arc":
@@ -1154,7 +1156,8 @@ class _Generator:
                 sx, sy = c.get("start", [0, 0])
                 sweep = c.get("sweepAngle", 3.14159)
                 self._w(f"arc{i} = arcs.addByCenterStartSweep(P({cx}, {cy}, 0), P({sx}, {sy}, 0), {sweep})")
-                curve_vars[i] = f"arc{i}"
+                _oi = c.get("_origIdx", i)
+                curve_vars[_oi] = f"arc{i}"
                 arc_vars[i] = f"arc{i}"
                 _register_pt((round(sx, 3), round(sy, 3)), f"arc{i}.startSketchPoint")
                 ex, ey = c.get("end", [sx, sy])
@@ -1163,8 +1166,23 @@ class _Generator:
                 cx, cy = c.get("center", [0, 0])
                 r = c.get("radius", 1)
                 self._w(f"circ{i} = {var}.sketchCurves.sketchCircles.addByCenterRadius(P({cx}, {cy}, 0), {r})")
-                curve_vars[i] = f"circ{i}"
+                _oi = c.get("_origIdx", i)
+                curve_vars[_oi] = f"circ{i}"
                 circle_vars[i] = f"circ{i}"
+
+        # Build fallback map for projected body curve endpoints.
+        # When a dimension references a BRepBody-projected curve not in curve_vars,
+        # use _nearest_proj to find the actual projected point at runtime.
+        _proj_curve_pts = {}  # (origIdx, role) → (x, y) in original capture space
+        if _has_body_projs:
+            for c in feat.get("curves", []):
+                oi = c.get("_origIdx")
+                if (oi is not None and c.get("isReference")
+                        and c.get("projectedFrom", {}).get("type") == "BRepBody"):
+                    sx, sy = c["start"]
+                    ex, ey = c["end"]
+                    _proj_curve_pts[(oi, "start")] = (sx, sy)
+                    _proj_curve_pts[(oi, "end")] = (ex, ey)
 
         # Emit dimensions with entity targets
         if dims:
@@ -1180,8 +1198,8 @@ class _Generator:
                     e2 = d.get("entityTwo")
                     orient = d.get("orientation", "Horizontal")
                     orient_code = "H" if orient == "Horizontal" else "V"
-                    e1_code = self._resolve_sketch_entity_ref(e1, curve_vars, var)
-                    e2_code = self._resolve_sketch_entity_ref(e2, curve_vars, var)
+                    e1_code = self._resolve_sketch_entity_ref(e1, curve_vars, var, _proj_curve_pts)
+                    e2_code = self._resolve_sketch_entity_ref(e2, curve_vars, var, _proj_curve_pts)
                     if e1_code and e2_code:
                         val = d.get("value", 0)
                         self._w(f"d.addDistanceDimension({e1_code}, {e2_code},")
@@ -1291,7 +1309,7 @@ class _Generator:
             self._w(f"{prof} = {var}.profiles.item(0)  # {prof_count} profile(s)")
         self.profiles[name] = prof
 
-    def _resolve_sketch_entity_ref(self, ref, curve_vars, sk_var):
+    def _resolve_sketch_entity_ref(self, ref, curve_vars, sk_var, proj_curve_pts=None):
         """Resolve a captured sketch entity reference to a code string."""
         if not ref:
             return None
@@ -1310,7 +1328,11 @@ class _Generator:
                     return f"{cv}.endSketchPoint"
                 elif role == "center":
                     return f"{cv}.centerSketchPoint"
-            # Fallback: position-based (not ideal but better than nothing)
+            # Fallback for BRepBody-projected curves: use _nearest_proj
+            if ci is not None and proj_curve_pts and (ci, role) in proj_curve_pts:
+                x, y = proj_curve_pts[(ci, role)]
+                return f"_nearest_proj({x}, {y})"
+            # Fallback: position-based
             pos = ref.get("position")
             if pos:
                 return f"P({pos[0]}, {pos[1]}, 0)  # TODO: find matching sketch point"
