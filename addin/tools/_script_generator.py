@@ -8,9 +8,15 @@ Python script that recreates the model. The generated script is self-contained
 Usage:
     from ._script_generator import generate_script
     script_text = generate_script(capture_data)
+
+    # For search-based building:
+    info = get_ambiguous_features(capture_data)
+    script = generate_with_choices(capture_data, {0: 2, 3: 1})
 """
 
+import copy
 import re
+from contextlib import contextmanager
 
 
 def generate_script(capture):
@@ -18,11 +24,76 @@ def generate_script(capture):
     return _Generator(capture).generate()
 
 
+def get_ambiguous_features(capture):
+    """Return list of {index, name, type, variants} for ambiguous features."""
+    g = _Generator(capture)
+    g._scan_needs()
+    result = []
+    for fi, feat in enumerate(capture.get("timeline", [])):
+        if feat.get("isRolledBack"):
+            continue
+        variants = g._feature_variants(feat)
+        if len(variants) > 1:
+            result.append({
+                "index": fi,
+                "name": feat.get("name", ""),
+                "type": feat.get("type", ""),
+                "variantCount": len(variants),
+                "descriptions": [v[1] for v in variants],
+            })
+    return result
+
+
+def generate_with_choices(capture, choices):
+    """Generate full script with specific variant choices for ambiguous features.
+
+    Args:
+        capture: capture_design JSON data
+        choices: dict mapping feature index → variant index
+                 (0-based; only ambiguous features need entries)
+
+    Returns:
+        Complete Fusion 360 Python script text.
+    """
+    return _Generator(capture).generate_with_choices(choices)
+
+
+def generate_prefix_script(capture):
+    """Generate a script that sets up design type + user parameters only.
+
+    Used as the first step in incremental building. Execute with clean=true
+    to start from a blank document with all parameters defined.
+
+    Returns:
+        Standalone Fusion 360 Python script text.
+    """
+    return _Generator(capture).generate_prefix_script()
+
+
+def generate_feature_script(capture, feature_index, choices=None):
+    """Generate a standalone script for ONE feature at feature_index.
+
+    Includes helpers + entity lookups for everything created by features 0..N-1,
+    then emits the single feature's code.
+
+    Args:
+        capture: capture_design JSON data
+        feature_index: index into the timeline array (0-based)
+        choices: optional dict mapping feature index → variant index
+
+    Returns:
+        Standalone Fusion 360 Python script text.
+    """
+    return _Generator(capture).generate_feature_script(feature_index, choices)
+
+
 class _Generator:
     """Walks capture_design output and emits a Fusion 360 Python script."""
 
     def __init__(self, capture):
-        self.cap = capture
+        # Deep-copy timeline so preprocessing can mutate body names safely
+        self.cap = dict(capture)
+        self.cap["timeline"] = copy.deepcopy(capture.get("timeline", []))
         self.out = []       # accumulated lines
         self.ind = 1        # indent level (inside run())
 
@@ -39,6 +110,37 @@ class _Generator:
         # Track which helpers the timeline needs
         self.needs = set()
 
+        # Fix body names captured at end-of-timeline back to at-feature-time names
+        self._fixup_split_body_names()
+
+    def _fixup_split_body_names(self):
+        """Correct extrude/sweep body names captured with post-split suffixes.
+
+        capture_design reads body names at end-of-timeline, so an extrude body
+        named "Leg_NL" at creation time shows as "Leg_NL (1)" if a downstream
+        split renamed it. This fixup restores the at-creation-time name so that
+        split/remove features can find bodies by their expected names.
+        """
+        timeline = self.cap.get("timeline", [])
+        for fi, feat in enumerate(timeline):
+            if feat.get("type") != "SplitBody":
+                continue
+            split_bodies = feat.get("bodies", [])
+            if not split_bodies:
+                continue
+            # The first output body name is the base (the original body's name
+            # at this timeline step). Upstream extrude may have this name with
+            # a (N) suffix added by the split.
+            base_name = re.sub(r'\s*\(\d+\)\s*$', '', split_bodies[0])
+            for pi in range(fi):
+                prev = timeline[pi]
+                if prev.get("type") in ("Extrude", "Sweep"):
+                    prev_bodies = prev.get("bodies", [])
+                    for bi, bn in enumerate(prev_bodies):
+                        stripped = re.sub(r'\s*\(\d+\)\s*$', '', bn)
+                        if stripped == base_name and bn != base_name:
+                            prev_bodies[bi] = base_name
+
     # ── Public ──
 
     def generate(self):
@@ -49,6 +151,374 @@ class _Generator:
         self._timeline()
         self._footer()
         return "\n".join(self.out)
+
+    def generate_with_choices(self, choices):
+        """Generate full script using specific variant indices for ambiguous features.
+
+        Args:
+            choices: dict mapping timeline feature index → variant index.
+                     Ambiguous features not in choices use variant 0 (default).
+        """
+        self._scan_needs()
+        self._header()
+        self._parameters()
+        self._helpers()
+        # Custom timeline: process features one at a time with variant selection
+        self._section("TIMELINE")
+        for fi, feat in enumerate(self.cap.get("timeline", [])):
+            if feat.get("isRolledBack"):
+                continue
+            t = feat.get("type", "Unknown")
+            idx = feat.get("index", "?")
+            name = feat.get("name", "")
+            self._w()
+            self._c(f"[{idx}] {t}: {name}")
+
+            # Check if ambiguous
+            variants = self._feature_variants_with_state(feat)
+            if len(variants) > 1:
+                vi = choices.get(fi, 0)
+                vi = min(vi, len(variants) - 1)
+                lines, desc, state = variants[vi]
+                self._c(f"variant {vi}: {desc}")
+                self.out.extend(lines)
+                # Apply state from chosen variant
+                self._restore_state(state)
+            else:
+                # Non-ambiguous or single variant: run emitter directly for
+                # both output lines and state side effects
+                handler = getattr(self, f"_feat_{t.lower()}", None)
+                if handler:
+                    handler(feat)
+                else:
+                    self._c(f"TODO: Unsupported feature type '{t}'")
+        self._footer()
+        return "\n".join(self.out)
+
+    def generate_prefix_script(self):
+        """Generate a script that sets up design type + user parameters only."""
+        self.out = []
+        self.out.append("import adsk.core, adsk.fusion, math")
+        self.out.append("")
+        self.out.append("")
+        self.out.append("def run(context):")
+        self.ind = 1
+        self._w("app = adsk.core.Application.get()")
+        self._w("design = adsk.fusion.Design.cast(app.activeProduct)")
+        self._w("design.designType = adsk.fusion.DesignTypes.ParametricDesignType")
+        self._w("root = design.rootComponent")
+        self._w("params = design.userParameters")
+        self._parameters()
+        return "\n".join(self.out)
+
+    def generate_feature_script(self, feature_index, choices=None):
+        """Generate a standalone script for ONE feature at feature_index.
+
+        Includes helpers + entity lookups for features 0..N-1, then
+        emits the single feature's code.
+        """
+        choices = choices or {}
+        timeline = self.cap.get("timeline", [])
+        if feature_index < 0 or feature_index >= len(timeline):
+            return f"# ERROR: feature_index {feature_index} out of range"
+
+        feat = timeline[feature_index]
+        if feat.get("isRolledBack"):
+            return "# Feature is rolled back — nothing to emit"
+
+        # Reset output state
+        self.out = []
+        self.ind = 1
+
+        # Scan ALL features for helper needs (we need the full set
+        # because _rebuild_entity_context may use helpers)
+        self._scan_needs()
+
+        # Boilerplate
+        self.out.append("import adsk.core, adsk.fusion, math")
+        self.out.append("")
+        self.out.append("")
+        self.out.append("def run(context):")
+        self._w("app = adsk.core.Application.get()")
+        self._w("design = adsk.fusion.Design.cast(app.activeProduct)")
+        self._w("root = design.rootComponent")
+        self._w("params = design.userParameters")
+
+        # Helpers
+        self._helpers()
+
+        # Entity context from prior features
+        self._rebuild_entity_context(feature_index, choices)
+
+        # Emit the single feature
+        t = feat.get("type", "Unknown")
+        idx = feat.get("index", "?")
+        name = feat.get("name", "")
+        self._w()
+        self._c(f"[{idx}] {t}: {name}")
+
+        variants = self._feature_variants_with_state(feat)
+        if len(variants) > 1:
+            vi = choices.get(feature_index, 0)
+            vi = min(vi, len(variants) - 1)
+            lines, desc, state = variants[vi]
+            self._c(f"variant {vi}: {desc}")
+            self.out.extend(lines)
+            self._restore_state(state)
+        else:
+            handler = getattr(self, f"_feat_{t.lower()}", None)
+            if handler:
+                handler(feat)
+            else:
+                self._c(f"TODO: Unsupported feature type '{t}'")
+
+        return "\n".join(self.out)
+
+    def _rebuild_entity_context(self, up_to_index, choices=None):
+        """Emit find_body/itemByName lookups for entities from features 0..N-1.
+
+        This lets a per-feature script reference bodies, sketches, planes, etc.
+        created by previously-executed features without re-running them.
+        """
+        choices = choices or {}
+        timeline = self.cap.get("timeline", [])
+
+        self._section("ENTITY CONTEXT (prior features)")
+
+        for i in range(up_to_index):
+            if i >= len(timeline):
+                break
+            feat = timeline[i]
+            if feat.get("isRolledBack"):
+                continue
+            t = feat.get("type")
+            name = feat.get("name", "")
+
+            if t == "ConstructionPlane":
+                var = self._var(name)
+                self._w(f'{var} = root.constructionPlanes.itemByName("{name}")')
+                self.planes[name] = var
+
+            elif t == "Sketch":
+                var = self._var(name)
+                self._w(f'{var} = root.sketches.itemByName("{name}")')
+                self.sketches[name] = var
+                # Resolve profile for downstream extrude/sweep
+                plane_info = feat.get("plane", {})
+                prof = f"{var}_prof"
+                if plane_info.get("type") == "BRepFace":
+                    # On-face sketch → multiple profiles, select smallest
+                    self._w(f"_best_pi, _best_a = 0, float('inf')")
+                    self._w(f"for _pi in range({var}.profiles.count):")
+                    self.ind += 1
+                    self._w(f"_bb = {var}.profiles.item(_pi).boundingBox")
+                    self._w(f"_a = abs(_bb.maxPoint.x-_bb.minPoint.x)*abs(_bb.maxPoint.y-_bb.minPoint.y)")
+                    self._w(f"if _a < _best_a: _best_a, _best_pi = _a, _pi")
+                    self.ind -= 1
+                    self._w(f"{prof} = {var}.profiles.item(_best_pi)")
+                    self._brep_face_sketches[name] = plane_info
+                else:
+                    self._w(f"{prof} = {var}.profiles.item(0)")
+                self.profiles[name] = prof
+
+            elif t in ("Extrude", "Sweep", "Mirror", "SplitBody",
+                        "RectangularPattern"):
+                for bn in feat.get("bodies", []):
+                    bv = self._var(bn)
+                    self._w(f'{bv} = find_body("{bn}")')
+                    self.bodies[bn] = bv
+
+            elif t == "Remove":
+                removed = feat.get("removedBody", "")
+                if removed in self.bodies:
+                    del self.bodies[removed]
+
+            elif t == "Combine":
+                if not feat.get("isKeepToolBodies"):
+                    for tb in feat.get("toolBodies", []):
+                        if tb in self.bodies:
+                            del self.bodies[tb]
+
+    # ── Variant support ──
+
+    @contextmanager
+    def _capture_output(self):
+        """Capture lines written by feature emitters into a separate list."""
+        saved = self.out
+        captured = []
+        self.out = captured
+        yield captured
+        self.out = saved
+
+    def _feature_variants(self, feat):
+        """Return list of (lines, description) for all variants of a feature.
+
+        Non-ambiguous features return a single variant (the default).
+        Used by get_ambiguous_features() for introspection.
+        """
+        return [(v[0], v[1]) for v in self._feature_variants_with_state(feat)]
+
+    def _feature_variants_with_state(self, feat):
+        """Return list of (lines, description, state) for all variants.
+
+        Each variant includes the generator state snapshot after emission,
+        so generate_with_choices can restore state for the chosen variant.
+        """
+        t = feat.get("type", "")
+
+        if t == "Sketch":
+            return self._sketch_variants(feat)
+        if t == "Extrude":
+            return self._extrude_variants(feat)
+        if t == "Sweep":
+            return self._sweep_variants(feat)
+
+        # Non-ambiguous: single default variant
+        handler = getattr(self, f"_feat_{t.lower()}", None)
+        if handler:
+            saved = self._save_state()
+            with self._capture_output() as lines:
+                handler(feat)
+            state = self._save_state()
+            self._restore_state(saved)
+            return [(lines, "default", state)]
+        return [([], f"unsupported type '{t}'", self._save_state())]
+
+    def _sketch_variants(self, feat):
+        """Generate sketch variants: project vs intersect × flip_y permutations."""
+        curves = feat.get("curves", [])
+        refs = [c for c in curves if c.get("isReference")]
+        has_body_proj = any(
+            c.get("projectedFrom", {}).get("type") == "BRepBody"
+            for c in refs
+        )
+        plane_info = feat.get("plane", {})
+        is_brep_face = (
+            plane_info.get("type") == "BRepFace"
+            and "sketchOrigin" in feat
+            and "sketchXDir" in feat
+            and "sketchYDir" in feat
+        )
+
+        if not (has_body_proj and is_brep_face):
+            # Not ambiguous — single default
+            saved = self._save_state()
+            with self._capture_output() as lines:
+                self._feat_sketch(feat)
+            state = self._save_state()
+            self._restore_state(saved)
+            return [(lines, "default", state)]
+
+        # Ambiguous: intersect vs project (runtime coord transform handles axis differences)
+        variants = []
+        for method in ["intersect", "project"]:
+                    f2 = copy.deepcopy(feat)
+                    for c in f2.get("curves", []):
+                        if c.get("isReference"):
+                            pf = c.get("projectedFrom", {})
+                            if pf.get("type") == "BRepBody":
+                                pf["method"] = method
+
+                    saved_state = self._save_state()
+                    with self._capture_output() as lines:
+                        self._feat_sketch(f2)
+                    state_after = self._save_state()
+                    self._restore_state(saved_state)
+
+                    desc = f"method={method}"
+                    variants.append((lines, desc, state_after))
+
+        return variants
+
+    def _extrude_variants(self, feat):
+        """Generate extrude variants: positive vs negative direction."""
+        dist = feat.get("distance", "1 cm")
+        if not (dist.startswith("-(") and dist.endswith(")")):
+            # Not ambiguous
+            saved = self._save_state()
+            with self._capture_output() as lines:
+                self._feat_extrude(feat)
+            state = self._save_state()
+            self._restore_state(saved)
+            return [(lines, "default", state)]
+
+        variants = []
+        # Variant 0: default (unwrap negative → flip)
+        saved = self._save_state()
+        with self._capture_output() as lines:
+            self._feat_extrude(feat)
+        state0 = self._save_state()
+        self._restore_state(saved)
+        variants.append((lines, "negative-unwrap (default)", state0))
+
+        # Variant 1: keep as positive (don't unwrap)
+        f2 = copy.deepcopy(feat)
+        inner = dist[2:-1].strip()
+        f2["distance"] = inner
+        f2["isDirectionFlipped"] = False
+        saved = self._save_state()
+        with self._capture_output() as lines:
+            self._feat_extrude(f2)
+        state1 = self._save_state()
+        self._restore_state(saved)
+        variants.append((lines, "positive (no flip)", state1))
+
+        return variants
+
+    def _sweep_variants(self, feat):
+        """Generate sweep variants: swap distanceOne/distanceTwo."""
+        d1 = feat.get("distanceOne")
+        d2 = feat.get("distanceTwo")
+        if not (d1 and d2):
+            # Not ambiguous
+            saved = self._save_state()
+            with self._capture_output() as lines:
+                self._feat_sweep(feat)
+            state = self._save_state()
+            self._restore_state(saved)
+            return [(lines, "default", state)]
+
+        variants = []
+        # Variant 0: as captured
+        saved = self._save_state()
+        with self._capture_output() as lines:
+            self._feat_sweep(feat)
+        state0 = self._save_state()
+        self._restore_state(saved)
+        variants.append((lines, f"d1={d1}, d2={d2}", state0))
+
+        # Variant 1: swapped
+        f2 = copy.deepcopy(feat)
+        f2["distanceOne"] = d2
+        f2["distanceTwo"] = d1
+        saved = self._save_state()
+        with self._capture_output() as lines:
+            self._feat_sweep(f2)
+        state1 = self._save_state()
+        self._restore_state(saved)
+        variants.append((lines, f"d1={d2}, d2={d1} (swapped)", state1))
+
+        return variants
+
+    def _save_state(self):
+        """Snapshot mutable generator state for save/restore."""
+        return {
+            "planes": dict(self.planes),
+            "sketches": dict(self.sketches),
+            "profiles": dict(self.profiles),
+            "bodies": dict(self.bodies),
+            "feats": dict(self.feats),
+            "_brep_face_sketches": dict(self._brep_face_sketches),
+        }
+
+    def _restore_state(self, state):
+        """Restore generator state from snapshot."""
+        self.planes = dict(state["planes"])
+        self.sketches = dict(state["sketches"])
+        self.profiles = dict(state["profiles"])
+        self.bodies = dict(state["bodies"])
+        self.feats = dict(state["feats"])
+        self._brep_face_sketches = dict(state["_brep_face_sketches"])
 
     # ── Output primitives ──
 
@@ -220,6 +690,23 @@ class _Generator:
         self._w("return best")
         self.ind -= 1
 
+        # find_face_near — select face by pointOnFace proximity
+        self._w()
+        self._w("def find_face_near(body, px, py, pz):")
+        self.ind += 1
+        self._w("best, best_d = None, 1e10")
+        self._w("for i in range(body.faces.count):")
+        self.ind += 1
+        self._w("f = body.faces.item(i)")
+        self._w("if isinstance(f.geometry, adsk.core.Plane):")
+        self.ind += 1
+        self._w("p = f.pointOnFace")
+        self._w("d = abs(p.x - px) + abs(p.y - py) + abs(p.z - pz)")
+        self._w("if d < best_d: best, best_d = f, d")
+        self.ind -= 2
+        self._w("return best")
+        self.ind -= 1
+
         if "combine" in self.needs:
             self._w()
             self._w('def combine(comp, target, tools, op, keep, name="Comb"):')
@@ -334,26 +821,14 @@ class _Generator:
                     c.get("isReference") and
                     c.get("projectedFrom", {}).get("type") == "BRepFace"
                 )]
-                # Fix Y-flip: captured sketch yDir may differ from find_face yDir.
-                ydir = f.get("sketchYDir", [0, 1, 0])
-                flip_y = False
-                normal = plane_info.get("normal", [0, 0, 1])
-                ax, ay, az = abs(normal[0]), abs(normal[1]), abs(normal[2])
-                if az > 0.9 and ydir[1] < 0:
-                    flip_y = True
-                elif ay > 0.9 and ydir[2] < 0:
-                    flip_y = True
-                elif ax > 0.9 and ydir[2] < 0:
-                    flip_y = True
-                if flip_y:
-                    for c in curves:
-                        if not c.get("isReference"):
-                            if "start" in c:
-                                c["start"] = [c["start"][0], -c["start"][1]]
-                            if "end" in c:
-                                c["end"] = [c["end"][0], -c["end"][1]]
-                            if "center" in c:
-                                c["center"] = [c["center"][0], -c["center"][1]]
+                # Runtime coordinate transform: the reconstructed sketch may
+                # have different axes than the original (rotation/reflection).
+                # Store the captured axes so _emit_raw_sketch can emit the
+                # transform function and wrap all drawn-curve coordinates.
+                f["_coord_transform"] = {
+                    "cap_xdir": f.get("sketchXDir", [1, 0, 0]),
+                    "cap_ydir": f.get("sketchYDir", [0, 1, 0]),
+                }
                 is_on_face = True
             elif refs and not has_edge_proj:
                 # Only auto-boundary refs → use find_face + filter refs
@@ -667,18 +1142,77 @@ class _Generator:
     def _feat_splitbody(self, f):
         name = f.get("name", "Split")
         bodies = f.get("bodies", [])
+        tool_info = f.get("splitTool", {})
+        extend = f.get("isSplittingToolExtended", True)
 
-        # Split+Remove sequences use deleteMe which invalidates sibling bodies
-        # in executeTextCommand mode. Skip the split — cosmetic trims only.
-        self._c(f"Split+Remove skipped (deleteMe invalidates siblings in sandbox)")
-        if bodies:
-            input_name = bodies[0]
-            self._c(f"Body '{input_name}' kept as-is (foot trim omitted)")
+        # Infer input body: try base names, exact names, then _body_ref suffix search
+        body_code = None
+        for bn in bodies:
+            base = re.sub(r'\s*\(\d+\)\s*$', '', bn)
+            if base in self.bodies:
+                body_code = self.bodies[base]
+                break
+        if body_code is None:
+            for bn in bodies:
+                if bn in self.bodies:
+                    body_code = self.bodies[bn]
+                    break
+        if body_code is None:
+            # Use _body_ref which handles suffix variations (e.g., "Leg" → "Leg (1)")
+            for bn in bodies:
+                base = re.sub(r'\s*\(\d+\)\s*$', '', bn)
+                ref = self._body_ref(base)
+                if not ref.startswith('find_body('):
+                    body_code = ref
+                    break
+        if body_code is None:
+            body_code = 'find_body("?")  # TODO: split input body not resolved'
+
+        # Resolve splitting tool
+        tool_type = tool_info.get("type")
+        if tool_type == "ConstructionPlane":
+            pname = tool_info.get("name", "")
+            builtin = {"XY": "root.xYConstructionPlane",
+                       "XZ": "root.xZConstructionPlane",
+                       "YZ": "root.yZConstructionPlane"}
+            tool_code = self.planes.get(pname, builtin.get(pname, f'root.constructionPlanes.itemByName("{pname}")'))
+        elif tool_type == "BRepFace":
+            body_name = tool_info.get("body", "")
+            normal = tool_info.get("normal")
+            bv = self._body_ref(body_name)
+            if normal:
+                axis, direction = self._normal_to_axis(normal)
+            else:
+                axis, direction = "z", 1
+            tool_code = f'find_face({bv}, "{axis}", {direction})'
+        elif tool_type == "BRepBody":
+            tool_code = self._body_ref(tool_info.get("name", ""))
+        else:
+            tool_code = "None  # TODO: unknown split tool type"
+
+        self._w(f"split_inp = root.features.splitBodyFeatures.createInput("
+                f"{body_code}, {tool_code}, {extend})")
+        self._w(f"split_feat = root.features.splitBodyFeatures.add(split_inp)")
+        self._w(f'split_feat.name = "{name}"')
+        self.feats[name] = "split_feat"
+
+        # Track ALL output bodies by finding them after split
+        for bn in bodies:
+            bv = self._var(bn)
+            self.bodies[bn] = bv
+            self._w(f'{bv} = find_body("{bn}")')
 
     def _feat_remove(self, f):
-        # Remove skipped — paired with SplitBody (deleteMe invalidates siblings)
         removed = f.get("removedBody", "")
-        self._c(f"Remove '{removed}' skipped (see SplitBody note above)")
+        if not removed:
+            self._c("TODO: Remove — no body name captured")
+            return
+        body_code = self._body_ref(removed)
+        # Guard: body may not exist if upstream split produced fewer pieces
+        self._w(f"_rm = {body_code}")
+        self._w(f"if _rm: root.features.removeFeatures.add(_rm)")
+        if removed in self.bodies:
+            del self.bodies[removed]
 
     def _feat_mirror(self, f):
         name = f.get("name", "Mirror")
@@ -1029,11 +1563,56 @@ class _Generator:
             self._w(f"{prof} = {var}.profiles.item(0)")
         self.profiles[name] = prof
 
+    def _emit_sketch_coord_transform(self, var, cap_xdir, cap_ydir, plane_info):
+        """Emit runtime code to compute the transform from captured sketch space
+        to the actual reconstructed sketch space.
+
+        The captured sketch has axes (cap_xdir, cap_ydir). The reconstructed
+        sketch on the same face may have different axes. We compute the 2x2
+        transform matrix at runtime by reading the actual sketch's xDirection
+        and yDirection, then computing how to map (cap_sx, cap_sy) → (act_sx, act_sy).
+
+        Both coordinate systems share the same origin (the face reference point)
+        and the same plane — only the in-plane axes may differ (rotation/reflection).
+        The transform is: actual_model = cap_sx * cap_xdir + cap_sy * cap_ydir
+                          act_sx = dot(actual_model, act_xdir)
+                          act_sy = dot(actual_model, act_ydir)
+        Which gives a 2x2 matrix: [[dot(cap_x,act_x), dot(cap_y,act_x)],
+                                    [dot(cap_x,act_y), dot(cap_y,act_y)]]
+        """
+        # Emit the captured axes as constants
+        self._w(f"# Coordinate transform: captured sketch axes -> actual sketch axes")
+        self._w(f"_cap_xd = ({cap_xdir[0]}, {cap_xdir[1]}, {cap_xdir[2]})")
+        self._w(f"_cap_yd = ({cap_ydir[0]}, {cap_ydir[1]}, {cap_ydir[2]})")
+        self._w(f"_act_xd = {var}.xDirection")
+        self._w(f"_act_yd = {var}.yDirection")
+        # 2x2 transform matrix: M = [[a,b],[c,d]]
+        # where a = dot(cap_xdir, act_xdir), b = dot(cap_ydir, act_xdir), etc.
+        self._w(f"_m00 = _cap_xd[0]*_act_xd.x + _cap_xd[1]*_act_xd.y + _cap_xd[2]*_act_xd.z")
+        self._w(f"_m01 = _cap_yd[0]*_act_xd.x + _cap_yd[1]*_act_xd.y + _cap_yd[2]*_act_xd.z")
+        self._w(f"_m10 = _cap_xd[0]*_act_yd.x + _cap_xd[1]*_act_yd.y + _cap_xd[2]*_act_yd.z")
+        self._w(f"_m11 = _cap_yd[0]*_act_yd.x + _cap_yd[1]*_act_yd.y + _cap_yd[2]*_act_yd.z")
+        self._w(f"def _xf(sx, sy):")
+        self.ind += 1
+        self._w(f"return (sx * _m00 + sy * _m01, sx * _m10 + sy * _m11)")
+        self.ind -= 1
+
     def _emit_raw_sketch(self, var, name, plane_code, curves, dims, feat, on_face=False):
         """Emit raw sketch geometry with parametric dimensions and constraints."""
         self._w(f"{var} = root.sketches.add({plane_code})")
         self._w(f'{var}.name = "{name}"')
         self._w(f"lns = {var}.sketchCurves.sketchLines")
+
+        # Emit coordinate transform if the sketch was on a BRepFace with
+        # body projections (axes may differ from captured sketch)
+        _has_coord_xf = False
+        coord_xf = feat.get("_coord_transform")
+        if coord_xf:
+            _has_coord_xf = True
+            self._emit_sketch_coord_transform(var, coord_xf["cap_xdir"], coord_xf["cap_ydir"], feat.get("plane", {}))
+        else:
+            # Identity transform — _xf passthrough for dimension references
+            self._w(f"def _xf(sx, sy): return (sx, sy)")
 
         has_arcs = any(c.get("type") == "Arc" for c in curves)
         has_circles = any(c.get("type") == "Circle" for c in curves)
@@ -1103,9 +1682,9 @@ class _Generator:
                             self._w(f"{pvar} = {var}.project({bv})")
 
         if _has_body_projs:
-            # Build runtime lookup of all projected sketch points (no threshold —
-            # _proj_connected gates which endpoints use this)
+            # Build runtime lookup of all projected sketch points AND curves
             self._w(f"_proj_pts = []  # [(x, y, sketchPoint), ...]")
+            self._w(f"_proj_curves = []  # [(sx, sy, ex, ey, curve), ...]")
             self._w(f"for _ci in range({var}.sketchCurves.count):")
             self.ind += 1
             self._w(f"_c = {var}.sketchCurves.item(_ci)")
@@ -1115,7 +1694,10 @@ class _Generator:
             self.ind += 1
             self._w(f"_g = _sp.geometry")
             self._w(f"_proj_pts.append((_g.x, _g.y, _sp))")
-            self.ind -= 3
+            self.ind -= 1
+            self._w(f"_s, _e = _c.startSketchPoint.geometry, _c.endSketchPoint.geometry")
+            self._w(f"_proj_curves.append((_s.x, _s.y, _e.x, _e.y, _c))")
+            self.ind -= 2
             self._w()
             self._w(f"def _nearest_proj(x, y):")
             self.ind += 1
@@ -1127,6 +1709,37 @@ class _Generator:
             self.ind -= 1
             self._w(f"return best")
             self.ind -= 1
+            self._w()
+            self._w(f"def _nearest_proj_curve(sx, sy, ex, ey):")
+            self.ind += 1
+            self._w(f"best, best_d = None, 1e10")
+            self._w(f"for _sx, _sy, _ex, _ey, _c in _proj_curves:")
+            self.ind += 1
+            self._w(f"_d = min(abs(_sx-sx)+abs(_sy-sy)+abs(_ex-ex)+abs(_ey-ey),")
+            self._w(f"        abs(_sx-ex)+abs(_sy-ey)+abs(_ex-sx)+abs(_ey-sy))")
+            self._w(f"if _d < best_d: best, best_d = _c, _d")
+            self.ind -= 1
+            self._w(f"return best")
+            self.ind -= 1
+
+            # Register projected BRepBody curves in curve_vars for
+            # constraint/dimension references (match by endpoint proximity)
+            for i, c in enumerate(curves):
+                if (c.get("isReference")
+                        and c.get("projectedFrom", {}).get("type") == "BRepBody"):
+                    _oi = c.get("_origIdx", i)
+                    sx, sy = c["start"]
+                    ex, ey = c["end"]
+                    cv = f"_pcurve_{_oi}"
+                    if _has_coord_xf:
+                        # Transform captured coords to actual sketch space for matching
+                        self._w(f"{cv} = _nearest_proj_curve(*_xf({sx}, {sy}), *_xf({ex}, {ey}))")
+                    else:
+                        self._w(f"{cv} = _nearest_proj_curve({sx}, {sy}, {ex}, {ey})")
+                    curve_vars[_oi] = cv
+                    # Don't register endpoints in pt_map — curve direction may
+                    # be reversed vs capture. Use _nearest_proj instead for
+                    # drawn lines that start at projected corners.
 
         for i, c in enumerate(curves):
             ctype = c.get("type", "")
@@ -1173,48 +1786,69 @@ class _Generator:
             if ctype == "Line":
                 sx, sy = c["start"]
                 ex, ey = c["end"]
+                # When coordinate transform is active, transform captured
+                # coords to actual sketch space for _nearest_proj queries
+                # and for computing deltas.
+                if _has_coord_xf and not c.get("isReference"):
+                    self._w(f"_cs_{i} = _xf({sx}, {sy})")
+                    self._w(f"_ce_{i} = _xf({ex}, {ey})")
+                    tsx, tsy = f"_cs_{i}[0]", f"_cs_{i}[1]"
+                    tex, tey = f"_ce_{i}[0]", f"_ce_{i}[1]"
+                else:
+                    tsx, tsy = str(sx), str(sy)
+                    tex, tey = str(ex), str(ey)
                 s_ref, s_key = _pt_ref(sx, sy)
                 e_ref, e_key = _pt_ref(ex, ey)
                 if _has_body_projs:
-                    # Use _origIdx to map back to original curve index.
                     oi = c.get("_origIdx", i)
                     s_is_proj = not s_ref and (oi, "start") in _proj_connected
                     e_is_proj = not e_ref and (oi, "end") in _proj_connected
 
                     if s_is_proj:
-                        # Get projected point geometry (Point3D) to draw at
-                        # exact position. After drawing, add coincident to
-                        # share the projected sketch point.
-                        self._w(f"_pp_{i}s = _nearest_proj({sx}, {sy})")
+                        self._w(f"_pp_{i}s = _nearest_proj({tsx}, {tsy})")
                         self._w(f"_pg_{i}s = _pp_{i}s.geometry")
                         s_code = f"P(_pg_{i}s.x, _pg_{i}s.y, 0)"
                     elif s_ref:
                         s_code = s_ref
+                    elif _has_coord_xf:
+                        s_code = f"P({tsx}, {tsy}, 0)"
                     else:
                         s_code = f"P({sx}, {sy}, 0)"
 
                     if e_is_proj:
-                        self._w(f"_pp_{i}e = _nearest_proj({ex}, {ey})")
+                        self._w(f"_pp_{i}e = _nearest_proj({tex}, {tey})")
                         self._w(f"_pg_{i}e = _pp_{i}e.geometry")
                         e_code = f"P(_pg_{i}e.x, _pg_{i}e.y, 0)"
                     elif e_ref:
                         e_code = e_ref
                     elif s_is_proj:
                         # Non-projected end: compute from projected start + offset
-                        dx = round(ex - sx, 6)
-                        dy = round(ey - sy, 6)
-                        e_code = f"P(_pg_{i}s.x + {dx}, _pg_{i}s.y + {dy}, 0)"
+                        # Use transformed coords for delta so direction is correct
+                        self._w(f"_dx_{i} = {tex} - {tsx}")
+                        self._w(f"_dy_{i} = {tey} - {tsy}")
+                        e_code = f"P(_pg_{i}s.x + _dx_{i}, _pg_{i}s.y + _dy_{i}, 0)"
+                    elif _has_coord_xf:
+                        e_code = f"P({tex}, {tey}, 0)"
                     else:
                         e_code = f"P({ex}, {ey}, 0)"
 
                     # Same for non-projected start with projected end
                     if not s_is_proj and not s_ref and e_is_proj:
-                        dx = round(sx - ex, 6)
-                        dy = round(sy - ey, 6)
-                        s_code = f"P(_pg_{i}e.x + {dx}, _pg_{i}e.y + {dy}, 0)"
+                        if _has_coord_xf:
+                            self._w(f"_dx_{i} = {tsx} - {tex}")
+                            self._w(f"_dy_{i} = {tsy} - {tey}")
+                            s_code = f"P(_pg_{i}e.x + _dx_{i}, _pg_{i}e.y + _dy_{i}, 0)"
+                        else:
+                            dx = round(sx - ex, 6)
+                            dy = round(sy - ey, 6)
+                            s_code = f"P(_pg_{i}e.x + {dx}, _pg_{i}e.y + {dy}, 0)"
                 else:
-                    s_code = s_ref if s_ref else f"P({sx}, {sy}, 0)"
-                    e_code = e_ref if e_ref else f"P({ex}, {ey}, 0)"
+                    if _has_coord_xf:
+                        s_code = s_ref if s_ref else f"P({tsx}, {tsy}, 0)"
+                        e_code = e_ref if e_ref else f"P({tex}, {tey}, 0)"
+                    else:
+                        s_code = s_ref if s_ref else f"P({sx}, {sy}, 0)"
+                        e_code = e_ref if e_ref else f"P({ex}, {ey}, 0)"
                 self._w(f"ln{i} = lns.addByTwoPoints({s_code}, {e_code})")
                 # Add coincident constraints to merge drawn endpoints
                 # with projected sketch points (shares the point, zero-gap)
@@ -1263,7 +1897,10 @@ class _Generator:
                     _proj_curve_pts[(oi, "start")] = (sx, sy)
                     _proj_curve_pts[(oi, "end")] = (ex, ey)
 
-        # Emit dimensions with entity targets
+        # Emit dimensions FIRST, then geometric constraints.
+        # Dimension + on-line coincident together determine point position.
+        # Dimension first: sets distance along axis. Coincident second:
+        # snaps to the projected edge (compatible, not over-constraining).
         if dims:
             self._w(f"d = {var}.sketchDimensions")
             for di, d in enumerate(dims):
@@ -1280,13 +1917,12 @@ class _Generator:
 
                     e1_code = self._resolve_sketch_entity_ref(e1, curve_vars, var, _proj_curve_pts)
                     e2_code = self._resolve_sketch_entity_ref(e2, curve_vars, var, _proj_curve_pts)
-                    # Skip dimensions referencing projected points when using
-                    # intersect (offset geometry is exact, dimension over-constrains)
-                    if _has_body_projs and e1_code and "_nearest_proj" in str(e1_code):
-                        self._c(f"dim[{di}]: {expr} (encoded in intersect offset)")
+                    if (_has_body_projs and e1_code and e2_code
+                            and "_nearest_proj" in str(e1_code)
+                            and "_nearest_proj" in str(e2_code)):
+                        self._c(f"dim[{di}]: {expr} (both endpoints from intersection)")
                         continue
                     if e1_code and e2_code:
-                        val = d.get("value", 0)
                         self._w(f"d.addDistanceDimension({e1_code}, {e2_code},")
                         self.ind += 1
                         self._w(f'{orient_code}, P(0, 0, 0)).parameter.expression = "{expr}"')
@@ -1315,7 +1951,6 @@ class _Generator:
                 else:
                     self._c(f"TODO: dim[{di}] {dtype}: {expr} = {d.get('value', 0)}")
 
-        # Emit geometric constraints with targets
         constraints = feat.get("constraints", [])
         if constraints and any(isinstance(c, dict) for c in constraints):
             self._w(f"gc = {var}.geometricConstraints")
@@ -1397,6 +2032,12 @@ class _Generator:
         if rtype == "SketchPoint":
             if role == "origin":
                 return f"{sk_var}.originPoint"
+            # For projected body curves, use _nearest_proj (curve direction
+            # may be reversed, so startSketchPoint/endSketchPoint are unreliable).
+            # Use _xf to transform captured coords if coord transform is active.
+            if ci is not None and proj_curve_pts and (ci, role) in proj_curve_pts:
+                x, y = proj_curve_pts[(ci, role)]
+                return f"_nearest_proj(*_xf({x}, {y}))"
             if ci is not None and ci in curve_vars:
                 cv = curve_vars[ci]
                 if role == "start":
@@ -1405,10 +2046,6 @@ class _Generator:
                     return f"{cv}.endSketchPoint"
                 elif role == "center":
                     return f"{cv}.centerSketchPoint"
-            # Fallback for BRepBody-projected curves: use _nearest_proj
-            if ci is not None and proj_curve_pts and (ci, role) in proj_curve_pts:
-                x, y = proj_curve_pts[(ci, role)]
-                return f"_nearest_proj({x}, {y})"
             # Fallback: position-based
             pos = ref.get("position")
             if pos:
@@ -1448,7 +2085,13 @@ class _Generator:
         if ptype == "BRepFace":
             body_name = plane_info.get("body", "")
             normal = plane_info.get("normal")
+            pof = plane_info.get("pointOnFace")
             bv = self._body_ref(body_name)
+            if pof:
+                # Use pointOnFace for precise face selection — face.geometry.normal
+                # is the mathematical normal (same for both sides of a body).
+                return (f'find_face_near({bv}, {round(pof[0], 4)}, '
+                        f'{round(pof[1], 4)}, {round(pof[2], 4)})')
             if normal:
                 axis, direction = self._normal_to_axis(normal)
             else:
