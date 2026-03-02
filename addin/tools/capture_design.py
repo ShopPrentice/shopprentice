@@ -29,6 +29,9 @@ from ._capture_helpers import (
     _capture_move,
     _capture_chamfer,
     _capture_fillet,
+    _capture_sweep,
+    _capture_split_body,
+    _capture_remove,
 )
 
 app = adsk.core.Application.get()
@@ -149,14 +152,14 @@ def handler() -> dict:
             # Extrude
             ext = adsk.fusion.ExtrudeFeature.cast(entity)
             if ext:
-                feat_info.update(_capture_extrude(ext, idx, tl))
+                feat_info.update(_capture_extrude(ext, idx, tl, design))
                 out["timeline"].append(feat_info)
                 continue
 
             # Sketch
             sk = adsk.fusion.Sketch.cast(entity)
             if sk:
-                feat_info.update(_capture_sketch(sk))
+                feat_info.update(_capture_sketch(sk, design))
                 out["timeline"].append(feat_info)
                 continue
 
@@ -170,21 +173,21 @@ def handler() -> dict:
             # Mirror
             mir = adsk.fusion.MirrorFeature.cast(entity)
             if mir:
-                feat_info.update(_capture_mirror(mir))
+                feat_info.update(_capture_mirror(mir, design))
                 out["timeline"].append(feat_info)
                 continue
 
             # RectangularPattern
             pat = adsk.fusion.RectangularPatternFeature.cast(entity)
             if pat:
-                feat_info.update(_capture_rectangular_pattern(pat))
+                feat_info.update(_capture_rectangular_pattern(pat, design))
                 out["timeline"].append(feat_info)
                 continue
 
             # Combine
             comb = adsk.fusion.CombineFeature.cast(entity)
             if comb:
-                feat_info.update(_capture_combine(comb, idx, tl))
+                feat_info.update(_capture_combine(comb, idx, tl, design))
                 out["timeline"].append(feat_info)
                 continue
 
@@ -199,21 +202,42 @@ def handler() -> dict:
             # Move
             mv = adsk.fusion.MoveFeature.cast(entity)
             if mv:
-                feat_info.update(_capture_move(mv))
+                feat_info.update(_capture_move(mv, design))
                 out["timeline"].append(feat_info)
                 continue
 
             # Chamfer
             chamfer = adsk.fusion.ChamferFeature.cast(entity)
             if chamfer:
-                feat_info.update(_capture_chamfer(chamfer))
+                feat_info.update(_capture_chamfer(chamfer, design))
                 out["timeline"].append(feat_info)
                 continue
 
             # Fillet
             fillet = adsk.fusion.FilletFeature.cast(entity)
             if fillet:
-                feat_info.update(_capture_fillet(fillet))
+                feat_info.update(_capture_fillet(fillet, design))
+                out["timeline"].append(feat_info)
+                continue
+
+            # Sweep
+            sweep = adsk.fusion.SweepFeature.cast(entity)
+            if sweep:
+                feat_info.update(_capture_sweep(sweep, design))
+                out["timeline"].append(feat_info)
+                continue
+
+            # SplitBody
+            split = adsk.fusion.SplitBodyFeature.cast(entity)
+            if split:
+                feat_info.update(_capture_split_body(split, design))
+                out["timeline"].append(feat_info)
+                continue
+
+            # Remove
+            remove = adsk.fusion.RemoveFeature.cast(entity)
+            if remove:
+                feat_info.update(_capture_remove(remove))
                 out["timeline"].append(feat_info)
                 continue
 
