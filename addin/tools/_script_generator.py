@@ -322,8 +322,8 @@ class _Generator:
                 for c in refs
             )
             if has_body_proj:
-                # Body projections depend on the exact face geometry (bevel, taper).
-                # Must use find_face — cplane gives wrong projection coordinates.
+                # Body projections: use find_face for accurate intersection
+                # geometry on beveled/tapered faces.
                 plane_code = self._resolve_plane(plane_info)
                 # Tag curves with original index before filtering
                 for ci, c in enumerate(curves):
@@ -334,23 +334,17 @@ class _Generator:
                     c.get("isReference") and
                     c.get("projectedFrom", {}).get("type") == "BRepFace"
                 )]
-                # Fix Y-flip: captured sketch may have yDir=(0,-1,0) but find_face
-                # creates yDir=(0,1,0). Negate Y for all non-reference curve coords.
+                # Fix Y-flip: captured sketch yDir may differ from find_face yDir.
                 ydir = f.get("sketchYDir", [0, 1, 0])
-                xdir = f.get("sketchXDir", [1, 0, 0])
-                # Check if sketch Y or X is flipped vs standard orientation
-                # Standard for Z-normal: xDir=(1,0,0), yDir=(0,1,0)
-                # Standard for Y-normal: xDir=(1,0,0), yDir=(0,0,1)
-                # Standard for X-normal: xDir=(0,1,0), yDir=(0,0,1)
                 flip_y = False
                 normal = plane_info.get("normal", [0, 0, 1])
                 ax, ay, az = abs(normal[0]), abs(normal[1]), abs(normal[2])
                 if az > 0.9 and ydir[1] < 0:
-                    flip_y = True  # Z-normal: standard yDir is +Y
+                    flip_y = True
                 elif ay > 0.9 and ydir[2] < 0:
-                    flip_y = True  # Y-normal: standard yDir is +Z
+                    flip_y = True
                 elif ax > 0.9 and ydir[2] < 0:
-                    flip_y = True  # X-normal: standard yDir is +Z
+                    flip_y = True
                 if flip_y:
                     for c in curves:
                         if not c.get("isReference"):
@@ -360,7 +354,6 @@ class _Generator:
                                 c["end"] = [c["end"][0], -c["end"][1]]
                             if "center" in c:
                                 c["center"] = [c["center"][0], -c["center"][1]]
-                    f["_yflipped"] = True
                 is_on_face = True
             elif refs and not has_edge_proj:
                 # Only auto-boundary refs → use find_face + filter refs
@@ -595,9 +588,14 @@ class _Generator:
                 self._w(f"sweep_path = root.features.createPath(sweep_edge)")
                 # Detect path direction: check which end is closer to the
                 # captured startVertex. If reversed, swap distance1/distance2.
+                # createPath may reverse direction from edge vertex order.
+                # Check isOpposedToEntity AND vertex proximity to determine
+                # the actual path direction.
                 self._w(f"_psv = sweep_edge.startVertex.geometry")
-                self._w(f"_path_fwd = (abs(_psv.x - {sv[0]:.4f}) + abs(_psv.y - {sv[1]:.4f}) + abs(_psv.z - {sv[2]:.4f}) < 0.1)")
-                self._c("_path_fwd=True means edge direction matches capture")
+                self._w(f"_vtx_match = (abs(_psv.x - {sv[0]:.4f}) + abs(_psv.y - {sv[1]:.4f}) + abs(_psv.z - {sv[2]:.4f}) < 0.1)")
+                self._w(f"_opposed = sweep_path.item(0).isOpposedToEntity")
+                self._w(f"_path_fwd = not (_vtx_match != _opposed)")
+                self._c("_path_fwd: True if path direction matches captured direction")
             elif pe.get("source") == "SketchCurve":
                 sk_name = pe.get("parentSketch", "")
                 self._c(f"Path: SketchCurve from '{sk_name}'")
@@ -1184,25 +1182,28 @@ class _Generator:
                     e_is_proj = not e_ref and (oi, "end") in _proj_connected
 
                     if s_is_proj:
-                        s_code = f"_nearest_proj({sx}, {sy})"
-                        self._w(f"_pp_{i}s = _nearest_proj({sx}, {sy}).geometry")
+                        # Get projected point geometry (Point3D) to draw at
+                        # exact position. After drawing, add coincident to
+                        # share the projected sketch point.
+                        self._w(f"_pp_{i}s = _nearest_proj({sx}, {sy})")
+                        self._w(f"_pg_{i}s = _pp_{i}s.geometry")
+                        s_code = f"P(_pg_{i}s.x, _pg_{i}s.y, 0)"
                     elif s_ref:
                         s_code = s_ref
                     else:
                         s_code = f"P({sx}, {sy}, 0)"
 
                     if e_is_proj:
-                        e_code = f"_nearest_proj({ex}, {ey})"
-                        self._w(f"_pp_{i}e = _nearest_proj({ex}, {ey}).geometry")
+                        self._w(f"_pp_{i}e = _nearest_proj({ex}, {ey})")
+                        self._w(f"_pg_{i}e = _pp_{i}e.geometry")
+                        e_code = f"P(_pg_{i}e.x, _pg_{i}e.y, 0)"
                     elif e_ref:
                         e_code = e_ref
                     elif s_is_proj:
-                        # Non-projected end with projected start: use projected
-                        # position + original offset vector. With intersect, the
-                        # positions are exact so no dimension needed.
+                        # Non-projected end: compute from projected start + offset
                         dx = round(ex - sx, 6)
                         dy = round(ey - sy, 6)
-                        e_code = f"P(_pp_{i}s.x + {dx}, _pp_{i}s.y + {dy}, 0)"
+                        e_code = f"P(_pg_{i}s.x + {dx}, _pg_{i}s.y + {dy}, 0)"
                     else:
                         e_code = f"P({ex}, {ey}, 0)"
 
@@ -1210,11 +1211,19 @@ class _Generator:
                     if not s_is_proj and not s_ref and e_is_proj:
                         dx = round(sx - ex, 6)
                         dy = round(sy - ey, 6)
-                        s_code = f"P(_pp_{i}e.x + {dx}, _pp_{i}e.y + {dy}, 0)"
+                        s_code = f"P(_pg_{i}e.x + {dx}, _pg_{i}e.y + {dy}, 0)"
                 else:
                     s_code = s_ref if s_ref else f"P({sx}, {sy}, 0)"
                     e_code = e_ref if e_ref else f"P({ex}, {ey}, 0)"
                 self._w(f"ln{i} = lns.addByTwoPoints({s_code}, {e_code})")
+                # Add coincident constraints to merge drawn endpoints
+                # with projected sketch points (shares the point, zero-gap)
+                if _has_body_projs:
+                    oi2 = c.get("_origIdx", i)
+                    if (oi2, "start") in _proj_connected:
+                        self._w(f"{var}.geometricConstraints.addCoincident(ln{i}.startSketchPoint, _pp_{i}s)")
+                    if (oi2, "end") in _proj_connected:
+                        self._w(f"{var}.geometricConstraints.addCoincident(ln{i}.endSketchPoint, _pp_{i}e)")
                 _register_pt(s_key, f"ln{i}.startSketchPoint")
                 _register_pt(e_key, f"ln{i}.endSketchPoint")
                 _oi = c.get("_origIdx", i)
