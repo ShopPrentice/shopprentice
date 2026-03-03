@@ -1234,7 +1234,7 @@ class _Generator:
             self._w(f"_bn = root.bRepBodies.item(_bi).name")
             base_esc = input_base.replace('"', '\\"')
             self._w(f'import re as _re')
-            self._w(f'if _re.sub(r"\\s*\\(\\d+\\)\\s*$", "", _bn) == "{base_esc}": _got += 1')
+            self._w(f'if _re.sub(r"(\\s*\\(\\d+\\))+\\s*$", "", _bn) == "{base_esc}": _got += 1')
             self.ind -= 1
             self._w(f"if _got < {n_expected}:")
             self.ind += 1
@@ -1243,7 +1243,7 @@ class _Generator:
             self._w(f"for _bi in range(root.bRepBodies.count):")
             self.ind += 1
             self._w(f"_b = root.bRepBodies.item(_bi)")
-            self._w(f'if _re.sub(r"\\s*\\(\\d+\\)\\s*$", "", _b.name) == "{base_esc}":')
+            self._w(f'if _re.sub(r"(\\s*\\(\\d+\\))+\\s*$", "", _b.name) == "{base_esc}":')
             self.ind += 1
             self._w(f"if _biggest is None or _b.volume > _biggest.volume: _biggest = _b")
             self.ind -= 2  # back to if _got level
@@ -1274,7 +1274,7 @@ class _Generator:
             self._w(f"_got2 = 0")
             self._w(f"for _bi2 in range(root.bRepBodies.count):")
             self.ind += 1
-            self._w(f'if _re.sub(r"\\s*\\(\\d+\\)\\s*$", "", root.bRepBodies.item(_bi2).name) == "{base_esc}": _got2 += 1')
+            self._w(f'if _re.sub(r"(\\s*\\(\\d+\\))+\\s*$", "", root.bRepBodies.item(_bi2).name) == "{base_esc}": _got2 += 1')
             self.ind -= 1
             self._w(f"if _got2 >= {n_expected}:")
             self.ind += 1
@@ -1298,6 +1298,7 @@ class _Generator:
         # After split, Fusion auto-names pieces (e.g., "Box (1)") which may
         # differ from the captured final names. Find by name first, then
         # match remaining by volume (descending) and rename.
+        self.ind = 1  # Reset: we're inside def run()
         self._w(f"_found = set()")
         for bn in bodies:
             bv = self._var(bn)
@@ -1327,12 +1328,12 @@ class _Generator:
             self.ind += 1
             self._w(f"_ub = _unmatched.pop(0)")
             self._w(f'_ub.name = _nm')
-            self.ind -= 2
-            self.ind -= 1
-            # Re-resolve after rename
+            self.ind -= 2  # end if _unmatched + for _nm
+            # Re-resolve after rename (still inside if _missing)
             for bn in bodies:
                 bv = self._var(bn)
                 self._w(f'if not {bv}: {bv} = find_body("{bn}")')
+            self.ind -= 1  # end if _missing
 
     def _feat_remove(self, f):
         removed = f.get("removedBody", "")
