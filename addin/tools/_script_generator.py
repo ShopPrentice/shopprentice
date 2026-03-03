@@ -1442,25 +1442,39 @@ class _Generator:
             return
 
         self._w("fillet_inp = root.features.filletFeatures.createInput()")
-        any_edges = False
+        any_items = False
         for si, es in enumerate(edge_sets):
             radius = es.get("radius", "0.1 cm")
             edges = es.get("edges", [])
             if not edges:
-                self._c(f"TODO: edge set {si} has no captured vertices")
+                self._c(f"TODO: edge set {si} has no captured data")
                 continue
-            any_edges = True
-            self._emit_edge_finder(f"fillet_edges_{si}", edges, f.get("bodies", []))
-            self._w(f"if fillet_edges_{si}.count > 0:")
-            self.ind += 1
-            self._w(f"fillet_inp.addConstantRadiusEdgeSet(fillet_edges_{si}, "
-                    f'adsk.core.ValueInput.createByString("{radius}"), True)')
-            self.ind -= 1
-        if any_edges:
+
+            # Check if items are BRepFace or BRepEdge
+            has_faces = any(e.get("type") == "BRepFace" for e in edges)
+            has_edges = any(e.get("type") == "BRepEdge" or "start" in e for e in edges)
+
+            if has_faces:
+                any_items = True
+                self._emit_face_finder(f"fillet_items_{si}", edges, f.get("bodies", []))
+                self._w(f"if fillet_items_{si}.count > 0:")
+                self.ind += 1
+                self._w(f"fillet_inp.addConstantRadiusEdgeSet(fillet_items_{si}, "
+                        f'adsk.core.ValueInput.createByString("{radius}"), True)')
+                self.ind -= 1
+            elif has_edges:
+                any_items = True
+                self._emit_edge_finder(f"fillet_edges_{si}", edges, f.get("bodies", []))
+                self._w(f"if fillet_edges_{si}.count > 0:")
+                self.ind += 1
+                self._w(f"fillet_inp.addConstantRadiusEdgeSet(fillet_edges_{si}, "
+                        f'adsk.core.ValueInput.createByString("{radius}"), True)')
+                self.ind -= 1
+        if any_items:
             self._w(f'fillet_feat = root.features.filletFeatures.add(fillet_inp)')
             self._w(f'fillet_feat.name = "{name}"')
         else:
-            self._c(f"TODO: Fillet '{name}' skipped — no edges captured")
+            self._c(f"TODO: Fillet '{name}' skipped — no edges/faces captured")
 
     def _feat_chamfer(self, f):
         name = f.get("name", "Chamfer")
@@ -1503,6 +1517,57 @@ class _Generator:
             self._w(f'chamfer_feat.name = "{name}"')
         else:
             self._c(f"TODO: Chamfer '{name}' skipped — no edges captured")
+
+    def _emit_face_finder(self, var, faces, body_names):
+        """Emit code that finds BRepFaces and adds their EDGES for fillet.
+
+        Fillet API requires BRepEdge objects, not BRepFaces. When the user
+        selected faces in the UI, we find the matching faces and add all
+        their edges to the collection.
+        """
+        self._w(f"{var} = adsk.core.ObjectCollection.create()")
+        if not faces:
+            return
+        self._w("_face_targets = [")
+        self.ind += 1
+        for f in faces:
+            if f.get("type") != "BRepFace":
+                continue
+            pof = f.get("pointOnFace", [0, 0, 0])
+            body = f.get("body", "")
+            self._w(f'("{body}", {pof[0]}, {pof[1]}, {pof[2]}),')
+        self.ind -= 1
+        self._w("]")
+        saved_ind = self.ind
+        self._w("_added = set()")
+        self._w("for _fb, _fx, _fy, _fz in _face_targets:")
+        self.ind += 1
+        self._c(f"Search ALL bodies (names may be swapped from mirror)")
+        self._w(f"_best_face, _best_d = None, 1e10")
+        self._w(f"for _bsi in range(root.bRepBodies.count):")
+        self.ind += 1
+        self._w(f"_body = root.bRepBodies.item(_bsi)")
+        self._w(f"for _fi in range(_body.faces.count):")
+        self.ind += 1
+        self._w(f"_f = _body.faces.item(_fi)")
+        self._w(f"_p = _f.pointOnFace")
+        self._w(f"_d = abs(_p.x-_fx)+abs(_p.y-_fy)+abs(_p.z-_fz)")
+        self._w(f"if _d < _best_d: _best_face, _best_d = _f, _d")
+        self.ind -= 2  # back to for _fb level
+        self._w(f"if _best_face and _best_d < 0.5:")
+        self.ind += 1
+        self._c(f"Add all edges of the matched face (fillet API needs edges)")
+        self._w(f"for _ei in range(_best_face.edges.count):")
+        self.ind += 1
+        self._w(f"_edge = _best_face.edges.item(_ei)")
+        self._w(f"_eid = _edge.tempId")
+        self._w(f"if _eid not in _added:")
+        self.ind += 1
+        self._w(f"{var}.add(_edge)")
+        self._w(f"_added.add(_eid)")
+        self.ind -= 3  # back to for _fb level
+        self.ind -= 1  # back to base
+        self.ind = saved_ind
 
     def _emit_edge_finder(self, var, edges, body_names):
         """Emit code that finds edges by matching vertex positions."""

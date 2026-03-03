@@ -1175,25 +1175,46 @@ def _capture_move(mv, design=None):
 # ── Edge vertex capture helper ──
 
 def _capture_edge_vertices(edges):
-    """Capture vertex positions for a collection of edges."""
+    """Capture vertex positions for a collection of edges or faces.
+
+    FilletEdgeSet.edges can contain BRepEdge or BRepFace items depending
+    on how the user selected them. Handle both.
+    """
     edge_list = []
     for ei in range(edges.count):
-        e = edges.item(ei)
-        try:
-            sv = e.startVertex.geometry
-            ev = e.endVertex.geometry
-            edge_info = {
-                "start": [round(sv.x, 4), round(sv.y, 4), round(sv.z, 4)],
-                "end": [round(ev.x, 4), round(ev.y, 4), round(ev.z, 4)],
-            }
-            # Body name for matching
+        item = edges.item(ei)
+        face = adsk.fusion.BRepFace.cast(item)
+        edge = adsk.fusion.BRepEdge.cast(item)
+        if edge:
             try:
-                edge_info["body"] = e.body.name
+                sv = edge.startVertex.geometry
+                ev = edge.endVertex.geometry
+                edge_info = {
+                    "type": "BRepEdge",
+                    "start": [round(sv.x, 4), round(sv.y, 4), round(sv.z, 4)],
+                    "end": [round(ev.x, 4), round(ev.y, 4), round(ev.z, 4)],
+                }
+                try:
+                    edge_info["body"] = edge.body.name
+                except:
+                    pass
+                edge_list.append(edge_info)
             except:
                 pass
-            edge_list.append(edge_info)
-        except:
-            pass
+        elif face:
+            try:
+                pof = face.pointOnFace
+                edge_info = {
+                    "type": "BRepFace",
+                    "pointOnFace": [round(pof.x, 4), round(pof.y, 4), round(pof.z, 4)],
+                }
+                try:
+                    edge_info["body"] = face.body.name
+                except:
+                    pass
+                edge_list.append(edge_info)
+            except:
+                pass
     return edge_list
 
 
