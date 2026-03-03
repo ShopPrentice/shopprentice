@@ -846,8 +846,15 @@ class _Generator:
         # BRepFace sketches: always use root to avoid cross-component
         # assembly context issues. Root has proxy access to all bodies.
         # ConstructionPlane sketches: use comp (same component).
+        # Determine sketch creation component.
+        # BRepFace or body-projection sketches need root for cross-component access.
+        # Construction plane sketches without body projections use comp.
+        has_any_body_proj = any(
+            c.get("projectedFrom", {}).get("type") == "BRepBody"
+            for c in curves if c.get("isReference")
+        )
         sketch_comp = "comp"
-        if plane_info.get("type") == "BRepFace":
+        if plane_info.get("type") == "BRepFace" or has_any_body_proj:
             sketch_comp = "root"
         f["_sketch_comp"] = sketch_comp
         self._current_sketch_comp = sketch_comp
