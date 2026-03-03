@@ -2632,11 +2632,20 @@ class _Generator:
                 return (f'find_face_near({bv}, {round(pof[0], 4)}, '
                         f'{round(pof[1], 4)}, {round(pof[2], 4)}, '
                         f'{round(n[0], 4)}, {round(n[1], 4)}, {round(n[2], 4)})')
+            # No pointOnFace — use find_face_near with origin if available,
+            # or find_face with axis/direction as last resort.
+            origin = plane_info.get("origin")
+            if origin:
+                n = normal or [0, 0, 0]
+                return (f'find_face_near({bv}, {round(origin[0], 4)}, '
+                        f'{round(origin[1], 4)}, {round(origin[2], 4)}, '
+                        f'{round(n[0], 4)}, {round(n[1], 4)}, {round(n[2], 4)})')
             if normal:
                 axis, direction = self._normal_to_axis(normal)
-            else:
-                axis, direction = "z", 1  # default: top face
-            return f'find_face({bv}, "{axis}", {direction})'
+                return f'find_face({bv}, "{axis}", {direction})'
+            # Last resort: no pointOnFace, no origin, no normal.
+            # Search all bodies for any planar face (None body = search all)
+            return f'find_face_near({bv}, 0, 0, 0)'
 
         return "root.xYConstructionPlane"
 
