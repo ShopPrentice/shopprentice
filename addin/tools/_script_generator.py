@@ -1859,14 +1859,18 @@ class _Generator:
         self._w(f'V, P(x0 + w + 1, y0 + h/2, 0)).parameter.expression = "{h_expr}"')
         self.ind -= 1
         if x0_expr != "0 cm":
+            # Use absolute expression — distance dims are always positive.
+            # The initial P(x0,...) already places the rect at the correct position.
+            abs_x0 = x0_expr.lstrip("-") if x0_expr.startswith("-") else x0_expr
             self._w("d.addDistanceDimension({0}.originPoint, rect[0].startSketchPoint,".format(var))
             self.ind += 1
-            self._w(f'H, P(x0/2, y0 - 2, 0)).parameter.expression = "{x0_expr}"')
+            self._w(f'H, P(x0/2, y0 - 2, 0)).parameter.expression = "{abs_x0}"')
             self.ind -= 1
         if y0_expr != "0 cm":
+            abs_y0 = y0_expr.lstrip("-") if y0_expr.startswith("-") else y0_expr
             self._w("d.addDistanceDimension({0}.originPoint, rect[0].startSketchPoint,".format(var))
             self.ind += 1
-            self._w(f'V, P(x0 - 1, y0/2, 0)).parameter.expression = "{y0_expr}"')
+            self._w(f'V, P(x0 - 1, y0/2, 0)).parameter.expression = "{abs_y0}"')
             self.ind -= 1
         prof = f"{var}_prof"
         if on_face:
