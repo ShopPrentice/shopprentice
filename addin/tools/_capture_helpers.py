@@ -1558,16 +1558,30 @@ def _capture_split_body(split, design):
             except Exception as e:
                 info["splitToolError"] = str(e)
 
-            # Output bodies (also BRep-dependent, need rollTo)
+            # Input body being split
             try:
-                info["bodies"] = [b.name for b in split.splitBodies]
+                info["inputBody"] = split.splitBodies.item(0).name
             except:
-                info["bodies"] = []
+                pass
+            # Output bodies read below after exiting edit mode
+            pass
     except Exception as e:
         info["rollToError"] = str(e)
 
+    # Read output bodies with marker AFTER the split (not in edit mode).
+    # rollTo(True) is edit mode — split not yet applied. Set markerPosition
+    # to just after the feature to see the result.
     if "bodies" not in info:
-        info["bodies"] = []
+        try:
+            tl = design.timeline
+            tlo = split.timelineObject
+            tl.markerPosition = tlo.index + 1
+            comp = split.parentComponent
+            info["bodies"] = [comp.bRepBodies.item(i).name
+                              for i in range(comp.bRepBodies.count)]
+            tl.moveToEnd()
+        except:
+            info["bodies"] = []
 
     return info
 

@@ -690,9 +690,9 @@ class _Generator:
         self._w("return best")
         self.ind -= 1
 
-        # find_face_near — select face by pointOnFace proximity
+        # find_face_near — select face by pointOnFace proximity + normal axis
         self._w()
-        self._w("def find_face_near(body, px, py, pz):")
+        self._w("def find_face_near(body, px, py, pz, nx=0, ny=0, nz=0):")
         self.ind += 1
         self._w("best, best_d = None, 1e10")
         self._w("for i in range(body.faces.count):")
@@ -700,6 +700,11 @@ class _Generator:
         self._w("f = body.faces.item(i)")
         self._w("if isinstance(f.geometry, adsk.core.Plane):")
         self.ind += 1
+        self._w("n = f.geometry.normal")
+        self._w("if nx or ny or nz:")
+        self.ind += 1
+        self._w("if abs(abs(n.x*nx+n.y*ny+n.z*nz) - 1.0) > 0.1: continue")
+        self.ind -= 1
         self._w("p = f.pointOnFace")
         self._w("d = abs(p.x - px) + abs(p.y - py) + abs(p.z - pz)")
         self._w("if d < best_d: best, best_d = f, d")
@@ -1145,20 +1150,25 @@ class _Generator:
         tool_info = f.get("splitTool", {})
         extend = f.get("isSplittingToolExtended", True)
 
-        # Infer input body: try base names, exact names, then _body_ref suffix search
+        # Resolve input body: use explicit inputBody if captured, else infer
+        input_name = f.get("inputBody")
         body_code = None
-        for bn in bodies:
-            base = re.sub(r'\s*\(\d+\)\s*$', '', bn)
-            if base in self.bodies:
-                body_code = self.bodies[base]
-                break
+        if input_name:
+            body_code = self._body_ref(input_name)
+            if body_code.startswith('find_body('):
+                body_code = None  # fallback to inference
+        if body_code is None:
+            for bn in bodies:
+                base = re.sub(r'\s*\(\d+\)\s*$', '', bn)
+                if base in self.bodies:
+                    body_code = self.bodies[base]
+                    break
         if body_code is None:
             for bn in bodies:
                 if bn in self.bodies:
                     body_code = self.bodies[bn]
                     break
         if body_code is None:
-            # Use _body_ref which handles suffix variations (e.g., "Leg" → "Leg (1)")
             for bn in bodies:
                 base = re.sub(r'\s*\(\d+\)\s*$', '', bn)
                 ref = self._body_ref(base)
@@ -1196,11 +1206,46 @@ class _Generator:
         self._w(f'split_feat.name = "{name}"')
         self.feats[name] = "split_feat"
 
-        # Track ALL output bodies by finding them after split
-        for bn in bodies:
-            bv = self._var(bn)
-            self.bodies[bn] = bv
-            self._w(f'{bv} = find_body("{bn}")')
+        # Track ALL output bodies — find by name or rename to match capture.
+        # After split, Fusion auto-names pieces (e.g., "Box", "Box (1)").
+        # The capture records final names which may differ. Find bodies
+        # by checking what exists, then rename to match the capture.
+        input_name = f.get("inputBody", "")
+        if input_name and len(bodies) > 1:
+            # Find all bodies related to the input after the split
+            self._w(f"_split_bodies = []")
+            self._w(f"for _bi in range(root.bRepBodies.count):")
+            self.ind += 1
+            self._w(f"_b = root.bRepBodies.item(_bi)")
+            self._w(f"_split_bodies.append(_b)")
+            self.ind -= 1
+            # Sort by volume to make assignment deterministic
+            self._w(f"_split_bodies.sort(key=lambda b: b.volume)")
+            # Sort expected bodies by the captured order
+            sorted_names = list(bodies)
+            for i, bn in enumerate(sorted_names):
+                bv = self._var(bn)
+                self.bodies[bn] = bv
+            # Assign by finding closest match
+            for bn in sorted_names:
+                bv = self._var(bn)
+                self._w(f'{bv} = find_body("{bn}")')
+                self._w(f'if not {bv}:')
+                self.ind += 1
+                self._c(f'Body "{bn}" not found by name, search by exclusion')
+                self._w(f'for _b in _split_bodies:')
+                self.ind += 1
+                self._w(f'if _b.name not in [{", ".join(repr(n) for n in sorted_names if n != bn)}]:')
+                self.ind += 1
+                self._w(f'{bv} = _b')
+                self._w(f'_b.name = "{bn}"')
+                self._w(f'break')
+                self.ind -= 3
+        else:
+            for bn in bodies:
+                bv = self._var(bn)
+                self.bodies[bn] = bv
+                self._w(f'{bv} = find_body("{bn}")')
 
     def _feat_remove(self, f):
         removed = f.get("removedBody", "")
@@ -2149,10 +2194,11 @@ class _Generator:
             pof = plane_info.get("pointOnFace")
             bv = self._body_ref(body_name)
             if pof:
-                # Use pointOnFace for precise face selection — face.geometry.normal
-                # is the mathematical normal (same for both sides of a body).
+                # Use pointOnFace + normal for precise face selection.
+                n = normal or [0, 0, 0]
                 return (f'find_face_near({bv}, {round(pof[0], 4)}, '
-                        f'{round(pof[1], 4)}, {round(pof[2], 4)})')
+                        f'{round(pof[1], 4)}, {round(pof[2], 4)}, '
+                        f'{round(n[0], 4)}, {round(n[1], 4)}, {round(n[2], 4)})')
             if normal:
                 axis, direction = self._normal_to_axis(normal)
             else:
