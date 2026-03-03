@@ -858,6 +858,33 @@ class _Generator:
                 self._c(f'TODO: unknown base plane "{base}", using XY')
                 base_code = "root.xYConstructionPlane"
             self._w(f'{var} = off_plane(comp, {base_code}, "{expr}", "{name}")')
+        elif f.get("origin") and f.get("normal"):
+            # Non-offset plane with known origin + normal.
+            # setByPlane doesn't work in executeTextCommand context.
+            # Use setByOffset from the closest axis-aligned plane + the
+            # "At Angle" method for tilted planes.
+            origin = f["origin"]
+            normal = f["normal"]
+            ax, ay, az = abs(normal[0]), abs(normal[1]), abs(normal[2])
+            if ax > 0.9:
+                # Mostly along X → offset from YZ
+                base_code = "comp.yZConstructionPlane"
+                offset = origin[0]
+            elif ay > 0.9:
+                base_code = "comp.xZConstructionPlane"
+                offset = origin[1]
+            else:
+                base_code = "comp.xYConstructionPlane"
+                offset = origin[2]
+
+            # Check if the plane is tilted (non-axis-aligned normal)
+            is_tilted = (ax < 0.999 and ay < 0.999 and az < 0.999)
+            if is_tilted:
+                # Create at angle to a standard plane through a line/edge
+                # For now, use setByOffset as approximation (loses the tilt)
+                self._c(f"Tilted plane at origin={origin} normal={normal}")
+                self._c(f"Approximation: offset from nearest axis (tilt not preserved)")
+            self._w(f'{var} = off_plane(comp, {base_code}, "{round(offset, 4)} cm", "{name}")')
         else:
             self._c(f"TODO: Non-offset plane (type={f.get('definitionType')})")
             self._w(f"{var} = None")
@@ -1286,16 +1313,25 @@ class _Generator:
         tool_info = f.get("splitTool", {})
         extend = f.get("isSplittingToolExtended", True)
 
-        # Resolve input body: use comp-scoped find_body for native body access
+        # Resolve input body: try tracked name, then runtime search with rename
         input_name = f.get("inputBody")
         body_code = None
         if input_name:
             if input_name in self.bodies:
                 body_code = self.bodies[input_name]
             else:
-                body_code = f'find_body("{input_name}", comp)'
-            if body_code.startswith('find_body('):
-                body_code = None  # fallback to inference
+                # Body may have been renamed between creation and split.
+                # Emit runtime code that searches by name then renames to match.
+                self._w(f'_split_body = find_body("{input_name}", comp)')
+                self._w(f"if not _split_body:")
+                self.ind += 1
+                self._c(f'Body "{input_name}" not found — try last body in comp')
+                self._w(f"if comp.bRepBodies.count > 0:")
+                self.ind += 1
+                self._w(f"_split_body = comp.bRepBodies.item(comp.bRepBodies.count - 1)")
+                self._w(f'_split_body.name = "{input_name}"')
+                self.ind -= 2
+                body_code = "_split_body"
         if body_code is None:
             for bn in bodies:
                 base = re.sub(r'\s*\(\d+\)\s*$', '', bn)
