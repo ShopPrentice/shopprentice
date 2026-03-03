@@ -1200,52 +1200,122 @@ class _Generator:
         else:
             tool_code = "None  # TODO: unknown split tool type"
 
+        # Determine expected split-related body count (bodies derived from inputBody)
+        input_base = re.sub(r'\s*\(\d+\)\s*$', '', input_name) if input_name else ""
+        expected_split_bodies = [bn for bn in bodies
+                                 if re.sub(r'\s*\(\d+\)\s*$', '', bn) == input_base
+                                 ] if input_base else []
+        needs_supplementary = len(expected_split_bodies) > 2  # >2 pieces = multi-tool
+
         self._w(f"split_inp = root.features.splitBodyFeatures.createInput("
                 f"{body_code}, {tool_code}, {extend})")
         self._w(f"split_feat = root.features.splitBodyFeatures.add(split_inp)")
         self._w(f'split_feat.name = "{name}"')
         self.feats[name] = "split_feat"
 
-        # Track ALL output bodies — find by name or rename to match capture.
-        # After split, Fusion auto-names pieces (e.g., "Box", "Box (1)").
-        # The capture records final names which may differ. Find bodies
-        # by checking what exists, then rename to match the capture.
-        input_name = f.get("inputBody", "")
-        if input_name and len(bodies) > 1:
-            # Find all bodies related to the input after the split
-            self._w(f"_split_bodies = []")
+        # API limitation: SplitBodyFeature only accepts 1 splitting tool,
+        # but the UI allows multiple. When the expected output has more
+        # pieces than a single tool produces, try supplementary splits
+        # with each available construction plane.
+        if needs_supplementary:
+            n_expected = len(expected_split_bodies)
+            self._w()
+            self._c(f"Multi-tool split workaround: expected {n_expected} pieces from 1 body")
+            self._c(f"API only supports 1 tool per split — try additional planes")
+            self._w(f"_pre_count = root.bRepBodies.count")
+            self._w(f"_need = {n_expected} - (root.bRepBodies.count - _pre_count + 2)")
+            self._c(f"2 = minimum pieces from first split")
+            # Count actual pieces from input body
+            self._w(f"_got = 0")
+            self._w(f"for _bi in range(root.bRepBodies.count):")
+            self.ind += 1
+            self._w(f"_bn = root.bRepBodies.item(_bi).name")
+            base_esc = input_base.replace('"', '\\"')
+            self._w(f'import re as _re')
+            self._w(f'if _re.sub(r"\\s*\\(\\d+\\)\\s*$", "", _bn) == "{base_esc}": _got += 1')
+            self.ind -= 1
+            self._w(f"if _got < {n_expected}:")
+            self.ind += 1
+            self._c(f"Try each construction plane as supplementary split tool")
+            self._w(f"_biggest = None")
             self._w(f"for _bi in range(root.bRepBodies.count):")
             self.ind += 1
             self._w(f"_b = root.bRepBodies.item(_bi)")
-            self._w(f"_split_bodies.append(_b)")
+            self._w(f'if _re.sub(r"\\s*\\(\\d+\\)\\s*$", "", _b.name) == "{base_esc}":')
+            self.ind += 1
+            self._w(f"if _biggest is None or _b.volume > _biggest.volume: _biggest = _b")
+            self.ind -= 2  # back to if _got level
+            self._w(f"if _biggest:")
+            self.ind += 1
+            self._w(f"for _pi in range(root.constructionPlanes.count):")
+            self.ind += 1
+            self._w(f"_pl = root.constructionPlanes.item(_pi)")
+            self._w(f"try:")
+            self.ind += 1
+            self._w(f"_si = root.features.splitBodyFeatures.createInput(_biggest, _pl, True)")
+            self._w(f"_sf = root.features.splitBodyFeatures.add(_si)")
+            self._c(f"Verify: count of related bodies should now be {n_expected}")
+            self._w(f"_got2 = 0")
+            self._w(f"for _bi2 in range(root.bRepBodies.count):")
+            self.ind += 1
+            self._w(f'if _re.sub(r"\\s*\\(\\d+\\)\\s*$", "", root.bRepBodies.item(_bi2).name) == "{base_esc}": _got2 += 1')
             self.ind -= 1
-            # Sort by volume to make assignment deterministic
-            self._w(f"_split_bodies.sort(key=lambda b: b.volume)")
-            # Sort expected bodies by the captured order
-            sorted_names = list(bodies)
-            for i, bn in enumerate(sorted_names):
-                bv = self._var(bn)
-                self.bodies[bn] = bv
-            # Assign by finding closest match
-            for bn in sorted_names:
-                bv = self._var(bn)
-                self._w(f'{bv} = find_body("{bn}")')
-                self._w(f'if not {bv}:')
-                self.ind += 1
-                self._c(f'Body "{bn}" not found by name, search by exclusion')
-                self._w(f'for _b in _split_bodies:')
-                self.ind += 1
-                self._w(f'if _b.name not in [{", ".join(repr(n) for n in sorted_names if n != bn)}]:')
-                self.ind += 1
-                self._w(f'{bv} = _b')
-                self._w(f'_b.name = "{bn}"')
-                self._w(f'break')
-                self.ind -= 3
-        else:
+            self._w(f"if _got2 >= {n_expected}:")
+            self.ind += 1
+            self._w(f'_sf.name = "{name}_sup"')
+            self._w(f"break")
+            self.ind -= 1
+            self._w(f"else:")
+            self.ind += 1
+            self._w(f"_sf.deleteMe()")
+            self.ind -= 2  # end try
+            self._w(f"except:")
+            self.ind += 1
+            self._w(f"pass")
+            self.ind -= 1  # end except
+            self.ind -= 1  # end for _pi
+            self.ind -= 1  # end if _biggest
+            self.ind -= 1  # end if _got
+
+        # Track ALL output bodies by name.
+        # After split, Fusion auto-names pieces (e.g., "Box (1)") which may
+        # differ from the captured final names. Find by name first, then
+        # match remaining by volume (descending) and rename.
+        self._w(f"_found = set()")
+        for bn in bodies:
+            bv = self._var(bn)
+            self.bodies[bn] = bv
+            self._w(f'{bv} = find_body("{bn}")')
+            self._w(f'if {bv}: _found.add("{bn}")')
+        # Rename unmatched bodies
+        unmatched = [bn for bn in bodies if bn not in
+                     {b for b in self.bodies if b in bodies}]
+        if len(bodies) > 1:
+            expected_names = [repr(bn) for bn in bodies]
+            self._w(f"_expected = [{', '.join(expected_names)}]")
+            self._w(f"_missing = [n for n in _expected if n not in _found]")
+            self._w(f"if _missing:")
+            self.ind += 1
+            self._w(f"_unmatched = []")
+            self._w(f"for _bi in range(root.bRepBodies.count):")
+            self.ind += 1
+            self._w(f"_b = root.bRepBodies.item(_bi)")
+            self._w(f"if _b.name not in _found: _unmatched.append(_b)")
+            self.ind -= 1
+            self._w(f"_unmatched.sort(key=lambda b: -b.volume)")
+            self._w(f"_missing.sort(key=lambda n: -max((b.volume for b in _unmatched), default=0) if not any(b.name == n for b in _unmatched) else 0)")
+            self._w(f"for _nm in _missing:")
+            self.ind += 1
+            self._w(f"if _unmatched:")
+            self.ind += 1
+            self._w(f"_ub = _unmatched.pop(0)")
+            self._w(f'_ub.name = _nm')
+            self.ind -= 2
+            self.ind -= 1
+            # Re-resolve after rename
             for bn in bodies:
                 bv = self._var(bn)
-                self.bodies[bn] = bv
-                self._w(f'{bv} = find_body("{bn}")')
+                self._w(f'if not {bv}: {bv} = find_body("{bn}")')
 
     def _feat_remove(self, f):
         removed = f.get("removedBody", "")
