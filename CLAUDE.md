@@ -37,3 +37,24 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 - **Feature-based**: Sketch > Dimension > Extrude (no TemporaryBRepManager)
 - **Combine-based joinery**: Build tenon as body, CUT into receiver, JOIN to owner
 - **Validate every phase**: `capture_design` after each execution, not just screenshots
+
+### Document Safety Rules (for search_build / script generator development)
+
+**NEVER modify user-saved documents.** All testing and building must happen on scratch (unsaved) documents.
+
+| Action | Safe Target | NEVER On |
+|--------|-------------|----------|
+| `capture_design` | Any document (read-only) | — |
+| `get_timeline_state` | Scratch doc only | Saved documents — rolls timeline marker |
+| `execute_script` | Scratch doc only | Saved documents — `clean=true` destroys timeline |
+| `execute_script(sandbox=true)` | Any (uses temp doc) | — |
+| Ground truth collection | Source doc via `get_timeline_state` | Must roll back to end after |
+
+**Workflow for search_build:**
+1. **Capture** from the user's saved document (read-only `capture_design`)
+2. **Save capture to file** (`/tmp/<name>_capture.json`) — reuse across runs
+3. **Switch to scratch doc** before any `execute_script` or `get_timeline_state`
+4. **Ground truth**: collect on the source doc, then **immediately roll back** to end
+5. **Build**: all feature execution on scratch doc only
+6. Use `--capture <file>` flag to skip re-capturing on subsequent runs
+7. `_verify_active_unsaved()` guard before any `clean=True` call
