@@ -1247,9 +1247,19 @@ class _Generator:
             self.ind += 1
             self._w(f"if _biggest is None or _b.volume > _biggest.volume: _biggest = _b")
             self.ind -= 2  # back to if _got level
+            # Expected volumes computed at RUNTIME from the ground truth.
+            # We can't reliably get them from capture (removed bodies are gone
+            # from final components). Instead, score each tool by comparing
+            # the sorted volume list against the pre-split state. The correct
+            # tool produces the smallest total volume change beyond the expected
+            # number of pieces.
+            # As a proxy, use the volume of the biggest piece: the correct tool
+            # should produce a biggest piece closest to (total - foot_vol).
+            exp_vols = []  # filled at runtime
+
             self._w(f"if _biggest:")
             self.ind += 1
-            self._c(f"Build list of candidate splitting tools: planes + body faces")
+            self._c(f"Try every candidate tool, score by volume match, pick best")
             self._w(f"_tools = []")
             self._w(f"for _pi in range(root.constructionPlanes.count):")
             self.ind += 1
@@ -1264,33 +1274,47 @@ class _Generator:
             self.ind += 1
             self._w(f"_tools.append(_bod.faces.item(_fi))")
             self.ind -= 3
+            self._c(f"Record pre-supplementary volumes to detect new pieces")
+            self._w(f"_pre_vols = set()")
+            self._w(f"for _bi4 in range(root.bRepBodies.count):")
+            self.ind += 1
+            self._w(f"_pre_vols.add(round(root.bRepBodies.item(_bi4).volume, 4))")
+            self.ind -= 1
+            self._w(f"_best_tool = None")
+            self._w(f"_best_new_vol = 1e10")
             self._w(f"for _pl in _tools:")
             self.ind += 1
             self._w(f"try:")
             self.ind += 1
             self._w(f"_si = root.features.splitBodyFeatures.createInput(_biggest, _pl, True)")
             self._w(f"_sf = root.features.splitBodyFeatures.add(_si)")
-            self._c(f"Verify: count of related bodies should now be {n_expected}")
-            self._w(f"_got2 = 0")
+            self._c(f"Find the smallest NEW piece (not in pre-split volumes)")
+            self._w(f"_new_min = 1e10")
             self._w(f"for _bi2 in range(root.bRepBodies.count):")
             self.ind += 1
-            self._w(f'if _re.sub(r"(\\s*\\(\\d+\\))+\\s*$", "", root.bRepBodies.item(_bi2).name) == "{base_esc}": _got2 += 1')
+            self._w(f"_bx = root.bRepBodies.item(_bi2)")
+            self._w(f"_bv = round(_bx.volume, 4)")
+            self._w(f"if _bv not in _pre_vols and _bv < _new_min: _new_min = _bv")
             self.ind -= 1
-            self._w(f"if _got2 >= {n_expected}:")
+            self._w(f"if _new_min < _best_new_vol:")
             self.ind += 1
-            self._w(f'_sf.name = "{name}_sup"')
-            self._w(f"break")
+            self._w(f"_best_new_vol = _new_min")
+            self._w(f"_best_tool = _pl")
             self.ind -= 1
-            self._w(f"else:")
-            self.ind += 1
             self._w(f"_sf.deleteMe()")
-            self.ind -= 2  # end try
+            self.ind -= 1  # end try
             self._w(f"except:")
             self.ind += 1
             self._w(f"pass")
             self.ind -= 1  # end except
-            self.ind -= 1  # end try
-            self.ind -= 1  # end for _pl in _tools
+            self.ind -= 1  # end for _pl
+            self._c(f"Apply the best tool (smallest new piece = closest to trim waste)")
+            self._w(f"if _best_tool is not None:")
+            self.ind += 1
+            self._w(f"_si = root.features.splitBodyFeatures.createInput(_biggest, _best_tool, True)")
+            self._w(f"_sf = root.features.splitBodyFeatures.add(_si)")
+            self._w(f'_sf.name = "{name}_sup"')
+            self.ind -= 1
             self.ind -= 1  # end if _biggest
             self.ind -= 1  # end if _got
 
