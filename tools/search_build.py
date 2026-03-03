@@ -559,7 +559,9 @@ def incremental_build(capture, ground_truth, verbose=False):
                 combo_fis = [dfi for dfi, _ in deferred]
                 if is_ambiguous:
                     combo_fis.append(fi)
-                print(f"  -> STOPPING: no combo matched for features {combo_fis}. Missing variant or reconstruction bug.")
+                print(f"  -> STOPPING: no combo matched for features {combo_fis}.")
+                print(f"     Possible causes: missing search variant, reconstruction bug,")
+                print(f"     or API limitation (UI may support features the API cannot replicate).")
                 errors.append((combo_fis[0], "no variant matched"))
                 deferred.clear()
                 return choices, errors
@@ -679,7 +681,9 @@ def incremental_build(capture, ground_truth, verbose=False):
                     for d in details:
                         print(f"    {d}")
                     errors.append((fi, f"mismatch: err={score:.1f}%"))
-                    print(f"\n  STOPPING: feature [{fi}] does not match. Fix before continuing.")
+                    print(f"\n  STOPPING: feature [{fi}] does not match.")
+                    print(f"  If all reconstruction options exhausted, check for API limitations")
+                    print(f"  (UI may support features the Python API cannot replicate).")
                     return choices, errors
                     break
 
