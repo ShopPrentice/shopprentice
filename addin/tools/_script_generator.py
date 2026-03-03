@@ -125,13 +125,15 @@ class _Generator:
         for fi, feat in enumerate(timeline):
             if feat.get("type") != "SplitBody":
                 continue
-            split_bodies = feat.get("bodies", [])
-            if not split_bodies:
+            # Use inputBody (the body being split) as the base name.
+            # The input body's at-creation-time name is the base without suffix.
+            input_body = feat.get("inputBody", "")
+            if not input_body:
+                split_bodies = feat.get("bodies", [])
+                input_body = split_bodies[0] if split_bodies else ""
+            if not input_body:
                 continue
-            # The first output body name is the base (the original body's name
-            # at this timeline step). Upstream extrude may have this name with
-            # a (N) suffix added by the split.
-            base_name = re.sub(r'\s*\(\d+\)\s*$', '', split_bodies[0])
+            base_name = re.sub(r'\s*\(\d+\)\s*$', '', input_body)
             for pi in range(fi):
                 prev = timeline[pi]
                 if prev.get("type") in ("Extrude", "Sweep"):
@@ -1247,9 +1249,23 @@ class _Generator:
             self.ind -= 2  # back to if _got level
             self._w(f"if _biggest:")
             self.ind += 1
+            self._c(f"Build list of candidate splitting tools: planes + body faces")
+            self._w(f"_tools = []")
             self._w(f"for _pi in range(root.constructionPlanes.count):")
             self.ind += 1
-            self._w(f"_pl = root.constructionPlanes.item(_pi)")
+            self._w(f"_tools.append(root.constructionPlanes.item(_pi))")
+            self.ind -= 1
+            self._w(f"for _bi3 in range(root.bRepBodies.count):")
+            self.ind += 1
+            self._w(f"_bod = root.bRepBodies.item(_bi3)")
+            self._w(f"if _bod != _biggest:")
+            self.ind += 1
+            self._w(f"for _fi in range(_bod.faces.count):")
+            self.ind += 1
+            self._w(f"_tools.append(_bod.faces.item(_fi))")
+            self.ind -= 3
+            self._w(f"for _pl in _tools:")
+            self.ind += 1
             self._w(f"try:")
             self.ind += 1
             self._w(f"_si = root.features.splitBodyFeatures.createInput(_biggest, _pl, True)")
@@ -1273,7 +1289,8 @@ class _Generator:
             self.ind += 1
             self._w(f"pass")
             self.ind -= 1  # end except
-            self.ind -= 1  # end for _pi
+            self.ind -= 1  # end try
+            self.ind -= 1  # end for _pl in _tools
             self.ind -= 1  # end if _biggest
             self.ind -= 1  # end if _got
 
@@ -2059,7 +2076,12 @@ class _Generator:
                     e1 = d.get("entityOne")
                     e2 = d.get("entityTwo")
                     orient = d.get("orientation", "Horizontal")
-                    orient_code = "H" if orient == "Horizontal" else "V"
+                    orient_map = {
+                        "Horizontal": "H",
+                        "Vertical": "V",
+                        "Aligned": "adsk.fusion.DimensionOrientations.AlignedDimensionOrientation",
+                    }
+                    orient_code = orient_map.get(orient, "H")
 
                     e1_code = self._resolve_sketch_entity_ref(e1, curve_vars, var, _proj_curve_pts)
                     e2_code = self._resolve_sketch_entity_ref(e2, curve_vars, var, _proj_curve_pts)
@@ -2068,12 +2090,8 @@ class _Generator:
                             and "_nearest_proj" in str(e2_code)):
                         self._c(f"dim[{di}]: {expr} (both endpoints from intersection)")
                         continue
-                    # Skip dims targeting on-edge endpoints (already exact by construction)
-                    e2_ci = e2.get("curveIndex") if e2 else None
-                    e2_role = e2.get("role", "") if e2 else ""
-                    if e2_ci is not None and (e2_ci, e2_role) in _on_edge_pts:
-                        self._c(f"dim[{di}]: {expr} (endpoint on-edge by construction)")
-                        continue
+                    # Keep dims for on-edge endpoints — makes them parametric.
+                    # (on-line coincident constraints are skipped separately)
                     if e1_code and e2_code:
                         self._w(f"d.addDistanceDimension({e1_code}, {e2_code},")
                         self.ind += 1
