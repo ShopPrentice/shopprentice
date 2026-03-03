@@ -1286,11 +1286,14 @@ class _Generator:
         tool_info = f.get("splitTool", {})
         extend = f.get("isSplittingToolExtended", True)
 
-        # Resolve input body: use explicit inputBody if captured, else infer
+        # Resolve input body: use comp-scoped find_body for native body access
         input_name = f.get("inputBody")
         body_code = None
         if input_name:
-            body_code = self._body_ref(input_name)
+            if input_name in self.bodies:
+                body_code = self.bodies[input_name]
+            else:
+                body_code = f'find_body("{input_name}", comp)'
             if body_code.startswith('find_body('):
                 body_code = None  # fallback to inference
         if body_code is None:
