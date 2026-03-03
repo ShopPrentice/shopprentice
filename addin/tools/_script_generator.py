@@ -336,17 +336,16 @@ class _Generator:
 
             elif t == "Sketch":
                 var = self._var(name)
-                # Sketches all end up in root. Names may get auto-suffixed
-                # (e.g., "Sketch1" → "Sketch1 (1)") when duplicated.
-                # Search by name then by suffix variants.
-                # Find sketch by name — take the LAST match to handle
-                # auto-suffixed duplicates (e.g., "Sketch1 (1)")
-                self._w(f"{var} = None")
-                self._w(f"for _si in range(root.sketches.count):")
+                # Search component first, then root, then all components
+                c_ref = self.components.get(comp_name, "root")
+                self._w(f'{var} = {c_ref}.sketches.itemByName("{name}")')
+                self._w(f"if not {var}:")
                 self.ind += 1
-                self._w(f'_sk = root.sketches.item(_si)')
-                self._w(f'if _sk.name == "{name}" or _sk.name.startswith("{name} ("): {var} = _sk')
-                self.ind -= 1
+                self._w(f"for _sc in [root] + [_o.component for _o in root.allOccurrences]:")
+                self.ind += 1
+                self._w(f"_sk = _sc.sketches.itemByName(\"{name}\")")
+                self._w(f"if _sk: {var} = _sk; break")
+                self.ind -= 2
                 self.sketches[name] = var
                 # Resolve profile for downstream extrude/sweep
                 plane_info = feat.get("plane", {})
@@ -685,26 +684,25 @@ class _Generator:
             self._w("return p")
             self.ind -= 1
 
-        # find_body — always useful
+        # find_body — walks occurrences to return proxied bodies (root context)
         self._w()
         self._w("def find_body(name):")
         self.ind += 1
-        self._w("def _walk(comp):")
+        self._w("for i in range(root.bRepBodies.count):")
         self.ind += 1
-        self._w("for i in range(comp.bRepBodies.count):")
+        self._w("if root.bRepBodies.item(i).name == name:")
         self.ind += 1
-        self._w("if comp.bRepBodies.item(i).name == name:")
-        self.ind += 1
-        self._w("return comp.bRepBodies.item(i)")
+        self._w("return root.bRepBodies.item(i)")
         self.ind -= 2
-        self._w("for occ in comp.occurrences:")
+        self._w("for occ in root.allOccurrences:")
         self.ind += 1
-        self._w("r = _walk(occ.component)")
-        self._w("if r: return r")
-        self.ind -= 1
+        self._w("for i in range(occ.bRepBodies.count):")
+        self.ind += 1
+        self._w("if occ.bRepBodies.item(i).name == name:")
+        self.ind += 1
+        self._w("return occ.bRepBodies.item(i)")
+        self.ind -= 3
         self._w("return None")
-        self.ind -= 1
-        self._w("return _walk(root)")
         self.ind -= 1
 
         # find_face — for face-based sketches and sweeps
@@ -733,14 +731,12 @@ class _Generator:
         self._w("bodies = [body] if body else []")
         self._w("if not bodies:")
         self.ind += 1
-        self._w("def _all(c):")
+        self._c("Search all bodies via occurrence proxies (root context)")
+        self._w("bodies = [root.bRepBodies.item(i) for i in range(root.bRepBodies.count)]")
+        self._w("for _occ in root.allOccurrences:")
         self.ind += 1
-        self._w("r = [c.bRepBodies.item(i) for i in range(c.bRepBodies.count)]")
-        self._w("for o in c.occurrences: r.extend(_all(o.component))")
-        self._w("return r")
-        self.ind -= 1
-        self._w("bodies = _all(root)")
-        self.ind -= 1
+        self._w("bodies.extend([_occ.bRepBodies.item(i) for i in range(_occ.bRepBodies.count)])")
+        self.ind -= 2
         self._w("best, best_d = None, 1e10")
         self._w("for _b in bodies:")
         self.ind += 1
@@ -767,10 +763,10 @@ class _Generator:
             self.ind += 1
             self._w("coll = adsk.core.ObjectCollection.create()")
             self._w("for b in (tools if isinstance(tools, list) else [tools]): coll.add(b)")
-            self._w("inp = root.features.combineFeatures.createInput(target, coll)")
+            self._w("inp = comp.features.combineFeatures.createInput(target, coll)")
             self._w("inp.operation = op")
             self._w("inp.isKeepToolBodies = keep")
-            self._w("f = root.features.combineFeatures.add(inp)")
+            self._w("f = comp.features.combineFeatures.add(inp)")
             self._w("f.name = name")
             self._w("return f")
             self.ind -= 1
@@ -781,8 +777,8 @@ class _Generator:
             self.ind += 1
             self._w("coll = adsk.core.ObjectCollection.create()")
             self._w("for b in bodies: coll.add(b)")
-            self._w("inp = root.features.mirrorFeatures.createInput(coll, plane)")
-            self._w("m = root.features.mirrorFeatures.add(inp)")
+            self._w("inp = comp.features.mirrorFeatures.createInput(coll, plane)")
+            self._w("m = comp.features.mirrorFeatures.add(inp)")
             self._w("m.name = name")
             self._w("return m")
             self.ind -= 1
@@ -822,9 +818,9 @@ class _Generator:
             expr = f.get("offset", "0 cm")
             base = f.get("basePlane", "")
             base_map = {
-                "XY": "root.xYConstructionPlane",
-                "XZ": "root.xZConstructionPlane",
-                "YZ": "root.yZConstructionPlane",
+                "XY": "comp.xYConstructionPlane",
+                "XZ": "comp.xZConstructionPlane",
+                "YZ": "comp.yZConstructionPlane",
             }
             if base in base_map:
                 base_code = base_map[base]
@@ -833,7 +829,7 @@ class _Generator:
             else:
                 self._c(f'TODO: unknown base plane "{base}", using XY')
                 base_code = "root.xYConstructionPlane"
-            self._w(f'{var} = off_plane(root, {base_code}, "{expr}", "{name}")')
+            self._w(f'{var} = off_plane(comp, {base_code}, "{expr}", "{name}")')
         else:
             self._c(f"TODO: Non-offset plane (type={f.get('definitionType')})")
             self._w(f"{var} = None")
@@ -845,6 +841,16 @@ class _Generator:
         curves = f.get("curves", [])
         dims = f.get("dimensions", [])
         plane_info = f.get("plane", {})
+
+        # Determine sketch creation component.
+        # BRepFace sketches: always use root to avoid cross-component
+        # assembly context issues. Root has proxy access to all bodies.
+        # ConstructionPlane sketches: use comp (same component).
+        sketch_comp = "comp"
+        if plane_info.get("type") == "BRepFace":
+            sketch_comp = "root"
+        f["_sketch_comp"] = sketch_comp
+        self._current_sketch_comp = sketch_comp
 
         # BRepFace sketches: strategy depends on geometry.
         # - Has auto-projected boundary + no explicit projections → find_face
@@ -905,6 +911,7 @@ class _Generator:
                 plane_code, curves = self._brep_face_to_cplane(f, curves)
         else:
             plane_code = self._resolve_plane(plane_info)
+            self._current_sketch_comp = "comp"
 
         if self._is_rect(curves):
             self._emit_rect_sketch(var, name, plane_code, curves, dims, on_face=is_on_face)
@@ -976,7 +983,7 @@ class _Generator:
             self._c(f"TODO: sketch '{sketch}' not tracked")
             prof = "None"
 
-        self._w(f"inp = root.features.extrudeFeatures.createInput({prof}, {op_code})")
+        self._w(f"inp = comp.features.extrudeFeatures.createInput({prof}, {op_code})")
 
         # Two-sided extent
         if f.get("hasTwoExtents"):
@@ -1012,7 +1019,7 @@ class _Generator:
             # Infer participants from affected bodies when not explicitly captured
             self._w(f"inp.participantBodies = {self._body_list(bodies)}")
 
-        self._w(f"{fvar} = root.features.extrudeFeatures.add(inp)")
+        self._w(f"{fvar} = comp.features.extrudeFeatures.add(inp)")
         self._w(f'{fvar}.name = "{name}"')
         self.feats[name] = fvar
 
@@ -1055,9 +1062,9 @@ class _Generator:
             self._c("TODO: No input entities captured — add the body to move")
             self._w("# move_coll.add(body)")
 
-        self._w("move_inp = root.features.moveFeatures.createInput2(move_coll)")
+        self._w("move_inp = comp.features.moveFeatures.createInput2(move_coll)")
         self._w("move_inp.defineAsFreeMove(xform)")
-        self._w(f'move_feat = root.features.moveFeatures.add(move_inp)')
+        self._w(f'move_feat = comp.features.moveFeatures.add(move_inp)')
         self._w(f'move_feat.name = "{name}"')
         self.feats[name] = "move_feat"
 
@@ -1157,7 +1164,7 @@ class _Generator:
                 self._w(f"sweep_edge = e")
                 self._w(f"break")
                 self.ind -= 2
-                self._w(f"sweep_path = root.features.createPath(sweep_edge)")
+                self._w(f"sweep_path = comp.features.createPath(sweep_edge)")
                 # Detect path direction: check which end is closer to the
                 # captured startVertex. If reversed, swap distance1/distance2.
                 # createPath may reverse direction from edge vertex order.
@@ -1172,7 +1179,7 @@ class _Generator:
                 sk_name = pe.get("parentSketch", "")
                 self._c(f"Path: SketchCurve from '{sk_name}'")
                 if sk_name in self.sketches:
-                    self._w(f"sweep_path = root.features.createPath({self.sketches[sk_name]}.sketchCurves.item(0))  # TODO: correct curve")
+                    self._w(f"sweep_path = comp.features.createPath({self.sketches[sk_name]}.sketchCurves.item(0))  # TODO: correct curve")
                 else:
                     self._w(f"sweep_path = None  # TODO: sketch '{sk_name}'")
             else:
@@ -1180,7 +1187,7 @@ class _Generator:
         else:
             self._w("sweep_path = None  # TODO: no path captured")
 
-        self._w(f"sweep_inp = root.features.sweepFeatures.createInput({prof_code}, sweep_path, {op_code})")
+        self._w(f"sweep_inp = comp.features.sweepFeatures.createInput({prof_code}, sweep_path, {op_code})")
 
         orient_map = {
             "Perpendicular": "adsk.fusion.SweepOrientationTypes.PerpendicularOrientationType",
@@ -1226,7 +1233,7 @@ class _Generator:
         if participants and op in ("Cut", "Join"):
             self._w(f"sweep_inp.participantBodies = {self._body_list(participants)}")
 
-        self._w(f"sweep_feat = root.features.sweepFeatures.add(sweep_inp)")
+        self._w(f"sweep_feat = comp.features.sweepFeatures.add(sweep_inp)")
         self._w(f'sweep_feat.name = "{name}"')
         self.feats[name] = "sweep_feat"
 
@@ -1299,9 +1306,9 @@ class _Generator:
                                  ] if input_base else []
         needs_supplementary = len(expected_split_bodies) > 2  # >2 pieces = multi-tool
 
-        self._w(f"split_inp = root.features.splitBodyFeatures.createInput("
+        self._w(f"split_inp = comp.features.splitBodyFeatures.createInput("
                 f"{body_code}, {tool_code}, {extend})")
-        self._w(f"split_feat = root.features.splitBodyFeatures.add(split_inp)")
+        self._w(f"split_feat = comp.features.splitBodyFeatures.add(split_inp)")
         self._w(f'split_feat.name = "{name}"')
         self.feats[name] = "split_feat"
 
@@ -1376,8 +1383,8 @@ class _Generator:
             self.ind += 1
             self._w(f"try:")
             self.ind += 1
-            self._w(f"_si = root.features.splitBodyFeatures.createInput(_biggest, _pl, True)")
-            self._w(f"_sf = root.features.splitBodyFeatures.add(_si)")
+            self._w(f"_si = comp.features.splitBodyFeatures.createInput(_biggest, _pl, True)")
+            self._w(f"_sf = comp.features.splitBodyFeatures.add(_si)")
             self._c(f"Find the smallest NEW piece (not in pre-split volumes)")
             self._w(f"_new_min = 1e10")
             self._w(f"for _bi2 in range(root.bRepBodies.count):")
@@ -1401,8 +1408,8 @@ class _Generator:
             self._c(f"Apply the best tool (smallest new piece = closest to trim waste)")
             self._w(f"if _best_tool is not None:")
             self.ind += 1
-            self._w(f"_si = root.features.splitBodyFeatures.createInput(_biggest, _best_tool, True)")
-            self._w(f"_sf = root.features.splitBodyFeatures.add(_si)")
+            self._w(f"_si = comp.features.splitBodyFeatures.createInput(_biggest, _best_tool, True)")
+            self._w(f"_sf = comp.features.splitBodyFeatures.add(_si)")
             self._w(f'_sf.name = "{name}_sup"')
             self.ind -= 1
             self.ind -= 1  # end if _biggest
@@ -1457,7 +1464,7 @@ class _Generator:
         body_code = self._body_ref(removed)
         # Guard: body may not exist if upstream split produced fewer pieces
         self._w(f"_rm = {body_code}")
-        self._w(f"if _rm: root.features.removeFeatures.add(_rm)")
+        self._w(f"if _rm: comp.features.removeFeatures.add(_rm)")
         if removed in self.bodies:
             del self.bodies[removed]
 
@@ -1531,7 +1538,7 @@ class _Generator:
             self._c(f"TODO: Fillet '{name}' — no edge data captured")
             return
 
-        self._w("fillet_inp = root.features.filletFeatures.createInput()")
+        self._w("fillet_inp = comp.features.filletFeatures.createInput()")
         any_items = False
         for si, es in enumerate(edge_sets):
             radius = es.get("radius", "0.1 cm")
@@ -1561,7 +1568,7 @@ class _Generator:
                         f'adsk.core.ValueInput.createByString("{radius}"), True)')
                 self.ind -= 1
         if any_items:
-            self._w(f'fillet_feat = root.features.filletFeatures.add(fillet_inp)')
+            self._w(f'fillet_feat = comp.features.filletFeatures.add(fillet_inp)')
             self._w(f'fillet_feat.name = "{name}"')
         else:
             self._c(f"TODO: Fillet '{name}' skipped — no edges/faces captured")
@@ -1574,7 +1581,7 @@ class _Generator:
             self._c(f"TODO: Chamfer '{name}' — no edge data captured")
             return
 
-        self._w("chamfer_inp = root.features.chamferFeatures.createInput2()")
+        self._w("chamfer_inp = comp.features.chamferFeatures.createInput2()")
         any_edges = False
         for si, es in enumerate(edge_sets):
             edges = es.get("edges", [])
@@ -1603,7 +1610,7 @@ class _Generator:
                         f'adsk.core.ValueInput.createByString("{angle}"), True)')
 
         if any_edges:
-            self._w(f'chamfer_feat = root.features.chamferFeatures.add(chamfer_inp)')
+            self._w(f'chamfer_feat = comp.features.chamferFeatures.add(chamfer_inp)')
             self._w(f'chamfer_feat.name = "{name}"')
         else:
             self._c(f"TODO: Chamfer '{name}' skipped — no edges captured")
@@ -1745,7 +1752,7 @@ class _Generator:
         else:
             self._c("TODO: pattern input bodies not captured")
 
-        self._w(f"pat_inp = root.features.rectangularPatternFeatures.createInput(")
+        self._w(f"pat_inp = comp.features.rectangularPatternFeatures.createInput(")
         self.ind += 1
         self._w(f"pat_coll,")
         self._w(f"{axis_code},")
@@ -1764,7 +1771,7 @@ class _Generator:
         else:
             self._w("pat_inp.quantityTwo = adsk.core.ValueInput.createByReal(1)")
 
-        self._w(f"{var} = root.features.rectangularPatternFeatures.add(pat_inp)")
+        self._w(f"{var} = comp.features.rectangularPatternFeatures.add(pat_inp)")
         self._w(f'{var}.name = "{name}"')
         self.feats[name] = var
 
@@ -1784,7 +1791,7 @@ class _Generator:
     def _feat_componentcreation(self, f):
         name = f.get("name", "Component")
         var = self._var(name)
-        self._w(f"{var}_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())")
+        self._w(f"{var}_occ = comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())")
         self._w(f'{var}_occ.component.name = "{name}"')
         self._w(f"{var}_c = {var}_occ.component")
         self.components[name] = f"{var}_c"
@@ -1832,7 +1839,7 @@ class _Generator:
             elif i not in used and abs(val - abs(y0)) < 0.01 and abs(y0) > 0.001:
                 y0_expr = expr; used.add(i)
 
-        self._w(f"{var} = root.sketches.add({plane_code})")
+        self._w(f"{var} = {getattr(self, '_current_sketch_comp', 'comp')}.sketches.add({plane_code})")
         self._w(f'{var}.name = "{name}"')
         self._w(f'x0, y0, w, h = ev("{x0_expr}"), ev("{y0_expr}"), ev("{w_expr}"), ev("{h_expr}")')
         self._w(f"rect = {var}.sketchCurves.sketchLines.addTwoPointRectangle(")
@@ -1912,7 +1919,7 @@ class _Generator:
 
     def _emit_raw_sketch(self, var, name, plane_code, curves, dims, feat, on_face=False):
         """Emit raw sketch geometry with parametric dimensions and constraints."""
-        self._w(f"{var} = root.sketches.add({plane_code})")
+        self._w(f"{var} = {getattr(self, '_current_sketch_comp', 'comp')}.sketches.add({plane_code})")
         self._w(f'{var}.name = "{name}"')
         self._w(f"lns = {var}.sketchCurves.sketchLines")
 
