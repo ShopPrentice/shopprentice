@@ -841,6 +841,9 @@ class _Generator:
             non_ref = [c for c in curves if not c.get("isReference")]
             refs = [c for c in curves if c.get("isReference")]
             self._brep_face_sketches[name] = plane_info
+            # Tag all curves with original index before any filtering
+            for ci, c in enumerate(curves):
+                c["_origIdx"] = ci
             # Check if any ref is an explicit body/edge projection
             has_body_proj = any(
                 c.get("projectedFrom", {}).get("type") == "BRepBody"
@@ -854,9 +857,6 @@ class _Generator:
                 # Body projections: use find_face for accurate intersection
                 # geometry on beveled/tapered faces.
                 plane_code = self._resolve_plane(plane_info)
-                # Tag curves with original index before filtering
-                for ci, c in enumerate(curves):
-                    c["_origIdx"] = ci
                 # Filter only the auto-boundary refs (BRepFace type), keep body proj refs.
                 # Deep-copy dicts so Y-flip doesn't mutate feat["curves"].
                 curves = [dict(c) for c in curves if not (
@@ -876,6 +876,11 @@ class _Generator:
                 # Only auto-boundary refs → use find_face + filter refs
                 plane_code = self._resolve_plane(plane_info)
                 curves = non_ref
+                # Coordinate transform for axis differences
+                f["_coord_transform"] = {
+                    "cap_xdir": f.get("sketchXDir", [1, 0, 0]),
+                    "cap_ydir": f.get("sketchYDir", [0, 1, 0]),
+                }
                 is_on_face = True
             else:
                 # Edge projections or no refs → use cplane
