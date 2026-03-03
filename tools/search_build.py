@@ -137,6 +137,8 @@ def states_match(expected, actual, tolerance_pct=None):
         tolerance_pct = VOLUME_TOLERANCE_PCT
     if actual is None:
         return False, ["execution failed"]
+    if not expected:
+        return True, ["  (no ground truth — skipped)"]
 
     details = []
     all_match = True
@@ -810,11 +812,12 @@ def main():
     if not args.skip_ground_truth:
         ground_truth = collect_ground_truth(capture, verbose=args.verbose)
     else:
-        print("\nSkipping per-feature ground truth (using final state only)")
+        print("\nSkipping per-feature ground truth (build-only mode)")
+        print("  Per-step validation disabled — only script errors will stop the build")
+        print("  Final validation against expected body state at the end")
         ground_truth = {}
-        for fi, feat in enumerate(timeline):
-            if not feat.get("isRolledBack"):
-                ground_truth[fi] = expected_state
+        # Empty ground truth per step = no per-step volume validation.
+        # Script errors still stop the build.
 
     # ── Switch to scratch doc ──
     ensure_scratch_doc(verbose=args.verbose)

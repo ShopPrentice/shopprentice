@@ -684,10 +684,18 @@ class _Generator:
             self._w("return p")
             self.ind -= 1
 
-        # find_body — walks occurrences to return proxied bodies (root context)
+        # find_body — searches comp first (native), then root+occurrences (proxied)
         self._w()
-        self._w("def find_body(name):")
+        self._w("def find_body(name, search_comp=None):")
         self.ind += 1
+        self._w("if search_comp:")
+        self.ind += 1
+        self._w("for i in range(search_comp.bRepBodies.count):")
+        self.ind += 1
+        self._w("if search_comp.bRepBodies.item(i).name == name:")
+        self.ind += 1
+        self._w("return search_comp.bRepBodies.item(i)")
+        self.ind -= 3
         self._w("for i in range(root.bRepBodies.count):")
         self.ind += 1
         self._w("if root.bRepBodies.item(i).name == name:")
@@ -826,6 +834,26 @@ class _Generator:
                 base_code = base_map[base]
             elif base in self.planes:
                 base_code = self.planes[base]
+            elif base.startswith("adsk::fusion::BRepFace"):
+                # BRepFace base — use the captured origin + normal to determine
+                # the plane position and offset from a standard plane.
+                origin = f.get("origin", [0, 0, 0])
+                normal = f.get("normal", [0, 0, 1])
+                ax, ay, az = abs(normal[0]), abs(normal[1]), abs(normal[2])
+                if az > 0.9:
+                    base_code = "comp.xYConstructionPlane"
+                    # Offset = origin Z (the face position minus expr adjusts)
+                    expr = f"{round(origin[2], 4)} cm"
+                elif ay > 0.9:
+                    base_code = "comp.xZConstructionPlane"
+                    expr = f"{round(origin[1], 4)} cm"
+                elif ax > 0.9:
+                    base_code = "comp.yZConstructionPlane"
+                    expr = f"{round(origin[0], 4)} cm"
+                else:
+                    base_code = "comp.xYConstructionPlane"
+                    expr = "0 cm"
+                self._c(f"BRepFace base → computed offset from origin {origin}")
             else:
                 self._c(f'TODO: unknown base plane "{base}", using XY')
                 base_code = "root.xYConstructionPlane"
@@ -840,6 +868,9 @@ class _Generator:
         self.sketches[name] = var
         curves = f.get("curves", [])
         dims = f.get("dimensions", [])
+        # Tag ALL curves with original index for dimension/constraint resolution
+        for ci, c in enumerate(curves):
+            c["_origIdx"] = ci
         plane_info = f.get("plane", {})
 
         # Determine sketch creation component.
@@ -847,8 +878,9 @@ class _Generator:
         # assembly context issues. Root has proxy access to all bodies.
         # ConstructionPlane sketches: use comp (same component).
         # Determine sketch creation component.
-        # BRepFace or body-projection sketches need root for cross-component access.
-        # Construction plane sketches without body projections use comp.
+        # BRepFace sketches → root (cross-component face access via proxies)
+        # ConstructionPlane sketches → comp (even with body projections,
+        #   because the plane is in the component and native bodies can be used)
         has_any_body_proj = any(
             c.get("projectedFrom", {}).get("type") == "BRepBody"
             for c in curves if c.get("isReference")
@@ -872,9 +904,6 @@ class _Generator:
             non_ref = [c for c in curves if not c.get("isReference")]
             refs = [c for c in curves if c.get("isReference")]
             self._brep_face_sketches[name] = plane_info
-            # Tag all curves with original index before any filtering
-            for ci, c in enumerate(curves):
-                c["_origIdx"] = ci
             # Check if any ref is an explicit body/edge projection
             has_body_proj = any(
                 c.get("projectedFrom", {}).get("type") == "BRepBody"
@@ -918,7 +947,8 @@ class _Generator:
                 plane_code, curves = self._brep_face_to_cplane(f, curves)
         else:
             plane_code = self._resolve_plane(plane_info)
-            self._current_sketch_comp = "comp"
+            if not has_any_body_proj:
+                self._current_sketch_comp = "comp"
 
         if self._is_rect(curves):
             self._emit_rect_sketch(var, name, plane_code, curves, dims, on_face=is_on_face)
@@ -2133,8 +2163,10 @@ class _Generator:
                 e_ref, e_key = _pt_ref(ex, ey)
                 if _has_body_projs:
                     oi = c.get("_origIdx", i)
-                    s_is_proj = not s_ref and (oi, "start") in _proj_connected
-                    e_is_proj = not e_ref and (oi, "end") in _proj_connected
+                    # Force proj even if s_ref exists — the coincident constraint
+                    # needs the projected sketch point, not a shared drawn point
+                    s_is_proj = (oi, "start") in _proj_connected
+                    e_is_proj = (oi, "end") in _proj_connected
 
                     if s_is_proj:
                         self._w(f"_pp_{i}s = _nearest_proj({tsx}, {tsy})")
