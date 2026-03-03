@@ -1643,6 +1643,7 @@ class _Generator:
         _has_body_projs = False
         _proj_endpoints = set()  # (round_x, round_y) of projected curve endpoints
         _proj_connected = set()  # (curve_idx, "start"/"end") pairs that should snap to projections
+        _on_edge_pts = set()    # (curve_idx, "end") pairs placed exactly on projected edge
 
         # Pass 1: collect all projected curve endpoint positions (pre-flip coordinates)
         for i, c in enumerate(feat.get("curves", [])):
@@ -1822,11 +1823,41 @@ class _Generator:
                     elif e_ref:
                         e_code = e_ref
                     elif s_is_proj:
-                        # Non-projected end: compute from projected start + offset
-                        # Use transformed coords for delta so direction is correct
-                        self._w(f"_dx_{i} = {tex} - {tsx}")
-                        self._w(f"_dy_{i} = {tey} - {tsy}")
-                        e_code = f"P(_pg_{i}s.x + _dx_{i}, _pg_{i}s.y + _dy_{i}, 0)"
+                        # Non-projected end: place ON the projected edge.
+                        # Find which projected curve this endpoint should lie on
+                        # (from coincident constraints in the capture), and compute
+                        # the endpoint along the actual curve direction.
+                        on_curve = self._find_online_constraint(feat, c.get("_origIdx", i), "end")
+                        if on_curve is not None and on_curve in curve_vars:
+                            cv_on = curve_vars[on_curve]
+                            # Compute endpoint along the projected curve from start
+                            # at approximate distance (will be set exactly by dimension)
+                            cap_dist = ((ex - sx)**2 + (ey - sy)**2)**0.5
+                            self._w(f"_es_{i} = {cv_on}.startSketchPoint.geometry")
+                            self._w(f"_ee_{i} = {cv_on}.endSketchPoint.geometry")
+                            self._w(f"_el_{i} = ((_ee_{i}.x-_es_{i}.x)**2+(_ee_{i}.y-_es_{i}.y)**2)**0.5")
+                            self._w(f"_ed_{i} = {round(cap_dist, 6)} / _el_{i} if _el_{i} > 0.001 else 0")
+                            # Pick direction: toward start or end of the curve?
+                            # Compare distance from the projected start point to both curve endpoints
+                            self._w(f"_ds_{i} = abs(_pg_{i}s.x-_es_{i}.x)+abs(_pg_{i}s.y-_es_{i}.y)")
+                            self._w(f"_de_{i} = abs(_pg_{i}s.x-_ee_{i}.x)+abs(_pg_{i}s.y-_ee_{i}.y)")
+                            self._w(f"if _ds_{i} < _de_{i}:")
+                            self.ind += 1
+                            self._w(f"_ex_{i} = _es_{i}.x + (_ee_{i}.x-_es_{i}.x)*_ed_{i}")
+                            self._w(f"_ey_{i} = _es_{i}.y + (_ee_{i}.y-_es_{i}.y)*_ed_{i}")
+                            self.ind -= 1
+                            self._w(f"else:")
+                            self.ind += 1
+                            self._w(f"_ex_{i} = _ee_{i}.x + (_es_{i}.x-_ee_{i}.x)*_ed_{i}")
+                            self._w(f"_ey_{i} = _ee_{i}.y + (_es_{i}.y-_ee_{i}.y)*_ed_{i}")
+                            self.ind -= 1
+                            e_code = f"P(_ex_{i}, _ey_{i}, 0)"
+                            _on_edge_pts.add((c.get("_origIdx", i), "end"))
+                        else:
+                            # Fallback: use transformed delta
+                            self._w(f"_dx_{i} = {tex} - {tsx}")
+                            self._w(f"_dy_{i} = {tey} - {tsy}")
+                            e_code = f"P(_pg_{i}s.x + _dx_{i}, _pg_{i}s.y + _dy_{i}, 0)"
                     elif _has_coord_xf:
                         e_code = f"P({tex}, {tey}, 0)"
                     else:
@@ -1922,6 +1953,12 @@ class _Generator:
                             and "_nearest_proj" in str(e2_code)):
                         self._c(f"dim[{di}]: {expr} (both endpoints from intersection)")
                         continue
+                    # Skip dims targeting on-edge endpoints (already exact by construction)
+                    e2_ci = e2.get("curveIndex") if e2 else None
+                    e2_role = e2.get("role", "") if e2 else ""
+                    if e2_ci is not None and (e2_ci, e2_role) in _on_edge_pts:
+                        self._c(f"dim[{di}]: {expr} (endpoint on-edge by construction)")
+                        continue
                     if e1_code and e2_code:
                         self._w(f"d.addDistanceDimension({e1_code}, {e2_code},")
                         self.ind += 1
@@ -1975,6 +2012,11 @@ class _Generator:
                 elif ctype == "CoincidentConstraint":
                     pt_ref = c.get("point")
                     ent_ref = c.get("entity")
+                    # Skip on-edge coincidents (already exact by construction)
+                    pt_ci = pt_ref.get("curveIndex") if pt_ref else None
+                    pt_role = pt_ref.get("role", "") if pt_ref else ""
+                    if pt_ci is not None and (pt_ci, pt_role) in _on_edge_pts:
+                        continue
                     pt_code = self._resolve_sketch_entity_ref(pt_ref, curve_vars, var)
                     ent_code = self._resolve_sketch_entity_ref(ent_ref, curve_vars, var)
                     if pt_code and ent_code and pt_code != ent_code:
@@ -2020,6 +2062,25 @@ class _Generator:
             prof_count = feat.get("profileCount", 1)
             self._w(f"{prof} = {var}.profiles.item(0)  # {prof_count} profile(s)")
         self.profiles[name] = prof
+
+    def _find_online_constraint(self, feat, curve_idx, role):
+        """Find if a curve endpoint has a coincident-on-line constraint.
+
+        Searches the captured constraints for a CoincidentConstraint where
+        point=(curveIndex=curve_idx, role=role) and entity is a SketchLine.
+        Returns the curveIndex of the line, or None.
+        """
+        for c in feat.get("constraints", []):
+            if not isinstance(c, dict):
+                continue
+            if c.get("type") != "CoincidentConstraint":
+                continue
+            pt = c.get("point", {})
+            ent = c.get("entity", {})
+            if (pt.get("curveIndex") == curve_idx and pt.get("role") == role
+                    and ent.get("type") == "SketchLine"):
+                return ent.get("curveIndex")
+        return None
 
     def _resolve_sketch_entity_ref(self, ref, curve_vars, sk_var, proj_curve_pts=None):
         """Resolve a captured sketch entity reference to a code string."""
