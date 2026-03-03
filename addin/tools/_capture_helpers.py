@@ -47,10 +47,26 @@ def _capture_body(body):
 
 # ── Sketch plane ──
 
-def _capture_sketch_plane(sk):
-    """Return structured plane info for a sketch's reference plane."""
+def _capture_sketch_plane(sk, design=None):
+    """Return structured plane info for a sketch's reference plane.
+
+    Uses rollTo when available to access BRep-dependent reference planes
+    that may not be accessible at end-of-timeline.
+    """
+    ref = None
     try:
         ref = sk.referencePlane
+    except:
+        pass
+    if ref is None and design:
+        try:
+            with _roll_to_feature(sk, design):
+                ref = sk.referencePlane
+        except:
+            pass
+    if ref is None:
+        return None
+    try:
         cp = adsk.fusion.ConstructionPlane.cast(ref)
         if cp:
             result = {"type": "ConstructionPlane", "name": cp.name}
@@ -197,7 +213,7 @@ def _capture_sketch(sk, design=None):
     info = {"type": "Sketch", "name": sk.name}
 
     # Structured sketch plane
-    plane = _capture_sketch_plane(sk)
+    plane = _capture_sketch_plane(sk, design)
     if plane:
         info["plane"] = plane
 
