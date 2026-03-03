@@ -323,29 +323,33 @@ class _Generator:
 
             elif t == "ConstructionPlane":
                 var = self._var(name)
-                self._w(f'{var} = root.constructionPlanes.itemByName("{name}")')
+                c_ref = self.components.get(comp_name)
+                if c_ref:
+                    self._w(f'{var} = {c_ref}.constructionPlanes.itemByName("{name}")')
+                else:
+                    self._w(f'{var} = root.constructionPlanes.itemByName("{name}")')
                 self.planes[name] = var
 
             elif t == "Sketch":
                 var = self._var(name)
-                self._w(f'{var} = root.sketches.itemByName("{name}")')
+                # Sketches all end up in root. Names may get auto-suffixed
+                # (e.g., "Sketch1" → "Sketch1 (1)") when duplicated.
+                # Search by name then by suffix variants.
+                # Find sketch by name — take the LAST match to handle
+                # auto-suffixed duplicates (e.g., "Sketch1 (1)")
+                self._w(f"{var} = None")
+                self._w(f"for _si in range(root.sketches.count):")
+                self.ind += 1
+                self._w(f'_sk = root.sketches.item(_si)')
+                self._w(f'if _sk.name == "{name}" or _sk.name.startswith("{name} ("): {var} = _sk')
+                self.ind -= 1
                 self.sketches[name] = var
                 # Resolve profile for downstream extrude/sweep
                 plane_info = feat.get("plane", {})
                 prof = f"{var}_prof"
                 if plane_info.get("type") == "BRepFace":
-                    # On-face sketch → multiple profiles, select smallest
-                    self._w(f"_best_pi, _best_a = 0, float('inf')")
-                    self._w(f"for _pi in range({var}.profiles.count):")
-                    self.ind += 1
-                    self._w(f"_bb = {var}.profiles.item(_pi).boundingBox")
-                    self._w(f"_a = abs(_bb.maxPoint.x-_bb.minPoint.x)*abs(_bb.maxPoint.y-_bb.minPoint.y)")
-                    self._w(f"if _a < _best_a: _best_a, _best_pi = _a, _pi")
-                    self.ind -= 1
-                    self._w(f"{prof} = {var}.profiles.item(_best_pi)")
                     self._brep_face_sketches[name] = plane_info
-                else:
-                    self._w(f"{prof} = {var}.profiles.item(0)")
+                self._w(f"{prof} = {var}.profiles.item(0)")
                 self.profiles[name] = prof
 
             elif t in ("Extrude", "Sweep", "Mirror", "SplitBody",
@@ -908,8 +912,40 @@ class _Generator:
                   "Intersect": "adsk.fusion.FeatureOperations.IntersectFeatureOperation"}
         op_code = op_map.get(op, "NEWBODY")
 
-        # Profile reference
-        if sketch in self.profiles:
+        # Profile reference — match by bounding box from capture when available
+        prof = None
+        # Find the sketch feature that matches by name AND is the most recent
+        # one before this extrude (handles multiple sketches with the same name
+        # in different components)
+        sketch_feat = None
+        feat_idx = f.get("index", len(self.cap.get("timeline", [])))
+        for ti, tf in enumerate(self.cap.get("timeline", [])):
+            if ti >= feat_idx:
+                break
+            if tf.get("type") == "Sketch" and tf.get("name") == sketch:
+                sketch_feat = tf
+        cap_profiles = sketch_feat.get("profiles", []) if sketch_feat else []
+        target_prof = next((p for p in cap_profiles if p.get("index") == pidx), None)
+
+        if target_prof and sketch in self.sketches:
+            sk_var = self.sketches[sketch]
+            mn = target_prof["min"]
+            mx = target_prof["max"]
+            # Match by area (width × height) — invariant to coordinate transform
+            target_w = abs(mx[0] - mn[0])
+            target_h = abs(mx[1] - mn[1])
+            self._c(f"Match profile by area: {target_w:.2f} x {target_h:.2f}")
+            self._w(f"_best_pi, _best_d = 0, 1e10")
+            self._w(f"for _pi in range({sk_var}.profiles.count):")
+            self.ind += 1
+            self._w(f"_bb = {sk_var}.profiles.item(_pi).boundingBox")
+            self._w(f"_w = abs(_bb.maxPoint.x - _bb.minPoint.x)")
+            self._w(f"_h = abs(_bb.maxPoint.y - _bb.minPoint.y)")
+            self._w(f"_d = abs(_w - {round(target_w, 4)}) + abs(_h - {round(target_h, 4)})")
+            self._w(f"if _d < _best_d: _best_pi, _best_d = _pi, _d")
+            self.ind -= 1
+            prof = f"{sk_var}.profiles.item(_best_pi)"
+        elif sketch in self.profiles:
             prof = self.profiles[sketch]
         elif sketch in self.sketches:
             prof = f"{self.sketches[sketch]}.profiles.item({pidx})"
@@ -2215,10 +2251,13 @@ class _Generator:
                     # Keep dims for on-edge endpoints — makes them parametric.
                     # (on-line coincident constraints are skipped separately)
                     if e1_code and e2_code:
+                        self._w(f"try:")
+                        self.ind += 1
                         self._w(f"d.addDistanceDimension({e1_code}, {e2_code},")
                         self.ind += 1
                         self._w(f'{orient_code}, P(0, 0, 0)).parameter.expression = "{expr}"')
-                        self.ind -= 1
+                        self.ind -= 2
+                        self._w(f"except: pass  # skip if already constrained")
                     else:
                         self._c(f"TODO: dim[{di}] {dtype}: {expr} (targets not resolved)")
 
@@ -2252,22 +2291,25 @@ class _Generator:
                     continue
                 ctype = c.get("type", "")
 
+                # Wrap each constraint in try/except — constraints can fail
+                # if geometry is already constrained (e.g., shared points,
+                # collinear lines, or implicit constraints from line creation)
+                call = None
                 if ctype == "HorizontalConstraint":
                     line_ref = c.get("line")
                     line_code = self._resolve_sketch_curve_ref(line_ref, curve_vars)
                     if line_code:
-                        self._w(f"gc.addHorizontal({line_code})")
+                        call = f"gc.addHorizontal({line_code})"
 
                 elif ctype == "VerticalConstraint":
                     line_ref = c.get("line")
                     line_code = self._resolve_sketch_curve_ref(line_ref, curve_vars)
                     if line_code:
-                        self._w(f"gc.addVertical({line_code})")
+                        call = f"gc.addVertical({line_code})"
 
                 elif ctype == "CoincidentConstraint":
                     pt_ref = c.get("point")
                     ent_ref = c.get("entity")
-                    # Skip on-edge coincidents (already exact by construction)
                     pt_ci = pt_ref.get("curveIndex") if pt_ref else None
                     pt_role = pt_ref.get("role", "") if pt_ref else ""
                     if pt_ci is not None and (pt_ci, pt_role) in _on_edge_pts:
@@ -2275,47 +2317,41 @@ class _Generator:
                     pt_code = self._resolve_sketch_entity_ref(pt_ref, curve_vars, var)
                     ent_code = self._resolve_sketch_entity_ref(ent_ref, curve_vars, var)
                     if pt_code and ent_code and pt_code != ent_code:
-                        self._w(f"gc.addCoincident({pt_code}, {ent_code})")
+                        call = f"gc.addCoincident({pt_code}, {ent_code})"
 
                 elif ctype == "ParallelConstraint":
                     l1 = self._resolve_sketch_curve_ref(c.get("lineOne"), curve_vars)
                     l2 = self._resolve_sketch_curve_ref(c.get("lineTwo"), curve_vars)
                     if l1 and l2:
-                        self._w(f"gc.addParallel({l1}, {l2})")
+                        call = f"gc.addParallel({l1}, {l2})"
 
                 elif ctype == "PerpendicularConstraint":
                     l1 = self._resolve_sketch_curve_ref(c.get("lineOne"), curve_vars)
                     l2 = self._resolve_sketch_curve_ref(c.get("lineTwo"), curve_vars)
                     if l1 and l2:
-                        self._w(f"gc.addPerpendicular({l1}, {l2})")
+                        call = f"gc.addPerpendicular({l1}, {l2})"
 
                 elif ctype == "TangentConstraint":
                     c1 = self._resolve_sketch_curve_ref(c.get("curveOne"), curve_vars)
                     c2 = self._resolve_sketch_curve_ref(c.get("curveTwo"), curve_vars)
                     if c1 and c2:
-                        self._w(f"gc.addTangent({c1}, {c2})")
+                        call = f"gc.addTangent({c1}, {c2})"
 
                 elif ctype == "EqualConstraint":
                     c1 = self._resolve_sketch_curve_ref(c.get("curveOne"), curve_vars)
                     c2 = self._resolve_sketch_curve_ref(c.get("curveTwo"), curve_vars)
                     if c1 and c2:
-                        self._w(f"gc.addEqual({c1}, {c2})")
+                        call = f"gc.addEqual({c1}, {c2})"
 
-        # Profile
+                if call:
+                    self._w(f"try: {call}")
+                    self._w(f"except: pass")
+
+        # Profile — use item(0) by default; the extrude/sweep emitter
+        # uses the captured profileIndex to select the correct profile.
         prof = f"{var}_prof"
-        if on_face:
-            # BRepFace auto-projects boundary → multiple profiles. Select smallest.
-            self._w(f"_best_pi, _best_a = 0, float('inf')")
-            self._w(f"for _pi in range({var}.profiles.count):")
-            self.ind += 1
-            self._w(f"_bb = {var}.profiles.item(_pi).boundingBox")
-            self._w(f"_a = abs(_bb.maxPoint.x-_bb.minPoint.x)*abs(_bb.maxPoint.y-_bb.minPoint.y)")
-            self._w(f"if _a < _best_a: _best_a, _best_pi = _a, _pi")
-            self.ind -= 1
-            self._w(f"{prof} = {var}.profiles.item(_best_pi)")
-        else:
-            prof_count = feat.get("profileCount", 1)
-            self._w(f"{prof} = {var}.profiles.item(0)  # {prof_count} profile(s)")
+        prof_count = feat.get("profileCount", 1)
+        self._w(f"{prof} = {var}.profiles.item(0)  # {prof_count} profile(s)")
         self.profiles[name] = prof
 
     def _find_online_constraint(self, feat, curve_idx, role):
