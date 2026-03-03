@@ -820,7 +820,6 @@ class _Generator:
     def _feat_constructionplane(self, f):
         name = f.get("name", "Plane")
         var = self._var(name)
-        self.planes[name] = var
 
         if f.get("definitionType") == "Offset":
             expr = f.get("offset", "0 cm")
@@ -858,16 +857,92 @@ class _Generator:
                 self._c(f'TODO: unknown base plane "{base}", using XY')
                 base_code = "root.xYConstructionPlane"
             self._w(f'{var} = off_plane(comp, {base_code}, "{expr}", "{name}")')
+        elif f.get("definitionType") == "AtAngle":
+            # At-angle plane: rotated from a base plane around an edge/line
+            angle_expr = f.get("angle", "0 deg")
+            base = f.get("basePlane", "")
+            linear = f.get("linearEntity", {})
+            base_map = {
+                "XY": "comp.xYConstructionPlane",
+                "XZ": "comp.xZConstructionPlane",
+                "YZ": "comp.yZConstructionPlane",
+            }
+            if base in base_map:
+                base_code = base_map[base]
+            elif base in self.planes:
+                base_code = self.planes[base]
+            elif not base and self.planes:
+                # No base captured — use the most recently created plane
+                last_plane = list(self.planes.values())[-1]
+                base_code = last_plane
+                self._c(f"No base plane captured — using last plane: {last_plane}")
+            else:
+                base_code = "comp.xYConstructionPlane"
+            # Resolve the linear entity (edge to rotate around)
+            lin_type = linear.get("type", "")
+            if lin_type == "BRepEdge":
+                body_name = linear.get("body", "")
+                sv = linear.get("start", [0, 0, 0])
+                ev = linear.get("end", [0, 0, 0])
+                bv = self._body_ref(body_name)
+                self._w(f"_angle_edge = None")
+                self._w(f"for _ei in range({bv}.edges.count):")
+                self.ind += 1
+                self._w(f"_e = {bv}.edges.item(_ei)")
+                self._w(f"_sv, _ev = _e.startVertex.geometry, _e.endVertex.geometry")
+                self._w(f"if ((abs(_sv.x-{sv[0]:.4f})+abs(_sv.y-{sv[1]:.4f})+abs(_sv.z-{sv[2]:.4f}) < 0.1 and")
+                self._w(f"    abs(_ev.x-{ev[0]:.4f})+abs(_ev.y-{ev[1]:.4f})+abs(_ev.z-{ev[2]:.4f}) < 0.1) or")
+                self._w(f"   (abs(_sv.x-{ev[0]:.4f})+abs(_sv.y-{ev[1]:.4f})+abs(_sv.z-{ev[2]:.4f}) < 0.1 and")
+                self._w(f"    abs(_ev.x-{sv[0]:.4f})+abs(_ev.y-{sv[1]:.4f})+abs(_ev.z-{sv[2]:.4f}) < 0.1)):")
+                self.ind += 1
+                self._w(f"_angle_edge = _e; break")
+                self.ind -= 2
+                line_code = "_angle_edge"
+            elif lin_type == "SketchLine":
+                sk_name = linear.get("parentSketch", "")
+                sv = linear.get("start", [0, 0, 0])
+                ev = linear.get("end", [0, 0, 0])
+                sk_var = self.sketches.get(sk_name)
+                if sk_var:
+                    self._w(f"_angle_line = None")
+                    self._w(f"for _ci in range({sk_var}.sketchCurves.count):")
+                    self.ind += 1
+                    self._w(f"_c = {sk_var}.sketchCurves.item(_ci)")
+                    self._w(f"_sl = adsk.fusion.SketchLine.cast(_c)")
+                    self._w(f"if _sl:")
+                    self.ind += 1
+                    self._w(f"_s, _e = _sl.startSketchPoint.geometry, _sl.endSketchPoint.geometry")
+                    self._w(f"if (abs(_s.x-{sv[0]:.4f})+abs(_s.y-{sv[1]:.4f}) < 0.1 and "
+                            f"abs(_e.x-{ev[0]:.4f})+abs(_e.y-{ev[1]:.4f}) < 0.1) or "
+                            f"(abs(_s.x-{ev[0]:.4f})+abs(_s.y-{ev[1]:.4f}) < 0.1 and "
+                            f"abs(_e.x-{sv[0]:.4f})+abs(_e.y-{sv[1]:.4f}) < 0.1):")
+                    self.ind += 1
+                    self._w(f"_angle_line = _sl; break")
+                    self.ind -= 3
+                    line_code = "_angle_line"
+                else:
+                    line_code = "comp.xConstructionAxis"
+                    self._c(f"TODO: sketch '{sk_name}' not found for AtAngle line")
+            elif lin_type == "ConstructionAxis":
+                axis_name = linear.get("name", "")
+                axis_map = {"X": "comp.xConstructionAxis", "Y": "comp.yConstructionAxis", "Z": "comp.zConstructionAxis"}
+                line_code = axis_map.get(axis_name, f'comp.constructionAxes.itemByName("{axis_name}")')
+            else:
+                line_code = "comp.xConstructionAxis"
+                self._c(f"TODO: unknown linear entity type '{lin_type}' for AtAngle plane")
+
+            self._w(f"_pl_inp = comp.constructionPlanes.createInput()")
+            self._w(f'_pl_inp.setByAngle({line_code}, adsk.core.ValueInput.createByString("{angle_expr}"), {base_code})')
+            self._w(f"{var} = comp.constructionPlanes.add(_pl_inp)")
+            self._w(f'{var}.name = "{name}"')
+
         elif f.get("origin") and f.get("normal"):
-            # Non-offset plane with known origin + normal.
-            # setByPlane doesn't work in executeTextCommand context.
-            # Use setByOffset from the closest axis-aligned plane + the
-            # "At Angle" method for tilted planes.
+            # Non-offset, non-angle plane with known origin + normal.
+            # Use offset from closest axis-aligned plane as approximation.
             origin = f["origin"]
             normal = f["normal"]
             ax, ay, az = abs(normal[0]), abs(normal[1]), abs(normal[2])
             if ax > 0.9:
-                # Mostly along X → offset from YZ
                 base_code = "comp.yZConstructionPlane"
                 offset = origin[0]
             elif ay > 0.9:
@@ -876,18 +951,12 @@ class _Generator:
             else:
                 base_code = "comp.xYConstructionPlane"
                 offset = origin[2]
-
-            # Check if the plane is tilted (non-axis-aligned normal)
-            is_tilted = (ax < 0.999 and ay < 0.999 and az < 0.999)
-            if is_tilted:
-                # Create at angle to a standard plane through a line/edge
-                # For now, use setByOffset as approximation (loses the tilt)
-                self._c(f"Tilted plane at origin={origin} normal={normal}")
-                self._c(f"Approximation: offset from nearest axis (tilt not preserved)")
+            self._c(f"Approximation: origin={origin} normal={normal}")
             self._w(f'{var} = off_plane(comp, {base_code}, "{round(offset, 4)} cm", "{name}")')
         else:
             self._c(f"TODO: Non-offset plane (type={f.get('definitionType')})")
             self._w(f"{var} = None")
+        self.planes[name] = var
 
     def _feat_sketch(self, f):
         name = f.get("name", "Sketch")

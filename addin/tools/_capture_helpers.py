@@ -837,6 +837,8 @@ def _capture_construction_plane(cp):
     try:
         defn = cp.definition
         offset_def = adsk.fusion.ConstructionPlaneOffsetDefinition.cast(defn)
+        angle_def = adsk.fusion.ConstructionPlaneAtAngleDefinition.cast(defn)
+
         if offset_def:
             info["definitionType"] = "Offset"
             info["offset"] = offset_def.offset.expression
@@ -846,6 +848,51 @@ def _capture_construction_plane(cp):
                 info["basePlane"] = bcp.name
             else:
                 info["basePlane"] = str(base.objectType)
+
+        elif angle_def:
+            info["definitionType"] = "AtAngle"
+            info["angle"] = angle_def.angle.expression
+            # Base plane
+            try:
+                base = angle_def.planarEntity
+                bcp = adsk.fusion.ConstructionPlane.cast(base)
+                if bcp:
+                    info["basePlane"] = bcp.name
+                else:
+                    info["basePlane"] = str(base.objectType)
+            except:
+                pass
+            # Linear entity (edge/line to rotate around)
+            try:
+                line = angle_def.linearEntity
+                edge = adsk.fusion.BRepEdge.cast(line)
+                if edge:
+                    sv = edge.startVertex.geometry
+                    ev = edge.endVertex.geometry
+                    info["linearEntity"] = {
+                        "type": "BRepEdge",
+                        "body": edge.body.name,
+                        "start": [round(sv.x, 4), round(sv.y, 4), round(sv.z, 4)],
+                        "end": [round(ev.x, 4), round(ev.y, 4), round(ev.z, 4)],
+                    }
+                else:
+                    ca = adsk.fusion.ConstructionAxis.cast(line)
+                    sl = adsk.fusion.SketchLine.cast(line)
+                    if ca:
+                        info["linearEntity"] = {"type": "ConstructionAxis", "name": ca.name}
+                    elif sl:
+                        s = sl.startSketchPoint.geometry
+                        e = sl.endSketchPoint.geometry
+                        info["linearEntity"] = {
+                            "type": "SketchLine",
+                            "parentSketch": sl.parentSketch.name,
+                            "start": [round(s.x, 4), round(s.y, 4), round(s.z, 4)],
+                            "end": [round(e.x, 4), round(e.y, 4), round(e.z, 4)],
+                        }
+                    else:
+                        info["linearEntity"] = {"type": str(line.objectType)}
+            except:
+                pass
     except Exception as e:
         info["definitionError"] = str(e)
 
