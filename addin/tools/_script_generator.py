@@ -614,7 +614,7 @@ class _Generator:
         self._w("for name, expr, unit, comment in [")
         self.ind += 1
         for p in params:
-            c = p.get("comment", "")
+            c = p.get("comment", "").replace("\n", " ").replace("\r", "").replace('"', '\\"')
             self._w(f'("{p["name"]}", "{p["expression"]}", "{p["unit"]}", "{c}"),')
         self.ind -= 1
         self._w("]:")
