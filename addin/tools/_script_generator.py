@@ -1394,10 +1394,16 @@ class _Generator:
                 self._w(f'_split_body = find_body("{input_name}", comp)')
                 self._w(f"if not _split_body:")
                 self.ind += 1
-                self._c(f'Body "{input_name}" not found — try last body in comp')
-                self._w(f"if comp.bRepBodies.count > 0:")
+                self._c(f'Body "{input_name}" not found — try largest body in comp')
+                self._w(f"_biggest = None")
+                self._w(f"for _bi in range(comp.bRepBodies.count):")
                 self.ind += 1
-                self._w(f"_split_body = comp.bRepBodies.item(comp.bRepBodies.count - 1)")
+                self._w(f"_b = comp.bRepBodies.item(_bi)")
+                self._w(f"if _biggest is None or _b.volume > _biggest.volume: _biggest = _b")
+                self.ind -= 1
+                self._w(f"if _biggest:")
+                self.ind += 1
+                self._w(f"_split_body = _biggest")
                 self._w(f'_split_body.name = "{input_name}"')
                 self.ind -= 2
                 body_code = "_split_body"
