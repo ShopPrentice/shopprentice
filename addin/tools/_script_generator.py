@@ -103,6 +103,8 @@ class _Generator:
         self.profiles = {}  # sketch name → var (the profile used by next feature)
         self.bodies = {}    # body name → var
         self.feats = {}     # feature name → var
+        self.components = {} # component name → var (e.g., "posts" → "posts_c")
+        self._root_name = capture.get("designName", "")  # root component name
 
         # Track BRepFace sketch info for CUT extrude direction fixing
         self._brep_face_sketches = {}  # sketch name → plane_info dict
@@ -258,6 +260,9 @@ class _Generator:
         name = feat.get("name", "")
         self._w()
         self._c(f"[{idx}] {t}: {name}")
+        # Set component context
+        comp_var = self._comp_ref(feat)
+        self._w(f"comp = {comp_var}")
 
         variants = self._feature_variants_with_state(feat)
         if len(variants) > 1:
@@ -295,8 +300,28 @@ class _Generator:
                 continue
             t = feat.get("type")
             name = feat.get("name", "")
+            comp_name = feat.get("component", "")
 
-            if t == "ConstructionPlane":
+            # Resolve component for this feature
+            if comp_name and comp_name != self._root_name and comp_name not in self.components:
+                # Component not yet created — find it by name
+                cvar = self._var(comp_name)
+                self._w(f"for _occ in root.allOccurrences:")
+                self.ind += 1
+                self._w(f'if _occ.component.name == "{comp_name}": {cvar}_c = _occ.component; break')
+                self.ind -= 1
+                self.components[comp_name] = f"{cvar}_c"
+
+            if t == "ComponentCreation":
+                cvar = self._var(name)
+                self.components[name] = f"{cvar}_c"
+                # Component exists from prior execution — find it
+                self._w(f"for _occ in root.allOccurrences:")
+                self.ind += 1
+                self._w(f'if _occ.component.name == "{name}": {cvar}_c = _occ.component; break')
+                self.ind -= 1
+
+            elif t == "ConstructionPlane":
                 var = self._var(name)
                 self._w(f'{var} = root.constructionPlanes.itemByName("{name}")')
                 self.planes[name] = var
@@ -720,10 +745,10 @@ class _Generator:
             self.ind += 1
             self._w("coll = adsk.core.ObjectCollection.create()")
             self._w("for b in (tools if isinstance(tools, list) else [tools]): coll.add(b)")
-            self._w("inp = comp.features.combineFeatures.createInput(target, coll)")
+            self._w("inp = root.features.combineFeatures.createInput(target, coll)")
             self._w("inp.operation = op")
             self._w("inp.isKeepToolBodies = keep")
-            self._w("f = comp.features.combineFeatures.add(inp)")
+            self._w("f = root.features.combineFeatures.add(inp)")
             self._w("f.name = name")
             self._w("return f")
             self.ind -= 1
@@ -734,8 +759,8 @@ class _Generator:
             self.ind += 1
             self._w("coll = adsk.core.ObjectCollection.create()")
             self._w("for b in bodies: coll.add(b)")
-            self._w("inp = comp.features.mirrorFeatures.createInput(coll, plane)")
-            self._w("m = comp.features.mirrorFeatures.add(inp)")
+            self._w("inp = root.features.mirrorFeatures.createInput(coll, plane)")
+            self._w("m = root.features.mirrorFeatures.add(inp)")
             self._w("m.name = name")
             self._w("return m")
             self.ind -= 1
@@ -752,6 +777,12 @@ class _Generator:
             name = feat.get("name", "")
             self._w()
             self._c(f"[{idx}] {t}: {name}")
+            # Set component context for child components
+            comp_var = self._comp_ref(feat)
+            if comp_var != "root":
+                self._w(f"comp = {comp_var}")
+            else:
+                self._w(f"comp = root")
             handler = getattr(self, f"_feat_{t.lower()}", None)
             if handler:
                 handler(feat)
@@ -1697,6 +1728,7 @@ class _Generator:
         self._w(f"{var}_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())")
         self._w(f'{var}_occ.component.name = "{name}"')
         self._w(f"{var}_c = {var}_occ.component")
+        self.components[name] = f"{var}_c"
 
     def _feat_snapshot(self, f):
         self._c("Snapshot (informational only, no code needed)")
@@ -2480,6 +2512,15 @@ class _Generator:
         return pl_var, new_curves
 
     # ── Body reference helpers ──
+
+    def _comp_ref(self, feat):
+        """Get the component variable for a feature. Returns 'root' for root component."""
+        comp_name = feat.get("component", "")
+        if not comp_name or comp_name == self._root_name:
+            return "root"
+        if comp_name in self.components:
+            return self.components[comp_name]
+        return "root"
 
     def _body_ref(self, name):
         """Get variable reference for a body name, with fallback for renamed bodies."""
