@@ -323,11 +323,15 @@ class _Generator:
 
             elif t == "ConstructionPlane":
                 var = self._var(name)
-                c_ref = self.components.get(comp_name)
-                if c_ref:
-                    self._w(f'{var} = {c_ref}.constructionPlanes.itemByName("{name}")')
-                else:
-                    self._w(f'{var} = root.constructionPlanes.itemByName("{name}")')
+                # Search root, then all components for the plane
+                self._w(f'{var} = root.constructionPlanes.itemByName("{name}")')
+                self._w(f"if not {var}:")
+                self.ind += 1
+                self._w(f"for _occ in root.allOccurrences:")
+                self.ind += 1
+                self._w(f'_p = _occ.component.constructionPlanes.itemByName("{name}")')
+                self._w(f"if _p: {var} = _p; break")
+                self.ind -= 2
                 self.planes[name] = var
 
             elif t == "Sketch":
@@ -722,13 +726,27 @@ class _Generator:
         self.ind -= 1
 
         # find_face_near — select face by pointOnFace proximity + normal axis
+        # If body is None, search ALL bodies in the design.
         self._w()
         self._w("def find_face_near(body, px, py, pz, nx=0, ny=0, nz=0):")
         self.ind += 1
-        self._w("best, best_d = None, 1e10")
-        self._w("for i in range(body.faces.count):")
+        self._w("bodies = [body] if body else []")
+        self._w("if not bodies:")
         self.ind += 1
-        self._w("f = body.faces.item(i)")
+        self._w("def _all(c):")
+        self.ind += 1
+        self._w("r = [c.bRepBodies.item(i) for i in range(c.bRepBodies.count)]")
+        self._w("for o in c.occurrences: r.extend(_all(o.component))")
+        self._w("return r")
+        self.ind -= 1
+        self._w("bodies = _all(root)")
+        self.ind -= 1
+        self._w("best, best_d = None, 1e10")
+        self._w("for _b in bodies:")
+        self.ind += 1
+        self._w("for i in range(_b.faces.count):")
+        self.ind += 1
+        self._w("f = _b.faces.item(i)")
         self._w("if isinstance(f.geometry, adsk.core.Plane):")
         self.ind += 1
         self._w("n = f.geometry.normal")
@@ -739,7 +757,7 @@ class _Generator:
         self._w("p = f.pointOnFace")
         self._w("d = abs(p.x - px) + abs(p.y - py) + abs(p.z - pz)")
         self._w("if d < best_d: best, best_d = f, d")
-        self.ind -= 2
+        self.ind -= 3
         self._w("return best")
         self.ind -= 1
 
