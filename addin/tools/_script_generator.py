@@ -112,8 +112,12 @@ class _Generator:
         # Track which helpers the timeline needs
         self.needs = set()
 
+        # Track overwritten body variables (when two extrudes create same-name body)
+        self._prev_bodies = {}  # body_name → previous var (before overwrite)
+
         # Fix body names captured at end-of-timeline back to at-feature-time names
         self._fixup_split_body_names()
+        self._fixup_body_references()
 
     def _fixup_split_body_names(self):
         """Correct extrude/sweep body names captured with post-split suffixes.
@@ -122,13 +126,15 @@ class _Generator:
         named "Leg_NL" at creation time shows as "Leg_NL (1)" if a downstream
         split renamed it. This fixup restores the at-creation-time name so that
         split/remove features can find bodies by their expected names.
+
+        Also handles user renames: if the split's inputBody doesn't match any
+        previous extrude body by name, find the nearest preceding NewBody
+        extrude in the same component and rename its body to match.
         """
         timeline = self.cap.get("timeline", [])
         for fi, feat in enumerate(timeline):
             if feat.get("type") != "SplitBody":
                 continue
-            # Use inputBody (the body being split) as the base name.
-            # The input body's at-creation-time name is the base without suffix.
             input_body = feat.get("inputBody", "")
             if not input_body:
                 split_bodies = feat.get("bodies", [])
@@ -136,14 +142,175 @@ class _Generator:
             if not input_body:
                 continue
             base_name = re.sub(r'\s*\(\d+\)\s*$', '', input_body)
+            split_comp = feat.get("component", "")
+            found_match = False
             for pi in range(fi):
                 prev = timeline[pi]
                 if prev.get("type") in ("Extrude", "Sweep"):
                     prev_bodies = prev.get("bodies", [])
                     for bi, bn in enumerate(prev_bodies):
                         stripped = re.sub(r'\s*\(\d+\)\s*$', '', bn)
-                        if stripped == base_name and bn != base_name:
-                            prev_bodies[bi] = base_name
+                        if stripped == base_name:
+                            found_match = True
+                            if bn != base_name:
+                                prev_bodies[bi] = base_name
+            # Handle user renames: if no extrude/sweep body matches the
+            # split's inputBody, look for the nearest preceding NewBody
+            # extrude in the same component whose body isn't referenced by
+            # any other split, and rename it.
+            if not found_match:
+                # Collect all inputBody names from other splits
+                other_inputs = set()
+                for oi, of in enumerate(timeline):
+                    if of.get("type") == "SplitBody" and oi != fi:
+                        ib = of.get("inputBody", "")
+                        if ib:
+                            other_inputs.add(ib)
+                # Search backwards for nearest NewBody extrude in same comp
+                for pi in range(fi - 1, -1, -1):
+                    prev = timeline[pi]
+                    if (prev.get("type") in ("Extrude", "Sweep")
+                            and prev.get("operation") == "NewBody"
+                            and prev.get("component", "") == split_comp):
+                        prev_bodies = prev.get("bodies", [])
+                        if len(prev_bodies) == 1 and prev_bodies[0] not in other_inputs:
+                            prev_bodies[0] = base_name
+                            break
+
+    def _fixup_body_references(self):
+        """Fix body names that reference bodies created after their usage.
+
+        When capture reads body names at end-of-timeline, names may differ from
+        at-feature-time names. Two patterns:
+
+        1. A body named at end-of-timeline by a later Pattern (e.g., "Body7" is
+           actually "wedge1" at the Combine's position).
+        2. A body that becomes a separate body only after a later SplitBody
+           (e.g., "notch1" is part of "post1" until Split2 separates it).
+        """
+        timeline = self.cap.get("timeline", [])
+        for fi, feat in enumerate(timeline):
+            ftype = feat.get("type")
+
+            # Combine: fix target and tool bodies
+            if ftype == "Combine":
+                target = feat.get("targetBody", "")
+                if target:
+                    resolved = self._resolve_body_at(timeline, target, fi)
+                    if resolved != target:
+                        feat["targetBody"] = resolved
+                tool_bodies = feat.get("toolBodies", [])
+                for ti, tb_name in enumerate(tool_bodies):
+                    resolved = self._resolve_body_at(timeline, tb_name, fi)
+                    if resolved != tb_name:
+                        tool_bodies[ti] = resolved
+
+            # Move: fix input bodies
+            if ftype == "Move":
+                inputs = feat.get("inputs", [])
+                for ii, inp_name in enumerate(inputs):
+                    resolved = self._resolve_body_at(timeline, inp_name, fi)
+                    if resolved != inp_name:
+                        inputs[ii] = resolved
+
+            # Mirror: fix input bodies
+            if ftype == "Mirror":
+                inputs = feat.get("inputBodies", [])
+                for ii, inp_name in enumerate(inputs):
+                    resolved = self._resolve_body_at(timeline, inp_name, fi)
+                    if resolved != inp_name:
+                        inputs[ii] = resolved
+
+            # Sketch: fix projected body references in curves
+            if ftype == "Sketch":
+                for curve in feat.get("curves", []):
+                    proj = curve.get("projectedFrom", {})
+                    if proj.get("type") == "BRepBody" and proj.get("body"):
+                        resolved = self._resolve_body_at(timeline, proj["body"], fi)
+                        if resolved != proj["body"]:
+                            proj["body"] = resolved
+
+            # Sketch: fix BRepFace plane body references
+            if ftype == "Sketch":
+                plane = feat.get("plane", {})
+                if plane.get("type") == "BRepFace" and plane.get("body"):
+                    resolved = self._resolve_body_at(timeline, plane["body"], fi)
+                    if resolved != plane["body"]:
+                        plane["body"] = resolved
+
+    def _resolve_body_at(self, timeline, body_name, before_index):
+        """Resolve a body name to its at-feature-time name.
+
+        Returns body_name unchanged if it already exists before before_index.
+        Otherwise, traces ancestry (split inputBody, or duplicate-name surplus).
+        """
+        # Check if body was created before this feature
+        for t in timeline[:before_index]:
+            if body_name in t.get("bodies", []):
+                return body_name
+
+        # Strategy 1: trace to ancestor via SplitBody
+        # If a later SplitBody creates this body, the body was part of
+        # the split's inputBody at this point in the timeline.
+        for si in range(before_index, len(timeline)):
+            sf = timeline[si]
+            if sf.get("type") == "SplitBody" and body_name in sf.get("bodies", []):
+                ancestor = sf.get("inputBody", "")
+                if ancestor:
+                    # Recursively resolve (ancestor might also be a future name)
+                    return self._resolve_body_at(timeline, ancestor, before_index)
+
+        # Strategy 2: find bodies created multiple times by NewBody extrudes
+        # (e.g., two extrudes both named "wedge1"). Only count NewBody extrude
+        # creations, not SplitBody outputs (splits create same-name pieces that
+        # aren't true duplicates).
+        extrude_count = {}
+        for pi in range(before_index):
+            prev = timeline[pi]
+            if (prev.get("type") in ("Extrude", "Sweep")
+                    and prev.get("operation") == "NewBody"):
+                for bn in prev.get("bodies", []):
+                    extrude_count[bn] = extrude_count.get(bn, 0) + 1
+
+        # Subtract consumptions (Combine keep=False, Remove)
+        for pi in range(before_index):
+            prev = timeline[pi]
+            if prev.get("type") == "Combine" and not prev.get("isKeepToolBodies", True):
+                for tb in prev.get("toolBodies", []):
+                    if tb in extrude_count:
+                        extrude_count[tb] -= 1
+                        if extrude_count[tb] <= 0:
+                            del extrude_count[tb]
+            if prev.get("type") == "Remove":
+                rn = prev.get("removedBody", "")
+                if rn in extrude_count:
+                    extrude_count[rn] -= 1
+                    if extrude_count[rn] <= 0:
+                        del extrude_count[rn]
+
+        # Find bodies created > 1 time (true duplicates)
+        best = None
+        for bn, count in extrude_count.items():
+            if count > 1:
+                if best is None:
+                    best = bn
+
+        if best:
+            return best
+
+        # Strategy 3: body_name matches a feature name (capture stored feature
+        # name instead of body name). Find the feature with this name in the
+        # same component and use its output body.
+        ref_comp = timeline[before_index].get("component", "root") if before_index < len(timeline) else "root"
+        for pi in range(before_index):
+            prev = timeline[pi]
+            if (prev.get("name") == body_name
+                    and prev.get("component", "root") == ref_comp
+                    and prev.get("bodies")):
+                # Use the first output body of this feature
+                return prev["bodies"][0]
+
+        return body_name
 
     # ── Public ──
 
@@ -904,6 +1071,21 @@ class _Generator:
                 ev = linear.get("end", [0, 0, 0])
                 sk_var = self.sketches.get(sk_name)
                 if sk_var:
+                    # Convert captured 2D sketch coords to 3D world coords
+                    # using the parent sketch's captured axes/origin
+                    sk_feat = None
+                    for tf in self.cap.get("timeline", []):
+                        if tf.get("type") == "Sketch" and tf.get("name") == sk_name:
+                            sk_feat = tf
+                            break
+                    use_world = False
+                    if sk_feat and sk_feat.get("sketchOrigin") and sk_feat.get("sketchXDir") and sk_feat.get("sketchYDir"):
+                        o = sk_feat["sketchOrigin"]
+                        xd = sk_feat["sketchXDir"]
+                        yd = sk_feat["sketchYDir"]
+                        s3d = [o[i] + sv[0]*xd[i] + sv[1]*yd[i] for i in range(3)]
+                        e3d = [o[i] + ev[0]*xd[i] + ev[1]*yd[i] for i in range(3)]
+                        use_world = True
                     self._w(f"_angle_line = None")
                     self._w(f"for _ci in range({sk_var}.sketchCurves.count):")
                     self.ind += 1
@@ -911,11 +1093,18 @@ class _Generator:
                     self._w(f"_sl = adsk.fusion.SketchLine.cast(_c)")
                     self._w(f"if _sl:")
                     self.ind += 1
-                    self._w(f"_s, _e = _sl.startSketchPoint.geometry, _sl.endSketchPoint.geometry")
-                    self._w(f"if (abs(_s.x-{sv[0]:.4f})+abs(_s.y-{sv[1]:.4f}) < 0.1 and "
-                            f"abs(_e.x-{ev[0]:.4f})+abs(_e.y-{ev[1]:.4f}) < 0.1) or "
-                            f"(abs(_s.x-{ev[0]:.4f})+abs(_s.y-{ev[1]:.4f}) < 0.1 and "
-                            f"abs(_e.x-{sv[0]:.4f})+abs(_e.y-{sv[1]:.4f}) < 0.1):")
+                    if use_world:
+                        self._w(f"_s, _e = _sl.startSketchPoint.worldGeometry, _sl.endSketchPoint.worldGeometry")
+                        self._w(f"if (abs(_s.x-{s3d[0]:.4f})+abs(_s.y-{s3d[1]:.4f})+abs(_s.z-{s3d[2]:.4f}) < 0.1 and "
+                                f"abs(_e.x-{e3d[0]:.4f})+abs(_e.y-{e3d[1]:.4f})+abs(_e.z-{e3d[2]:.4f}) < 0.1) or "
+                                f"(abs(_s.x-{e3d[0]:.4f})+abs(_s.y-{e3d[1]:.4f})+abs(_s.z-{e3d[2]:.4f}) < 0.1 and "
+                                f"abs(_e.x-{s3d[0]:.4f})+abs(_e.y-{s3d[1]:.4f})+abs(_e.z-{s3d[2]:.4f}) < 0.1):")
+                    else:
+                        self._w(f"_s, _e = _sl.startSketchPoint.geometry, _sl.endSketchPoint.geometry")
+                        self._w(f"if (abs(_s.x-{sv[0]:.4f})+abs(_s.y-{sv[1]:.4f}) < 0.1 and "
+                                f"abs(_e.x-{ev[0]:.4f})+abs(_e.y-{ev[1]:.4f}) < 0.1) or "
+                                f"(abs(_s.x-{ev[0]:.4f})+abs(_e.y-{ev[1]:.4f}) < 0.1 and "
+                                f"abs(_e.x-{sv[0]:.4f})+abs(_e.y-{sv[1]:.4f}) < 0.1):")
                     self.ind += 1
                     self._w(f"_angle_line = _sl; break")
                     self.ind -= 3
@@ -968,6 +1157,36 @@ class _Generator:
         for ci, c in enumerate(curves):
             c["_origIdx"] = ci
         plane_info = f.get("plane", {})
+
+        # Enrich BRepFace plane_info with computed normal/pointOnFace from sketch axes
+        # when the capture couldn't get face geometry (downstream features alter faces)
+        if (plane_info.get("type") == "BRepFace"
+                and not plane_info.get("pointOnFace")
+                and not plane_info.get("normal")
+                and f.get("sketchXDir") and f.get("sketchYDir") and f.get("sketchOrigin")):
+            xd = f["sketchXDir"]
+            yd = f["sketchYDir"]
+            origin = f["sketchOrigin"]
+            # normal = cross(xDir, yDir)
+            plane_info["normal"] = [
+                round(xd[1]*yd[2] - xd[2]*yd[1], 6),
+                round(xd[2]*yd[0] - xd[0]*yd[2], 6),
+                round(xd[0]*yd[1] - xd[1]*yd[0], 6),
+            ]
+            # Compute a point ON the face from the first curve's midpoint in world coords.
+            # sketchOrigin can be far from the face (e.g. at Z=0 for a face at Z=260).
+            first_curve = curves[0] if curves else None
+            if first_curve and first_curve.get("start") and first_curve.get("end"):
+                s = first_curve["start"]
+                e = first_curve["end"]
+                mx, my = (s[0]+e[0])/2, (s[1]+e[1])/2  # midpoint in sketch space
+                plane_info["pointOnFace"] = [
+                    round(origin[0] + mx*xd[0] + my*yd[0], 4),
+                    round(origin[1] + mx*xd[1] + my*yd[1], 4),
+                    round(origin[2] + mx*xd[2] + my*yd[2], 4),
+                ]
+            else:
+                plane_info["origin"] = origin
 
         # Determine sketch creation component.
         # BRepFace sketches: always use root to avoid cross-component
@@ -1045,6 +1264,13 @@ class _Generator:
             plane_code = self._resolve_plane(plane_info)
             if not has_any_body_proj:
                 self._current_sketch_comp = "comp"
+            # Enable coordinate transform for non-BRepFace sketches too
+            # (needed when sketch axes differ from default)
+            if "sketchXDir" in f and "sketchYDir" in f and f["sketchXDir"] and f["sketchYDir"]:
+                f["_coord_transform"] = {
+                    "cap_xdir": f["sketchXDir"],
+                    "cap_ydir": f["sketchYDir"],
+                }
 
         if self._is_rect(curves):
             self._emit_rect_sketch(var, name, plane_code, curves, dims, on_face=is_on_face)
@@ -1094,17 +1320,34 @@ class _Generator:
             sk_var = self.sketches[sketch]
             mn = target_prof["min"]
             mx = target_prof["max"]
-            # Match by area (width × height) — invariant to coordinate transform
-            target_w = abs(mx[0] - mn[0])
-            target_h = abs(mx[1] - mn[1])
-            self._c(f"Match profile by area: {target_w:.2f} x {target_h:.2f}")
+            t_mnx, t_mny = round(mn[0], 4), round(mn[1], 4)
+            t_mxx, t_mxy = round(mx[0], 4), round(mx[1], 4)
+            # Transform captured bbox to actual sketch coordinate space
+            cap_xd = sketch_feat.get("sketchXDir") if sketch_feat else None
+            cap_yd = sketch_feat.get("sketchYDir") if sketch_feat else None
+            if cap_xd and cap_yd:
+                self._c(f"Match profile by bbox (transformed): ({t_mnx}, {t_mny}) to ({t_mxx}, {t_mxy})")
+                self._w(f"_cx = ({cap_xd[0]}, {cap_xd[1]}, {cap_xd[2]})")
+                self._w(f"_cy = ({cap_yd[0]}, {cap_yd[1]}, {cap_yd[2]})")
+                self._w(f"_ax = {sk_var}.xDirection")
+                self._w(f"_ay = {sk_var}.yDirection")
+                self._w(f"_m00 = _cx[0]*_ax.x + _cx[1]*_ax.y + _cx[2]*_ax.z")
+                self._w(f"_m01 = _cy[0]*_ax.x + _cy[1]*_ax.y + _cy[2]*_ax.z")
+                self._w(f"_m10 = _cx[0]*_ay.x + _cx[1]*_ay.y + _cx[2]*_ay.z")
+                self._w(f"_m11 = _cy[0]*_ay.x + _cy[1]*_ay.y + _cy[2]*_ay.z")
+                self._w(f"_t1 = ({t_mnx}*_m00 + {t_mny}*_m01, {t_mnx}*_m10 + {t_mny}*_m11)")
+                self._w(f"_t2 = ({t_mxx}*_m00 + {t_mxy}*_m01, {t_mxx}*_m10 + {t_mxy}*_m11)")
+                self._w(f"_t_mnx, _t_mny = min(_t1[0], _t2[0]), min(_t1[1], _t2[1])")
+                self._w(f"_t_mxx, _t_mxy = max(_t1[0], _t2[0]), max(_t1[1], _t2[1])")
+                t_ref = ("_t_mnx", "_t_mny", "_t_mxx", "_t_mxy")
+            else:
+                self._c(f"Match profile by bbox: ({t_mnx}, {t_mny}) to ({t_mxx}, {t_mxy})")
+                t_ref = (f"({t_mnx})", f"({t_mny})", f"({t_mxx})", f"({t_mxy})")
             self._w(f"_best_pi, _best_d = 0, 1e10")
             self._w(f"for _pi in range({sk_var}.profiles.count):")
             self.ind += 1
             self._w(f"_bb = {sk_var}.profiles.item(_pi).boundingBox")
-            self._w(f"_w = abs(_bb.maxPoint.x - _bb.minPoint.x)")
-            self._w(f"_h = abs(_bb.maxPoint.y - _bb.minPoint.y)")
-            self._w(f"_d = abs(_w - {round(target_w, 4)}) + abs(_h - {round(target_h, 4)})")
+            self._w(f"_d = abs(_bb.minPoint.x - {t_ref[0]}) + abs(_bb.minPoint.y - {t_ref[1]}) + abs(_bb.maxPoint.x - {t_ref[2]}) + abs(_bb.maxPoint.y - {t_ref[3]})")
             self._w(f"if _d < _best_d: _best_pi, _best_d = _pi, _d")
             self.ind -= 1
             prof = f"{sk_var}.profiles.item(_best_pi)"
@@ -1151,6 +1394,19 @@ class _Generator:
         elif not participants and op in ("Cut", "Join") and bodies:
             # Infer participants from affected bodies when not explicitly captured
             self._w(f"inp.participantBodies = {self._body_list(bodies)}")
+        elif not participants and op in ("Cut", "Join") and not bodies:
+            # No participants and no bodies captured — infer from sketch plane.
+            # If the sketch is on a BRepFace, the face's body is the likely participant.
+            sketch_feat = None
+            for tf in self.cap.get("timeline", []):
+                if tf.get("type") == "Sketch" and tf.get("name") == sketch:
+                    sketch_feat = tf
+            if sketch_feat:
+                sk_plane = sketch_feat.get("plane", {})
+                if sk_plane.get("type") == "BRepFace" and sk_plane.get("body"):
+                    plane_body = sk_plane["body"]
+                    pb_ref = self._body_ref(plane_body)
+                    self._w(f"if {pb_ref}: inp.participantBodies = [{pb_ref}]")
 
         self._w(f"{fvar} = comp.features.extrudeFeatures.add(inp)")
         self._w(f'{fvar}.name = "{name}"')
@@ -1162,6 +1418,9 @@ class _Generator:
                 # Avoid collision with feature variable
                 if bv == fvar:
                     bv = bv + "_b"
+                # Track overwritten body variable for duplicate-name bodies
+                if bn in self.bodies and self.bodies[bn] != bv:
+                    self._prev_bodies[bn] = self.bodies[bn]
                 self.bodies[bn] = bv
                 self._w(f"{bv} = {fvar}.bodies.item({i})")
                 self._w(f'{bv}.name = "{bn}"')
@@ -1169,6 +1428,8 @@ class _Generator:
             bv = self._var(name)
             if bv == fvar:
                 bv = bv + "_b"
+            if name in self.bodies and self.bodies[name] != bv:
+                self._prev_bodies[name] = self.bodies[name]
             self.bodies[name] = bv
             self._w(f"{bv} = {fvar}.bodies.item(0)")
             self._w(f'{bv}.name = "{name}"')
@@ -1225,13 +1486,83 @@ class _Generator:
             self._c(f"TODO: sketch '{sketch_name}' not tracked")
             prof_code = "None"
         elif pcoll_count > 1:
-            # Multi-profile sweep: match profiles by bounding box dimensions
+            # Multi-profile sweep: match profiles by bounding box
             # from the capture data. This handles profile count/ordering changes
             # from BRepFace→find_face conversion.
             pdims = f.get("profileDims", [])
+            # Look up sketch's captured profiles for full bounding box data
+            sketch_feat = None
+            feat_idx = f.get("index", len(self.cap.get("timeline", [])))
+            for ti, tf in enumerate(self.cap.get("timeline", [])):
+                if ti >= feat_idx:
+                    break
+                if tf.get("type") == "Sketch" and tf.get("name") == sketch_name:
+                    sketch_feat = tf
+            cap_profiles = sketch_feat.get("profiles", []) if sketch_feat else []
+            # Try to resolve full bounding boxes for each profileDims entry
+            pd_bboxes = []
+            if pdims and cap_profiles:
+                for pd in pdims:
+                    tw, th = pd[0], pd[1]
+                    best_cp, best_d = None, 1e10
+                    for cp in cap_profiles:
+                        cpw = abs(cp["max"][0] - cp["min"][0])
+                        cph = abs(cp["max"][1] - cp["min"][1])
+                        d = abs(cpw - tw) + abs(cph - th)
+                        if d < best_d:
+                            best_d = d
+                            best_cp = cp
+                    pd_bboxes.append(best_cp if best_cp and best_d < 0.01 else None)
+            use_bbox = pd_bboxes and all(b is not None for b in pd_bboxes)
+            # Get sketch axes for coordinate transform
+            cap_xd = sketch_feat.get("sketchXDir") if sketch_feat else None
+            cap_yd = sketch_feat.get("sketchYDir") if sketch_feat else None
             self._w("sweep_profs = adsk.core.ObjectCollection.create()")
-            if pdims:
-                # Match by target dimensions
+            if use_bbox:
+                # Full bounding box matching — distinguishes profiles by position
+                if cap_xd and cap_yd:
+                    # Transform captured bbox to actual sketch coordinate space
+                    self._w(f"_cx = ({cap_xd[0]}, {cap_xd[1]}, {cap_xd[2]})")
+                    self._w(f"_cy = ({cap_yd[0]}, {cap_yd[1]}, {cap_yd[2]})")
+                    self._w(f"_ax = {sk_var}.xDirection")
+                    self._w(f"_ay = {sk_var}.yDirection")
+                    self._w(f"_m00 = _cx[0]*_ax.x + _cx[1]*_ax.y + _cx[2]*_ax.z")
+                    self._w(f"_m01 = _cy[0]*_ax.x + _cy[1]*_ax.y + _cy[2]*_ax.z")
+                    self._w(f"_m10 = _cx[0]*_ay.x + _cx[1]*_ay.y + _cx[2]*_ay.z")
+                    self._w(f"_m11 = _cy[0]*_ay.x + _cy[1]*_ay.y + _cy[2]*_ay.z")
+                self._w("_target_bboxes = [")
+                self.ind += 1
+                for bb in pd_bboxes:
+                    mn, mx = bb["min"], bb["max"]
+                    self._w(f"({round(mn[0], 4)}, {round(mn[1], 4)}, {round(mx[0], 4)}, {round(mx[1], 4)}),")
+                self.ind -= 1
+                self._w("]")
+                self._w("_used = set()")
+                self._w("for _c_mnx, _c_mny, _c_mxx, _c_mxy in _target_bboxes:")
+                self.ind += 1
+                if cap_xd and cap_yd:
+                    self._w("_t1 = (_c_mnx*_m00 + _c_mny*_m01, _c_mnx*_m10 + _c_mny*_m11)")
+                    self._w("_t2 = (_c_mxx*_m00 + _c_mxy*_m01, _c_mxx*_m10 + _c_mxy*_m11)")
+                    self._w("_mnx, _mny = min(_t1[0], _t2[0]), min(_t1[1], _t2[1])")
+                    self._w("_mxx, _mxy = max(_t1[0], _t2[0]), max(_t1[1], _t2[1])")
+                else:
+                    self._w("_mnx, _mny, _mxx, _mxy = _c_mnx, _c_mny, _c_mxx, _c_mxy")
+                self._w("_best_pi, _best_d = -1, 1e10")
+                self._w(f"for _pi in range({sk_var}.profiles.count):")
+                self.ind += 1
+                self._w("if _pi not in _used:")
+                self.ind += 1
+                self._w(f"_bb = {sk_var}.profiles.item(_pi).boundingBox")
+                self._w(f"_d = abs(_bb.minPoint.x - _mnx) + abs(_bb.minPoint.y - _mny) + abs(_bb.maxPoint.x - _mxx) + abs(_bb.maxPoint.y - _mxy)")
+                self._w(f"if _d < _best_d: _best_pi, _best_d = _pi, _d")
+                self.ind -= 2
+                self._w(f"if _best_pi >= 0:")
+                self.ind += 1
+                self._w(f"sweep_profs.add({sk_var}.profiles.item(_best_pi))")
+                self._w(f"_used.add(_best_pi)")
+                self.ind -= 2
+            elif pdims:
+                # Fallback: match by dimensions only (when sketch profiles lack bounding box data)
                 self._w("_target_dims = [")
                 self.ind += 1
                 for pd in pdims:
@@ -1472,14 +1803,14 @@ class _Generator:
             self._w()
             self._c(f"Multi-tool split workaround: expected {n_expected} pieces from 1 body")
             self._c(f"API only supports 1 tool per split — try additional planes")
-            self._w(f"_pre_count = root.bRepBodies.count")
-            self._w(f"_need = {n_expected} - (root.bRepBodies.count - _pre_count + 2)")
+            self._w(f"_pre_count = comp.bRepBodies.count")
+            self._w(f"_need = {n_expected} - (comp.bRepBodies.count - _pre_count + 2)")
             self._c(f"2 = minimum pieces from first split")
             # Count actual pieces from input body
             self._w(f"_got = 0")
-            self._w(f"for _bi in range(root.bRepBodies.count):")
+            self._w(f"for _bi in range(comp.bRepBodies.count):")
             self.ind += 1
-            self._w(f"_bn = root.bRepBodies.item(_bi).name")
+            self._w(f"_bn = comp.bRepBodies.item(_bi).name")
             base_esc = input_base.replace('"', '\\"')
             self._w(f'import re as _re')
             self._w(f'if _re.sub(r"(\\s*\\(\\d+\\))+\\s*$", "", _bn) == "{base_esc}": _got += 1')
@@ -1488,34 +1819,26 @@ class _Generator:
             self.ind += 1
             self._c(f"Try each construction plane as supplementary split tool")
             self._w(f"_biggest = None")
-            self._w(f"for _bi in range(root.bRepBodies.count):")
+            self._w(f"for _bi in range(comp.bRepBodies.count):")
             self.ind += 1
-            self._w(f"_b = root.bRepBodies.item(_bi)")
+            self._w(f"_b = comp.bRepBodies.item(_bi)")
             self._w(f'if _re.sub(r"(\\s*\\(\\d+\\))+\\s*$", "", _b.name) == "{base_esc}":')
             self.ind += 1
             self._w(f"if _biggest is None or _b.volume > _biggest.volume: _biggest = _b")
             self.ind -= 2  # back to if _got level
-            # Expected volumes computed at RUNTIME from the ground truth.
-            # We can't reliably get them from capture (removed bodies are gone
-            # from final components). Instead, score each tool by comparing
-            # the sorted volume list against the pre-split state. The correct
-            # tool produces the smallest total volume change beyond the expected
-            # number of pieces.
-            # As a proxy, use the volume of the biggest piece: the correct tool
-            # should produce a biggest piece closest to (total - foot_vol).
             exp_vols = []  # filled at runtime
 
             self._w(f"if _biggest:")
             self.ind += 1
             self._c(f"Try every candidate tool, score by volume match, pick best")
             self._w(f"_tools = []")
-            self._w(f"for _pi in range(root.constructionPlanes.count):")
+            self._w(f"for _pi in range(comp.constructionPlanes.count):")
             self.ind += 1
-            self._w(f"_tools.append(root.constructionPlanes.item(_pi))")
+            self._w(f"_tools.append(comp.constructionPlanes.item(_pi))")
             self.ind -= 1
-            self._w(f"for _bi3 in range(root.bRepBodies.count):")
+            self._w(f"for _bi3 in range(comp.bRepBodies.count):")
             self.ind += 1
-            self._w(f"_bod = root.bRepBodies.item(_bi3)")
+            self._w(f"_bod = comp.bRepBodies.item(_bi3)")
             self._w(f"if _bod != _biggest:")
             self.ind += 1
             self._w(f"for _fi in range(_bod.faces.count):")
@@ -1524,9 +1847,9 @@ class _Generator:
             self.ind -= 3
             self._c(f"Record pre-supplementary volumes to detect new pieces")
             self._w(f"_pre_vols = set()")
-            self._w(f"for _bi4 in range(root.bRepBodies.count):")
+            self._w(f"for _bi4 in range(comp.bRepBodies.count):")
             self.ind += 1
-            self._w(f"_pre_vols.add(round(root.bRepBodies.item(_bi4).volume, 4))")
+            self._w(f"_pre_vols.add(round(comp.bRepBodies.item(_bi4).volume, 4))")
             self.ind -= 1
             self._w(f"_best_tool = None")
             self._w(f"_best_new_vol = 1e10")
@@ -1538,9 +1861,9 @@ class _Generator:
             self._w(f"_sf = comp.features.splitBodyFeatures.add(_si)")
             self._c(f"Find the smallest NEW piece (not in pre-split volumes)")
             self._w(f"_new_min = 1e10")
-            self._w(f"for _bi2 in range(root.bRepBodies.count):")
+            self._w(f"for _bi2 in range(comp.bRepBodies.count):")
             self.ind += 1
-            self._w(f"_bx = root.bRepBodies.item(_bi2)")
+            self._w(f"_bx = comp.bRepBodies.item(_bi2)")
             self._w(f"_bv = round(_bx.volume, 4)")
             self._w(f"if _bv not in _pre_vols and _bv < _new_min: _new_min = _bv")
             self.ind -= 1
@@ -1567,45 +1890,24 @@ class _Generator:
             self.ind -= 1  # end if _got
 
         # Track ALL output bodies by name.
-        # After split, Fusion auto-names pieces (e.g., "Box (1)") which may
-        # differ from the captured final names. Find by name first, then
-        # match remaining by volume (descending) and rename.
+        # After split, Fusion auto-names pieces which differ from captured
+        # end-of-timeline names. Snapshot before/after, then force-rename
+        # ALL bodies in the component to match expected names by volume order.
         self.ind = 1  # Reset: we're inside def run()
-        self._w(f"_found = set()")
+        expected_names = [repr(bn) for bn in bodies]
+        self._w(f"_expected = [{', '.join(expected_names)}]")
+        self._w(f"_all_comp_bodies = [comp.bRepBodies.item(_i) for _i in range(comp.bRepBodies.count)]")
+        self._w(f"_all_comp_bodies.sort(key=lambda b: -b.volume)")
+        self._c(f"Rename all {len(bodies)} bodies in component to match captured names (by volume)")
+        self._w(f"for _i, _nm in enumerate(_expected):")
+        self.ind += 1
+        self._w(f"if _i < len(_all_comp_bodies): _all_comp_bodies[_i].name = _nm")
+        self.ind -= 1
+        # Now resolve body variables by name
         for bn in bodies:
             bv = self._var(bn)
             self.bodies[bn] = bv
-            self._w(f'{bv} = find_body("{bn}")')
-            self._w(f'if {bv}: _found.add("{bn}")')
-        # Rename unmatched bodies
-        unmatched = [bn for bn in bodies if bn not in
-                     {b for b in self.bodies if b in bodies}]
-        if len(bodies) > 1:
-            expected_names = [repr(bn) for bn in bodies]
-            self._w(f"_expected = [{', '.join(expected_names)}]")
-            self._w(f"_missing = [n for n in _expected if n not in _found]")
-            self._w(f"if _missing:")
-            self.ind += 1
-            self._w(f"_unmatched = []")
-            self._w(f"for _bi in range(root.bRepBodies.count):")
-            self.ind += 1
-            self._w(f"_b = root.bRepBodies.item(_bi)")
-            self._w(f"if _b.name not in _found: _unmatched.append(_b)")
-            self.ind -= 1
-            self._w(f"_unmatched.sort(key=lambda b: -b.volume)")
-            self._w(f"_missing.sort(key=lambda n: -max((b.volume for b in _unmatched), default=0) if not any(b.name == n for b in _unmatched) else 0)")
-            self._w(f"for _nm in _missing:")
-            self.ind += 1
-            self._w(f"if _unmatched:")
-            self.ind += 1
-            self._w(f"_ub = _unmatched.pop(0)")
-            self._w(f'_ub.name = _nm')
-            self.ind -= 2  # end if _unmatched + for _nm
-            # Re-resolve after rename (still inside if _missing)
-            for bn in bodies:
-                bv = self._var(bn)
-                self._w(f'if not {bv}: {bv} = find_body("{bn}")')
-            self.ind -= 1  # end if _missing
+            self._w(f'{bv} = find_body("{bn}", comp)')
 
     def _feat_remove(self, f):
         removed = f.get("removedBody", "")
@@ -1679,7 +1981,7 @@ class _Generator:
             self._c(f"TODO: tool bodies not captured ({err})")
             tools_code = "[]"
 
-        self._w(f'combine(root, {tc}, {tools_code}, {op_code}, {keep}, "{name}")')
+        self._w(f'combine(comp, {tc}, {tools_code}, {op_code}, {keep}, "{name}")')
 
     def _feat_fillet(self, f):
         name = f.get("name", "Fillet")
@@ -1928,11 +2230,14 @@ class _Generator:
 
         # Track output bodies — pat.bodies only includes NEW copies, not the original.
         # Filter out bodies already tracked (the original input body).
+        # Also rename pattern bodies to match captured names so downstream
+        # find_body() calls work (scratch doc has different auto-numbering).
         new_bodies = [bn for bn in bodies if bn not in self.bodies]
         for i, bn in enumerate(new_bodies):
             bv = self._var(bn)
             self.bodies[bn] = bv
             self._w(f'{bv} = {var}.bodies.item({i})')
+            self._w(f'{bv}.name = "{bn}"')
 
     def _feat_constructionaxis(self, f):
         name = f.get("name", "Axis")
@@ -2147,13 +2452,29 @@ class _Generator:
                     if bname not in _body_proj_done:
                         _body_proj_done.add(bname)
                         _has_body_projs = True
-                        bv = self._body_ref(bname)
                         pvar = f"_proj_body_{self._var(bname)}"
                         method = pf.get("method", "project")
                         if method == "intersect":
+                            # Collect ALL proxied bodies with this name across
+                            # all occurrences — multiple components may have a
+                            # body with the same name. The intersection only
+                            # produces curves for bodies that actually cross
+                            # the sketch plane.
                             self._c(f"Intersect body '{bname}' with sketch plane")
-                            self._w(f"{pvar} = {var}.intersectWithSketchPlane([{bv}])")
+                            bodies_var = f"_bodies_{self._var(bname)}"
+                            self._w(f"{bodies_var} = []")
+                            self._w(f"for _occ in root.allOccurrences:")
+                            self.ind += 1
+                            self._w(f"for _bi in range(_occ.bRepBodies.count):")
+                            self.ind += 1
+                            self._w(f'if _occ.bRepBodies.item(_bi).name == "{bname}":')
+                            self.ind += 1
+                            self._w(f"{bodies_var}.append(_occ.bRepBodies.item(_bi))")
+                            self.ind -= 3
+                            self._w(f"if {bodies_var}: {pvar} = {var}.intersectWithSketchPlane({bodies_var})")
                         else:
+                            # For project, use find_body (first match)
+                            bv = f'find_body("{bname}")'
                             self._c(f"Project body '{bname}'")
                             self._w(f"{pvar} = {var}.project({bv})")
 
@@ -2183,6 +2504,10 @@ class _Generator:
             self._w(f"_d = abs(_px - x) + abs(_py - y)")
             self._w(f"if _d < best_d: best, best_d = _sp, _d")
             self.ind -= 1
+            self._w(f"if best is None:")
+            self.ind += 1
+            self._w(f"best = {var}.sketchPoints.add(P(x, y, 0))")
+            self.ind -= 1
             self._w(f"return best")
             self.ind -= 1
             self._w()
@@ -2194,6 +2519,10 @@ class _Generator:
             self._w(f"_d = min(abs(_sx-sx)+abs(_sy-sy)+abs(_ex-ex)+abs(_ey-ey),")
             self._w(f"        abs(_sx-ex)+abs(_sy-ey)+abs(_ex-sx)+abs(_ey-sy))")
             self._w(f"if _d < best_d: best, best_d = _c, _d")
+            self.ind -= 1
+            self._w(f"if best is None:")
+            self.ind += 1
+            self._w(f"best = {var}.sketchCurves.sketchLines.addByTwoPoints(P(sx, sy, 0), P(ex, ey, 0))")
             self.ind -= 1
             self._w(f"return best")
             self.ind -= 1
@@ -2585,10 +2914,7 @@ class _Generator:
                     return f"{cv}.endSketchPoint"
                 elif role == "center":
                     return f"{cv}.centerSketchPoint"
-            # Fallback: position-based
-            pos = ref.get("position")
-            if pos:
-                return f"P({pos[0]}, {pos[1]}, 0)  # TODO: find matching sketch point"
+            # Fallback: unresolvable sketch point — return None to skip constraint
             return None
 
         if rtype in ("SketchLine", "SketchArc", "SketchCircle"):

@@ -207,12 +207,11 @@ def _compare_body(label, exp, act, tolerance_pct):
                     bb_ok = False
 
     vol_ok = delta_pct <= tolerance_pct
-    if vol_ok:
-        # Volume matches — accept even if bb differs (name swap from mirror)
-        if not bb_ok:
-            msgs.append(f"  + {label}: vol={exp_v:.4f} ({delta_pct:.3f}%) (bb differs, likely name swap)")
-        else:
-            msgs.append(f"  + {label}: vol={exp_v:.4f} ({delta_pct:.3f}%)")
+    if vol_ok and bb_ok:
+        msgs.append(f"  + {label}: vol={exp_v:.4f} ({delta_pct:.3f}%)")
+    elif vol_ok and not bb_ok:
+        msgs.append(f"  x {label}: vol={exp_v:.4f} ({delta_pct:.3f}%), bb mismatch")
+        ok = False
     else:
         parts = [f"vol {exp_v:.4f}->{act_v:.4f} ({delta_pct:.2f}%)"]
         if not bb_ok:
@@ -613,6 +612,10 @@ def incremental_build(capture, ground_truth, verbose=False):
             # Generate per-feature script
             script = generate_feature_script(capture, fi, trial_choices)
 
+            # Save for debugging
+            with open(f"/tmp/_sb_feat{fi}.py", "w") as _dbg:
+                _dbg.write(script)
+
             # Execute on scratch doc
             t0 = time.time()
             try:
@@ -633,7 +636,7 @@ def incremental_build(capture, ground_truth, verbose=False):
                     return choices, errors
 
             if result.get("isError"):
-                msg = result.get("content", [{}])[0].get("text", "?")[:150]
+                msg = result.get("content", [{}])[0].get("text", "?")[:2000]
                 print(f"SCRIPT ERROR ({dt:.1f}s): {msg}")
                 if is_ambiguous:
                     tl_after = get_timeline_count()
@@ -810,6 +813,23 @@ def main():
 
     # ── Collect ground truth ──
     if not args.skip_ground_truth:
+        # Ensure source document is active (ground truth reads its timeline)
+        src_name = capture.get("designName", "")
+        if src_name:
+            try:
+                list_result = mcp("manage_documents", action="list")
+                docs = json.loads(list_result["content"][0]["text"])
+                active = next((d for d in docs if d["isActive"]), None)
+                if active and active["name"] != src_name:
+                    src_doc = next((d for d in docs if d["name"] == src_name), None)
+                    if src_doc:
+                        print(f"Activating source document: {src_name}")
+                        mcp("manage_documents", action="activate", index=src_doc["index"])
+                    else:
+                        print(f"WARNING: Source document '{src_name}' not open — "
+                              f"ground truth may fail")
+            except Exception as e:
+                print(f"WARNING: Could not check documents: {e}")
         ground_truth = collect_ground_truth(capture, verbose=args.verbose)
     else:
         print("\nSkipping per-feature ground truth (build-only mode)")
