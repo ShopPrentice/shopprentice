@@ -1,6 +1,6 @@
 # AutoFusion Script Generator — Developer Workflow
 
-When working on the search-based script builder (`tools/search_build.py`) or the script generator (`addin/tools/_script_generator.py`), follow these rules strictly.
+When working on the search-based script builder (`tools/search_build.py`) or the script generator (`addin/tools/_script_generator/`), follow these rules strictly.
 
 ## Document Safety — ABSOLUTE RULES
 
@@ -45,14 +45,14 @@ When the search builder stops at a feature, follow this decision tree:
 | Category | Signs | Fix Location |
 |----------|-------|-------------|
 | **Missing capture data** | Feature field is empty/None, edges=[], bodies=[] | `_capture_helpers.py` |
-| **Wrong entity resolution** | `NoneType` error, wrong body/sketch found | `_script_generator.py` → `_rebuild_entity_context` |
-| **Coordinate mismatch** | Correct shape but wrong position/orientation | `_script_generator.py` → `_coord_transform`, `_xf` |
-| **Cross-component context** | "not in assembly context" error | `_script_generator.py` → `find_body` proxy, `sketch_comp` |
-| **Dimension/constraint conflict** | "over-constrained", "already has dimension" | `_script_generator.py` → try/except guards, constraint order |
+| **Wrong entity resolution** | `NoneType` error, wrong body/sketch found | `_core.py` → `_rebuild_entity_context` |
+| **Coordinate mismatch** | Correct shape but wrong position/orientation | `_feat_sketch.py` → `_coord_transform`, `_xf` |
+| **Cross-component context** | "not in assembly context" error | `_base.py` → `find_body` proxy, `_feat_sketch.py` → `sketch_comp` |
+| **Dimension/constraint conflict** | "over-constrained", "already has dimension" | `_feat_sketch.py` → try/except guards, constraint order |
 | **API limitation** | All variants fail, geometry looks correct visually | Check UI vs API — file Autodesk forum issue |
-| **Missing search variant** | Best variant has >0% error, correct option not tried | `_script_generator.py` → `_*_variants()` methods |
-| **Profile selection** | Wrong profile index, extrude creates wrong body | `_script_generator.py` → profile bbox matching |
-| **Body naming** | Bodies exist but with wrong names (split/rename) | `_script_generator.py` → `_fixup_split_body_names`, rename logic |
+| **Missing search variant** | Best variant has >0% error, correct option not tried | `_variants.py` → `_*_variants()` methods |
+| **Profile selection** | Wrong profile index, extrude creates wrong body | `_feat_extrude.py` → profile bbox matching |
+| **Body naming** | Bodies exist but with wrong names (split/rename) | `_core.py` → `_fixup_split_body_names`, rename logic |
 | **New feature type** | "TODO: Unsupported feature type" | Add `_feat_<type>` emitter |
 
 ### 3. Capture Issues — What to Check
@@ -126,7 +126,7 @@ Create a fixture in `tests/fixtures/` when:
 ```
 1. Run search_build on saved capture: --capture /tmp/<name>_capture.json
 2. Feature N fails → identify category from decision tree above
-3. Fix in _capture_helpers.py or _script_generator.py
+3. Fix in _capture_helpers.py or _script_generator/ package
 4. reload_addin (if capture fix)
 5. Run round-trip tests: python tests/test_round_trip.py (must stay 21/21)
 6. Re-run search_build with --capture (reuse saved capture)
