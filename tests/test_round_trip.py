@@ -44,8 +44,11 @@ def mcp(tool, **args):
     return resp["result"]
 
 
+BB_TOLERANCE_CM = 0.05  # bounding box tolerance in cm
+
+
 def get_bodies(capture_result):
-    """Extract {name: volume} from capture_design result."""
+    """Extract {name: {volume, boundingBox}} from capture_design result."""
     text = capture_result["content"][0]["text"]
     data = json.loads(text)
 
@@ -55,7 +58,10 @@ def get_bodies(capture_result):
             name = b.get("name", "?")
             vol = b.get("volume")
             if vol is not None:
-                bodies[name] = vol
+                bodies[name] = {
+                    "volume": vol,
+                    "boundingBox": b.get("boundingBox", {}),
+                }
         for child in comp.get("children", []):
             walk(child)
     walk(data["components"])
@@ -128,7 +134,7 @@ def run_fixture(name, fixture_path, verbose=False):
     dt = time.time() - t0
     details["steps"].append({"step": "capture_original", "time": round(dt, 1)})
     original_bodies = get_bodies(orig_cap)
-    details["originalBodies"] = original_bodies
+    details["originalBodies"] = {n: b["volume"] for n, b in original_bodies.items()}
     print(f"    Bodies: {list(original_bodies.keys())}")
 
     if not original_bodies:
@@ -181,41 +187,67 @@ def run_fixture(name, fixture_path, verbose=False):
     dt = time.time() - t0
     details["steps"].append({"step": "capture_replica", "time": round(dt, 1)})
     replica_bodies = get_bodies(replica_cap)
-    details["replicaBodies"] = replica_bodies
+    details["replicaBodies"] = {n: b["volume"] for n, b in replica_bodies.items()}
 
-    # Compare volumes
-    print(f"\n  Volume comparison:")
+    # Compare volumes and bounding boxes
+    print(f"\n  Volume + bbox comparison:")
     passed = True
     comparisons = []
 
-    for bname, orig_vol in sorted(original_bodies.items()):
-        rep_vol = replica_bodies.get(bname)
-        if rep_vol is None:
-            # Try matching by position: body may have different name
+    for bname, orig in sorted(original_bodies.items()):
+        orig_vol = orig["volume"]
+        rep = replica_bodies.get(bname)
+        if rep is None:
             print(f"    {bname}: MISSING in replica")
             passed = False
             comparisons.append({"body": bname, "original": orig_vol, "replica": None, "status": "MISSING"})
         else:
+            rep_vol = rep["volume"]
             if orig_vol == 0:
                 delta_pct = 0 if rep_vol == 0 else 100
             else:
                 delta_pct = abs(rep_vol - orig_vol) / abs(orig_vol) * 100
-            status = "OK" if delta_pct < TOLERANCE_PCT else "FAIL"
+            vol_ok = delta_pct < TOLERANCE_PCT
+
+            # Bounding box check
+            orig_bb = orig.get("boundingBox", {})
+            rep_bb = rep.get("boundingBox", {})
+            bb_ok = True
+            bb_delta = 0.0
+            if orig_bb and rep_bb:
+                for key in ("min", "max"):
+                    op = orig_bb.get(key, [0, 0, 0])
+                    rp = rep_bb.get(key, [0, 0, 0])
+                    for i in range(3):
+                        d = abs(op[i] - rp[i])
+                        bb_delta = max(bb_delta, d)
+                        if d > BB_TOLERANCE_CM:
+                            bb_ok = False
+
+            if vol_ok and bb_ok:
+                status = "OK"
+            elif vol_ok and not bb_ok:
+                status = "BBOX_FAIL"
+            else:
+                status = "FAIL"
+
             sym = "✓" if status == "OK" else "✗"
-            print(f"    {sym} {bname}: {orig_vol:.4f} → {rep_vol:.4f} ({delta_pct:.3f}%) {status}")
-            if status == "FAIL":
+            bb_str = f" bb={bb_delta:.4f}cm" if orig_bb and rep_bb else ""
+            print(f"    {sym} {bname}: {orig_vol:.4f} → {rep_vol:.4f} ({delta_pct:.3f}%){bb_str} {status}")
+            if status != "OK":
                 passed = False
             comparisons.append({
                 "body": bname, "original": orig_vol, "replica": rep_vol,
-                "deltaPct": round(delta_pct, 4), "status": status,
+                "deltaPct": round(delta_pct, 4), "bbDelta": round(bb_delta, 4),
+                "bbStatus": "OK" if bb_ok else "FAIL", "status": status,
             })
 
     # Check for extra bodies in replica
     for bname in sorted(replica_bodies.keys()):
         if bname not in original_bodies:
-            print(f"    + {bname}: EXTRA body in replica (vol={replica_bodies[bname]:.4f})")
+            print(f"    + {bname}: EXTRA body in replica (vol={replica_bodies[bname]['volume']:.4f})")
             passed = False
-            comparisons.append({"body": bname, "replica": replica_bodies[bname], "status": "EXTRA"})
+            comparisons.append({"body": bname, "replica": replica_bodies[bname]["volume"], "status": "EXTRA"})
 
     details["comparisons"] = comparisons
 

@@ -74,6 +74,39 @@ def _capture_snapshot(design):
             walk(occ.component, comp_name + "/")
 
     walk(design.rootComponent)
+
+    # Body volumes for sandbox validation
+    body_volumes = {}
+    def walk_volumes(comp):
+        for bi in range(comp.bRepBodies.count):
+            body = comp.bRepBodies.item(bi)
+            try:
+                body_volumes[body.name] = round(body.volume, 4)
+            except:
+                pass
+        for occ in comp.occurrences:
+            walk_volumes(occ.component)
+    walk_volumes(design.rootComponent)
+    snapshot["bodyVolumes"] = body_volumes
+
+    # Body bounding boxes for position validation
+    body_bboxes = {}
+    def walk_bboxes(comp):
+        for bi in range(comp.bRepBodies.count):
+            body = comp.bRepBodies.item(bi)
+            try:
+                bb = body.boundingBox
+                body_bboxes[body.name] = {
+                    "min": [round(bb.minPoint.x, 4), round(bb.minPoint.y, 4), round(bb.minPoint.z, 4)],
+                    "max": [round(bb.maxPoint.x, 4), round(bb.maxPoint.y, 4), round(bb.maxPoint.z, 4)],
+                }
+            except:
+                pass
+        for occ in comp.occurrences:
+            walk_bboxes(occ.component)
+    walk_bboxes(design.rootComponent)
+    snapshot["bodyBoundingBoxes"] = body_bboxes
+
     return snapshot
 
 

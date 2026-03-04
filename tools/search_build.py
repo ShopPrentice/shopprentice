@@ -119,6 +119,19 @@ def get_body_volumes_from_sandbox(sandbox_result):
     return snapshot.get("bodyVolumes", {})
 
 
+def get_body_state_from_sandbox(sandbox_result):
+    """Extract {name: {volume, boundingBox}} from sandbox result."""
+    if sandbox_result.get("isError"):
+        return None
+    snapshot = sandbox_result.get("snapshot", {})
+    vols = snapshot.get("bodyVolumes", {})
+    bboxes = snapshot.get("bodyBoundingBoxes", {})
+    return {
+        name: {"volume": vol, "boundingBox": bboxes.get(name, {})}
+        for name, vol in vols.items()
+    }
+
+
 BB_TOLERANCE_CM = 0.05  # bounding box tolerance in cm (mirrors can shift slightly)
 
 
@@ -157,16 +170,15 @@ def states_match(expected, actual, tolerance_pct=None):
         else:
             unmatched_expected[name] = exp
 
-    # Pass 2: fuzzy match by volume for split-renamed bodies
+    # Pass 2: fuzzy match by geometry (volume + bbox) for split-renamed bodies
     unmatched_actual = {n: v for n, v in actual.items() if n not in matched_actual}
     for exp_name, exp in list(unmatched_expected.items()):
-        best_name, best_pct = None, float("inf")
+        best_name, best_dist = None, float("inf")
         for act_name, act in unmatched_actual.items():
-            exp_v, act_v = exp["volume"], act["volume"]
-            pct = abs(act_v - exp_v) / abs(exp_v) * 100 if exp_v != 0 else (0 if act_v == 0 else 100)
-            if pct < best_pct:
-                best_pct, best_name = pct, act_name
-        if best_name is not None and best_pct <= tolerance_pct:
+            d = _body_distance(exp, act)
+            if d < best_dist:
+                best_dist, best_name = d, act_name
+        if best_name is not None and best_dist < 150:  # reasonable threshold
             act = unmatched_actual.pop(best_name)
             del unmatched_expected[exp_name]
             ok, msgs = _compare_body(f"{exp_name} ~> {best_name}", exp, act, tolerance_pct)
@@ -221,34 +233,52 @@ def _compare_body(label, exp, act, tolerance_pct):
     return ok, msgs
 
 
+def _body_distance(exp, act):
+    """Combined volume + bbox distance score for one body pair."""
+    exp_v, act_v = exp["volume"], act["volume"]
+    if exp_v != 0:
+        score = abs(act_v - exp_v) / abs(exp_v) * 100
+    elif act_v != 0:
+        score = 100
+    else:
+        score = 0
+    # Add bbox penalty (scale: 1 cm offset ≈ 10 points)
+    exp_bb = exp.get("boundingBox", {})
+    act_bb = act.get("boundingBox", {})
+    if exp_bb and act_bb:
+        for key in ("min", "max"):
+            ep = exp_bb.get(key, [0, 0, 0])
+            ap = act_bb.get(key, [0, 0, 0])
+            for i in range(3):
+                score += abs(ep[i] - ap[i]) * 10
+    return score
+
+
 def state_error(expected, actual):
-    """Aggregate error score from body state comparison (lower is better)."""
+    """Aggregate error score from body state comparison (lower is better).
+
+    Uses _body_distance (volume + bbox) for both scoring and fuzzy pairing.
+    """
     if actual is None:
         return float("inf")
     # Body count mismatch penalty
     score = abs(len(expected) - len(actual)) * 100
     remaining = dict(actual)
     for name, exp_body in expected.items():
-        exp = exp_body["volume"]
         act_body = remaining.pop(name, None)
         if act_body is None:
-            # Fuzzy match
-            best_n, best_pct = None, float("inf")
+            # Fuzzy match by combined vol+bbox distance
+            best_n, best_score = None, float("inf")
             for rn, rb in remaining.items():
-                rv = rb["volume"]
-                pct = abs(rv - exp) / abs(exp) * 100 if exp != 0 else (0 if rv == 0 else 100)
-                if pct < best_pct:
-                    best_pct, best_n = pct, rn
-            if best_n is not None and best_pct < 50:
+                s = _body_distance(exp_body, rb)
+                if s < best_score:
+                    best_score, best_n = s, rn
+            if best_n is not None and best_score < 150:
                 act_body = remaining.pop(best_n)
             else:
                 score += 100
                 continue
-        act = act_body["volume"]
-        if exp != 0:
-            score += abs(act - exp) / abs(exp) * 100
-        elif act != 0:
-            score += 100
+        score += _body_distance(exp_body, act_body)
     return score
 
 
@@ -726,9 +756,7 @@ def final_validate(script, expected_state, verbose=False):
         print(f"FAIL: Script error ({dt:.1f}s): {msg}")
         return False
 
-    actual_vols = get_body_volumes_from_sandbox(result)
-    # Convert to state format for comparison
-    actual = {n: {"volume": v, "boundingBox": {}} for n, v in (actual_vols or {}).items()}
+    actual = get_body_state_from_sandbox(result)
     match, details = states_match(expected_state, actual)
 
     for d in details:

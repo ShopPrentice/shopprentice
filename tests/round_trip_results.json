@@ -6,29 +6,29 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.3
+          "time": 1.4
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.4
         }
       ],
       "originalBodies": {
         "Rail": 288.0
       },
-      "exportedLines": 130,
+      "exportedLines": 193,
       "replicaBodies": {
         "Rail": 288.0
       },
@@ -38,6 +38,8 @@
           "original": 288.0,
           "replica": 288.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -50,29 +52,29 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.3
+          "time": 0.6
         },
         {
           "step": "export_script",
-          "time": 0.3
+          "time": 0.6
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.3
+          "time": 0.6
         }
       ],
       "originalBodies": {
         "Board": 210.0
       },
-      "exportedLines": 130,
+      "exportedLines": 195,
       "replicaBodies": {
         "Board": 210.0
       },
@@ -82,6 +84,8 @@
           "original": 210.0,
           "replica": 210.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -94,30 +98,30 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.3
         }
       ],
       "originalBodies": {
         "Base": 160.0,
         "Post": 90.0
       },
-      "exportedLines": 123,
+      "exportedLines": 187,
       "replicaBodies": {
         "Base": 160.0,
         "Post": 90.0
@@ -128,6 +132,8 @@
           "original": 160.0,
           "replica": 160.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -135,6 +141,8 @@
           "original": 90.0,
           "replica": 90.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -151,11 +159,11 @@
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "execute_export",
@@ -163,7 +171,7 @@
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.3
         }
       ],
       "originalBodies": {
@@ -171,7 +179,7 @@
         "Pin (1)": 0.5655,
         "Pin (2)": 0.5655
       },
-      "exportedLines": 93,
+      "exportedLines": 150,
       "replicaBodies": {
         "Pin": 0.5655,
         "Pin (1)": 0.5655,
@@ -183,6 +191,8 @@
           "original": 0.5655,
           "replica": 0.5655,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -190,6 +200,8 @@
           "original": 0.5655,
           "replica": 0.5655,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -197,6 +209,8 @@
           "original": 0.5655,
           "replica": 0.5655,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -209,30 +223,30 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.3
         }
       ],
       "originalBodies": {
         "Plate1": 48.0,
         "Plate2": 48.0
       },
-      "exportedLines": 122,
+      "exportedLines": 187,
       "replicaBodies": {
         "Plate1": 48.0,
         "Plate2": 48.0
@@ -243,6 +257,8 @@
           "original": 48.0,
           "replica": 48.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -250,6 +266,8 @@
           "original": 48.0,
           "replica": 48.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -266,11 +284,11 @@
         },
         {
           "step": "capture_original",
-          "time": 0.3
+          "time": 0.5
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.5
         },
         {
           "step": "execute_export",
@@ -278,14 +296,14 @@
         },
         {
           "step": "capture_replica",
-          "time": 0.3
+          "time": 0.5
         }
       ],
       "originalBodies": {
         "Block": 425.6456,
         "SymBody": 16.0
       },
-      "exportedLines": 159,
+      "exportedLines": 242,
       "replicaBodies": {
         "Block": 425.6456,
         "SymBody": 16.0
@@ -296,6 +314,8 @@
           "original": 425.6456,
           "replica": 425.6456,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -303,6 +323,8 @@
           "original": 16.0,
           "replica": 16.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -315,29 +337,29 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.4
         }
       ],
       "originalBodies": {
         "Beam": 472.7124
       },
-      "exportedLines": 124,
+      "exportedLines": 211,
       "replicaBodies": {
         "Beam": 472.7124
       },
@@ -347,6 +369,8 @@
           "original": 472.7124,
           "replica": 472.7124,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -359,29 +383,29 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.4
         }
       ],
       "originalBodies": {
         "Box": 189.3217
       },
-      "exportedLines": 136,
+      "exportedLines": 181,
       "replicaBodies": {
         "Box": 189.3217
       },
@@ -391,6 +415,8 @@
           "original": 189.3217,
           "replica": 189.3217,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -407,26 +433,26 @@
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "export_script",
-          "time": 0.1
+          "time": 0.3
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.3
         }
       ],
       "originalBodies": {
         "Leg_L": 108.0,
         "Leg_R": 108.0
       },
-      "exportedLines": 109,
+      "exportedLines": 154,
       "replicaBodies": {
         "Leg_L": 108.0,
         "Leg_R": 108.0
@@ -437,6 +463,8 @@
           "original": 108.0,
           "replica": 108.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -444,6 +472,8 @@
           "original": 108.0,
           "replica": 108.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -460,11 +490,11 @@
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "execute_export",
@@ -472,13 +502,13 @@
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.3
         }
       ],
       "originalBodies": {
         "Box": 64.0
       },
-      "exportedLines": 93,
+      "exportedLines": 137,
       "replicaBodies": {
         "Box": 64.0
       },
@@ -488,6 +518,8 @@
           "original": 64.0,
           "replica": 64.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -504,11 +536,11 @@
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "execute_export",
@@ -516,7 +548,7 @@
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.3
         }
       ],
       "originalBodies": {
@@ -525,7 +557,7 @@
         "Peg (2)": 2.3562,
         "Peg (3)": 2.3562
       },
-      "exportedLines": 94,
+      "exportedLines": 152,
       "replicaBodies": {
         "Peg": 2.3562,
         "Peg (1)": 2.3562,
@@ -538,6 +570,8 @@
           "original": 2.3562,
           "replica": 2.3562,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -545,6 +579,8 @@
           "original": 2.3562,
           "replica": 2.3562,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -552,6 +588,8 @@
           "original": 2.3562,
           "replica": 2.3562,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -559,6 +597,8 @@
           "original": 2.3562,
           "replica": 2.3562,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -575,11 +615,11 @@
         },
         {
           "step": "capture_original",
-          "time": 0.4
+          "time": 0.8
         },
         {
           "step": "export_script",
-          "time": 0.4
+          "time": 0.8
         },
         {
           "step": "execute_export",
@@ -587,7 +627,7 @@
         },
         {
           "step": "capture_replica",
-          "time": 0.4
+          "time": 0.8
         }
       ],
       "originalBodies": {
@@ -596,7 +636,7 @@
         "Domino1": 6.0,
         "Domino2": 6.0
       },
-      "exportedLines": 205,
+      "exportedLines": 314,
       "replicaBodies": {
         "Board": 200.0,
         "Domino0": 6.0,
@@ -609,6 +649,8 @@
           "original": 200.0,
           "replica": 200.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -616,6 +658,8 @@
           "original": 6.0,
           "replica": 6.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -623,6 +667,8 @@
           "original": 6.0,
           "replica": 6.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -630,6 +676,8 @@
           "original": 6.0,
           "replica": 6.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -646,25 +694,25 @@
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.4
         }
       ],
       "originalBodies": {
         "Rail": 297.0
       },
-      "exportedLines": 137,
+      "exportedLines": 226,
       "replicaBodies": {
         "Rail": 297.0
       },
@@ -674,6 +722,8 @@
           "original": 297.0,
           "replica": 297.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -690,11 +740,11 @@
         },
         {
           "step": "capture_original",
-          "time": 0.1
+          "time": 0.2
         },
         {
           "step": "export_script",
-          "time": 0.1
+          "time": 0.2
         },
         {
           "step": "execute_export",
@@ -702,13 +752,13 @@
         },
         {
           "step": "capture_replica",
-          "time": 0.1
+          "time": 0.2
         }
       ],
       "originalBodies": {
         "Arch": 219.3982
       },
-      "exportedLines": 87,
+      "exportedLines": 154,
       "replicaBodies": {
         "Arch": 219.3982
       },
@@ -718,6 +768,8 @@
           "original": 219.3982,
           "replica": 219.3982,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -730,29 +782,29 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.3
         }
       ],
       "originalBodies": {
         "Plank": 360.0
       },
-      "exportedLines": 124,
+      "exportedLines": 188,
       "replicaBodies": {
         "Plank": 360.0
       },
@@ -762,9 +814,55 @@
           "original": 360.0,
           "replica": 360.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
+    }
+  },
+  "fixture_split_body": {
+    "passed": false,
+    "details": {
+      "name": "fixture_split_body",
+      "steps": [
+        {
+          "step": "execute_fixture",
+          "time": 1.3
+        },
+        {
+          "step": "capture_original",
+          "time": 0.5
+        },
+        {
+          "step": "export_script",
+          "time": 0.5
+        },
+        {
+          "step": "execute_export",
+          "time": 0.2
+        }
+      ],
+      "originalBodies": {
+        "Bottom": 24.0,
+        "Middle": 72.0,
+        "Top": 24.0
+      },
+      "exportedLines": 172,
+      "error": "export execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
+    }
+  },
+  "fixture_split_body_FAILED": {
+    "passed": false,
+    "details": {
+      "name": "fixture_split_body_FAILED",
+      "steps": [
+        {
+          "step": "execute_fixture",
+          "time": 0.2
+        }
+      ],
+      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
     }
   },
   "fixture_sweep": {
@@ -774,30 +872,30 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "export_script",
-          "time": 0.1
+          "time": 0.3
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.3
         }
       ],
       "originalBodies": {
         "Rail": 180.0,
         "Bead": 15.708
       },
-      "exportedLines": 118,
+      "exportedLines": 174,
       "replicaBodies": {
         "Rail": 180.0,
         "Bead": 15.708
@@ -808,6 +906,8 @@
           "original": 15.708,
           "replica": 15.708,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -815,6 +915,8 @@
           "original": 180.0,
           "replica": 180.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -827,30 +929,30 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.3
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.3
         }
       ],
       "originalBodies": {
         "Bar": 270.0,
         "Bead": 11.3097
       },
-      "exportedLines": 118,
+      "exportedLines": 174,
       "replicaBodies": {
         "Bar": 270.0,
         "Bead": 11.3097
@@ -861,6 +963,8 @@
           "original": 270.0,
           "replica": 270.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         },
         {
@@ -868,6 +972,8 @@
           "original": 11.3097,
           "replica": 11.3097,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -884,11 +990,11 @@
         },
         {
           "step": "capture_original",
-          "time": 0.1
+          "time": 0.2
         },
         {
           "step": "export_script",
-          "time": 0.1
+          "time": 0.2
         },
         {
           "step": "execute_export",
@@ -896,13 +1002,13 @@
         },
         {
           "step": "capture_replica",
-          "time": 0.1
+          "time": 0.2
         }
       ],
       "originalBodies": {
         "Web": 453.7086
       },
-      "exportedLines": 90,
+      "exportedLines": 133,
       "replicaBodies": {
         "Web": 453.7086
       },
@@ -912,6 +1018,8 @@
           "original": 453.7086,
           "replica": 453.7086,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -924,29 +1032,29 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.4
         }
       ],
       "originalBodies": {
         "Slab": 438.0
       },
-      "exportedLines": 129,
+      "exportedLines": 192,
       "replicaBodies": {
         "Slab": 438.0
       },
@@ -956,6 +1064,8 @@
           "original": 438.0,
           "replica": 438.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
@@ -968,29 +1078,29 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_original",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "export_script",
-          "time": 0.2
+          "time": 0.4
         },
         {
           "step": "execute_export",
-          "time": 1.2
+          "time": 1.3
         },
         {
           "step": "capture_replica",
-          "time": 0.2
+          "time": 0.4
         }
       ],
       "originalBodies": {
         "Post": 231.0
       },
-      "exportedLines": 130,
+      "exportedLines": 193,
       "replicaBodies": {
         "Post": 231.0
       },
@@ -1000,6 +1110,8 @@
           "original": 231.0,
           "replica": 231.0,
           "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
           "status": "OK"
         }
       ]
