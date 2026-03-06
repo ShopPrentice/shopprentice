@@ -311,6 +311,98 @@ ext_input.participantBodies = [target_body]  # Python list, NOT ObjectCollection
 ```
 Using `ObjectCollection` causes `TypeError`. Using no participant bodies causes accidental merging or cutting of adjacent bodies.
 
+### Fillet and Chamfer Features
+
+Phase 3 detail features that soften or break edges. Both require selecting edges from existing bodies — all structural geometry and joinery must be built first.
+
+**API asymmetry (CRITICAL):**
+- **Fillet:** `filletFeatures.createInput()` → `inp.addConstantRadiusEdgeSet(edges, radius, propagate)`
+- **Chamfer:** `chamferFeatures.createInput2()` → `inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(edges, distance, propagate)`
+
+Note: chamfer uses `createInput2()` (not `createInput()`) and has a nested `.chamferEdgeSets` collection before the add method.
+
+#### Edge Selection Strategies
+
+Edges must be selected programmatically. Three patterns by increasing specificity:
+
+**1. All edges of a body** — full-body chamfer/fillet (e.g., lid):
+```python
+edges = adsk.core.ObjectCollection.create()
+for edge in body.edges:
+    edges.add(edge)
+```
+
+**2. Edges at a coordinate** — edge ring at a specific plane (e.g., top edges, bottom edges):
+```python
+edges = adsk.core.ObjectCollection.create()
+target_z = ev("box_height")
+for i in range(body.edges.count):
+    e = body.edges.item(i)
+    sv, ev2 = e.startVertex.geometry, e.endVertex.geometry
+    if abs(sv.z - target_z) < 0.01 and abs(ev2.z - target_z) < 0.01:
+        edges.add(e)
+```
+
+**3. Edges of a face** — when the design intent is "fillet this face" (e.g., seat-to-leg transitions):
+```python
+face = af.find_face(body, "z", +1)  # top face
+edges = adsk.core.ObjectCollection.create()
+added = set()
+for i in range(face.edges.count):
+    edge = face.edges.item(i)
+    if edge.tempId not in added:
+        edges.add(edge)
+        added.add(edge.tempId)
+```
+
+**CRITICAL:** The fillet/chamfer API requires `BRepEdge` objects, never `BRepFace`. When the design intent is "fillet a face," iterate the face's edges and add them. Use `tempId` to deduplicate shared edges between adjacent faces.
+
+#### Chamfer Types
+
+| Type | Method | Use For |
+|------|--------|---------|
+| Equal distance | `addEqualDistanceChamferEdgeSet(edges, dist, propagate)` | Most common — uniform bevel |
+| Two distances | `addTwoDistanceChamferEdgeSet(edges, d1, d2, propagate)` | Asymmetric bevel |
+| Distance + angle | `addDistanceAndAngleChamferEdgeSet(edges, dist, angle, propagate)` | Angled cuts |
+
+#### Code Patterns
+
+```python
+# Fillet — constant radius
+fillet_inp = comp.features.filletFeatures.createInput()
+fillet_inp.addConstantRadiusEdgeSet(
+    edges,
+    adsk.core.ValueInput.createByString("fl_r"),
+    True)  # propagate to tangent edges
+fillet = comp.features.filletFeatures.add(fillet_inp)
+fillet.name = "SeatFillet"
+
+# Chamfer — equal distance
+ch_inp = comp.features.chamferFeatures.createInput2()
+ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+    edges,
+    adsk.core.ValueInput.createByString("ch_d"),
+    True)  # propagate
+ch = comp.features.chamferFeatures.add(ch_inp)
+ch.name = "LidChamfer"
+```
+
+#### Parameters
+
+Use 2-letter prefixes consistent with joinery conventions:
+```python
+params.add("fl_r", VI("0.125 in"), "in", "Fillet radius")
+params.add("ch_d", VI("0.125 in"), "in", "Chamfer distance")
+```
+
+Common woodworking values: fillet 1/16"–1/4" (comfort, softening), chamfer 1/8"–1/4" (visual detail, splinter prevention).
+
+#### Sizing Constraints
+
+- Fillet radius must be less than half the smallest adjacent face dimension — too large and the fillet fails.
+- Chamfer distance must be less than the shortest edge length on any affected face.
+- When in doubt, start small (1/8") and let the user adjust via Change Parameters.
+
 ## Standard Helpers
 
 These reusable helpers form the foundation of the model-coordinate workflow. The caller specifies everything in model coordinates using parameter expressions; the helpers handle all sketch-space complexity.
@@ -722,6 +814,8 @@ Name every feature and body for a readable timeline and easy debugging:
 | Planes | `Part_Pl` or `Feature_Pl` | `Back_Pl`, `BG_Pl`, `LidLip_Pl` |
 | Combines | `Feature_Cut` | `BGL_Cut`, `BGF_Cut` |
 | Joinery | `JointType_Corner_Op` | `DT_FL_Cut`, `DT_BR_Join` |
+| Fillets | `Part_Fil` | `Seat_Fil`, `LidEdge_Fil` |
+| Chamfers | `Part_Ch` | `Lid_Ch`, `LegBottom_Ch` |
 
 ## Verification Checklist
 1. Component tree shows logical grouping (or root-only for small pieces)
@@ -749,6 +843,10 @@ Name every feature and body for a readable timeline and easy debugging:
 | Loose tenon (domino) bodies disappear | Second CUT used `keepTool=False`, consuming the body | Use `keepTool=True` on ALL CUTs for visible loose tenon joints |
 | Rectangle deforms when parameter changes | `addTwoPointRectangle` lacks explicit H/V geometric constraints | Add `addHorizontal`/`addVertical` on all 4 lines after creation. Apply same rule to any sketch line that should stay H or V. |
 | H/V constraint distorts triangle on YZ plane | On YZ planes, model-Y maps to sketch-V and model-Z to sketch-H — opposite of XZ planes. Using `addHorizontal` on a model-horizontal (same-Z) line that's sketch-vertical destroys the profile. | Always check sketch axis mapping via `modelToSketchSpace` before assigning H/V constraints. Swap H↔V for YZ planes. |
+| Chamfer fails with `createInput()` | Chamfer API requires `createInput2()`, not `createInput()` | Always use `chamferFeatures.createInput2()` and the nested `.chamferEdgeSets` collection |
+| Fillet fails — radius too large | Fillet radius exceeds half the smallest adjacent face dimension | Reduce `fl_r`; keep it < half the shortest edge on any affected face |
+| Fillet/chamfer selects wrong edges | Edge coordinate filter matches unintended edges (e.g., groove interior edges) | Add `edge.body.name` check; filter by both coordinate AND body |
+| Fillet API rejects BRepFace | `addConstantRadiusEdgeSet` requires edges, not faces | Iterate `face.edges`, deduplicate via `tempId`, add individual edges |
 
 ## Incremental Build Strategy
 
@@ -760,7 +858,7 @@ Complex furniture (10+ bodies, 3+ joint systems) should be built in phases. Each
 |-------|--------------|
 | 1. Structure | All boards/panels in correct positions, no joinery. Verify orientation and dimensions. |
 | 2. Joinery | Add tenons/tails as bodies, mirrors, patterns, JOINs. Add CUT operations for mortises/sockets. |
-| 3. Details | Chamfers, fillets, decorative elements. |
+| 3. Details | Chamfers, fillets, decorative cutouts. Select edges by coordinate or face (see Fillet and Chamfer Features). Use parametric radius/distance expressions. Always last — geometry must be fully built before edge selection. |
 
 ### Rules
 

@@ -6,19 +6,45 @@ import re
 class _GeometryMixin:
     """Plane resolution, body/component references, BRepFace→cplane conversion."""
 
-    def _resolve_plane(self, plane_info):
+    def _resolve_plane(self, plane_info, consumer_comp=""):
         if not plane_info:
             return "root.xYConstructionPlane"
         ptype = plane_info.get("type")
         pname = plane_info.get("name", "")
 
         if ptype == "ConstructionPlane":
-            if pname in self.planes:
-                return self.planes[pname]
             builtin = {"XY": "root.xYConstructionPlane",
                        "XZ": "root.xZConstructionPlane",
                        "YZ": "root.yZConstructionPlane"}
-            return builtin.get(pname, f'root.xYConstructionPlane  # TODO: "{pname}"')
+            if pname in builtin:
+                return builtin[pname]
+            # Try origin/normal matching against timeline to find correct
+            # component-scoped key (prevents collision when multiple
+            # components have same-named planes)
+            p_origin = plane_info.get("origin")
+            p_normal = plane_info.get("normal")
+            if p_origin and p_normal:
+                for tf in self.cap.get("timeline", []):
+                    if (tf.get("type") == "ConstructionPlane"
+                            and tf.get("name") == pname):
+                        tf_o = tf.get("origin", [])
+                        tf_n = tf.get("normal", [])
+                        if (tf_o and tf_n
+                                and sum(abs(a - b) for a, b in zip(p_origin, tf_o)) < 0.1
+                                and sum(abs(a - b) for a, b in zip(p_normal, tf_n)) < 0.1):
+                            cn = tf.get("component", "")
+                            scoped = f"{cn}:{pname}" if cn else ""
+                            if scoped and scoped in self.planes:
+                                return self.planes[scoped]
+                            break
+            # No origin/normal — try consumer's own component first
+            if consumer_comp:
+                scoped = f"{consumer_comp}:{pname}"
+                if scoped in self.planes:
+                    return self.planes[scoped]
+            if pname in self.planes:
+                return self.planes[pname]
+            return f'root.xYConstructionPlane  # TODO: "{pname}"'
 
         if ptype == "BRepFace":
             body_name = plane_info.get("body", "")
@@ -31,8 +57,6 @@ class _GeometryMixin:
                 return (f'find_face_near({bv}, {round(pof[0], 4)}, '
                         f'{round(pof[1], 4)}, {round(pof[2], 4)}, '
                         f'{round(n[0], 4)}, {round(n[1], 4)}, {round(n[2], 4)})')
-            # No pointOnFace — use find_face_near with origin if available,
-            # or find_face with axis/direction as last resort.
             origin = plane_info.get("origin")
             if origin:
                 n = normal or [0, 0, 0]
@@ -42,11 +66,39 @@ class _GeometryMixin:
             if normal:
                 axis, direction = self._normal_to_axis(normal)
                 return f'find_face({bv}, "{axis}", {direction})'
-            # Last resort: no pointOnFace, no origin, no normal.
-            # Search all bodies for any planar face (None body = search all)
             return f'find_face_near({bv}, 0, 0, 0)'
 
         return "root.xYConstructionPlane"
+
+    def _resolve_plane_proxied(self, plane_info, consumer_comp):
+        """Resolve plane and emit proxy code if it's from a different component.
+
+        consumer_comp: component name of the feature using the plane.
+        Returns the variable/expression to use for the plane.
+        """
+        plane_code = self._resolve_plane(plane_info, consumer_comp)
+
+        # Only proxy user-created construction planes (not builtins, not BRepFace)
+        ptype = plane_info.get("type") if plane_info else None
+        if ptype != "ConstructionPlane":
+            return plane_code
+
+        plane_comp = self._plane_comps.get(plane_code, "")
+        if (plane_comp and consumer_comp
+                and plane_comp != consumer_comp
+                and plane_comp != self._root_name):
+            # Cross-component plane — proxy it through the occurrence
+            proxy_var = f"_{self._var(plane_info.get('name', 'pl'))}_proxy"
+            self._w(f"{proxy_var} = {plane_code}")
+            self._w(f"for _occ in root.allOccurrences:")
+            self.ind += 1
+            self._w(f'if _occ.component.name == "{plane_comp}":')
+            self.ind += 1
+            self._w(f"{proxy_var} = {plane_code}.createForAssemblyContext(_occ); break")
+            self.ind -= 2
+            return proxy_var
+
+        return plane_code
 
     def _normal_to_axis(self, n):
         ax, ay, az = abs(n[0]), abs(n[1]), abs(n[2])
@@ -153,8 +205,29 @@ class _GeometryMixin:
             return self.components[comp_name]
         return "root"
 
-    def _body_ref(self, name):
-        """Get variable reference for a body name, with fallback for renamed bodies."""
+    def _body_ref(self, name, component=None):
+        """Get variable reference for a body name, with fallback for renamed bodies.
+
+        Args:
+            component: If given, look up the body from this specific component
+                       instead of the current feature's component.  When an
+                       explicit component is provided and the scoped lookup fails,
+                       skip unscoped fallback to avoid cross-component collisions.
+        """
+        # Try component-scoped key first (prevents cross-component collision)
+        comp = component or getattr(self, '_current_comp', '')
+        if comp:
+            scoped = f"{comp}:{name}"
+            if scoped in self.bodies:
+                return self.bodies[scoped]
+        # When an explicit component was requested and not found, don't fall back
+        # to unscoped lookup — that would silently resolve to a same-named body
+        # in a different component.  Use component-scoped find_body instead.
+        if component:
+            comp_var = self.components.get(component)
+            if comp_var:
+                return f'find_body("{name}", {comp_var})'
+            return f'find_body("{name}")'
         if name in self.bodies:
             return self.bodies[name]
         # Strip parenthesized suffix: "Leg_NL (1)" → "Leg_NL"

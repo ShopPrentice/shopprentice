@@ -39,6 +39,9 @@ class _VariantsMixin:
         if t == "Sweep":
             return self._sweep_variants(feat)
 
+        if t == "RectangularPattern":
+            return self._rectangularpattern_variants(feat)
+
         # Non-ambiguous: single default variant
         handler = getattr(self, f"_feat_{t.lower()}", None)
         if handler:
@@ -97,9 +100,26 @@ class _VariantsMixin:
         return variants
 
     def _extrude_variants(self, feat):
-        """Generate extrude variants: positive vs negative direction."""
+        """Generate extrude variants: direction flip and/or sequential multi-profile."""
         dist = feat.get("distance", "1 cm")
-        if not (dist.startswith("-(") and dist.endswith(")")):
+        is_negative = dist.startswith("-(") and dist.endswith(")")
+
+        # Detect multi-profile sketch created in ROOT but extruded in a
+        # child component — ObjectCollection may fail with bSet.
+        # Only needed when the sketch is actually in root (not when it's
+        # a _use_native_face sketch created in the component).
+        needs_sequential_variant = False
+        profile_indices = feat.get("profileIndices", [feat.get("profileIndex", 0)])
+        if len(profile_indices) > 1 and self._comp_ref(feat) != "root":
+            sketch_name = feat.get("sketch", "")
+            sketch_comp = feat.get("sketchComponent", feat.get("component", ""))
+            sk_key = f"{sketch_comp}:{sketch_name}" if sketch_comp else sketch_name
+            sk_owner = self._sketch_owners.get(
+                sk_key, self._sketch_owners.get(sketch_name, ""))
+            if sk_owner == "root":
+                needs_sequential_variant = True
+
+        if not is_negative and not needs_sequential_variant:
             # Not ambiguous
             saved = self._save_state()
             with self._capture_output() as lines:
@@ -109,25 +129,37 @@ class _VariantsMixin:
             return [(lines, "default", state)]
 
         variants = []
-        # Variant 0: default (unwrap negative → flip)
+        # Variant 0: default (ObjectCollection for multi, unwrap negative if present)
         saved = self._save_state()
         with self._capture_output() as lines:
             self._feat_extrude(feat)
         state0 = self._save_state()
         self._restore_state(saved)
-        variants.append((lines, "negative-unwrap (default)", state0))
+        variants.append((lines, "default", state0))
 
-        # Variant 1: keep as positive (don't unwrap)
-        f2 = copy.deepcopy(feat)
-        inner = dist[2:-1].strip()
-        f2["distance"] = inner
-        f2["isDirectionFlipped"] = False
-        saved = self._save_state()
-        with self._capture_output() as lines:
-            self._feat_extrude(f2)
-        state1 = self._save_state()
-        self._restore_state(saved)
-        variants.append((lines, "positive (no flip)", state1))
+        if is_negative:
+            # Variant: keep as positive (don't unwrap)
+            f2 = copy.deepcopy(feat)
+            inner = dist[2:-1].strip()
+            f2["distance"] = inner
+            f2["isDirectionFlipped"] = False
+            saved = self._save_state()
+            with self._capture_output() as lines:
+                self._feat_extrude(f2)
+            state1 = self._save_state()
+            self._restore_state(saved)
+            variants.append((lines, "positive (no flip)", state1))
+
+        if needs_sequential_variant:
+            # Variant: sequential single-profile extrudes (avoids bSet error)
+            f2 = copy.deepcopy(feat)
+            f2["_force_sequential"] = True
+            saved = self._save_state()
+            with self._capture_output() as lines:
+                self._feat_extrude(f2)
+            state2 = self._save_state()
+            self._restore_state(saved)
+            variants.append((lines, "sequential multi-profile", state2))
 
         return variants
 
@@ -166,6 +198,37 @@ class _VariantsMixin:
 
         return variants
 
+    def _rectangularpattern_variants(self, feat):
+        """Generate pattern variants: try X, Y, Z axes × flip when direction is unknown."""
+        axis_name = feat.get("axisOne", "")
+        direction = feat.get("directionOne")
+        if direction:
+            # Direction known (with sign) — single default variant
+            saved = self._save_state()
+            with self._capture_output() as lines:
+                self._feat_rectangularpattern(feat)
+            state = self._save_state()
+            self._restore_state(saved)
+            return [(lines, "default", state)]
+
+        # Direction unknown — try all 3 axes × positive/negative distance
+        dist = feat.get("distanceOne", "5 cm")
+        variants = []
+        for axis in ["X", "Y", "Z"]:
+            for neg in [False, True]:
+                f2 = copy.deepcopy(feat)
+                f2["axisOne"] = axis
+                if neg:
+                    f2["distanceOne"] = f"-({dist})"
+                saved = self._save_state()
+                with self._capture_output() as lines:
+                    self._feat_rectangularpattern(f2)
+                state = self._save_state()
+                self._restore_state(saved)
+                desc = f"axis={axis}" + (" neg" if neg else "")
+                variants.append((lines, desc, state))
+        return variants
+
     def _save_state(self):
         """Snapshot mutable generator state for save/restore."""
         return {
@@ -175,6 +238,8 @@ class _VariantsMixin:
             "bodies": dict(self.bodies),
             "feats": dict(self.feats),
             "_brep_face_sketches": dict(self._brep_face_sketches),
+            "_sketch_owners": dict(self._sketch_owners),
+            "_flipped_planes": set(self._flipped_planes),
         }
 
     def _restore_state(self, state):
@@ -185,3 +250,5 @@ class _VariantsMixin:
         self.bodies = dict(state["bodies"])
         self.feats = dict(state["feats"])
         self._brep_face_sketches = dict(state["_brep_face_sketches"])
+        self._sketch_owners = dict(state.get("_sketch_owners", {}))
+        self._flipped_planes = set(state.get("_flipped_planes", set()))

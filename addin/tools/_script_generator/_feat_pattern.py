@@ -21,20 +21,29 @@ class _PatternMixin:
             "Y": "root.yConstructionAxis",
             "Z": "root.zConstructionAxis",
         }
+        negative = False
         if axis_name in axis_map:
             axis_code = axis_map[axis_name]
         elif direction:
-            # Infer axis from direction vector
-            dx, dy, dz = [abs(v) for v in direction]
-            if dx >= dy and dx >= dz:
+            # Infer axis from direction vector (preserving sign)
+            dx, dy, dz = direction
+            adx, ady, adz = abs(dx), abs(dy), abs(dz)
+            if adx >= ady and adx >= adz:
                 axis_code = "root.xConstructionAxis"
-            elif dy >= dx and dy >= dz:
+                negative = dx < 0
+            elif ady >= adx and ady >= adz:
                 axis_code = "root.yConstructionAxis"
+                negative = dy < 0
             else:
                 axis_code = "root.zConstructionAxis"
+                negative = dz < 0
         else:
             axis_code = "root.xConstructionAxis"
             self._c(f"TODO: axis '{axis_name}' not resolved, defaulting to X")
+
+        # Wrap distance for negative direction
+        if negative:
+            dist = f"-({dist})"
 
         # Resolve distance type
         dist_type_code = ("adsk.fusion.PatternDistanceType.SpacingPatternDistanceType"
@@ -69,20 +78,59 @@ class _PatternMixin:
         else:
             self._w("pat_inp.quantityTwo = adsk.core.ValueInput.createByReal(1)")
 
+        # Track output bodies — rename pattern copies to match original names.
+        pattern_copies = f.get("patternCopies", [])
+        if pattern_copies:
+            # pat.bodies API is unreliable — scan comp.bRepBodies for new copies.
+            # Record body names BEFORE pattern creation to find the delta after.
+            self._w("_before_pat = set(comp.bRepBodies.item(_i).name"
+                     " for _i in range(comp.bRepBodies.count))")
+
         self._w(f"{var} = comp.features.rectangularPatternFeatures.add(pat_inp)")
         self._w(f'{var}.name = "{name}"')
         self.feats[name] = var
 
-        # Track output bodies — pat.bodies only includes NEW copies, not the original.
-        # Filter out bodies already tracked (the original input body).
-        # Also rename pattern bodies to match captured names so downstream
-        # find_body() calls work (scratch doc has different auto-numbering).
-        new_bodies = [bn for bn in bodies if bn not in self.bodies]
-        for i, bn in enumerate(new_bodies):
-            bv = self._var(bn)
-            self.bodies[bn] = bv
-            self._w(f'{bv} = {var}.bodies.item({i})')
-            self._w(f'{bv}.name = "{bn}"')
+        if pattern_copies:
+            direction = f.get("directionOne", [1, 0, 0])
+            dx, dy, dz = direction
+            adx, ady, adz = abs(dx), abs(dy), abs(dz)
+            if ady >= adx and ady >= adz:
+                sort_attr = "y"
+                sign = 1 if dy >= 0 else -1
+            elif adz >= adx and adz >= ady:
+                sort_attr = "z"
+                sign = 1 if dz >= 0 else -1
+            else:
+                sort_attr = "x"
+                sign = 1 if dx >= 0 else -1
+            # Find new bodies created by pattern
+            self._w("_pat_copies = []")
+            self._w("for _i in range(comp.bRepBodies.count):")
+            self.ind += 1
+            self._w("_b = comp.bRepBodies.item(_i)")
+            self._w("if _b.name not in _before_pat:")
+            self.ind += 1
+            self._w("_pat_copies.append(_b)")
+            self.ind -= 2
+            self._w(f"_pat_copies.sort(key=lambda _b:"
+                     f" {sign} * getattr(_b.boundingBox.minPoint, '{sort_attr}'))")
+            for i, bn in enumerate(pattern_copies):
+                bv = self._body_var(bn)
+                self._register_body(bn, bv)
+                self._w(f"if {i} < len(_pat_copies):")
+                self.ind += 1
+                self._w(f"{bv} = _pat_copies[{i}]")
+                self._w(f'{bv}.name = "{bn}"')
+                self.ind -= 1
+        else:
+            # Fallback: use pat.bodies directly (works when capture has full list)
+            input_set = set(inputs)
+            new_bodies = [bn for bn in bodies if bn not in input_set]
+            for i, bn in enumerate(new_bodies):
+                bv = self._body_var(bn)
+                self._register_body(bn, bv)
+                self._w(f'{bv} = {var}.bodies.item({i})')
+                self._w(f'{bv}.name = "{bn}"')
 
     def _feat_constructionaxis(self, f):
         name = f.get("name", "Axis")

@@ -37,6 +37,17 @@ class _BaseMixin:
         # Track overwritten body variables (when two extrudes create same-name body)
         self._prev_bodies = {}  # body_name → previous var (before overwrite)
 
+        # Track which component each plane variable was created in
+        self._plane_comps = {}  # plane var → component name
+
+        # Track which component each sketch was created in ("root" or "comp")
+        self._sketch_owners = {}  # sketch name → "root" or "comp"
+
+        self._flipped_planes = set()  # reserved for future use
+
+        # Current feature's component (set before each handler dispatch)
+        self._current_comp = ""
+
         # Fix body names — calls _CoreMixin methods via MRO
         self._fixup_split_body_names()
         self._fixup_body_references()
@@ -61,6 +72,22 @@ class _BaseMixin:
         if not v or v[0].isdigit():
             v = "v_" + v
         return v
+
+    def _body_var(self, body_name):
+        """Create component-scoped Python variable name for a body."""
+        comp = self._current_comp
+        if comp and comp != self._root_name:
+            return self._var(f"{body_name}_{comp}")
+        return self._var(body_name)
+
+    def _register_body(self, body_name, var_name):
+        """Register body variable with both plain and component-scoped keys."""
+        if body_name in self.bodies and self.bodies[body_name] != var_name:
+            self._prev_bodies[body_name] = self.bodies[body_name]
+        self.bodies[body_name] = var_name
+        comp = self._current_comp
+        if comp and comp != self._root_name:
+            self.bodies[f"{comp}:{body_name}"] = var_name
 
     # ── Scanning ──
 
@@ -182,7 +209,9 @@ class _BaseMixin:
         self._w("if search_comp.bRepBodies.item(i).name == name:")
         self.ind += 1
         self._w("return search_comp.bRepBodies.item(i)")
-        self.ind -= 3
+        self.ind -= 2
+        self._w("return None  # not found in specified component")
+        self.ind -= 1
         self._w("for i in range(root.bRepBodies.count):")
         self.ind += 1
         self._w("if root.bRepBodies.item(i).name == name:")
@@ -223,21 +252,78 @@ class _BaseMixin:
         self._w()
         self._w("def find_face_near(body, px, py, pz, nx=0, ny=0, nz=0):")
         self.ind += 1
-        self._w("bodies = [body] if body else []")
+        self._c("Search proxied bodies by name for root-context faces")
+        self._w("bodies = []")
+        self._w("if body:")
+        self.ind += 1
+        self._w("bn = body.name")
+        self._w("for i in range(root.bRepBodies.count):")
+        self.ind += 1
+        self._w("if root.bRepBodies.item(i).name == bn: bodies.append(root.bRepBodies.item(i))")
+        self.ind -= 1
+        self._w("for _occ in root.allOccurrences:")
+        self.ind += 1
+        self._w("for i in range(_occ.bRepBodies.count):")
+        self.ind += 1
+        self._w("if _occ.bRepBodies.item(i).name == bn: bodies.append(_occ.bRepBodies.item(i))")
+        self.ind -= 2
+        self._w("if not bodies: bodies = [body]")
+        self.ind -= 1
         self._w("if not bodies:")
         self.ind += 1
-        self._c("Search all bodies via occurrence proxies (root context)")
+        self._c("No body given — search all bodies via occurrence proxies")
         self._w("bodies = [root.bRepBodies.item(i) for i in range(root.bRepBodies.count)]")
         self._w("for _occ in root.allOccurrences:")
         self.ind += 1
         self._w("bodies.extend([_occ.bRepBodies.item(i) for i in range(_occ.bRepBodies.count)])")
         self.ind -= 2
         self._w("best, best_d = None, 1e10")
-        self._w("for _b in bodies:")
+        self._w("def _search_faces(bl):")
+        self.ind += 1
+        self._w("nonlocal best, best_d")
+        self._w("for _b in bl:")
         self.ind += 1
         self._w("for i in range(_b.faces.count):")
         self.ind += 1
         self._w("f = _b.faces.item(i)")
+        self._w("if isinstance(f.geometry, adsk.core.Plane):")
+        self.ind += 1
+        self._w("n = f.geometry.normal")
+        self._w("if nx or ny or nz:")
+        self.ind += 1
+        self._w("if abs(abs(n.x*nx+n.y*ny+n.z*nz) - 1.0) > 0.1: continue")
+        self.ind -= 1
+        self._w("p = f.pointOnFace")
+        self._w("d = abs(p.x - px) + abs(p.y - py) + abs(p.z - pz)")
+        self._w("if d < best_d: best, best_d = f, d")
+        self.ind -= 4
+        self._w("_search_faces(bodies)")
+        self._c("Fallback: search all bodies if name-based search found no face")
+        self._w("if best is None and body:")
+        self.ind += 1
+        self._w("_all = [root.bRepBodies.item(i) for i in range(root.bRepBodies.count)]")
+        self._w("for _occ in root.allOccurrences:")
+        self.ind += 1
+        self._w("_all.extend([_occ.bRepBodies.item(i) for i in range(_occ.bRepBodies.count)])")
+        self.ind -= 1
+        self._w("_search_faces(_all)")
+        self.ind -= 1
+        self._w("return best")
+        self.ind -= 1
+
+        # find_face_in_comp — search only a component's native bodies.
+        # Used for BRepFace sketches that need auto-projection of all
+        # intersecting bodies (requires sketch to be in the component).
+        self._w()
+        self._w("def find_face_in_comp(comp, px, py, pz, nx=0, ny=0, nz=0):")
+        self.ind += 1
+        self._w("best, best_d = None, 1e10")
+        self._w("for bi in range(comp.bRepBodies.count):")
+        self.ind += 1
+        self._w("_b = comp.bRepBodies.item(bi)")
+        self._w("for fi in range(_b.faces.count):")
+        self.ind += 1
+        self._w("f = _b.faces.item(fi)")
         self._w("if isinstance(f.geometry, adsk.core.Plane):")
         self.ind += 1
         self._w("n = f.geometry.normal")
@@ -256,8 +342,15 @@ class _BaseMixin:
             self._w()
             self._w('def combine(comp, target, tools, op, keep, name="Comb"):')
             self.ind += 1
+            self._w("if target is None: return None  # no valid target body")
             self._w("coll = adsk.core.ObjectCollection.create()")
-            self._w("for b in (tools if isinstance(tools, list) else [tools]): coll.add(b)")
+            self._w("for b in (tools if isinstance(tools, list) else [tools]):")
+            self.ind += 1
+            self._w("if b is not None: coll.add(b)")
+            self.ind -= 1
+            self._w("if coll.count == 0: return None  # no valid tool bodies")
+            self._w("try:")
+            self.ind += 1
             self._w("inp = comp.features.combineFeatures.createInput(target, coll)")
             self._w("inp.operation = op")
             self._w("inp.isKeepToolBodies = keep")
@@ -265,6 +358,44 @@ class _BaseMixin:
             self._w("f.name = name")
             self._w("return f")
             self.ind -= 1
+            self._w("except RuntimeError:")
+            self.ind += 1
+            self._w("pass")
+            self.ind -= 1
+            self._c("Cross-component fallback: proxy bodies via occurrences, combine at root")
+            self._w("def _proxy(b):")
+            self.ind += 1
+            self._w("pc = b.parentComponent")
+            self._w("for _occ in root.allOccurrences:")
+            self.ind += 1
+            self._w("if _occ.component.name == pc.name:")
+            self.ind += 1
+            self._w("for i in range(_occ.bRepBodies.count):")
+            self.ind += 1
+            self._w("if _occ.bRepBodies.item(i).name == b.name: return _occ.bRepBodies.item(i)")
+            self.ind -= 3
+            self._w("return b")
+            self.ind -= 1
+            self._w("try:")
+            self.ind += 1
+            self._w("pt = _proxy(target)")
+            self._w("pcoll = adsk.core.ObjectCollection.create()")
+            self._w("for b in (tools if isinstance(tools, list) else [tools]):")
+            self.ind += 1
+            self._w("if b is not None: pcoll.add(_proxy(b))")
+            self.ind -= 1
+            self._w("if pcoll.count == 0: return None")
+            self._w("inp = root.features.combineFeatures.createInput(pt, pcoll)")
+            self._w("inp.operation = op")
+            self._w("inp.isKeepToolBodies = keep")
+            self._w("f = root.features.combineFeatures.add(inp)")
+            self._w("f.name = name")
+            self._w("return f")
+            self.ind -= 1
+            self._w("except RuntimeError:")
+            self.ind += 1
+            self._w("return None  # combine failed even with proxied bodies")
+            self.ind -= 2
 
         if "mirror_bodies" in self.needs:
             self._w()

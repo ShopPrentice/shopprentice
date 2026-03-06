@@ -131,21 +131,57 @@ class _CoreMixin:
         Returns body_name unchanged if it already exists before before_index.
         Otherwise, traces ancestry (split inputBody, or duplicate-name surplus).
         """
-        # Check if body was created before this feature
+        # Check if body was created or referenced before this feature.
+        # Check output lists (bodies, outputBodies) AND reference fields
+        # (target, tools, mirror inputs, split inputs) — a referenced body
+        # definitely existed.
         for t in timeline[:before_index]:
             if body_name in t.get("bodies", []):
+                return body_name
+            if body_name in t.get("patternCopies", []):
+                return body_name
+            if body_name in t.get("outputBodies", []):
+                return body_name
+            if body_name == t.get("targetBody"):
+                return body_name
+            if body_name in t.get("toolBodies", []):
+                return body_name
+            if body_name in t.get("inputBodies", []):
+                return body_name
+            if body_name == t.get("inputBody"):
                 return body_name
 
         # Strategy 1: trace to ancestor via SplitBody
         # If a later SplitBody creates this body, the body was part of
         # the split's inputBody at this point in the timeline.
+        # NOTE: SplitBody `bodies` lists ALL component bodies at that
+        # position, not just split outputs.  Only match if the body was
+        # NOT referenced by any feature before the split (otherwise it
+        # pre-existed the split and is not a descendant).
         for si in range(before_index, len(timeline)):
             sf = timeline[si]
-            if sf.get("type") == "SplitBody" and body_name in sf.get("bodies", []):
-                ancestor = sf.get("inputBody", "")
-                if ancestor:
-                    # Recursively resolve (ancestor might also be a future name)
-                    return self._resolve_body_at(timeline, ancestor, before_index)
+            if sf.get("type") != "SplitBody":
+                continue
+            if body_name not in sf.get("bodies", []):
+                continue
+            # Verify the body wasn't referenced before the split
+            referenced_before_split = False
+            for ti in range(si):
+                t = timeline[ti]
+                if (body_name in t.get("bodies", [])
+                        or body_name in t.get("outputBodies", [])
+                        or body_name == t.get("targetBody")
+                        or body_name in t.get("toolBodies", [])
+                        or body_name in t.get("inputBodies", [])
+                        or body_name == t.get("inputBody")):
+                    referenced_before_split = True
+                    break
+            if referenced_before_split:
+                continue  # Pre-existing body, not a split output
+            ancestor = sf.get("inputBody", "")
+            if ancestor:
+                # Recursively resolve (ancestor might also be a future name)
+                return self._resolve_body_at(timeline, ancestor, before_index)
 
         # Strategy 2: find bodies created multiple times by NewBody extrudes
         # (e.g., two extrudes both named "wedge1"). Only count NewBody extrude
@@ -231,6 +267,13 @@ class _CoreMixin:
             name = feat.get("name", "")
             self._w()
             self._c(f"[{idx}] {t}: {name}")
+            # Set component context
+            self._current_comp = feat.get("component", "")
+            comp_var = self._comp_ref(feat)
+            if comp_var != "root":
+                self._w(f"comp = {comp_var}")
+            else:
+                self._w(f"comp = root")
 
             # Check if ambiguous
             variants = self._feature_variants_with_state(feat)
@@ -315,6 +358,7 @@ class _CoreMixin:
         self._w()
         self._c(f"[{idx}] {t}: {name}")
         # Set component context
+        self._current_comp = feat.get("component", "")
         comp_var = self._comp_ref(feat)
         self._w(f"comp = {comp_var}")
 
@@ -358,63 +402,153 @@ class _CoreMixin:
 
             # Resolve component for this feature
             if comp_name and comp_name != self._root_name and comp_name not in self.components:
-                # Component not yet created — find it by name
+                # Component not yet created — find or create it by name
                 cvar = self._var(comp_name)
+                self._w(f"{cvar}_c = None")
                 self._w(f"for _occ in root.allOccurrences:")
                 self.ind += 1
                 self._w(f'if _occ.component.name == "{comp_name}": {cvar}_c = _occ.component; break')
+                self.ind -= 1
+                self._w(f"if {cvar}_c is None:")
+                self.ind += 1
+                self._w(f"_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())")
+                self._w(f'_occ.component.name = "{comp_name}"')
+                self._w(f"{cvar}_c = _occ.component")
                 self.ind -= 1
                 self.components[comp_name] = f"{cvar}_c"
 
             if t == "ComponentCreation":
                 cvar = self._var(name)
                 self.components[name] = f"{cvar}_c"
-                # Component exists from prior execution — find it
+                # Component exists from prior execution — find or create it
+                self._w(f"{cvar}_c = None")
                 self._w(f"for _occ in root.allOccurrences:")
                 self.ind += 1
                 self._w(f'if _occ.component.name == "{name}": {cvar}_c = _occ.component; break')
                 self.ind -= 1
+                self._w(f"if {cvar}_c is None:")
+                self.ind += 1
+                self._w(f"_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())")
+                self._w(f'_occ.component.name = "{name}"')
+                self._w(f"{cvar}_c = _occ.component")
+                self.ind -= 1
 
             elif t == "ConstructionPlane":
-                var = self._var(name)
-                # Search root, then all components for the plane
-                self._w(f'{var} = root.constructionPlanes.itemByName("{name}")')
-                self._w(f"if not {var}:")
-                self.ind += 1
-                self._w(f"for _occ in root.allOccurrences:")
-                self.ind += 1
-                self._w(f'_p = _occ.component.constructionPlanes.itemByName("{name}")')
-                self._w(f"if _p: {var} = _p; break")
-                self.ind -= 2
+                # Use component-scoped variable to avoid collisions
+                # when multiple components have planes with the same name.
+                # Planes in child components are proxied via occurrence
+                # so they work in cross-component references.
+                if comp_name and comp_name != self._root_name:
+                    var = self._var(f"{name}_{comp_name}")
+                    self._w(f'{var} = None')
+                    self._w(f"for _occ in root.allOccurrences:")
+                    self.ind += 1
+                    self._w(f'if _occ.component.name == "{comp_name}":')
+                    self.ind += 1
+                    self._w(f'_p = _occ.component.constructionPlanes.itemByName("{name}")')
+                    self._w(f"if _p: {var} = _p.createForAssemblyContext(_occ); break")
+                    self.ind -= 2
+                    self.planes[f"{comp_name}:{name}"] = var
+                else:
+                    var = self._var(name)
+                    self._w(f'{var} = root.constructionPlanes.itemByName("{name}")')
+                    self._w(f"if not {var}:")
+                    self.ind += 1
+                    self._w(f"for _occ in root.allOccurrences:")
+                    self.ind += 1
+                    self._w(f'_p = _occ.component.constructionPlanes.itemByName("{name}")')
+                    self._w(f"if _p: {var} = _p.createForAssemblyContext(_occ); break")
+                    self.ind -= 2
                 self.planes[name] = var
 
             elif t == "Sketch":
-                var = self._var(name)
-                # Search component first, then root, then all components
-                c_ref = self.components.get(comp_name, "root")
-                self._w(f'{var} = {c_ref}.sketches.itemByName("{name}")')
+                # Use component-suffixed variable name (matches _feat_sketch)
+                if comp_name and comp_name != self._root_name:
+                    var = self._var(f"{name}_{comp_name}")
+                else:
+                    var = self._var(name)
+                plane_info = feat.get("plane", {})
+                is_brep_face = plane_info.get("type") == "BRepFace"
+
+                # BRepFace sketches are created in root (cross-component face
+                # access), so search root first for those.
+                if is_brep_face:
+                    self._w(f'{var} = root.sketches.itemByName("{name}")')
+                    self._w(f"if not {var}:")
+                    self.ind += 1
+                    c_ref = self.components.get(comp_name, "root")
+                    self._w(f'{var} = {c_ref}.sketches.itemByName("{name}")')
+                    self.ind -= 1
+                else:
+                    c_ref = self.components.get(comp_name, "root")
+                    self._w(f'{var} = {c_ref}.sketches.itemByName("{name}")')
+                # Fallback: search all components
                 self._w(f"if not {var}:")
                 self.ind += 1
                 self._w(f"for _sc in [root] + [_o.component for _o in root.allOccurrences]:")
                 self.ind += 1
-                self._w(f"_sk = _sc.sketches.itemByName(\"{name}\")")
+                self._w(f'_sk = _sc.sketches.itemByName("{name}")')
                 self._w(f"if _sk: {var} = _sk; break")
                 self.ind -= 2
+
+                # Register with both plain and component-scoped keys
                 self.sketches[name] = var
-                # Resolve profile for downstream extrude/sweep
-                plane_info = feat.get("plane", {})
-                prof = f"{var}_prof"
-                if plane_info.get("type") == "BRepFace":
+                if comp_name and comp_name != self._root_name:
+                    self.sketches[f"{comp_name}:{name}"] = var
+                # Track BRepFace info and sketch ownership.
+                # BRepFace sketches go to root UNLESS they have cross-body
+                # BRepFace refs (different body from the plane body), which
+                # triggers _use_native_face → sketch stays in component.
+                if is_brep_face:
                     self._brep_face_sketches[name] = plane_info
+                    if comp_name:
+                        self._brep_face_sketches[f"{comp_name}:{name}"] = plane_info
+                    face_body = plane_info.get("body", "")
+                    has_cross_body = any(
+                        c.get("isReference")
+                        and c.get("projectedFrom", {}).get("type") == "BRepFace"
+                        and c.get("projectedFrom", {}).get("body", "") not in ("", face_body)
+                        for c in feat.get("curves", [])
+                    )
+                    has_edge_proj = any(
+                        c.get("isReference")
+                        and c.get("projectedFrom", {}).get("type") == "BRepEdge"
+                        for c in feat.get("curves", [])
+                    )
+                    # Cross-body refs or edge projections → sketch in comp
+                    owner = "comp" if (has_cross_body or has_edge_proj) else "root"
+                    self._sketch_owners[name] = owner
+                    if comp_name:
+                        self._sketch_owners[f"{comp_name}:{name}"] = owner
+                else:
+                    self._sketch_owners[name] = "comp"
+                    if comp_name:
+                        self._sketch_owners[f"{comp_name}:{name}"] = "comp"
+
+                # Resolve profile for downstream extrude/sweep
+                prof = f"{var}_prof"
                 self._w(f"{prof} = {var}.profiles.item(0)")
                 self.profiles[name] = prof
 
             elif t in ("Extrude", "Sweep", "Mirror", "SplitBody",
-                        "RectangularPattern"):
-                for bn in feat.get("bodies", []):
-                    bv = self._var(bn)
-                    self._w(f'{bv} = find_body("{bn}")')
-                    self.bodies[bn] = bv
+                        "RectangularPattern", "CopyPasteBody"):
+                # Set component context for _body_var scoping
+                self._current_comp = comp_name
+                # Register bodies from both "bodies" and "patternCopies"
+                all_body_names = list(feat.get("bodies", []))
+                for pc in feat.get("patternCopies", []):
+                    if pc not in all_body_names:
+                        all_body_names.append(pc)
+                for bn in all_body_names:
+                    bv = self._body_var(bn)
+                    # Use component-scoped lookup to avoid name collisions
+                    # (e.g., beam:Body1 vs deck5:Body1)
+                    if comp_name and comp_name != self._root_name:
+                        c_ref = self.components.get(comp_name, "root")
+                        self._w(f'{bv} = find_body("{bn}", {c_ref})')
+                    else:
+                        self._w(f'{bv} = find_body("{bn}")')
+                    self._register_body(bn, bv)
 
             elif t == "Remove":
                 removed = feat.get("removedBody", "")
@@ -422,10 +556,14 @@ class _CoreMixin:
                     del self.bodies[removed]
 
             elif t == "Combine":
+                self._current_comp = comp_name
                 if not feat.get("isKeepToolBodies"):
                     for tb in feat.get("toolBodies", []):
                         if tb in self.bodies:
                             del self.bodies[tb]
+                        scoped = f"{comp_name}:{tb}" if comp_name else ""
+                        if scoped and scoped in self.bodies:
+                            del self.bodies[scoped]
 
     # ── Timeline dispatch ──
 
@@ -440,6 +578,7 @@ class _CoreMixin:
             self._w()
             self._c(f"[{idx}] {t}: {name}")
             # Set component context for child components
+            self._current_comp = feat.get("component", "")
             comp_var = self._comp_ref(feat)
             if comp_var != "root":
                 self._w(f"comp = {comp_var}")

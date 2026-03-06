@@ -16,7 +16,12 @@ class _ModifiersMixin:
         input_name = f.get("inputBody")
         body_code = None
         if input_name:
-            if input_name in self.bodies:
+            # Try component-scoped key first
+            split_comp_name = f.get("component", "")
+            scoped_key = f"{split_comp_name}:{input_name}" if split_comp_name else ""
+            if scoped_key and scoped_key in self.bodies:
+                body_code = self.bodies[scoped_key]
+            elif input_name in self.bodies:
                 body_code = self.bodies[input_name]
             else:
                 # Body may have been renamed between creation and split.
@@ -59,13 +64,10 @@ class _ModifiersMixin:
             body_code = 'find_body("?")  # TODO: split input body not resolved'
 
         # Resolve splitting tool
+        split_comp = f.get("component", "")
         tool_type = tool_info.get("type")
         if tool_type == "ConstructionPlane":
-            pname = tool_info.get("name", "")
-            builtin = {"XY": "root.xYConstructionPlane",
-                       "XZ": "root.xZConstructionPlane",
-                       "YZ": "root.yZConstructionPlane"}
-            tool_code = self.planes.get(pname, builtin.get(pname, f'root.constructionPlanes.itemByName("{pname}")'))
+            tool_code = self._resolve_plane_proxied(tool_info, split_comp)
         elif tool_type == "BRepFace":
             body_name = tool_info.get("body", "")
             normal = tool_info.get("normal")
@@ -92,6 +94,16 @@ class _ModifiersMixin:
         self._w(f"split_feat = comp.features.splitBodyFeatures.add(split_inp)")
         self._w(f'split_feat.name = "{name}"')
         self.feats[name] = "split_feat"
+
+        # Multi-body split: UI allows selecting multiple bodies to split with
+        # one tool, but API createInput only accepts one. Emit sequential splits.
+        extra_bodies = f.get("inputBodies", [])
+        if extra_bodies:
+            for eb in extra_bodies[1:]:  # skip first (already split above)
+                eb_code = self._body_ref(eb)
+                self._w(f"split_inp = comp.features.splitBodyFeatures.createInput("
+                        f"{eb_code}, {tool_code}, {extend})")
+                self._w(f"comp.features.splitBodyFeatures.add(split_inp)")
 
         # API limitation: SplitBodyFeature only accepts 1 splitting tool,
         # but the UI allows multiple. When the expected output has more
@@ -190,22 +202,80 @@ class _ModifiersMixin:
 
         # Track ALL output bodies by name.
         # After split, Fusion auto-names pieces which differ from captured
-        # end-of-timeline names. Snapshot before/after, then force-rename
-        # ALL bodies in the component to match expected names by volume order.
+        # end-of-timeline names. Rename to match captured names using
+        # distance-based matching (volume + bounding box position).
         self.ind = 1  # Reset: we're inside def run()
-        expected_names = [repr(bn) for bn in bodies]
-        self._w(f"_expected = [{', '.join(expected_names)}]")
-        self._w(f"_all_comp_bodies = [comp.bRepBodies.item(_i) for _i in range(comp.bRepBodies.count)]")
-        self._w(f"_all_comp_bodies.sort(key=lambda b: -b.volume)")
-        self._c(f"Rename all {len(bodies)} bodies in component to match captured names (by volume)")
-        self._w(f"for _i, _nm in enumerate(_expected):")
+        body_geo = f.get("bodyGeo", {})
+        if body_geo:
+            # Distance-based matching: pair each expected body to the closest
+            # actual body by volume + bbox position. Avoids sort-order issues
+            # when multiple bodies have similar volumes.
+            self._c(f"Rename {len(bodies)} bodies by volume+position matching")
+            self._w(f"_all_comp_bodies = [comp.bRepBodies.item(_i) for _i in range(comp.bRepBodies.count)]")
+            # First rename all to temp names to avoid conflicts
+            self._w(f"for _ti, _tb in enumerate(_all_comp_bodies): _tb.name = f'__tmp_{{_ti}}'")
+            # Build expected geo list
+            geo_items = []
+            for bn in bodies:
+                geo = body_geo.get(bn, {})
+                vol = geo.get("volume", 0)
+                bbmin = geo.get("bbMin", [0, 0, 0])
+                geo_items.append(f'("{bn}", {vol}, {bbmin})')
+            self._w(f"_expected_geo = [")
+            self.ind += 1
+            for gi in geo_items:
+                self._w(f"{gi},")
+            self.ind -= 1
+            self._w(f"]")
+            self._w(f"_used = set()")
+            self._w(f"for _nm, _ev, _emin in _expected_geo:")
+            self.ind += 1
+            self._w(f"_best_i, _best_d = -1, 1e10")
+            self._w(f"for _bi, _b in enumerate(_all_comp_bodies):")
+            self.ind += 1
+            self._w(f"if _bi in _used: continue")
+            self._w(f"_d = abs(_b.volume - _ev)")
+            self._w(f"try:")
+            self.ind += 1
+            self._w(f"_bb = _b.boundingBox")
+            self._w(f"_d += abs(_bb.minPoint.x - _emin[0]) + abs(_bb.minPoint.y - _emin[1]) + abs(_bb.minPoint.z - _emin[2])")
+            self.ind -= 1
+            self._w(f"except: pass")
+            self._w(f"if _d < _best_d: _best_i, _best_d = _bi, _d")
+            self.ind -= 1
+            self._w(f"if _best_i >= 0:")
+            self.ind += 1
+            self._w(f"_all_comp_bodies[_best_i].name = _nm")
+            self._w(f"_used.add(_best_i)")
+            self.ind -= 2
+        else:
+            # Fallback: sort-based matching (legacy captures without bodyGeo)
+            expected_names = [repr(bn) for bn in bodies]
+            self._w(f"_expected = [{', '.join(expected_names)}]")
+            self._w(f"_all_comp_bodies = [comp.bRepBodies.item(_i) for _i in range(comp.bRepBodies.count)]")
+            self._w(f"def _sort_key(b):")
+            self.ind += 1
+            self._w(f"bb = b.boundingBox")
+            self._w(f"return (-b.volume, round(bb.minPoint.x, 4), round(bb.minPoint.y, 4), round(bb.minPoint.z, 4))")
+            self.ind -= 1
+            self._w(f"_all_comp_bodies.sort(key=_sort_key)")
+            self._c(f"Rename all {len(bodies)} bodies in component to match captured names (by volume+position)")
+            self._w(f"for _i, _nm in enumerate(_expected):")
+            self.ind += 1
+            self._w(f"if _i < len(_all_comp_bodies): _all_comp_bodies[_i].name = _nm")
+            self.ind -= 1
+        # Diagnostic: check body count matches
+        self._w(f"if comp.bRepBodies.count != {len(bodies)}:")
         self.ind += 1
-        self._w(f"if _i < len(_all_comp_bodies): _all_comp_bodies[_i].name = _nm")
-        self.ind -= 1
+        self._w(f"app.log(f'WARNING: Split body count mismatch: expected {len(bodies)}, got {{comp.bRepBodies.count}}')")
+        self._w(f"for _bi in range(comp.bRepBodies.count):")
+        self.ind += 1
+        self._w(f"app.log(f'  body[{{_bi}}]: {{comp.bRepBodies.item(_bi).name}} vol={{round(comp.bRepBodies.item(_bi).volume, 2)}}')")
+        self.ind -= 2
         # Now resolve body variables by name
         for bn in bodies:
-            bv = self._var(bn)
-            self.bodies[bn] = bv
+            bv = self._body_var(bn)
+            self._register_body(bn, bv)
             self._w(f'{bv} = find_body("{bn}", comp)')
 
     def _feat_remove(self, f):
@@ -220,6 +290,30 @@ class _ModifiersMixin:
         if removed in self.bodies:
             del self.bodies[removed]
 
+    def _feat_copypastebody(self, f):
+        """Emit CopyPasteBody: duplicates a body within the same component."""
+        name = f.get("name", "CopyPasteBodies1")
+        source_names = f.get("sourceBody", [])
+        output_names = f.get("bodies", [])
+        comp_name = f.get("component", "")
+        for i, src_name in enumerate(source_names):
+            src_ref = self._body_ref(src_name, component=comp_name)
+            self._w(f"_cpb = comp.features.copyPasteBodies.add({src_ref})")
+            # Rename the copy to match the original output name
+            if i < len(output_names):
+                out_name = output_names[i]
+                self._w(f"_cpb_body = _cpb.bodies.item(0)")
+                self._w(f'_cpb_body.name = "{out_name}"')
+        # Register output bodies
+        for bn in output_names:
+            bv = self._body_var(bn)
+            if comp_name and comp_name != self._root_name:
+                c_ref = self.components.get(comp_name, "root")
+                self._w(f'{bv} = find_body("{bn}", {c_ref})')
+            else:
+                self._w(f'{bv} = find_body("{bn}")')
+            self._register_body(bn, bv)
+
     def _feat_mirror(self, f):
         name = f.get("name", "Mirror")
         var = self._var(name)
@@ -227,13 +321,9 @@ class _ModifiersMixin:
         bodies = f.get("bodies", [])
         input_bodies = f.get("inputBodies", [])
 
-        # Resolve plane
-        pname = plane_info.get("name", "")
-        if pname in self.planes:
-            plane_code = self.planes[pname]
-        else:
-            self._c(f'TODO: mirror plane "{pname}" not tracked')
-            plane_code = "None"
+        # Resolve plane (handles component scoping + cross-component proxy)
+        mirror_comp = f.get("component", "")
+        plane_code = self._resolve_plane_proxied(plane_info, mirror_comp)
 
         # Resolve inputs
         if input_bodies:
@@ -247,12 +337,12 @@ class _ModifiersMixin:
                 self._c("TODO: mirror inputs unknown")
                 input_code = "[]"
 
-        self._w(f"{var} = mirror_bodies(root, {input_code}, {plane_code}, \"{name}\")")
+        self._w(f"{var} = mirror_bodies(comp, {input_code}, {plane_code}, \"{name}\")")
 
         self.feats[name] = var
         for i, bn in enumerate(bodies):
-            bv = self._var(bn)
-            self.bodies[bn] = bv
+            bv = self._body_var(bn)
+            self._register_body(bn, bv)
             self._w(f'{bv} = {var}.bodies.item({i})')
             self._w(f'{bv}.name = "{bn}"')
 
@@ -262,25 +352,56 @@ class _ModifiersMixin:
         target = f.get("targetBody")
         tools = f.get("toolBodies", [])
         keep = f.get("isKeepToolBodies", False)
+        target_comp = f.get("targetComponent")
+        tool_comps = f.get("toolComponents", [])
 
         op_map = {"Join": "JOIN", "Cut": "CUT"}
         op_code = op_map.get(op, "JOIN")
 
         if target:
-            tc = self._body_ref(target)
+            tc = self._body_ref(target, component=target_comp)
         else:
             err = f.get("targetBodyError", "not captured")
             self._c(f"TODO: target body not captured ({err})")
             tc = "None"
 
         if tools:
-            tools_code = self._body_list(tools)
+            # Filter out the target body from tools (can't cut/join a body with itself)
+            # Only filter when tool is in the SAME component as target (same-named
+            # bodies in different components are distinct bodies)
+            filtered = []
+            for i, t in enumerate(tools):
+                tc_i = tool_comps[i] if i < len(tool_comps) else None
+                same_body = (t == target and
+                             (not tc_i or not target_comp or tc_i == target_comp))
+                if not same_body:
+                    filtered.append((t, tc_i))
+            if filtered:
+                refs = [self._body_ref(t, component=c) for t, c in filtered]
+                tools_code = f"[{', '.join(refs)}]"
+            else:
+                tools_code = "[]"
         else:
             err = f.get("toolBodiesError", "not captured")
             self._c(f"TODO: tool bodies not captured ({err})")
             tools_code = "[]"
 
-        self._w(f'combine(comp, {tc}, {tools_code}, {op_code}, {keep}, "{name}")')
+        var = self._var(name)
+        self._w(f'{var} = combine(comp, {tc}, {tools_code}, {op_code}, {keep}, "{name}")')
+
+        # CUT may split the target into extra bodies — register only NEW ones
+        # (exclude the target body and tool bodies which already exist)
+        output_bodies = f.get("outputBodies", [])
+        known = {target} | set(tools)
+        new_bodies = [bn for bn in output_bodies if bn not in known]
+        if new_bodies:
+            # Find the new bodies by index in the output list
+            for bn in new_bodies:
+                idx = output_bodies.index(bn)
+                bv = self._body_var(bn)
+                self._register_body(bn, bv)
+                self._w(f'{bv} = {var}.bodies.item({idx})')
+                self._w(f'{bv}.name = "{bn}"')
 
     def _feat_fillet(self, f):
         name = f.get("name", "Fillet")

@@ -103,6 +103,14 @@ def handler() -> dict:
                 "message": "No active design"
             }
 
+        # Ensure timeline is fully evaluated (rolled to end) so all feature
+        # properties read correctly.  Save/restore the original position.
+        tl = design.timeline
+        original_marker = tl.markerPosition
+        if original_marker != tl.count:
+            tl.markerPosition = tl.count
+            adsk.doEvents()
+
         out = {
             "designName": design.rootComponent.name,
             "designType": "Parametric" if design.designType == adsk.fusion.DesignTypes.ParametricDesignType else "Direct",
@@ -132,8 +140,63 @@ def handler() -> dict:
             try:
                 entity = item.entity
             except RuntimeError:
+                # item.entity fails for some feature types (e.g. CopyPasteBody).
+                # Search component features for the one at this timeline index.
+                cpb_found = False
+                try:
+                    for _comp in [design.rootComponent] + [
+                            occ.component for occ in design.rootComponent.allOccurrences]:
+                        for _fi in range(_comp.features.copyPasteBodies.count):
+                            cpb = _comp.features.copyPasteBodies.item(_fi)
+                            if cpb.timelineObject.index == idx:
+                                src_names = []
+                                for _si in range(cpb.sourceBody.count):
+                                    src_names.append(cpb.sourceBody.item(_si).name)
+                                out_names = []
+                                for _bi in range(cpb.bodies.count):
+                                    out_names.append(cpb.bodies.item(_bi).name)
+                                feat_info = {
+                                    "index": idx,
+                                    "isGroup": item.isGroup,
+                                    "isRolledBack": item.isRolledBack,
+                                    "type": "CopyPasteBody",
+                                    "name": cpb.name,
+                                    "component": _comp.name,
+                                    "sourceBody": src_names,
+                                    "bodies": out_names,
+                                }
+                                out["timeline"].append(feat_info)
+                                cpb_found = True
+                                break
+                        if cpb_found:
+                            break
+                except:
+                    pass
+                if not cpb_found:
+                    try:
+                        out["timeline"].append({
+                            "index": idx,
+                            "isGroup": item.isGroup,
+                            "isRolledBack": item.isRolledBack,
+                            "type": "Unknown",
+                            "name": f"_skipped_{idx}",
+                            "_entityError": "RuntimeError",
+                        })
+                    except:
+                        pass
                 continue
             if entity is None:
+                try:
+                    out["timeline"].append({
+                        "index": idx,
+                        "isGroup": item.isGroup,
+                        "isRolledBack": item.isRolledBack,
+                        "type": "Unknown",
+                        "name": f"_skipped_{idx}",
+                        "_entityError": "None",
+                    })
+                except:
+                    pass
                 continue
 
             feat_info = {
@@ -142,10 +205,14 @@ def handler() -> dict:
                 "isRolledBack": item.isRolledBack,
             }
 
-            # Component
+            # Component — Feature subclasses use .parentComponent,
+            # construction entities (ConstructionPlane/Axis) use .parent
             try:
-                if hasattr(entity, 'parentComponent') and entity.parentComponent:
-                    feat_info["component"] = entity.parentComponent.name
+                pc = getattr(entity, 'parentComponent', None)
+                if pc is None:
+                    pc = getattr(entity, 'parent', None)
+                if pc and hasattr(pc, 'name'):
+                    feat_info["component"] = pc.name
             except:
                 pass
 
@@ -271,6 +338,14 @@ def handler() -> dict:
                 pass
             out["timeline"].append(feat_info)
 
+        # Restore original timeline position
+        if original_marker != tl.count:
+            try:
+                tl.markerPosition = original_marker
+                adsk.doEvents()
+            except:
+                pass
+
         return {
             "content": [{"type": "text", "text": __import__('json').dumps(out, indent=2)}],
             "isError": False,
@@ -278,6 +353,15 @@ def handler() -> dict:
         }
 
     except Exception as e:
+        # Restore timeline position on error too
+        try:
+            if 'original_marker' in dir():
+                tl_err = design.timeline
+                if tl_err.markerPosition != original_marker:
+                    tl_err.markerPosition = original_marker
+                    adsk.doEvents()
+        except:
+            pass
         app.log(f"capture_design error: {e}\n{traceback.format_exc()}")
         return {
             "content": [{"type": "text", "text": f"Error: {e}\n{traceback.format_exc()}"}],

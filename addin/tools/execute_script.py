@@ -45,7 +45,7 @@ def _execute_sandbox(script):
         script += "\nrun(None)"
         with tempfile.NamedTemporaryFile(
                 mode='w', prefix='sandbox_', suffix='.py',
-                delete=False) as f:
+                delete=False, encoding='utf-8') as f:
             f.write(script)
             temp_file = f.name
 
@@ -54,6 +54,9 @@ def _execute_sandbox(script):
         # Commit so geometry computes before snapshotting
         app.executeTextCommand('PTransaction.Commit')
         transaction_started = False
+
+        # Force B-Rep evaluation before snapshot (volume needs computed geometry)
+        adsk.doEvents()
 
         snapshot = _capture_snapshot(design)
 
@@ -164,7 +167,7 @@ def handler(script: str, sandbox: bool = False, clean: bool = False) -> dict:
     try:
         script += "\nrun(None)"
 
-        with tempfile.NamedTemporaryFile(mode='w', prefix='script', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', prefix='script', suffix='.py', delete=False, encoding='utf-8') as f:
             f.write(script)
             temp_file = f.name
 

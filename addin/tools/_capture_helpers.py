@@ -167,6 +167,19 @@ def _identify_sketch_entity(entity, sk):
                 if abs(px - cx) < 0.01 and abs(py - cy) < 0.01:
                     return {"type": "SketchPoint", "curveIndex": ci, "role": "center"}
 
+        # Check spline fit points
+        for ci in range(sk.sketchCurves.count):
+            c = sk.sketchCurves.item(ci)
+            spline = adsk.fusion.SketchFittedSpline.cast(c)
+            if spline:
+                for fi in range(spline.fitPoints.count):
+                    fp = spline.fitPoints.item(fi)
+                    fx = round(fp.geometry.x, 3)
+                    fy = round(fp.geometry.y, 3)
+                    if abs(px - fx) < 0.01 and abs(py - fy) < 0.01:
+                        return {"type": "SketchPoint", "curveIndex": ci,
+                                "role": "fitPoint", "fitIndex": fi}
+
         return {"type": "SketchPoint", "position": [px, py]}
 
     # SketchLine — match by index
@@ -193,6 +206,14 @@ def _identify_sketch_entity(entity, sk):
                 return {"type": "SketchCircle", "curveIndex": ci}
         return {"type": "SketchCircle"}
 
+    # SketchFittedSpline — match by index
+    spline = adsk.fusion.SketchFittedSpline.cast(entity)
+    if spline:
+        for ci in range(sk.sketchCurves.count):
+            if sk.sketchCurves.item(ci) == spline:
+                return {"type": "SketchFittedSpline", "curveIndex": ci}
+        return {"type": "SketchFittedSpline"}
+
     # BRepEdge (projected edges)
     edge = adsk.fusion.BRepEdge.cast(entity)
     if edge:
@@ -217,14 +238,13 @@ def _capture_sketch(sk, design=None):
     if plane:
         info["plane"] = plane
 
-    # Sketch coordinate system (for BRepFace → construction plane conversion)
-    if plane and plane.get("type") == "BRepFace":
-        try:
-            info["sketchOrigin"] = [round(sk.origin.x, 4), round(sk.origin.y, 4), round(sk.origin.z, 4)]
-            info["sketchXDir"] = [round(sk.xDirection.x, 6), round(sk.xDirection.y, 6), round(sk.xDirection.z, 6)]
-            info["sketchYDir"] = [round(sk.yDirection.x, 6), round(sk.yDirection.y, 6), round(sk.yDirection.z, 6)]
-        except:
-            pass
+    # Sketch coordinate system — always capture for coordinate transforms
+    try:
+        info["sketchOrigin"] = [round(sk.origin.x, 4), round(sk.origin.y, 4), round(sk.origin.z, 4)]
+        info["sketchXDir"] = [round(sk.xDirection.x, 6), round(sk.xDirection.y, 6), round(sk.xDirection.z, 6)]
+        info["sketchYDir"] = [round(sk.yDirection.x, 6), round(sk.yDirection.y, 6), round(sk.yDirection.z, 6)]
+    except:
+        pass
 
     # Check if any curves are projected references — if so, need rollTo
     # for accurate edge vertex positions (downstream features may alter topology)
@@ -282,6 +302,10 @@ def _capture_sketch(sk, design=None):
                                 body = adsk.fusion.BRepBody.cast(ref)
                                 if body:
                                     pf = {"type": "BRepBody", "body": body.name}
+                                    try:
+                                        pf["bodyComponent"] = body.parentComponent.name
+                                    except:
+                                        pass
                                     # Detect intersect vs project: if body bbox
                                     # spans the sketch plane, it's an intersection
                                     try:
@@ -311,6 +335,10 @@ def _capture_sketch(sk, design=None):
                                         ca = adsk.fusion.ConstructionAxis.cast(ref)
                                         if ca:
                                             curve_info["projectedFrom"] = {"type": "ConstructionAxis", "name": ca.name}
+                                        else:
+                                            cp = adsk.fusion.ConstructionPlane.cast(ref)
+                                            if cp:
+                                                curve_info["projectedFrom"] = {"type": "ConstructionPlane", "name": cp.name}
                     except:
                         pass
             except:
@@ -357,6 +385,10 @@ def _capture_sketch(sk, design=None):
                                 if body:
                                     pf = {"type": "BRepBody", "body": body.name}
                                     try:
+                                        pf["bodyComponent"] = body.parentComponent.name
+                                    except:
+                                        pass
+                                    try:
                                         bb = body.boundingBox
                                         po = sk.origin
                                         n = adsk.core.Vector3D.create(
@@ -374,6 +406,14 @@ def _capture_sketch(sk, design=None):
                                     face = adsk.fusion.BRepFace.cast(ref)
                                     if face:
                                         arc_info["projectedFrom"] = {"type": "BRepFace", "body": face.body.name}
+                                    else:
+                                        ca = adsk.fusion.ConstructionAxis.cast(ref)
+                                        if ca:
+                                            arc_info["projectedFrom"] = {"type": "ConstructionAxis", "name": ca.name}
+                                        else:
+                                            cp = adsk.fusion.ConstructionPlane.cast(ref)
+                                            if cp:
+                                                arc_info["projectedFrom"] = {"type": "ConstructionPlane", "name": cp.name}
                     except:
                         pass
             except:
@@ -389,6 +429,85 @@ def _capture_sketch(sk, design=None):
                 "radius": round(circle.radius, 4),
             })
             continue
+        # Fitted spline
+        spline = adsk.fusion.SketchFittedSpline.cast(c)
+        if spline:
+            pts = []
+            for pi in range(spline.fitPoints.count):
+                fp = spline.fitPoints.item(pi)
+                pts.append([round(fp.geometry.x, 4), round(fp.geometry.y, 4)])
+            spline_info = {
+                "type": "FittedSpline",
+                "fitPoints": pts,
+                "isConstruction": spline.isConstruction,
+            }
+            try:
+                if spline.isReference:
+                    spline_info["isReference"] = True
+            except:
+                pass
+            curves_info.append(spline_info)
+            continue
+        # Fixed spline (B-spline with control frame)
+        fixed_spline = adsk.fusion.SketchFixedSpline.cast(c)
+        if fixed_spline:
+            pts = []
+            # Try controlFramePoints first
+            try:
+                for pi in range(fixed_spline.controlFramePoints.count):
+                    cp = fixed_spline.controlFramePoints.item(pi)
+                    pts.append([round(cp.geometry.x, 4), round(cp.geometry.y, 4)])
+            except:
+                pass
+            # Fallback: extract from NurbsCurve3D geometry
+            if not pts:
+                try:
+                    geom = fixed_spline.geometry
+                    (ok, ctrl_pts, degree, knots, is_rational, weights, is_periodic) = geom.getData()
+                    if ok:
+                        for pi in range(ctrl_pts.count):
+                            p = ctrl_pts.item(pi)
+                            sp = sk.modelToSketchSpace(p)
+                            pts.append([round(sp.x, 4), round(sp.y, 4)])
+                except:
+                    pass
+            # Fallback 2: sample points along the curve
+            if not pts:
+                try:
+                    ev = fixed_spline.geometry.evaluator
+                    (ok, t0, t1) = ev.getParameterExtents()
+                    if ok:
+                        n_samples = 20
+                        for si in range(n_samples + 1):
+                            t = t0 + (t1 - t0) * si / n_samples
+                            (ok2, pt3d) = ev.getPointAtParameter(t)
+                            if ok2:
+                                sp = sk.modelToSketchSpace(pt3d)
+                                pts.append([round(sp.x, 4), round(sp.y, 4)])
+                        sp_info["isSampled"] = True
+                except:
+                    pass
+            sp_info = {
+                "type": "SketchFixedSpline",
+                "controlPoints": pts,
+                "isConstruction": fixed_spline.isConstruction,
+            }
+            try:
+                sp_info["start"] = [round(fixed_spline.startSketchPoint.geometry.x, 4),
+                                    round(fixed_spline.startSketchPoint.geometry.y, 4)]
+                sp_info["end"] = [round(fixed_spline.endSketchPoint.geometry.x, 4),
+                                  round(fixed_spline.endSketchPoint.geometry.y, 4)]
+            except:
+                pass
+            try:
+                if fixed_spline.isReference:
+                    sp_info["isReference"] = True
+            except:
+                pass
+            curves_info.append(sp_info)
+            continue
+        # Unknown curve type — capture minimally
+        curves_info.append({"type": type(c).__name__})
 
     # Restore timeline after projection capture
     if _rolled:
@@ -396,6 +515,83 @@ def _capture_sketch(sk, design=None):
             design.timeline.moveToEnd()
         except:
             pass
+
+    # Post-process: attribute un-attributed reference LINE curves by matching
+    # against body edges in model space.  This handles curves from
+    # intersectWithSketchPlane whose referencedEntity returns None.
+    _unattr = [i for i, c in enumerate(curves_info)
+               if c.get("isReference") and "projectedFrom" not in c
+               and c.get("type") == "Line"
+               and c.get("start") and c.get("end")]
+    _plane_info = info.get("plane", {})
+    if _unattr and _plane_info and _plane_info.get("body"):
+        face_body_name = _plane_info.get("body", "")
+        _found_bodies = {}  # body_name -> (body, comp_name)
+        # Collect candidate bodies (skip the face body itself)
+        _all_bodies = []
+        try:
+            for _occ in design.rootComponent.allOccurrences:
+                for _bi in range(_occ.bRepBodies.count):
+                    _b = _occ.bRepBodies.item(_bi)
+                    if _b.name != face_body_name:
+                        _all_bodies.append(_b)
+        except:
+            pass
+        # Build edge cache: {body_name: [(sv, ev), ...]}
+        _edge_cache = {}
+        for _b in _all_bodies:
+            bn = _b.name
+            if bn in _edge_cache:
+                continue
+            edges = []
+            try:
+                for _ei in range(min(_b.edges.count, 500)):
+                    _e = _b.edges.item(_ei)
+                    _sv = _e.startVertex.geometry
+                    _ev = _e.endVertex.geometry
+                    edges.append((_sv.x, _sv.y, _sv.z, _ev.x, _ev.y, _ev.z))
+            except:
+                pass
+            _edge_cache[bn] = edges
+            try:
+                _found_bodies[bn] = (_b, _b.parentComponent.name)
+            except:
+                _found_bodies[bn] = (_b, "")
+        for ri in _unattr:
+            c = curves_info[ri]
+            sx, sy = c["start"]
+            ex, ey = c["end"]
+            try:
+                sp3 = sk.sketchToModelSpace(adsk.core.Point3D.create(sx, sy, 0))
+                ep3 = sk.sketchToModelSpace(adsk.core.Point3D.create(ex, ey, 0))
+            except:
+                continue
+            spx, spy, spz = sp3.x, sp3.y, sp3.z
+            epx, epy, epz = ep3.x, ep3.y, ep3.z
+            best_bn, best_d = None, 0.5
+            for bn, edges in _edge_cache.items():
+                for (svx,svy,svz,evx,evy,evz) in edges:
+                    d1 = (abs(svx-spx)+abs(svy-spy)+abs(svz-spz) +
+                          abs(evx-epx)+abs(evy-epy)+abs(evz-epz))
+                    d2 = (abs(svx-epx)+abs(svy-epy)+abs(svz-epz) +
+                          abs(evx-spx)+abs(evy-spy)+abs(evz-spz))
+                    d = min(d1, d2)
+                    if d < best_d:
+                        best_d = d
+                        best_bn = bn
+                        if d < 0.01:
+                            break
+                if best_d < 0.01:
+                    break
+            if best_bn:
+                _, comp_name = _found_bodies.get(best_bn, (None, ""))
+                c["projectedFrom"] = {
+                    "type": "BRepBody",
+                    "body": best_bn,
+                    "method": "intersect",
+                }
+                if comp_name:
+                    c["projectedFrom"]["bodyComponent"] = comp_name
 
     info["curves"] = curves_info
     info["profileCount"] = sk.profiles.count
@@ -459,6 +655,17 @@ def _capture_sketch(sk, design=None):
         if diametral:
             try:
                 dim_entry["entity"] = _identify_sketch_entity(diametral.entity, sk)
+            except:
+                pass
+
+        angular = adsk.fusion.SketchAngularDimension.cast(d)
+        if angular:
+            try:
+                dim_entry["lineOne"] = _identify_sketch_entity(angular.lineOne, sk)
+            except:
+                pass
+            try:
+                dim_entry["lineTwo"] = _identify_sketch_entity(angular.lineTwo, sk)
             except:
                 pass
 
@@ -544,6 +751,34 @@ def _capture_sketch(sk, design=None):
                 pass
             try:
                 constraint_entry["curveTwo"] = _identify_sketch_entity(eq.curveTwo, sk)
+            except:
+                pass
+
+        # MidPoint
+        mp = adsk.fusion.MidPointConstraint.cast(gc)
+        if mp:
+            try:
+                constraint_entry["point"] = _identify_sketch_entity(mp.point, sk)
+            except:
+                pass
+            try:
+                constraint_entry["midPointCurve"] = _identify_sketch_entity(mp.midPointCurve, sk)
+            except:
+                pass
+
+        # Symmetry
+        sym = adsk.fusion.SymmetryConstraint.cast(gc)
+        if sym:
+            try:
+                constraint_entry["entityOne"] = _identify_sketch_entity(sym.entityOne, sk)
+            except:
+                pass
+            try:
+                constraint_entry["entityTwo"] = _identify_sketch_entity(sym.entityTwo, sk)
+            except:
+                pass
+            try:
+                constraint_entry["symmetryLine"] = _identify_sketch_entity(sym.symmetryLine, sk)
             except:
                 pass
 
@@ -661,8 +896,25 @@ def _capture_extrude(ext, idx, tl, design=None):
 
     body_names = [b.name for b in ext.bodies]
 
-    # If bodies list is empty (consumed by downstream combine/join), infer the
-    # body name by scanning downstream Combine features for toolBodies references.
+    # Try rollTo(False) to capture user-renamed body names.  At end-of-
+    # timeline a consumed body's ext.bodies may be empty or stale; rolling
+    # to just AFTER the feature shows the body alive with its current name.
+    # NOTE: _roll_to_feature uses rollTo(True) (before), we need (False) (after).
+    if design and ext.operation == adsk.fusion.FeatureOperations.NewBodyFeatureOperation:
+        try:
+            tl = design.timeline
+            ext.timelineObject.rollTo(False)  # roll to just after this feature
+            try:
+                rolled = [b.name for b in ext.bodies]
+                if rolled:
+                    body_names = rolled
+            finally:
+                tl.moveToEnd()
+        except:
+            pass
+
+    # If bodies list is still empty (consumed by downstream combine/join),
+    # infer the body name by scanning downstream Combine features.
     if not body_names and design and ext.operation == adsk.fusion.FeatureOperations.NewBodyFeatureOperation:
         if idx is not None and tl is not None:
             body_names = _infer_extrude_body_name(ext, idx, tl, design)
@@ -684,6 +936,41 @@ def _capture_extrude(ext, idx, tl, design=None):
                 _try_participants()
         except:
             pass
+
+    # Fallback: infer participantBodies by comparing body volumes before/after
+    # the extrude. The body whose volume changed is the actual JOIN/CUT target.
+    if "participantBodies" not in info and info.get("operation") in ("Join", "Cut") and design:
+        try:
+            tl = design.timeline
+            tlo = ext.timelineObject
+            idx = tlo.index
+            comp = ext.parentComponent
+
+            # Volumes BEFORE the extrude
+            tl.markerPosition = idx
+            before = {}
+            for i in range(comp.bRepBodies.count):
+                b = comp.bRepBodies.item(i)
+                before[b.name] = round(b.volume, 4)
+
+            # Volumes AFTER the extrude
+            tl.markerPosition = idx + 1
+            after = {}
+            for i in range(comp.bRepBodies.count):
+                b = comp.bRepBodies.item(i)
+                after[b.name] = round(b.volume, 4)
+
+            tl.moveToEnd()
+
+            # Bodies whose volume changed = participants
+            changed = [n for n in before if n in after and before[n] != after[n]]
+            if changed:
+                info["participantBodies"] = changed
+        except:
+            try:
+                design.timeline.moveToEnd()
+            except:
+                pass
 
     try:
         if ext.startFaces and ext.startFaces.count > 0:
@@ -821,25 +1108,44 @@ def _match_profile_index(ext, sk_found, info):
     try:
         profile = ext.profile
         profiles_coll = adsk.core.ObjectCollection.cast(profile)
-        ext_prof = profiles_coll.item(0) if profiles_coll else adsk.fusion.Profile.cast(profile)
-        if ext_prof:
-            ext_bb = ext_prof.boundingBox
-            ext_min = (round(ext_bb.minPoint.x, 3), round(ext_bb.minPoint.y, 3))
-            ext_max = (round(ext_bb.maxPoint.x, 3), round(ext_bb.maxPoint.y, 3))
+        # Collect ALL profiles the extrude uses
+        ext_profs = []
+        if profiles_coll:
+            for i in range(profiles_coll.count):
+                p = adsk.fusion.Profile.cast(profiles_coll.item(i))
+                if p:
+                    ext_profs.append(p)
+        else:
+            p = adsk.fusion.Profile.cast(profile)
+            if p:
+                ext_profs.append(p)
+
+        if ext_profs:
             info["profileCount"] = sk_found.profiles.count
-            best_idx = 0
-            best_dist = float('inf')
-            for pi in range(sk_found.profiles.count):
-                sp = sk_found.profiles.item(pi)
-                sp_bb = sp.boundingBox
-                sp_min = (round(sp_bb.minPoint.x, 3), round(sp_bb.minPoint.y, 3))
-                sp_max = (round(sp_bb.maxPoint.x, 3), round(sp_bb.maxPoint.y, 3))
-                dist = (abs(sp_min[0] - ext_min[0]) + abs(sp_min[1] - ext_min[1])
-                        + abs(sp_max[0] - ext_max[0]) + abs(sp_max[1] - ext_max[1]))
-                if dist < best_dist:
-                    best_dist = dist
-                    best_idx = pi
-            info["profileIndex"] = best_idx
+            matched_indices = []
+            for ext_prof in ext_profs:
+                ext_bb = ext_prof.boundingBox
+                ext_min = (round(ext_bb.minPoint.x, 3), round(ext_bb.minPoint.y, 3))
+                ext_max = (round(ext_bb.maxPoint.x, 3), round(ext_bb.maxPoint.y, 3))
+                best_idx = 0
+                best_dist = float('inf')
+                for pi in range(sk_found.profiles.count):
+                    sp = sk_found.profiles.item(pi)
+                    sp_bb = sp.boundingBox
+                    sp_min = (round(sp_bb.minPoint.x, 3), round(sp_bb.minPoint.y, 3))
+                    sp_max = (round(sp_bb.maxPoint.x, 3), round(sp_bb.maxPoint.y, 3))
+                    dist = (abs(sp_min[0] - ext_min[0]) + abs(sp_min[1] - ext_min[1])
+                            + abs(sp_max[0] - ext_max[0]) + abs(sp_max[1] - ext_max[1]))
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_idx = pi
+                matched_indices.append(best_idx)
+            # Single profile → profileIndex (int), multi → profileIndices (list)
+            if len(matched_indices) == 1:
+                info["profileIndex"] = matched_indices[0]
+            else:
+                info["profileIndices"] = matched_indices
+                info["profileIndex"] = matched_indices[0]  # backward compat
     except:
         pass
 
@@ -854,6 +1160,7 @@ def _capture_construction_plane(cp):
         defn = cp.definition
         offset_def = adsk.fusion.ConstructionPlaneOffsetDefinition.cast(defn)
         angle_def = adsk.fusion.ConstructionPlaneAtAngleDefinition.cast(defn)
+        midplane_def = adsk.fusion.ConstructionPlaneMidplaneDefinition.cast(defn)
 
         if offset_def:
             info["definitionType"] = "Offset"
@@ -864,6 +1171,28 @@ def _capture_construction_plane(cp):
                 info["basePlane"] = bcp.name
             else:
                 info["basePlane"] = str(base.objectType)
+
+        elif midplane_def:
+            info["definitionType"] = "MidPlane"
+            for attr, key in [("planarEntityOne", "planeOne"), ("planarEntityTwo", "planeTwo")]:
+                try:
+                    entity = getattr(midplane_def, attr)
+                    bcp = adsk.fusion.ConstructionPlane.cast(entity)
+                    if bcp:
+                        info[key] = {"type": "ConstructionPlane", "name": bcp.name}
+                    else:
+                        face = adsk.fusion.BRepFace.cast(entity)
+                        if face:
+                            pof = face.pointOnFace
+                            info[key] = {
+                                "type": "BRepFace",
+                                "body": face.body.name,
+                                "pointOnFace": [round(pof.x, 4), round(pof.y, 4), round(pof.z, 4)],
+                            }
+                        else:
+                            info[key] = {"type": str(entity.objectType)}
+                except:
+                    pass
 
         elif angle_def:
             info["definitionType"] = "AtAngle"
@@ -977,8 +1306,18 @@ def _capture_mirror(mir, design=None):
     else:
         _try_inputs()
 
-    # Output bodies (accessible without rollTo)
-    info["bodies"] = [b.name for b in mir.bodies]
+    # Output bodies — try direct access first, rollTo if consumed downstream
+    out = [b.name for b in mir.bodies]
+    if not out and design:
+        try:
+            mir.timelineObject.rollTo(False)
+            try:
+                out = [b.name for b in mir.bodies]
+            finally:
+                design.timeline.moveToEnd()
+        except:
+            pass
+    info["bodies"] = out
 
     try:
         if mir.patternComputeOption == adsk.fusion.PatternComputeOptions.IdenticalPatternCompute:
@@ -994,6 +1333,59 @@ def _capture_mirror(mir, design=None):
 
 
 # ── Rectangular Pattern ──
+
+def _extract_linear_direction(entity):
+    """Extract a normalised direction vector from any linear entity.
+
+    Handles BRepEdge (Line3D geometry), SketchLine, BRepFace (plane normal),
+    and ConstructionPlane (normal).  Returns [x, y, z] rounded to 6 decimals,
+    or None if the entity type is unrecognised.
+    """
+    # BRepEdge — Line3D has startPoint/endPoint, NOT .direction
+    try:
+        edge = adsk.fusion.BRepEdge.cast(entity)
+        if edge:
+            line = adsk.core.Line3D.cast(edge.geometry)
+            if line:
+                s, e = line.startPoint, line.endPoint
+                dx, dy, dz = e.x - s.x, e.y - s.y, e.z - s.z
+                ln = (dx**2 + dy**2 + dz**2) ** 0.5
+                if ln > 1e-6:
+                    return [round(dx/ln, 6), round(dy/ln, 6), round(dz/ln, 6)]
+    except:
+        pass
+    # SketchLine
+    try:
+        sl = adsk.fusion.SketchLine.cast(entity)
+        if sl:
+            s = sl.startSketchPoint.worldGeometry
+            e = sl.endSketchPoint.worldGeometry
+            dx, dy, dz = e.x - s.x, e.y - s.y, e.z - s.z
+            ln = (dx**2 + dy**2 + dz**2) ** 0.5
+            if ln > 1e-6:
+                return [round(dx/ln, 6), round(dy/ln, 6), round(dz/ln, 6)]
+    except:
+        pass
+    # BRepFace — use plane normal as direction
+    try:
+        face = adsk.fusion.BRepFace.cast(entity)
+        if face:
+            plane = adsk.core.Plane.cast(face.geometry)
+            if plane:
+                n = plane.normal
+                return [round(n.x, 6), round(n.y, 6), round(n.z, 6)]
+    except:
+        pass
+    # ConstructionPlane — use normal
+    try:
+        cp = adsk.fusion.ConstructionPlane.cast(entity)
+        if cp:
+            n = cp.geometry.normal
+            return [round(n.x, 6), round(n.y, 6), round(n.z, 6)]
+    except:
+        pass
+    return None
+
 
 def _capture_rectangular_pattern(pat, design=None):
     """Capture a RectangularPatternFeature."""
@@ -1030,15 +1422,30 @@ def _capture_rectangular_pattern(pat, design=None):
             except:
                 pass
         else:
-            try:
-                edge = adsk.fusion.BRepEdge.cast(axis)
-                if edge:
-                    geom = edge.geometry
-                    line = adsk.core.Line3D.cast(geom)
-                    if line:
-                        info["directionOne"] = [round(line.direction.x, 6), round(line.direction.y, 6), round(line.direction.z, 6)]
-            except:
-                pass
+            direction = _extract_linear_direction(axis)
+            if direction:
+                info["directionOne"] = direction
+    except:
+        pass
+
+    # Direction two (if present)
+    try:
+        axis2 = pat.directionTwoEntity
+        if axis2:
+            ca2 = adsk.fusion.ConstructionAxis.cast(axis2)
+            if ca2:
+                info["axisTwo"] = ca2.name
+                try:
+                    line = ca2.geometry
+                    info["directionTwo"] = [round(line.direction.x, 6),
+                                            round(line.direction.y, 6),
+                                            round(line.direction.z, 6)]
+                except:
+                    pass
+            else:
+                d2 = _extract_linear_direction(axis2)
+                if d2:
+                    info["directionTwo"] = d2
     except:
         pass
 
@@ -1064,16 +1471,96 @@ def _capture_rectangular_pattern(pat, design=None):
         except:
             pass
 
+    def _try_bodies_and_direction():
+        """Capture bodies list and infer direction from bbox displacement.
+
+        Must be called inside rollTo so pat.bodies returns ALL copies
+        (at end-of-timeline, downstream Combines may consume pattern bodies).
+        """
+        body_names = [pat.bodies.item(i).name for i in range(pat.bodies.count)]
+        if body_names:
+            info["bodies"] = body_names
+        # Infer actual direction from body bounding-box displacements.
+        # More reliable than directionOneEntity.geometry, which may report
+        # the entity's own orientation rather than the pattern axis.
+        bodies = [pat.bodies.item(i) for i in range(pat.bodies.count)]
+        if len(bodies) >= 2:
+            b0 = bodies[0].boundingBox
+            b1 = bodies[1].boundingBox
+            dx = b1.minPoint.x - b0.minPoint.x
+            dy = b1.minPoint.y - b0.minPoint.y
+            dz = b1.minPoint.z - b0.minPoint.z
+            adx, ady, adz = abs(dx), abs(dy), abs(dz)
+            if adx >= ady and adx >= adz and adx > 0.001:
+                info["directionOne"] = [1.0 if dx > 0 else -1.0, 0.0, 0.0]
+            elif ady >= adx and ady >= adz and ady > 0.001:
+                info["directionOne"] = [0.0, 1.0 if dy > 0 else -1.0, 0.0]
+            elif adz > 0.001:
+                info["directionOne"] = [0.0, 0.0, 1.0 if dz > 0 else -1.0]
+
     if design:
         try:
             with _roll_to_feature(pat, design):
                 _try_inputs()
+                _try_bodies_and_direction()
         except:
             _try_inputs()
+            _try_bodies_and_direction()
     else:
         _try_inputs()
+        _try_bodies_and_direction()
 
-    info["bodies"] = [b.name for b in pat.bodies]
+    # Fallback: if bodies weren't captured inside rollTo
+    if "bodies" not in info:
+        info["bodies"] = [b.name for b in pat.bodies]
+
+    # Pattern copy detection: scan component bodies at END-OF-TIMELINE.
+    # rollTo(True) doesn't make pattern copies visible in comp.bRepBodies
+    # (Fusion API quirk), but they ARE visible at end-of-timeline.
+    try:
+        comp = pat.parentComponent
+        input_names = set(info.get("inputs", []))
+        # Get input body volume (at end-of-timeline, may differ from rollTo vol
+        # due to downstream CUTs, but copies should still match each other)
+        input_vols = {}
+        for bi in range(comp.bRepBodies.count):
+            b = comp.bRepBodies.item(bi)
+            if b.name in input_names:
+                input_vols[b.name] = b.volume
+        # If input body was consumed by downstream Combine, use volume from
+        # any copy (all copies have identical volume at creation)
+        if not input_vols:
+            # Use first non-input body as reference volume
+            for bi in range(comp.bRepBodies.count):
+                b = comp.bRepBodies.item(bi)
+                input_vols["_ref"] = b.volume
+                break
+        # Find copies: same volume as input (within tolerance), not input name
+        if input_vols:
+            # Copies start identical to input. Downstream CUTs may modify
+            # some copies (up to ~5% volume change). Use 5% tolerance.
+            ref_vol = next(iter(input_vols.values()))
+            copies = []
+            for bi in range(comp.bRepBodies.count):
+                b = comp.bRepBodies.item(bi)
+                if b.name in input_names:
+                    continue
+                if ref_vol > 0 and abs(b.volume - ref_vol) / ref_vol < 0.05:
+                    copies.append({
+                        "name": b.name,
+                        "min": [round(b.boundingBox.minPoint.x, 4),
+                                round(b.boundingBox.minPoint.y, 4),
+                                round(b.boundingBox.minPoint.z, 4)],
+                    })
+            if copies:
+                # Sort by position along pattern direction for stable ordering
+                d = info.get("directionOne", [1, 0, 0])
+                ax = 0 if abs(d[0]) >= abs(d[1]) and abs(d[0]) >= abs(d[2]) else (
+                     1 if abs(d[1]) >= abs(d[2]) else 2)
+                copies.sort(key=lambda c: c["min"][ax])
+                info["patternCopies"] = [c["name"] for c in copies]
+    except:
+        pass
 
     return info
 
@@ -1127,8 +1614,13 @@ def _capture_combine(comb, idx, tl, design=None):
     # Try direct access first
     tool_names = _get_target_and_tools()
 
-    # If body access failed, retry with rollTo
-    if ("targetBodyError" in info or "toolBodiesError" in info) and design:
+    # Retry with rollTo if body access failed OR if tool names have duplicates
+    # (duplicates indicate stale body references at end-of-timeline — Fusion API
+    # quirk where comb.toolBodies returns wrong BRepBody objects after timeline
+    # recomputation, e.g. pattern copies resolving to the source body).
+    has_error = "targetBodyError" in info or "toolBodiesError" in info
+    has_dupes = len(tool_names) != len(set(tool_names))
+    if (has_error or has_dupes) and design:
         for key in ["targetBody", "targetBodyError", "targetComponent",
                      "toolBodies", "toolBodiesError", "toolComponents"]:
             info.pop(key, None)
@@ -1148,6 +1640,20 @@ def _capture_combine(comb, idx, tl, design=None):
         info["isKeepToolBodies"] = comb.isKeepToolBodies
     except:
         pass
+
+    # Capture output bodies — CUT operations may split the target into multiple pieces,
+    # creating new bodies that the user may rename.  Use rollTo(False) to get current names.
+    if info.get("operation") == "Cut" and design:
+        try:
+            comb.timelineObject.rollTo(False)
+            try:
+                out_bodies = [b.name for b in comb.bodies]
+                if out_bodies:
+                    info["outputBodies"] = out_bodies
+            finally:
+                design.timeline.moveToEnd()
+        except:
+            pass
 
     return info
 
@@ -1642,9 +2148,14 @@ def _capture_split_body(split, design):
             except Exception as e:
                 info["splitToolError"] = str(e)
 
-            # Input body being split
+            # Input bodies being split (can be multiple)
             try:
-                info["inputBody"] = split.splitBodies.item(0).name
+                sb = split.splitBodies
+                if sb.count == 1:
+                    info["inputBody"] = sb.item(0).name
+                else:
+                    info["inputBodies"] = [sb.item(i).name for i in range(sb.count)]
+                    info["inputBody"] = sb.item(0).name  # backwards compat
             except:
                 pass
             # Output bodies read below after exiting edit mode
@@ -1661,8 +2172,37 @@ def _capture_split_body(split, design):
             tlo = split.timelineObject
             tl.markerPosition = tlo.index + 1
             comp = split.parentComponent
-            info["bodies"] = [comp.bRepBodies.item(i).name
-                              for i in range(comp.bRepBodies.count)]
+            # Sort by (-volume, bbox.min) for deterministic order among
+            # equal-volume mirror copies — emitter uses the same sort key.
+            body_keys = []
+            for i in range(comp.bRepBodies.count):
+                b = comp.bRepBodies.item(i)
+                try:
+                    bb = b.boundingBox
+                    key = (-b.volume,
+                           round(bb.minPoint.x, 4),
+                           round(bb.minPoint.y, 4),
+                           round(bb.minPoint.z, 4))
+                except:
+                    key = (-b.volume, 0, 0, 0)
+                body_keys.append((b.name, key))
+            body_keys.sort(key=lambda x: x[1])
+            info["bodies"] = [name for name, key in body_keys]
+            # Store volume+bbox for each body so the generator can use
+            # distance-based matching instead of relying on sort order.
+            body_geo = {}
+            for i in range(comp.bRepBodies.count):
+                b = comp.bRepBodies.item(i)
+                try:
+                    bb = b.boundingBox
+                    body_geo[b.name] = {
+                        "volume": round(b.volume, 4),
+                        "bbMin": [round(bb.minPoint.x, 4), round(bb.minPoint.y, 4), round(bb.minPoint.z, 4)],
+                        "bbMax": [round(bb.maxPoint.x, 4), round(bb.maxPoint.y, 4), round(bb.maxPoint.z, 4)],
+                    }
+                except:
+                    body_geo[b.name] = {"volume": round(b.volume, 4), "bbMin": [0,0,0], "bbMax": [0,0,0]}
+            info["bodyGeo"] = body_geo
             tl.moveToEnd()
         except:
             info["bodies"] = []

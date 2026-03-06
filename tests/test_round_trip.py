@@ -77,11 +77,13 @@ def get_timeline_features(capture_result):
 
 def _ensure_scratch_doc():
     """Ensure we're on a scratch (unsaved) document, never a saved one.
-    Reuses an existing unsaved doc if available instead of creating new ones."""
+    Reuses an existing unsaved doc if available instead of creating new ones.
+    CRITICAL: Aborts if active doc is saved after all attempts — prevents
+    destroying user documents with clean=True."""
     try:
         docs = json.loads(mcp("manage_documents", action="list")["content"][0]["text"])
     except Exception:
-        return  # manage_documents not available, proceed without check
+        raise RuntimeError("Cannot verify active document — aborting to protect saved docs")
 
     active = next((d for d in docs if d["isActive"]), None)
     if active and not active["isSaved"]:
@@ -91,11 +93,30 @@ def _ensure_scratch_doc():
     for d in docs:
         if not d["isSaved"] and not d["isActive"]:
             mcp("manage_documents", action="activate", index=d["index"])
-            return
+            # Verify switch worked
+            docs2 = json.loads(mcp("manage_documents", action="list")["content"][0]["text"])
+            active2 = next((d for d in docs2 if d["isActive"]), None)
+            if active2 and not active2["isSaved"]:
+                return
+            # Switch failed — fall through to creation
 
-    # No unsaved doc exists — create one
-    mcp("manage_documents", action="new")
-    # If active is unsaved, reuse it (clean=True will wipe it anyway)
+    # No unsaved doc exists — create Assembly Design (not Part Design)
+    import textwrap
+    mcp("execute_script", script=textwrap.dedent("""\
+        import adsk.core
+        def run(context):
+            app = adsk.core.Application.get()
+            app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+    """), clean=False)
+
+    # CRITICAL: Verify the active doc is now unsaved
+    docs3 = json.loads(mcp("manage_documents", action="list")["content"][0]["text"])
+    active3 = next((d for d in docs3 if d["isActive"]), None)
+    if not active3 or active3["isSaved"]:
+        raise RuntimeError(
+            f"FATAL: Active doc '{active3['name'] if active3 else '?'}' is SAVED "
+            f"after scratch doc creation. Aborting to prevent data loss."
+        )
 
 
 def run_fixture(name, fixture_path, verbose=False):

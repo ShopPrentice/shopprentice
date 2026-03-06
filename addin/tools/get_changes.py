@@ -75,36 +75,41 @@ def _capture_snapshot(design):
 
     walk(design.rootComponent)
 
-    # Body volumes for sandbox validation
-    body_volumes = {}
-    def walk_volumes(comp):
+    # Body volumes and bounding boxes for sandbox validation
+    # Collect raw list first to detect duplicate names across components
+    _body_raw = []  # [(body_name, comp_name, volume, bbox_dict)]
+    def walk_bodies(comp, comp_name="root"):
         for bi in range(comp.bRepBodies.count):
             body = comp.bRepBodies.item(bi)
             try:
-                body_volumes[body.name] = round(body.volume, 4)
+                vol = round(body.volume, 4)
             except:
-                pass
-        for occ in comp.occurrences:
-            walk_volumes(occ.component)
-    walk_volumes(design.rootComponent)
-    snapshot["bodyVolumes"] = body_volumes
-
-    # Body bounding boxes for position validation
-    body_bboxes = {}
-    def walk_bboxes(comp):
-        for bi in range(comp.bRepBodies.count):
-            body = comp.bRepBodies.item(bi)
+                continue
+            bbox = {}
             try:
                 bb = body.boundingBox
-                body_bboxes[body.name] = {
+                bbox = {
                     "min": [round(bb.minPoint.x, 4), round(bb.minPoint.y, 4), round(bb.minPoint.z, 4)],
                     "max": [round(bb.maxPoint.x, 4), round(bb.maxPoint.y, 4), round(bb.maxPoint.z, 4)],
                 }
             except:
                 pass
+            _body_raw.append((body.name, comp_name, vol, bbox))
         for occ in comp.occurrences:
-            walk_bboxes(occ.component)
-    walk_bboxes(design.rootComponent)
+            walk_bodies(occ.component, occ.component.name)
+    walk_bodies(design.rootComponent)
+    # Detect duplicate names and qualify with [component]
+    _name_counts = {}
+    for bname, _, _, _ in _body_raw:
+        _name_counts[bname] = _name_counts.get(bname, 0) + 1
+    body_volumes = {}
+    body_bboxes = {}
+    for bname, cname, vol, bbox in _body_raw:
+        key = "{} [{}]".format(bname, cname) if _name_counts[bname] > 1 else bname
+        body_volumes[key] = vol
+        if bbox:
+            body_bboxes[key] = bbox
+    snapshot["bodyVolumes"] = body_volumes
     snapshot["bodyBoundingBoxes"] = body_bboxes
 
     return snapshot

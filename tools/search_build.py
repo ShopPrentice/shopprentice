@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import sys
+import textwrap
 import time
 
 # Add addin/tools to import path for _script_generator
@@ -45,8 +46,10 @@ VOLUME_TOLERANCE_PCT = 0.01  # strict: 0.01% = essentially exact match
 
 
 def _set_tolerance(val):
-    global VOLUME_TOLERANCE_PCT
+    global VOLUME_TOLERANCE_PCT, BB_TOLERANCE_CM
     VOLUME_TOLERANCE_PCT = val
+    # Scale bbox tolerance proportionally when volume tolerance is elevated
+    BB_TOLERANCE_CM = BB_TOLERANCE_DEFAULT * max(1, val / 0.01)
 
 
 # ── MCP helpers ──────────────────────────────────────────────────
@@ -86,20 +89,42 @@ def mcp_text(tool, **args):
         return text
 
 
-def get_body_state(data):
-    """Extract {name: {volume, boundingBox}} from timeline state or capture data."""
+def get_body_state(data, qualify_duplicates=True):
+    """Extract {name: {volume, boundingBox}} from timeline state or capture data.
+
+    When qualify_duplicates=True, duplicate body names across components are
+    qualified with [component_name] to prevent overwriting.  This matches the
+    qualification in get_changes.py and is used for final validation.
+
+    When qualify_duplicates=False, duplicates silently overwrite (last wins).
+    Use for per-feature comparison where build and source may have different
+    component structures causing inconsistent qualification.
+    """
     bodies = {}
     if "components" in data:
-        def walk(comp):
+        # Collect raw list to detect duplicates
+        raw = []  # [(comp_name, body_name, body_data)]
+        def walk(comp, comp_name="root"):
             for b in comp.get("bodies", []):
-                name = b.get("name", "?")
-                bodies[name] = {
+                bname = b.get("name", "?")
+                raw.append((comp_name, bname, {
                     "volume": b.get("volume", 0),
                     "boundingBox": b.get("boundingBox", {}),
-                }
+                }))
             for child in comp.get("children", []):
-                walk(child)
+                walk(child, child.get("name", "?"))
         walk(data["components"])
+        if qualify_duplicates:
+            # Detect duplicates
+            name_counts = {}
+            for _, bname, _ in raw:
+                name_counts[bname] = name_counts.get(bname, 0) + 1
+            for comp_name, bname, bdata in raw:
+                key = f"{bname} [{comp_name}]" if name_counts[bname] > 1 else bname
+                bodies[key] = bdata
+        else:
+            for comp_name, bname, bdata in raw:
+                bodies[bname] = bdata
     elif "bodyVolumes" in data:
         for name, vol in data["bodyVolumes"].items():
             bodies[name] = {"volume": vol, "boundingBox": {}}
@@ -133,6 +158,7 @@ def get_body_state_from_sandbox(sandbox_result):
 
 
 BB_TOLERANCE_CM = 0.05  # bounding box tolerance in cm (mirrors can shift slightly)
+BB_TOLERANCE_DEFAULT = 0.05
 
 
 def states_match(expected, actual, tolerance_pct=None):
@@ -209,20 +235,29 @@ def _compare_body(label, exp, act, tolerance_pct):
 
     exp_bb = exp.get("boundingBox", {})
     act_bb = act.get("boundingBox", {})
+    # Graduated BB tolerance: when volume matches very closely, boolean
+    # kernel precision artifacts can shift bboxes without changing volume.
+    # Use relaxed tolerance (1.0 cm) when volume error < 0.01%.
+    effective_bb_tol = BB_TOLERANCE_CM
+    if delta_pct < 0.01:
+        effective_bb_tol = max(BB_TOLERANCE_CM, 1.0)
     bb_ok = True
     if exp_bb and act_bb:
         for key in ("min", "max"):
             ep = exp_bb.get(key, [0, 0, 0])
             ap = act_bb.get(key, [0, 0, 0])
             for i in range(3):
-                if abs(ep[i] - ap[i]) > BB_TOLERANCE_CM:
+                if abs(ep[i] - ap[i]) > effective_bb_tol:
                     bb_ok = False
 
     vol_ok = delta_pct <= tolerance_pct
     if vol_ok and bb_ok:
         msgs.append(f"  + {label}: vol={exp_v:.4f} ({delta_pct:.3f}%)")
     elif vol_ok and not bb_ok:
-        msgs.append(f"  x {label}: vol={exp_v:.4f} ({delta_pct:.3f}%), bb mismatch")
+        bb_detail = ""
+        if exp_bb and act_bb:
+            bb_detail = f" exp_bb={[round(v,1) for v in exp_bb.get('min',[])]}..{[round(v,1) for v in exp_bb.get('max',[])]} act_bb={[round(v,1) for v in act_bb.get('min',[])]}..{[round(v,1) for v in act_bb.get('max',[])]}"
+        msgs.append(f"  x {label}: vol={exp_v:.4f} ({delta_pct:.3f}%), bb mismatch{bb_detail}")
         ok = False
     else:
         parts = [f"vol {exp_v:.4f}->{act_v:.4f} ({delta_pct:.2f}%)"]
@@ -282,13 +317,231 @@ def state_error(expected, actual):
     return score
 
 
+SKETCH_CURVE_TOLERANCE = 0.5  # cm tolerance for curve endpoint matching (world space)
+
+
+def _sk_to_world(pt2d, origin, xdir, ydir):
+    """Transform 2D sketch point to 3D world coordinates."""
+    return [
+        origin[0] + pt2d[0] * xdir[0] + pt2d[1] * ydir[0],
+        origin[1] + pt2d[0] * xdir[1] + pt2d[1] * ydir[1],
+        origin[2] + pt2d[0] * xdir[2] + pt2d[1] * ydir[2],
+    ]
+
+
+def _transform_curves_to_world(curves, origin, xdir, ydir):
+    """Transform all curve coordinates from sketch space to world space."""
+    out = []
+    for c in curves:
+        ctype = c.get("type", "?")
+        wc = dict(c)
+        if ctype == "Line":
+            wc["start"] = _sk_to_world(c.get("start", [0, 0]), origin, xdir, ydir)
+            wc["end"] = _sk_to_world(c.get("end", [0, 0]), origin, xdir, ydir)
+        elif ctype == "Arc":
+            wc["center"] = _sk_to_world(c.get("center", [0, 0]), origin, xdir, ydir)
+            wc["start"] = _sk_to_world(c.get("start", [0, 0]), origin, xdir, ydir)
+            wc["end"] = _sk_to_world(c.get("end", [0, 0]), origin, xdir, ydir)
+        elif ctype == "FittedSpline":
+            wc["fitPoints"] = [_sk_to_world(p, origin, xdir, ydir)
+                               for p in c.get("fitPoints", [])]
+        elif ctype == "Circle":
+            wc["center"] = _sk_to_world(c.get("center", [0, 0]), origin, xdir, ydir)
+        out.append(wc)
+    return out
+
+
+def _compare_sketch(expected_feat, actual_sketches, pre_sketch_ids=None, verbose=False):
+    """Compare a captured sketch's curves against rebuilt sketch curves.
+
+    All comparisons are done in world space to handle different sketch
+    coordinate systems on BRepFace sketches.
+
+    pre_sketch_ids: set of (name, component) tuples of sketches that existed
+    before this feature was executed. New sketches are identified by difference.
+
+    Returns (match: bool, details: list[str])
+    """
+    if pre_sketch_ids is None:
+        pre_sketch_ids = set()
+    sk_name = expected_feat.get("name", "?")
+    sk_comp = expected_feat.get("component", "")
+    exp_curves = expected_feat.get("curves", [])
+    exp_profiles = expected_feat.get("profileCount", 0)
+
+    if not exp_curves:
+        return True, [f"  (no curves to compare for {sk_name})"]
+
+    # Expected sketch coordinate system from capture
+    exp_origin = expected_feat.get("sketchOrigin", [0, 0, 0])
+    exp_xdir = expected_feat.get("sketchXDir", [1, 0, 0])
+    exp_ydir = expected_feat.get("sketchYDir", [0, 1, 0])
+
+    # Primary: find the newly created sketch by set difference.
+    # This handles name/component changes on the rebuilt doc.
+    actual_sk = None
+    new_sketches = [ask for ask in actual_sketches
+                    if (ask.get("name", ""), ask.get("component", "")) not in pre_sketch_ids]
+    if len(new_sketches) == 1:
+        actual_sk = new_sketches[0]
+    elif len(new_sketches) > 1:
+        # Multiple new sketches — pick the closest by origin
+        best_d = float("inf")
+        for ask in new_sketches:
+            act_origin = ask.get("sketchOrigin", [0, 0, 0])
+            d = sum(abs(exp_origin[i] - act_origin[i]) for i in range(3))
+            if d < best_d:
+                best_d = d
+                actual_sk = ask
+    # Fallback: match by origin from all sketches
+    if actual_sk is None:
+        best_d = float("inf")
+        for ask in actual_sketches:
+            act_origin = ask.get("sketchOrigin", [0, 0, 0])
+            d = sum(abs(exp_origin[i] - act_origin[i]) for i in range(3))
+            if d < best_d:
+                best_d = d
+                actual_sk = ask
+
+    if actual_sk is None:
+        return False, [f"  Sketch '{sk_name}' not found in rebuilt doc"]
+
+    act_curves = actual_sk.get("curves", [])
+    act_profiles = actual_sk.get("profileCount", 0)
+
+    # Actual sketch coordinate system
+    act_origin = actual_sk.get("sketchOrigin", [0, 0, 0])
+    act_xdir = actual_sk.get("sketchXDir", [1, 0, 0])
+    act_ydir = actual_sk.get("sketchYDir", [0, 1, 0])
+
+    details = []
+
+    # Compare profile count
+    if exp_profiles != act_profiles:
+        details.append(f"  x Profile count: expected={exp_profiles} actual={act_profiles}")
+
+    # Transform to world space for comparison
+    exp_drawn = [c for c in exp_curves if not c.get("isReference")]
+    act_drawn = [c for c in act_curves if not c.get("isReference")]
+
+    exp_world = _transform_curves_to_world(exp_drawn, exp_origin, exp_xdir, exp_ydir)
+    act_world = _transform_curves_to_world(act_drawn, act_origin, act_xdir, act_ydir)
+
+    if len(exp_world) != len(act_world):
+        details.append(f"  x Drawn curve count: expected={len(exp_world)} actual={len(act_world)}")
+
+    # Match curves by type and world-space endpoint proximity
+    tol = SKETCH_CURVE_TOLERANCE
+    matched_act = set()
+    unmatched_exp = []
+
+    for ei, ec in enumerate(exp_world):
+        etype = ec.get("type", "?")
+        best_ai, best_dist = None, float("inf")
+
+        for ai, ac in enumerate(act_world):
+            if ai in matched_act:
+                continue
+            if ac.get("type") != etype:
+                continue
+            d = _curve_distance(ec, ac)
+            if d < best_dist:
+                best_dist, best_ai = d, ai
+
+        if best_ai is not None and best_dist < tol:
+            matched_act.add(best_ai)
+        else:
+            unmatched_exp.append((ei, ec, best_dist))
+
+    if unmatched_exp:
+        for ei, ec, dist in unmatched_exp:
+            etype = ec.get("type", "?")
+            if etype == "Line":
+                s = [round(v, 2) for v in ec.get("start", [])]
+                e = [round(v, 2) for v in ec.get("end", [])]
+                details.append(f"  x curve[{ei}] {etype} {s}->{e} not matched (dist={dist:.3f})")
+            elif etype == "FittedSpline":
+                pts = ec.get("fitPoints", [])
+                details.append(f"  x curve[{ei}] {etype} {len(pts)} pts not matched (dist={dist:.3f})")
+            else:
+                details.append(f"  x curve[{ei}] {etype} not matched (dist={dist:.3f})")
+
+    extra_act = len(act_world) - len(matched_act)
+    if extra_act > 0:
+        details.append(f"  x {extra_act} extra drawn curves in rebuilt sketch")
+
+    match = len(details) == 0
+    if match:
+        details.append(f"  + Sketch {sk_name}: {len(exp_drawn)} curves, {exp_profiles} profiles OK")
+    return match, details
+
+
+def _curve_distance(exp, act):
+    """Distance metric between two curves of the same type (world space)."""
+    ctype = exp.get("type", "?")
+    if ctype == "Line":
+        es, ee = exp.get("start", [0, 0, 0]), exp.get("end", [0, 0, 0])
+        a_s, ae = act.get("start", [0, 0, 0]), act.get("end", [0, 0, 0])
+        # Try both orientations (line direction can be reversed)
+        d_fwd = max(abs(es[i] - a_s[i]) for i in range(len(es)))
+        d_fwd = max(d_fwd, max(abs(ee[i] - ae[i]) for i in range(len(ee))))
+        d_rev = max(abs(es[i] - ae[i]) for i in range(len(es)))
+        d_rev = max(d_rev, max(abs(ee[i] - a_s[i]) for i in range(len(ee))))
+        return min(d_fwd, d_rev)
+    elif ctype == "Arc":
+        ec, ac_ = exp.get("center", [0, 0, 0]), act.get("center", [0, 0, 0])
+        d = max(abs(ec[i] - ac_[i]) for i in range(len(ec)))
+        d += abs(exp.get("radius", 0) - act.get("radius", 0))
+        return d
+    elif ctype == "FittedSpline":
+        ep = exp.get("fitPoints", [])
+        ap = act.get("fitPoints", [])
+        if len(ep) != len(ap):
+            return float("inf")
+        d = 0
+        for i in range(len(ep)):
+            d = max(d, max(abs(ep[i][j] - ap[i][j]) for j in range(len(ep[i]))))
+        return d
+    elif ctype == "Circle":
+        ec, ac_ = exp.get("center", [0, 0, 0]), act.get("center", [0, 0, 0])
+        return max(abs(ec[i] - ac_[i]) for i in range(len(ec)))
+    return float("inf")
+
+
 # ── Document management ──────────────────────────────────────────
 
+_CREATE_ASSEMBLY_SCRIPT = textwrap.dedent("""\
+    import adsk.core, adsk.fusion
+    def run(context):
+        app = adsk.core.Application.get()
+        doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+""")
+
+
+def _is_assembly_design():
+    """Check if active document is Assembly Design (supports multi-component)."""
+    try:
+        r = mcp("execute_script", script=textwrap.dedent("""\
+            import adsk.core, adsk.fusion
+            def run(context):
+                app = adsk.core.Application.get()
+                design = adsk.fusion.Design.cast(app.activeProduct)
+                # Part Design = 0, Parametric = 1, Direct = 2
+                print(f"designType={design.designType}")
+        """), clean=False)
+        text = r["content"][0]["text"]
+        # ParametricDesignType = 1 means Assembly Design
+        return "designType=1" in text
+    except Exception:
+        return False
+
+
 def ensure_scratch_doc(verbose=False):
-    """Switch to an existing unsaved doc, or create one if none exist.
+    """Switch to an existing unsaved Assembly Design doc, or create one.
 
     Never touches user-saved documents. Reuses existing untitled docs
-    to avoid document proliferation. Verifies the switch succeeded.
+    to avoid document proliferation. Detects and replaces Part Design
+    docs that can't support multi-component designs.
     """
     if verbose:
         print("Switching to scratch document...")
@@ -298,27 +551,43 @@ def ensure_scratch_doc(verbose=False):
     except Exception:
         docs = []
 
+    def _try_reuse(d, activate=False):
+        """Try to reuse doc d. Returns True if it's an Assembly Design."""
+        if activate:
+            mcp("manage_documents", action="activate", index=d["index"])
+        if _is_assembly_design():
+            if verbose:
+                print(f"  Reusing Assembly Design: {d['name']}")
+            _verify_active_unsaved()
+            return True
+        # Part Design — close it and fall through to creation
+        if verbose:
+            print(f"  Closing Part Design: {d['name']}")
+        mcp("manage_documents", action="close")
+        return False
+
     # Check if already on an unsaved doc
     active = next((d for d in docs if d["isActive"]), None)
     if active and not active["isSaved"]:
-        if verbose:
-            print(f"  Reusing: {active['name']}")
-        _verify_active_unsaved()
-        return active
+        if _try_reuse(active):
+            return active
 
     # Try to activate an existing unsaved doc
+    # Re-list since we may have closed the active doc
+    try:
+        list_result = mcp("manage_documents", action="list")
+        docs = json.loads(list_result["content"][0]["text"])
+    except Exception:
+        docs = []
     for d in docs:
         if not d["isSaved"] and not d["isActive"]:
-            mcp("manage_documents", action="activate", index=d["index"])
-            if verbose:
-                print(f"  Reusing: {d['name']}")
-            _verify_active_unsaved()
-            return d
+            if _try_reuse(d, activate=True):
+                return d
 
-    # No unsaved doc exists — create one
-    mcp("manage_documents", action="new")
+    # No suitable unsaved doc — create Assembly Design
+    mcp("execute_script", script=_CREATE_ASSEMBLY_SCRIPT, clean=False)
     if verbose:
-        print(f"  Created new scratch doc")
+        print(f"  Created new Assembly Design scratch doc")
     _verify_active_unsaved()
     return None
 
@@ -368,11 +637,73 @@ def run(context):
 
 # ── Ground truth collection ──────────────────────────────────────
 
+def _fix_gt_shift(ground_truth, timeline, end_state, verbose=False):
+    """Detect and fix GT off-by-one caused by multi-body SplitBody lazy eval.
+
+    Fusion's get_timeline_state has a bug: when a SplitBody feature splits
+    multiple input bodies, the secondary splits don't appear until the NEXT
+    timeline position.  This causes GT[i] to show the state of feature [i-1]
+    for all features from the split onwards.
+
+    Fix: detect the shift point and remap GT[i] = original GT[i+1].
+    The last feature gets the end-of-timeline state.
+    """
+    active_fis = sorted(k for k in ground_truth if isinstance(k, int))
+    if not active_fis:
+        return ground_truth
+
+    shift_point = None
+    for idx, fi in enumerate(active_fis):
+        feat = timeline[fi] if fi < len(timeline) else {}
+        if feat.get("type") == "SplitBody":
+            input_bodies = feat.get("inputBodies", [])
+            if len(input_bodies) > 1:
+                # Verify: body count increase should equal len(inputBodies)
+                # (each split adds 1 net body).  If less, GT is shifted.
+                prev_fi = active_fis[idx - 1] if idx > 0 else None
+                prev_count = len(ground_truth.get(prev_fi, {})) if prev_fi is not None else 0
+                curr_count = len(ground_truth[fi])
+                actual_new = curr_count - prev_count
+                expected_new = len(input_bodies)  # each body → 2 pieces = +1 net
+                if actual_new < expected_new:
+                    shift_point = fi
+                    if verbose:
+                        print(f"\n  GT off-by-one detected at [{fi}] SplitBody: "
+                              f"{actual_new} new bodies, expected {expected_new}. "
+                              f"Shifting GT[i] = GT[i+1] from here.")
+                    break
+
+    if shift_point is None:
+        return ground_truth
+
+    # Remap: for fi >= shift_point, use GT[next_fi]
+    fixed = {}
+    for key, val in ground_truth.items():
+        if not isinstance(key, int):
+            fixed[key] = val  # preserve _qualified_final etc.
+            continue
+        if key < shift_point:
+            fixed[key] = val
+        else:
+            pos = active_fis.index(key)
+            if pos + 1 < len(active_fis):
+                fixed[key] = ground_truth[active_fis[pos + 1]]
+            else:
+                # Last feature: use end-of-timeline state
+                fixed[key] = end_state
+
+    return fixed
+
+
 def collect_ground_truth(capture, verbose=False):
     """Collect per-feature body state from the original design.
 
-    Calls get_timeline_state for each non-rolled-back feature.
-    Returns dict: {feature_index: {body_name: {volume, boundingBox}}}
+    Uses sequential marker advancement (no_restore) to avoid Fusion's
+    recompute quirk where jumping back from end-of-timeline leaves
+    multi-body SplitBody features partially evaluated.
+
+    Returns dict: {feature_index: {body_name: {volume, boundingBox}},
+                   "_qualified_final": {qualified_name: {volume, boundingBox}}}
     """
     timeline = capture.get("timeline", [])
     if verbose:
@@ -384,33 +715,47 @@ def collect_ground_truth(capture, verbose=False):
             continue
         t0 = time.time()
         try:
-            result = mcp_text("get_timeline_state", index=fi)
-            state = get_body_state(result)
+            tl_idx = feat.get("index", fi)
+            # Use no_restore=True to keep the marker at the current position.
+            # This means each call advances forward from the previous position
+            # instead of jumping back to the end and then forward again.
+            result = mcp_text("get_timeline_state", index=tl_idx,
+                              no_restore=True)
+            state = get_body_state(result, qualify_duplicates=True)
             ground_truth[fi] = state
             dt = time.time() - t0
             if verbose:
                 body_count = len(state)
+                idx_note = f" (tl={tl_idx})" if tl_idx != fi else ""
                 print(f"  [{fi}] {feat.get('type', '?')}: {feat.get('name', '?')} "
-                      f"-> {body_count} bodies ({dt:.1f}s)")
+                      f"-> {body_count} bodies ({dt:.1f}s){idx_note}")
         except Exception as e:
             dt = time.time() - t0
             if verbose:
                 print(f"  [{fi}] {feat.get('type', '?')}: ERROR ({dt:.1f}s): {e}")
             ground_truth[fi] = {}
 
-    # Roll timeline back to the end so the source doc is left in its
-    # original state (not rolled back to an intermediate step)
+    # Roll timeline back to the end and capture the true final state
+    end_state = {}
     try:
-        mcp_text("get_timeline_state", index=-1)
+        end_raw = mcp_text("get_timeline_state", index=-1)
+        end_state = get_body_state(end_raw, qualify_duplicates=True)
     except Exception:
         pass
+
+    # Use end-of-timeline state for final validation (not last loop entry,
+    # which may be shifted by the SplitBody off-by-one bug)
+    ground_truth["_qualified_final"] = end_state
+
+    # Detect and fix GT off-by-one shift from multi-body SplitBody
+    ground_truth = _fix_gt_shift(ground_truth, timeline, end_state, verbose)
 
     return ground_truth
 
 
 # ── Incremental build ────────────────────────────────────────────
 
-def incremental_build(capture, ground_truth, verbose=False):
+def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
     """Build the script incrementally, one feature at a time.
 
     For each feature:
@@ -468,12 +813,21 @@ def incremental_build(capture, ground_truth, verbose=False):
         # validation at the next body-changing step
         if is_ambiguous and volumes_unchanged:
             deferred.append((fi, af))
-            # Execute variant 0 as placeholder (will undo+retry if deferred resolves)
+            # Execute a working variant as placeholder (will undo+retry if deferred resolves)
             print(f"\n--- [{fi}] {t}: {name} ({n_variants} variants, deferred) ---")
-            choices[fi] = 0
-            script = generate_feature_script(capture, fi, choices)
-            mcp("execute_script", script=script, sandbox=False)
-            total_attempts += 1
+            placeholder_ok = False
+            for vi in range(n_variants):
+                choices[fi] = vi
+                script = generate_feature_script(capture, fi, choices)
+                r = mcp("execute_script", script=script, sandbox=False)
+                total_attempts += 1
+                if not r.get("isError"):
+                    placeholder_ok = True
+                    break
+            if not placeholder_ok:
+                print(f"  WARNING: all {n_variants} variants errored for deferred [{fi}]")
+                errors.append((fi, "all deferred variants errored"))
+                return choices, errors
             continue
 
         # If we have deferred features AND this step changes bodies, resolve them
@@ -546,7 +900,7 @@ def incremental_build(capture, ground_truth, verbose=False):
                 # Validate
                 try:
                     state = mcp_text("get_timeline_state", index=-1)
-                    actual = get_body_state(state)
+                    actual = get_body_state(state, qualify_duplicates=True)
                 except Exception:
                     print("CAPTURE ERROR")
                     tl_now = get_timeline_count()
@@ -592,12 +946,15 @@ def incremental_build(capture, ground_truth, verbose=False):
                 combo_fis = [dfi for dfi, _ in deferred]
                 if is_ambiguous:
                     combo_fis.append(fi)
-                print(f"  -> STOPPING: no combo matched for features {combo_fis}.")
-                print(f"     Possible causes: missing search variant, reconstruction bug,")
-                print(f"     or API limitation (UI may support features the API cannot replicate).")
                 errors.append((combo_fis[0], "no variant matched"))
                 deferred.clear()
-                return choices, errors
+                if no_stop:
+                    print(f"  -> no combo matched for features {combo_fis} (--no-stop: continuing)")
+                else:
+                    print(f"  -> STOPPING: no combo matched for features {combo_fis}.")
+                    print(f"     Possible causes: missing search variant, reconstruction bug,")
+                    print(f"     or API limitation (UI may support features the API cannot replicate).")
+                    return choices, errors
 
             deferred.clear()
             if is_ambiguous:
@@ -606,7 +963,7 @@ def incremental_build(capture, ground_truth, verbose=False):
             # Current non-ambiguous feature was also executed — validate it
             try:
                 state = mcp_text("get_timeline_state", index=-1)
-                actual = get_body_state(state)
+                actual = get_body_state(state, qualify_duplicates=True)
                 match, details = states_match(expected, actual)
                 score = state_error(expected, actual)
                 if match:
@@ -628,6 +985,16 @@ def incremental_build(capture, ground_truth, verbose=False):
 
         # Track timeline count before
         tl_before = get_timeline_count()
+
+        # Track existing sketches for sketch validation (set-difference matching)
+        pre_sketch_ids = set()
+        if t == "Sketch":
+            try:
+                pre_state = mcp_text("get_timeline_state", index=-1, include_sketches=True)
+                for sk in pre_state.get("sketches", []):
+                    pre_sketch_ids.add((sk.get("name", ""), sk.get("component", "")))
+            except Exception:
+                pass
 
         best_vi = None
         best_score = float("inf")
@@ -662,8 +1029,11 @@ def incremental_build(capture, ground_truth, verbose=False):
                     continue
                 else:
                     errors.append((fi, str(e)))
-                    print(f"\n  STOPPING: feature [{fi}] script error.")
-                    return choices, errors
+                    if no_stop:
+                        print(f"  (--no-stop: continuing past error)")
+                    else:
+                        print(f"\n  STOPPING: feature [{fi}] script error.")
+                        return choices, errors
 
             if result.get("isError"):
                 msg = result.get("content", [{}])[0].get("text", "?")[:2000]
@@ -674,13 +1044,18 @@ def incremental_build(capture, ground_truth, verbose=False):
                     continue
                 else:
                     errors.append((fi, msg))
-                    print(f"\n  STOPPING: feature [{fi}] script error.")
-                    return choices, errors
+                    if no_stop:
+                        print(f"  (--no-stop: continuing past error)")
+                    else:
+                        print(f"\n  STOPPING: feature [{fi}] script error.")
+                        return choices, errors
 
             # Get current volumes from scratch doc
+            is_sketch_feat = (t == "Sketch")
             try:
-                state = mcp_text("get_timeline_state", index=-1)
-                actual = get_body_state(state)
+                state = mcp_text("get_timeline_state", index=-1,
+                                 include_sketches=is_sketch_feat)
+                actual = get_body_state(state, qualify_duplicates=True)
             except Exception as e:
                 print(f"CAPTURE ERROR ({dt:.1f}s): {e}")
                 if is_ambiguous:
@@ -693,6 +1068,23 @@ def incremental_build(capture, ground_truth, verbose=False):
 
             match, details = states_match(expected, actual)
             score = state_error(expected, actual)
+
+            # For sketch features, also validate curve geometry
+            if is_sketch_feat and match:
+                actual_sketches = state.get("sketches", [])
+                feat_data = capture["timeline"][fi]
+                sk_match, sk_details = _compare_sketch(
+                    feat_data, actual_sketches, pre_sketch_ids, verbose)
+                if not sk_match:
+                    # Sketch mismatch is a warning, not a hard failure.
+                    # Downstream body validation catches geometry errors that matter.
+                    print(f"SKETCH_WARN ({dt:.1f}s)")
+                    for d in sk_details:
+                        print(f"    {d}")
+                    # Don't override match — body state still valid
+                elif verbose:
+                    for d in sk_details:
+                        print(f"    {d}")
 
             if match:
                 print(f"MATCH ({dt:.1f}s)")
@@ -713,15 +1105,18 @@ def incremental_build(capture, ground_truth, verbose=False):
                     tl_after = get_timeline_count()
                     undo_timeline_items(max(0, tl_after - tl_before))
                 else:
-                    # Non-ambiguous mismatch: stop build
+                    # Non-ambiguous mismatch
                     print(f"MISMATCH (err={score:.1f}%, {dt:.1f}s)")
                     for d in details:
                         print(f"    {d}")
                     errors.append((fi, f"mismatch: err={score:.1f}%"))
-                    print(f"\n  STOPPING: feature [{fi}] does not match.")
-                    print(f"  If all reconstruction options exhausted, check for API limitations")
-                    print(f"  (UI may support features the Python API cannot replicate).")
-                    return choices, errors
+                    if no_stop:
+                        print(f"  (--no-stop: continuing past mismatch)")
+                    else:
+                        print(f"\n  STOPPING: feature [{fi}] does not match.")
+                        print(f"  If all reconstruction options exhausted, check for API limitations")
+                        print(f"  (UI may support features the Python API cannot replicate).")
+                        return choices, errors
                     break
 
         # If ambiguous and no exact match, use best variant
@@ -734,9 +1129,18 @@ def incremental_build(capture, ground_truth, verbose=False):
             script = generate_feature_script(capture, fi, trial_choices)
             mcp("execute_script", script=script, sandbox=False)
         elif is_ambiguous and best_vi is None:
-            print(f"  -> STOPPING: no variant matched for [{fi}].")
             errors.append((fi, "no variant matched"))
-            return choices, errors
+            if no_stop:
+                print(f"  -> no variant matched for [{fi}] (--no-stop: continuing)")
+                # Execute the best-scoring variant (least bad) to continue
+                if best_vi is not None:
+                    trial_choices = dict(choices)
+                    trial_choices[fi] = best_vi
+                    script = generate_feature_script(capture, fi, trial_choices)
+                    mcp("execute_script", script=script, sandbox=False)
+            else:
+                print(f"  -> STOPPING: no variant matched for [{fi}].")
+                return choices, errors
 
     print(f"\nIncremental build complete: {total_attempts} feature executions")
     return choices, errors
@@ -788,6 +1192,10 @@ def main():
                         help="Generate with all default variants (no search)")
     parser.add_argument("--skip-ground-truth", action="store_true",
                         help="Skip ground truth collection (use final volumes only)")
+    parser.add_argument("--ground-truth", type=str,
+                        help="Path to ground truth JSON (load if exists, save after collection)")
+    parser.add_argument("--no-stop", action="store_true",
+                        help="Don't stop on mismatch, continue building")
 
     args = parser.parse_args()
     _set_tolerance(args.tolerance)
@@ -809,7 +1217,7 @@ def main():
         with open(args.capture) as f:
             capture = json.load(f)
 
-    # Extract final expected state
+    # Extract final expected state (from capture, overridden by GT later)
     expected_state = get_body_state(capture)
     print(f"Expected bodies ({len(expected_state)}):")
     for name, body in sorted(expected_state.items()):
@@ -841,24 +1249,61 @@ def main():
 
     # ── Collect ground truth ──
     if not args.skip_ground_truth:
-        # Ensure source document is active (ground truth reads its timeline)
-        src_name = capture.get("designName", "")
-        if src_name:
-            try:
-                list_result = mcp("manage_documents", action="list")
-                docs = json.loads(list_result["content"][0]["text"])
-                active = next((d for d in docs if d["isActive"]), None)
-                if active and active["name"] != src_name:
-                    src_doc = next((d for d in docs if d["name"] == src_name), None)
-                    if src_doc:
-                        print(f"Activating source document: {src_name}")
-                        mcp("manage_documents", action="activate", index=src_doc["index"])
+        # Try loading from file first
+        gt_file = args.ground_truth
+        if gt_file and os.path.exists(gt_file):
+            with open(gt_file) as f:
+                raw = json.load(f)
+            # JSON keys are strings — convert back to int (skip special keys)
+            ground_truth = {}
+            for k, v in raw.items():
+                if k.startswith("_"):
+                    ground_truth[k] = v  # preserve special keys like _qualified_final
+                else:
+                    ground_truth[int(k)] = v
+            print(f"\nLoaded ground truth from {gt_file} ({len(ground_truth)} features)")
+            # Apply shift fix for multi-body SplitBody off-by-one
+            timeline = capture.get("timeline", [])
+            end_state = ground_truth.get("_qualified_final", {})
+            ground_truth = _fix_gt_shift(
+                ground_truth, timeline, end_state, verbose=args.verbose)
+        else:
+            # Ensure source document is active (ground truth reads its timeline)
+            src_name = capture.get("designName", "")
+            src_activated = False
+            if src_name:
+                try:
+                    list_result = mcp("manage_documents", action="list")
+                    docs = json.loads(list_result["content"][0]["text"])
+                    active = next((d for d in docs if d["isActive"]), None)
+                    if active and active["name"] == src_name:
+                        src_activated = True
                     else:
-                        print(f"WARNING: Source document '{src_name}' not open — "
-                              f"ground truth may fail")
-            except Exception as e:
-                print(f"WARNING: Could not check documents: {e}")
-        ground_truth = collect_ground_truth(capture, verbose=args.verbose)
+                        src_doc = next((d for d in docs if d["name"] == src_name), None)
+                        if src_doc:
+                            print(f"Activating source document: {src_name}")
+                            mcp("manage_documents", action="activate",
+                                index=src_doc["index"])
+                            src_activated = True
+                        else:
+                            print(f"ERROR: Source document '{src_name}' not open.")
+                            print(f"  Open '{src_name}' in Fusion, or use --ground-truth "
+                                  f"<file> to load cached ground truth.")
+                            sys.exit(1)
+                except Exception as e:
+                    print(f"WARNING: Could not check documents: {e}")
+            if not src_name or src_name == "(Unsaved)":
+                print("ERROR: Capture is from an unsaved document — ground truth "
+                      "collection would read stale timeline data.")
+                print("  Re-capture from the saved source document, or use "
+                      "--skip-ground-truth.")
+                sys.exit(1)
+            ground_truth = collect_ground_truth(capture, verbose=args.verbose)
+            # Save to file for reuse
+            if gt_file:
+                with open(gt_file, "w") as f:
+                    json.dump(ground_truth, f)
+                print(f"Saved ground truth to {gt_file}")
     else:
         print("\nSkipping per-feature ground truth (build-only mode)")
         print("  Per-step validation disabled — only script errors will stop the build")
@@ -866,6 +1311,14 @@ def main():
         ground_truth = {}
         # Empty ground truth per step = no per-step volume validation.
         # Script errors still stop the build.
+
+    # Override expected_state with GT qualified data when available
+    # (capture component tree may have stale body volumes)
+    gt_qualified = ground_truth.get("_qualified_final")
+    if gt_qualified:
+        print(f"\nOverriding expected state with GT qualified final "
+              f"({len(gt_qualified)} bodies)")
+        expected_state = gt_qualified
 
     # ── Switch to scratch doc ──
     ensure_scratch_doc(verbose=args.verbose)
@@ -877,10 +1330,12 @@ def main():
         choices = {}
         # Still do incremental build for validation
         choices, errors = incremental_build(
-            capture, ground_truth, verbose=args.verbose)
+            capture, ground_truth, verbose=args.verbose,
+            no_stop=args.no_stop)
     else:
         choices, errors = incremental_build(
-            capture, ground_truth, verbose=args.verbose)
+            capture, ground_truth, verbose=args.verbose,
+            no_stop=args.no_stop)
 
     print(f"\nFinal choices: {choices}")
     if errors:

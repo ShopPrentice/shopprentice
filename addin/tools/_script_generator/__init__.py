@@ -44,7 +44,7 @@ def get_ambiguous_features(capture):
     g = _Generator(capture)
     g._scan_needs()
     result = []
-    for fi, feat in enumerate(capture.get("timeline", [])):
+    for fi, feat in enumerate(g.cap.get("timeline", [])):
         if feat.get("isRolledBack"):
             continue
         variants = g._feature_variants(feat)

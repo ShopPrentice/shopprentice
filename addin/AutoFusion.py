@@ -81,6 +81,9 @@ def run(context):
             resources=registered_resources
         )
 
+        # Store MCP ref for hot-reload access
+        sys._autofusion_mcp = mcp
+
         if mcp:
             app.log(
                 f"AutoFusion started successfully!\n\n"

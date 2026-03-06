@@ -9,91 +9,9 @@ def _fmt_pt(pt):
 class _ExtrudeMixin:
     """Feature emitters for extrude, sweep, and move operations."""
 
-    def _feat_extrude(self, f):
-        name = f.get("name", "Extrude")
-        fvar = self._var(name)
-
-        op = f.get("operation", "NewBody")
-        dist = f.get("distance", "1 cm")
-        sketch = f.get("sketch", "")
-        pidx = f.get("profileIndex", 0)
-        taper = f.get("taperAngle")
+    def _emit_extrude_extent(self, f, dist, taper, flipped):
+        """Emit extent, taper settings on the 'inp' variable."""
         extent = f.get("extentType", "Distance")
-        bodies = f.get("bodies", [])
-        participants = f.get("participantBodies", [])
-        flipped = f.get("isDirectionFlipped", False)
-
-        # Detect negative-wrapped expressions: "-( expr )" means the extrude went
-        # opposite to the sketch plane normal. Unwrap and set flip.
-        if dist.startswith("-(") and dist.endswith(")"):
-            dist = dist[2:-1].strip()
-            flipped = True
-
-        op_map = {"NewBody": "NEWBODY", "Cut": "CUT", "Join": "JOIN",
-                  "Intersect": "adsk.fusion.FeatureOperations.IntersectFeatureOperation"}
-        op_code = op_map.get(op, "NEWBODY")
-
-        # Profile reference — match by bounding box from capture when available
-        prof = None
-        # Find the sketch feature that matches by name AND is the most recent
-        # one before this extrude (handles multiple sketches with the same name
-        # in different components)
-        sketch_feat = None
-        feat_idx = f.get("index", len(self.cap.get("timeline", [])))
-        for ti, tf in enumerate(self.cap.get("timeline", [])):
-            if ti >= feat_idx:
-                break
-            if tf.get("type") == "Sketch" and tf.get("name") == sketch:
-                sketch_feat = tf
-        cap_profiles = sketch_feat.get("profiles", []) if sketch_feat else []
-        target_prof = next((p for p in cap_profiles if p.get("index") == pidx), None)
-
-        if target_prof and sketch in self.sketches:
-            sk_var = self.sketches[sketch]
-            mn = target_prof["min"]
-            mx = target_prof["max"]
-            t_mnx, t_mny = round(mn[0], 4), round(mn[1], 4)
-            t_mxx, t_mxy = round(mx[0], 4), round(mx[1], 4)
-            # Transform captured bbox to actual sketch coordinate space
-            cap_xd = sketch_feat.get("sketchXDir") if sketch_feat else None
-            cap_yd = sketch_feat.get("sketchYDir") if sketch_feat else None
-            if cap_xd and cap_yd:
-                self._c(f"Match profile by bbox (transformed): ({t_mnx}, {t_mny}) to ({t_mxx}, {t_mxy})")
-                self._w(f"_cx = ({cap_xd[0]}, {cap_xd[1]}, {cap_xd[2]})")
-                self._w(f"_cy = ({cap_yd[0]}, {cap_yd[1]}, {cap_yd[2]})")
-                self._w(f"_ax = {sk_var}.xDirection")
-                self._w(f"_ay = {sk_var}.yDirection")
-                self._w(f"_m00 = _cx[0]*_ax.x + _cx[1]*_ax.y + _cx[2]*_ax.z")
-                self._w(f"_m01 = _cy[0]*_ax.x + _cy[1]*_ax.y + _cy[2]*_ax.z")
-                self._w(f"_m10 = _cx[0]*_ay.x + _cx[1]*_ay.y + _cx[2]*_ay.z")
-                self._w(f"_m11 = _cy[0]*_ay.x + _cy[1]*_ay.y + _cy[2]*_ay.z")
-                self._w(f"_t1 = ({t_mnx}*_m00 + {t_mny}*_m01, {t_mnx}*_m10 + {t_mny}*_m11)")
-                self._w(f"_t2 = ({t_mxx}*_m00 + {t_mxy}*_m01, {t_mxx}*_m10 + {t_mxy}*_m11)")
-                self._w(f"_t_mnx, _t_mny = min(_t1[0], _t2[0]), min(_t1[1], _t2[1])")
-                self._w(f"_t_mxx, _t_mxy = max(_t1[0], _t2[0]), max(_t1[1], _t2[1])")
-                t_ref = ("_t_mnx", "_t_mny", "_t_mxx", "_t_mxy")
-            else:
-                self._c(f"Match profile by bbox: ({t_mnx}, {t_mny}) to ({t_mxx}, {t_mxy})")
-                t_ref = (f"({t_mnx})", f"({t_mny})", f"({t_mxx})", f"({t_mxy})")
-            self._w(f"_best_pi, _best_d = 0, 1e10")
-            self._w(f"for _pi in range({sk_var}.profiles.count):")
-            self.ind += 1
-            self._w(f"_bb = {sk_var}.profiles.item(_pi).boundingBox")
-            self._w(f"_d = abs(_bb.minPoint.x - {t_ref[0]}) + abs(_bb.minPoint.y - {t_ref[1]}) + abs(_bb.maxPoint.x - {t_ref[2]}) + abs(_bb.maxPoint.y - {t_ref[3]})")
-            self._w(f"if _d < _best_d: _best_pi, _best_d = _pi, _d")
-            self.ind -= 1
-            prof = f"{sk_var}.profiles.item(_best_pi)"
-        elif sketch in self.profiles:
-            prof = self.profiles[sketch]
-        elif sketch in self.sketches:
-            prof = f"{self.sketches[sketch]}.profiles.item({pidx})"
-        else:
-            self._c(f"TODO: sketch '{sketch}' not tracked")
-            prof = "None"
-
-        self._w(f"inp = comp.features.extrudeFeatures.createInput({prof}, {op_code})")
-
-        # Two-sided extent
         if f.get("hasTwoExtents"):
             d2 = f.get("distanceTwo", "1 cm")
             t2 = f.get("taperAngleTwo")
@@ -121,14 +39,13 @@ class _ExtrudeMixin:
         if not f.get("hasTwoExtents") and taper and taper not in ("0.0 deg", "0 deg"):
             self._w(f'inp.taperAngle = adsk.core.ValueInput.createByString("{taper}")')
 
+    def _emit_extrude_participants(self, f, op, bodies, participants, dist, sketch):
+        """Emit participantBodies on the 'inp' variable."""
         if participants and op in ("Cut", "Join"):
             self._w(f"inp.participantBodies = {self._body_list(participants)}")
         elif not participants and op in ("Cut", "Join") and bodies:
-            # Infer participants from affected bodies when not explicitly captured
             self._w(f"inp.participantBodies = {self._body_list(bodies)}")
-        elif not participants and op in ("Cut", "Join") and not bodies:
-            # No participants and no bodies captured — infer from sketch plane.
-            # If the sketch is on a BRepFace, the face's body is the likely participant.
+        elif not participants and op == "Join" and not bodies:
             sketch_feat = None
             for tf in self.cap.get("timeline", []):
                 if tf.get("type") == "Sketch" and tf.get("name") == sketch:
@@ -138,7 +55,193 @@ class _ExtrudeMixin:
                 if sk_plane.get("type") == "BRepFace" and sk_plane.get("body"):
                     plane_body = sk_plane["body"]
                     pb_ref = self._body_ref(plane_body)
-                    self._w(f"if {pb_ref}: inp.participantBodies = [{pb_ref}]")
+                    is_negative = dist.lstrip().startswith("-")
+                    if is_negative:
+                        self._w(f'_pb = [comp.bRepBodies.item(_i) for _i in range(comp.bRepBodies.count) if comp.bRepBodies.item(_i).name != "{plane_body}"]')
+                        self._w(f"if _pb: inp.participantBodies = _pb")
+                    else:
+                        self._w(f"if {pb_ref}: inp.participantBodies = [{pb_ref}]")
+
+    def _feat_extrude(self, f):
+        name = f.get("name", "Extrude")
+        fvar = self._var(name)
+
+        op = f.get("operation", "NewBody")
+        dist = f.get("distance", "1 cm")
+        sketch = f.get("sketch", "")
+        pidx = f.get("profileIndex", 0)
+        taper = f.get("taperAngle")
+        bodies = f.get("bodies", [])
+        participants = f.get("participantBodies", [])
+        flipped = f.get("isDirectionFlipped", False)
+
+        # Detect negative-wrapped expressions: "-( expr )" means the extrude went
+        # opposite to the sketch plane normal. Unwrap and set flip.
+        if dist.startswith("-(") and dist.endswith(")"):
+            dist = dist[2:-1].strip()
+            flipped = True
+
+        op_map = {"NewBody": "NEWBODY", "Cut": "CUT", "Join": "JOIN",
+                  "Intersect": "adsk.fusion.FeatureOperations.IntersectFeatureOperation"}
+        op_code = op_map.get(op, "NEWBODY")
+
+        # Profile reference — match by bounding box from capture when available
+        prof = None
+        # Find the sketch feature that matches by name AND component
+        sketch_feat = None
+        sketch_comp = f.get("sketchComponent", f.get("component", ""))
+        feat_idx = f.get("index", len(self.cap.get("timeline", [])))
+        for ti, tf in enumerate(self.cap.get("timeline", [])):
+            if ti >= feat_idx:
+                break
+            if (tf.get("type") == "Sketch" and tf.get("name") == sketch
+                    and tf.get("component", "") == sketch_comp):
+                sketch_feat = tf
+        if sketch_feat is None:
+            # Fallback: match by name only (last one before this extrude)
+            for ti, tf in enumerate(self.cap.get("timeline", [])):
+                if ti >= feat_idx:
+                    break
+                if tf.get("type") == "Sketch" and tf.get("name") == sketch:
+                    sketch_feat = tf
+        cap_profiles = sketch_feat.get("profiles", []) if sketch_feat else []
+        profile_indices = f.get("profileIndices", [pidx])
+        target_profs = [
+            next((p for p in cap_profiles if p.get("index") == idx), None)
+            for idx in profile_indices
+        ]
+        target_profs = [t for t in target_profs if t is not None]
+
+        # Look up sketch variable by component-scoped key first
+        sk_key = f"{sketch_comp}:{sketch}" if sketch_comp else sketch
+        sk_var = self.sketches.get(sk_key, self.sketches.get(sketch))
+
+        # Determine coordinate transform availability
+        cap_xd = sketch_feat.get("sketchXDir") if sketch_feat else None
+        cap_yd = sketch_feat.get("sketchYDir") if sketch_feat else None
+        has_xf = bool(cap_xd and cap_yd)
+
+        if target_profs and sk_var:
+            is_multi = len(target_profs) > 1
+
+            # Detect cross-component multi-profile: ObjectCollection of profiles
+            # from a root-level sketch can't be used in a child component's
+            # createInput — Fusion doesn't auto-proxy ObjectCollection contents.
+            # Use sequential single-profile extrudes instead.
+            # Triggers when: _sketch_owners says "root" (set by _feat_sketch
+            # during full script generation), OR _force_sequential flag is set
+            # (set by _extrude_variants for search builder per-feature scripts).
+            sk_owner_key = f"{sketch_comp}:{sketch}" if sketch_comp else sketch
+            sk_owner = self._sketch_owners.get(sk_owner_key,
+                           self._sketch_owners.get(sketch, ""))
+            cross_comp_multi = (is_multi
+                and (sk_owner == "root" or f.get("_force_sequential"))
+                and self._comp_ref(f) != "root")
+
+            # Emit coordinate transform (once, reused for all profiles)
+            if has_xf:
+                self._w(f"_cx = ({cap_xd[0]}, {cap_xd[1]}, {cap_xd[2]})")
+                self._w(f"_cy = ({cap_yd[0]}, {cap_yd[1]}, {cap_yd[2]})")
+                self._w(f"_ax = {sk_var}.xDirection")
+                self._w(f"_ay = {sk_var}.yDirection")
+                self._w(f"_m00 = _cx[0]*_ax.x + _cx[1]*_ax.y + _cx[2]*_ax.z")
+                self._w(f"_m01 = _cy[0]*_ax.x + _cy[1]*_ax.y + _cy[2]*_ax.z")
+                self._w(f"_m10 = _cx[0]*_ay.x + _cx[1]*_ay.y + _cx[2]*_ay.z")
+                self._w(f"_m11 = _cy[0]*_ay.x + _cy[1]*_ay.y + _cy[2]*_ay.z")
+
+            if is_multi:
+                if cross_comp_multi:
+                    self._c(f"Cross-component multi-profile: {len(target_profs)} sequential extrudes")
+                    self._w(f"_matched_pis = []")
+                else:
+                    self._c(f"Multi-profile extrude: {len(target_profs)} profiles")
+                    self._w(f"_prof_coll = adsk.core.ObjectCollection.create()")
+                self._w(f"_used = set()")
+
+            for ti, tp in enumerate(target_profs):
+                mn = tp["min"]
+                mx = tp["max"]
+                t_mnx, t_mny = round(mn[0], 4), round(mn[1], 4)
+                t_mxx, t_mxy = round(mx[0], 4), round(mx[1], 4)
+                if has_xf:
+                    self._c(f"Match profile by bbox (transformed): ({t_mnx}, {t_mny}) to ({t_mxx}, {t_mxy})")
+                    self._w(f"_t1 = ({t_mnx}*_m00 + {t_mny}*_m01, {t_mnx}*_m10 + {t_mny}*_m11)")
+                    self._w(f"_t2 = ({t_mxx}*_m00 + {t_mxy}*_m01, {t_mxx}*_m10 + {t_mxy}*_m11)")
+                    self._w(f"_t_mnx, _t_mny = min(_t1[0], _t2[0]), min(_t1[1], _t2[1])")
+                    self._w(f"_t_mxx, _t_mxy = max(_t1[0], _t2[0]), max(_t1[1], _t2[1])")
+                    t_ref = ("_t_mnx", "_t_mny", "_t_mxx", "_t_mxy")
+                else:
+                    self._c(f"Match profile by bbox: ({t_mnx}, {t_mny}) to ({t_mxx}, {t_mxy})")
+                    t_ref = (f"({t_mnx})", f"({t_mny})", f"({t_mxx})", f"({t_mxy})")
+                self._w(f"_best_pi, _best_d = 0, 1e10")
+                self._w(f"for _pi in range({sk_var}.profiles.count):")
+                self.ind += 1
+                if is_multi:
+                    self._w(f"if _pi in _used: continue")
+                self._w(f"_bb = {sk_var}.profiles.item(_pi).boundingBox")
+                self._w(f"_d = abs(_bb.minPoint.x - {t_ref[0]}) + abs(_bb.minPoint.y - {t_ref[1]}) + abs(_bb.maxPoint.x - {t_ref[2]}) + abs(_bb.maxPoint.y - {t_ref[3]})")
+                self._w(f"if _d < _best_d: _best_pi, _best_d = _pi, _d")
+                self.ind -= 1
+                if is_multi:
+                    if cross_comp_multi:
+                        self._w(f"_matched_pis.append(_best_pi)")
+                    else:
+                        self._w(f"_prof_coll.add({sk_var}.profiles.item(_best_pi))")
+                    self._w(f"_used.add(_best_pi)")
+
+            # Cross-component multi-profile: sequential single-profile extrudes.
+            # For NewBody: first profile creates the body, subsequent profiles
+            # JOIN into it to produce a single merged body (matching the
+            # ObjectCollection behavior that creates one body from N profiles).
+            if cross_comp_multi:
+                self._w(f"_ext_results = []")
+                self._w(f"for _idx, _mi in enumerate(_matched_pis):")
+                self.ind += 1
+                if op == "NewBody":
+                    self._w(f"_op = NEWBODY if _idx == 0 else JOIN")
+                    self._w(f"inp = comp.features.extrudeFeatures.createInput({sk_var}.profiles.item(_mi), _op)")
+                else:
+                    self._w(f"inp = comp.features.extrudeFeatures.createInput({sk_var}.profiles.item(_mi), {op_code})")
+                self._emit_extrude_extent(f, dist, taper, flipped)
+                self._emit_extrude_participants(f, op, bodies, participants, dist, sketch)
+                if op == "NewBody":
+                    self._w(f"if _idx > 0: inp.participantBodies = [_ext_results[0].bodies.item(0)]")
+                self._w(f"_ext_results.append(comp.features.extrudeFeatures.add(inp))")
+                self.ind -= 1
+                self._w(f'_ext_results[0].name = "{name}"')
+                self.feats[name] = "_ext_results[0]"
+                if bodies:
+                    for i, bn in enumerate(bodies):
+                        bv = self._body_var(bn)
+                        if bv == fvar:
+                            bv = bv + "_b"
+                        self._register_body(bn, bv)
+                        self._w(f"{bv} = _ext_results[{i}].bodies.item(0)")
+                        self._w(f'{bv}.name = "{bn}"')
+                elif op == "NewBody":
+                    bv = self._body_var(name)
+                    if bv == fvar:
+                        bv = bv + "_b"
+                    self._register_body(name, bv)
+                    self._w(f"{bv} = _ext_results[0].bodies.item(0)")
+                    self._w(f'{bv}.name = "{name}"')
+                return
+
+            if is_multi:
+                prof = "_prof_coll"
+            else:
+                prof = f"{sk_var}.profiles.item(_best_pi)"
+        elif sketch in self.profiles:
+            prof = self.profiles[sketch]
+        elif sk_var:
+            prof = f"{sk_var}.profiles.item({pidx})"
+        else:
+            self._c(f"TODO: sketch '{sketch}' not tracked")
+            prof = "None"
+
+        self._w(f"inp = comp.features.extrudeFeatures.createInput({prof}, {op_code})")
+        self._emit_extrude_extent(f, dist, taper, flipped)
+        self._emit_extrude_participants(f, op, bodies, participants, dist, sketch)
 
         self._w(f"{fvar} = comp.features.extrudeFeatures.add(inp)")
         self._w(f'{fvar}.name = "{name}"')
@@ -146,23 +249,18 @@ class _ExtrudeMixin:
 
         if bodies:
             for i, bn in enumerate(bodies):
-                bv = self._var(bn)
+                bv = self._body_var(bn)
                 # Avoid collision with feature variable
                 if bv == fvar:
                     bv = bv + "_b"
-                # Track overwritten body variable for duplicate-name bodies
-                if bn in self.bodies and self.bodies[bn] != bv:
-                    self._prev_bodies[bn] = self.bodies[bn]
-                self.bodies[bn] = bv
+                self._register_body(bn, bv)
                 self._w(f"{bv} = {fvar}.bodies.item({i})")
                 self._w(f'{bv}.name = "{bn}"')
         elif op == "NewBody":
-            bv = self._var(name)
+            bv = self._body_var(name)
             if bv == fvar:
                 bv = bv + "_b"
-            if name in self.bodies and self.bodies[name] != bv:
-                self._prev_bodies[name] = self.bodies[name]
-            self.bodies[name] = bv
+            self._register_body(name, bv)
             self._w(f"{bv} = {fvar}.bodies.item(0)")
             self._w(f'{bv}.name = "{name}"')
 
@@ -213,7 +311,9 @@ class _ExtrudeMixin:
         if not indices:
             indices = [pidx]
 
-        sk_var = self.sketches.get(sketch_name)
+        sweep_comp = f.get("sketchComponent", f.get("component", ""))
+        sweep_sk_key = f"{sweep_comp}:{sketch_name}" if sweep_comp else sketch_name
+        sk_var = self.sketches.get(sweep_sk_key, self.sketches.get(sketch_name))
         if not sk_var:
             self._c(f"TODO: sketch '{sketch_name}' not tracked")
             prof_code = "None"
@@ -374,8 +474,9 @@ class _ExtrudeMixin:
             elif pe.get("source") == "SketchCurve":
                 sk_name = pe.get("parentSketch", "")
                 self._c(f"Path: SketchCurve from '{sk_name}'")
-                if sk_name in self.sketches:
-                    self._w(f"sweep_path = comp.features.createPath({self.sketches[sk_name]}.sketchCurves.item(0))  # TODO: correct curve")
+                _path_sk = self.sketches.get(f"{sweep_comp}:{sk_name}", self.sketches.get(sk_name))
+                if _path_sk:
+                    self._w(f"sweep_path = comp.features.createPath({_path_sk}.sketchCurves.item(0))  # TODO: correct curve")
                 else:
                     self._w(f"sweep_path = None  # TODO: sketch '{sk_name}'")
             else:
@@ -434,7 +535,7 @@ class _ExtrudeMixin:
         self.feats[name] = "sweep_feat"
 
         for i, bn in enumerate(bodies):
-            bv = self._var(bn)
-            self.bodies[bn] = bv
+            bv = self._body_var(bn)
+            self._register_body(bn, bv)
             self._w(f'{bv} = sweep_feat.bodies.item({i})')
             self._w(f'{bv}.name = "{bn}"')
