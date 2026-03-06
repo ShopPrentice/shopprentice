@@ -40,6 +40,15 @@ When the search builder stops at a feature, follow this decision tree:
 - Check bounding box positions
 - Compare profile count and curve positions if sketch-related
 
+### 1b. Is it a CASCADE?
+
+**CASCADE** — a body's volume changes but it's not a direct target of the feature:
+- Caused by Fusion's internal parametric dependency chain (e.g., fillet on wall changes deck board volume because deck sketch has partial coincidence with wall face boundary)
+- Signs: volume mismatch < 1%, bounding box matches, body not in feature's `bodies` or `inputs` list
+- The search builder auto-detects cascades and tracks volume deltas through subsequent features
+- Pattern copies of cascade bodies inherit the same delta (detected by matching known offsets against actual data)
+- **Never use base-name matching** to propagate cascades — bodies in different components can share names (e.g., "Body1 [deck5]" vs "Body1 [rafts (1)]")
+
 ### 2. Identify the Root Cause Category
 
 | Category | Signs | Fix Location |
@@ -54,6 +63,7 @@ When the search builder stops at a feature, follow this decision tree:
 | **Profile selection** | Wrong profile index, extrude creates wrong body | `_feat_extrude.py` → profile bbox matching |
 | **Body naming** | Bodies exist but with wrong names (split/rename) | `_core.py` → `_fixup_split_body_names`, rename logic |
 | **New feature type** | "TODO: Unsupported feature type" | Add `_feat_<type>` emitter |
+| **Parametric cascade** | Volume shifts on non-target bodies, < 1% | `search_build.py` → `_detect_cascades` auto-handles |
 
 ### 3. Capture Issues — What to Check
 
@@ -138,8 +148,8 @@ Create a fixture in `tests/fixtures/` when:
 - Modify user's saved document
 - Accept approximate matches (tolerance > 0.01%)
 - Skip validation steps
-- Create new documents (reuse existing Untitled)
 - Run ground truth collection on saved documents
+- Use base-name matching to propagate cascade deltas across components
 
 **Always:**
 - Verify active doc is unsaved before execute_script
@@ -147,3 +157,12 @@ Create a fixture in `tests/fixtures/` when:
 - Wrap constraints/dimensions in try/except for robustness
 - Use occurrence-proxied bodies for cross-component access
 - Save captures to files for reuse
+- Close and recreate the scratch doc if `clean=True` fails silently (stale params/features survive)
+
+## Scratch Document Stale State
+
+`_clean_design()` deletes timeline features + user parameters inside a transaction. If deletions fail silently (caught by `except: pass`), the document retains stale state. Subsequent `params.add()` calls fail with "param name is not valid" because the parameter already exists.
+
+**Signs:** prefix script reports OK but features immediately fail with `evaluateExpression` errors (parameters not found) or "param name is not valid".
+
+**Fix:** Close the Untitled scratch document via `manage_documents(action="close")` and let `ensure_scratch_doc` create a fresh one. This is faster than debugging which specific deletion failed.
