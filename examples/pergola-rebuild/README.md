@@ -1,6 +1,10 @@
-# Pergola with Attached Deck
+# Pergola with Attached Deck (Rebuild)
 
 A parametric pergola and deck structure modeled in Fusion 360. 90"W x 60"D pergola at 168" height, with an attached 135"W x 70"D elevated deck, diagonal braces, scarf-jointed posts, and 10 rafters.
+
+![Pergola overview](screenshots/overview.png)
+
+![Pergola front](screenshots/front.png)
 
 ## Regenerated Model
 
