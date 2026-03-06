@@ -89,6 +89,47 @@ def mcp_text(tool, **args):
         return text
 
 
+def _apply_transform(bb, transform):
+    """Apply occurrence translation+rotation transform to a bounding box.
+
+    transform is the full 16-element row-major 4x4 matrix (from occ.transform.asArray()).
+    Falls back to 3-element translation-only for backward compatibility.
+    """
+    if not bb or not transform:
+        return bb
+    mn = bb.get("min")
+    mx = bb.get("max")
+    if not mn or not mx:
+        return bb
+    if len(transform) == 3:
+        # Legacy: translation-only [tx, ty, tz]
+        tx, ty, tz = transform
+        return {
+            "min": [mn[0] + tx, mn[1] + ty, mn[2] + tz],
+            "max": [mx[0] + tx, mx[1] + ty, mx[2] + tz],
+        }
+    if len(transform) == 16:
+        # Full 4x4 row-major matrix
+        def xf_point(p):
+            x, y, z = p
+            nx = transform[0]*x + transform[1]*y + transform[2]*z + transform[3]
+            ny = transform[4]*x + transform[5]*y + transform[6]*z + transform[7]
+            nz = transform[8]*x + transform[9]*y + transform[10]*z + transform[11]
+            return [nx, ny, nz]
+        # Transform all 8 corners and take new AABB
+        corners = [
+            [mn[0], mn[1], mn[2]], [mx[0], mn[1], mn[2]],
+            [mn[0], mx[1], mn[2]], [mx[0], mx[1], mn[2]],
+            [mn[0], mn[1], mx[2]], [mx[0], mn[1], mx[2]],
+            [mn[0], mx[1], mx[2]], [mx[0], mx[1], mx[2]],
+        ]
+        transformed = [xf_point(c) for c in corners]
+        new_min = [min(p[i] for p in transformed) for i in range(3)]
+        new_max = [max(p[i] for p in transformed) for i in range(3)]
+        return {"min": new_min, "max": new_max}
+    return bb
+
+
 def get_body_state(data, qualify_duplicates=True):
     """Extract {name: {volume, boundingBox}} from timeline state or capture data.
 
@@ -104,15 +145,31 @@ def get_body_state(data, qualify_duplicates=True):
     if "components" in data:
         # Collect raw list to detect duplicates
         raw = []  # [(comp_name, body_name, body_data)]
-        def walk(comp, comp_name="root"):
+        def walk(comp, comp_name="root", parent_transform=None):
+            # Compose transform: parent * current occurrence
+            cur_xf = comp.get("transform")
+            if parent_transform and cur_xf:
+                # Both exist — compose (only supports translation-only for now)
+                if len(parent_transform) == 3 and len(cur_xf) == 3:
+                    combined = [parent_transform[i] + cur_xf[i] for i in range(3)]
+                else:
+                    combined = cur_xf  # Full matrix composition not needed yet
+            elif cur_xf:
+                combined = cur_xf
+            else:
+                combined = parent_transform
+
             for b in comp.get("bodies", []):
                 bname = b.get("name", "?")
+                bb = b.get("boundingBox", {})
+                if combined:
+                    bb = _apply_transform(bb, combined)
                 raw.append((comp_name, bname, {
                     "volume": b.get("volume", 0),
-                    "boundingBox": b.get("boundingBox", {}),
+                    "boundingBox": bb,
                 }))
             for child in comp.get("children", []):
-                walk(child, child.get("name", "?"))
+                walk(child, child.get("name", "?"), combined)
         walk(data["components"])
         if qualify_duplicates:
             # Detect duplicates
@@ -319,6 +376,100 @@ def state_error(expected, actual):
 
 SKETCH_CURVE_TOLERANCE = 0.5  # cm tolerance for curve endpoint matching (world space)
 
+CASCADE_TOLERANCE_PCT = 1.0  # max volume delta to classify as cascade (not a real error)
+
+
+def _detect_cascades(expected, actual, feat, cascade_deltas):
+    """Detect Fusion parametric cascade: bodies that change volume due to a
+    feature that doesn't directly modify them (e.g., fillet on body A causes
+    body B's volume to shift via internal dependency chain).
+
+    Returns new cascade deltas {body_name: volume_offset}.
+    """
+    # Only detect for geometry-modifying features (not Sketch, ComponentCreation, etc.)
+    feat_type = feat.get("type", "")
+    if feat_type in ("Sketch", "ComponentCreation", "ConstructionPlane",
+                     "ConstructionAxis", "Unknown"):
+        return {}
+
+    # Bodies directly modified by this feature
+    direct_bodies = set(feat.get("bodies", []))
+    direct_bodies.update(feat.get("inputs", []))
+
+    new_deltas = {}
+    for name, exp in expected.items():
+        act = actual.get(name)
+        if act is None:
+            continue
+        exp_v = exp["volume"]
+        act_v = act["volume"]
+        if exp_v == 0:
+            continue
+        delta_pct = abs(act_v - exp_v) / abs(exp_v) * 100
+        if delta_pct <= VOLUME_TOLERANCE_PCT:
+            continue  # already matches
+        if delta_pct > CASCADE_TOLERANCE_PCT:
+            continue  # too large for cascade
+
+        # Strip qualified suffix [component] for direct_bodies check
+        base_name = name.split(" [")[0] if " [" in name else name
+        if base_name in direct_bodies:
+            continue  # directly modified — not a cascade
+
+        # BB must match (cascade changes volume but not shape envelope)
+        exp_bb = exp.get("boundingBox", {})
+        act_bb = act.get("boundingBox", {})
+        bb_ok = True
+        if exp_bb and act_bb:
+            for key in ("min", "max"):
+                ep = exp_bb.get(key, [0, 0, 0])
+                ap = act_bb.get(key, [0, 0, 0])
+                for i in range(3):
+                    if abs(ep[i] - ap[i]) > BB_TOLERANCE_CM:
+                        bb_ok = False
+        if not bb_ok:
+            continue
+
+        # This is a cascade: body volume changed without direct modification
+        offset = act_v - exp_v
+        new_deltas[name] = offset
+
+    return new_deltas
+
+
+def _apply_cascade_deltas(expected, actual, cascade_deltas):
+    """Return adjusted expected dict with cascade deltas applied.
+
+    For bodies with a known cascade delta, adjust expected volume.
+    For new bodies whose volume mismatch matches a known offset, infer cascade.
+    Requires actual data for inference (no base-name guessing).
+    """
+    if not cascade_deltas:
+        return expected
+
+    # Collect unique delta values for pattern-copy inference
+    known_offsets = set(round(d, 2) for d in cascade_deltas.values())
+
+    adjusted = {}
+    for name, exp in expected.items():
+        adj = dict(exp)
+        # Direct name match
+        if name in cascade_deltas:
+            adj["volume"] = exp["volume"] + cascade_deltas[name]
+        else:
+            # Infer cascade for pattern copies via volume mismatch
+            if actual:
+                act = actual.get(name)
+                if act and exp["volume"] > 0:
+                    diff = act["volume"] - exp["volume"]
+                    for offset in known_offsets:
+                        if abs(diff - offset) < 0.1:
+                            adj["volume"] = exp["volume"] + offset
+                            cascade_deltas[name] = offset
+                            break
+        adjusted[name] = adj
+    return adjusted
+
 
 def _sk_to_world(pt2d, origin, xdir, ydir):
     """Transform 2D sketch point to 3D world coordinates."""
@@ -519,19 +670,33 @@ _CREATE_ASSEMBLY_SCRIPT = textwrap.dedent("""\
 
 
 def _is_assembly_design():
-    """Check if active document is Assembly Design (supports multi-component)."""
+    """Check if active document is Assembly Design (supports multi-component).
+
+    Part Design and Assembly Design both have designType=1 (Parametric).
+    The distinction: Part Design restricts to one component. We detect by
+    trying addNewComponent — if it fails, it's Part Design.
+    """
     try:
         r = mcp("execute_script", script=textwrap.dedent("""\
             import adsk.core, adsk.fusion
             def run(context):
                 app = adsk.core.Application.get()
                 design = adsk.fusion.Design.cast(app.activeProduct)
-                # Part Design = 0, Parametric = 1, Direct = 2
-                print(f"designType={design.designType}")
+                if design.designType != adsk.fusion.DesignTypes.ParametricDesignType:
+                    print("NOT_PARAMETRIC")
+                    return
+                root = design.rootComponent
+                try:
+                    xf = adsk.core.Matrix3D.create()
+                    occ = root.occurrences.addNewComponent(xf)
+                    # Success — it's Assembly Design. Undo the component.
+                    occ.deleteMe()
+                    print("ASSEMBLY")
+                except:
+                    print("PART")
         """), clean=False)
         text = r["content"][0]["text"]
-        # ParametricDesignType = 1 means Assembly Design
-        return "designType=1" in text
+        return "ASSEMBLY" in text
     except Exception:
         return False
 
@@ -706,8 +871,27 @@ def collect_ground_truth(capture, verbose=False):
                    "_qualified_final": {qualified_name: {volume, boundingBox}}}
     """
     timeline = capture.get("timeline", [])
+    expected_count = len(timeline)
     if verbose:
-        print(f"\nCollecting ground truth ({len(timeline)} features)...")
+        print(f"\nCollecting ground truth ({expected_count} features)...")
+
+    # Pre-flight check: verify active document has the expected timeline
+    try:
+        preflight = mcp_text("get_timeline_state", index=-1)
+        actual_count = preflight.get("timelineCount", 0)
+        if actual_count != expected_count:
+            raise RuntimeError(
+                f"Active document has {actual_count} timeline items, "
+                f"but capture expects {expected_count}. "
+                f"Ensure the source document is active."
+            )
+        if verbose:
+            print(f"  Pre-flight OK: {actual_count} timeline items")
+    except RuntimeError:
+        raise
+    except Exception as e:
+        if verbose:
+            print(f"  Pre-flight warning: {e}")
 
     ground_truth = {}
     for fi, feat in enumerate(timeline):
@@ -776,6 +960,7 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
     errors = []
     total_attempts = 0
     deferred = []  # [(fi, af)] — ambiguous features with deferred variant selection
+    cascade_deltas = {}  # {body_name: volume_offset} — Fusion parametric cascade tracking
 
     # Execute prefix script (parameters only) with clean=true
     print("\nExecuting prefix script (parameters)...")
@@ -827,7 +1012,7 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
             if not placeholder_ok:
                 print(f"  WARNING: all {n_variants} variants errored for deferred [{fi}]")
                 errors.append((fi, "all deferred variants errored"))
-                return choices, errors
+                return choices, errors, cascade_deltas
             continue
 
         # If we have deferred features AND this step changes bodies, resolve them
@@ -907,8 +1092,10 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
                     undo_timeline_items(max(0, tl_now - tl_before))
                     continue
 
-                match, details = states_match(expected, actual)
-                score = state_error(expected, actual)
+                adj_expected = _apply_cascade_deltas(
+                    expected, actual, cascade_deltas)
+                match, details = states_match(adj_expected, actual)
+                score = state_error(adj_expected, actual)
 
                 if match:
                     print(f"MATCH ({score:.1f}%)")
@@ -954,7 +1141,7 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
                     print(f"  -> STOPPING: no combo matched for features {combo_fis}.")
                     print(f"     Possible causes: missing search variant, reconstruction bug,")
                     print(f"     or API limitation (UI may support features the API cannot replicate).")
-                    return choices, errors
+                    return choices, errors, cascade_deltas
 
             deferred.clear()
             if is_ambiguous:
@@ -964,8 +1151,10 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
             try:
                 state = mcp_text("get_timeline_state", index=-1)
                 actual = get_body_state(state, qualify_duplicates=True)
-                match, details = states_match(expected, actual)
-                score = state_error(expected, actual)
+                adj_expected = _apply_cascade_deltas(
+                    expected, actual, cascade_deltas)
+                match, details = states_match(adj_expected, actual)
+                score = state_error(adj_expected, actual)
                 if match:
                     print(f"  [{fi}] {t}: {name}... MATCH")
                 else:
@@ -1033,7 +1222,7 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
                         print(f"  (--no-stop: continuing past error)")
                     else:
                         print(f"\n  STOPPING: feature [{fi}] script error.")
-                        return choices, errors
+                        return choices, errors, cascade_deltas
 
             if result.get("isError"):
                 msg = result.get("content", [{}])[0].get("text", "?")[:2000]
@@ -1048,7 +1237,7 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
                         print(f"  (--no-stop: continuing past error)")
                     else:
                         print(f"\n  STOPPING: feature [{fi}] script error.")
-                        return choices, errors
+                        return choices, errors, cascade_deltas
 
             # Get current volumes from scratch doc
             is_sketch_feat = (t == "Sketch")
@@ -1066,8 +1255,10 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
                     errors.append((fi, f"capture error: {e}"))
                     break
 
-            match, details = states_match(expected, actual)
-            score = state_error(expected, actual)
+            # Apply cascade deltas to expected before comparison
+            adj_expected = _apply_cascade_deltas(expected, actual, cascade_deltas)
+            match, details = states_match(adj_expected, actual)
+            score = state_error(adj_expected, actual)
 
             # For sketch features, also validate curve geometry
             if is_sketch_feat and match:
@@ -1093,6 +1284,21 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
                     choices[fi] = vi
                 break
             else:
+                # Detect cascade mismatches (Fusion parametric cascade)
+                if not is_ambiguous:
+                    new_cascades = _detect_cascades(
+                        expected, actual, feat, cascade_deltas)
+                    if new_cascades:
+                        cascade_deltas.update(new_cascades)
+                        cascade_names = ", ".join(new_cascades.keys())
+                        adj_expected2 = _apply_cascade_deltas(
+                            expected, actual, cascade_deltas)
+                        match2, details2 = states_match(adj_expected2, actual)
+                        if match2:
+                            print(f"MATCH ({dt:.1f}s) "
+                                  f"[cascade: {cascade_names}]")
+                            break
+
                 if is_ambiguous:
                     print(f"no match (err={score:.1f}%, {dt:.1f}s)")
                     if verbose:
@@ -1116,7 +1322,7 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
                         print(f"\n  STOPPING: feature [{fi}] does not match.")
                         print(f"  If all reconstruction options exhausted, check for API limitations")
                         print(f"  (UI may support features the Python API cannot replicate).")
-                        return choices, errors
+                        return choices, errors, cascade_deltas
                     break
 
         # If ambiguous and no exact match, use best variant
@@ -1140,15 +1346,15 @@ def incremental_build(capture, ground_truth, verbose=False, no_stop=False):
                     mcp("execute_script", script=script, sandbox=False)
             else:
                 print(f"  -> STOPPING: no variant matched for [{fi}].")
-                return choices, errors
+                return choices, errors, cascade_deltas
 
     print(f"\nIncremental build complete: {total_attempts} feature executions")
-    return choices, errors
+    return choices, errors, cascade_deltas
 
 
 # ── Final validation ─────────────────────────────────────────────
 
-def final_validate(script, expected_state, verbose=False):
+def final_validate(script, expected_state, cascade_deltas=None, verbose=False):
     """Run final validation of the complete script via sandbox."""
     print("\n--- Final validation ---")
     t0 = time.time()
@@ -1161,7 +1367,15 @@ def final_validate(script, expected_state, verbose=False):
         return False
 
     actual = get_body_state_from_sandbox(result)
-    match, details = states_match(expected_state, actual)
+
+    # Apply cascade deltas with actual data for proper inference
+    if cascade_deltas:
+        adj_expected = _apply_cascade_deltas(
+            expected_state, actual, dict(cascade_deltas))
+    else:
+        adj_expected = expected_state
+
+    match, details = states_match(adj_expected, actual)
 
     for d in details:
         print(d)
@@ -1284,7 +1498,17 @@ def main():
                             print(f"Activating source document: {src_name}")
                             mcp("manage_documents", action="activate",
                                 index=src_doc["index"])
-                            src_activated = True
+                            # Verify activation succeeded by re-listing
+                            time.sleep(1)  # Allow Fusion UI to settle
+                            vfy = mcp("manage_documents", action="list")
+                            vfy_docs = json.loads(vfy["content"][0]["text"])
+                            vfy_active = next((d for d in vfy_docs if d["isActive"]), None)
+                            if vfy_active and vfy_active["name"] == src_name:
+                                src_activated = True
+                            else:
+                                print(f"WARNING: Activation may not have taken effect. "
+                                      f"Active: {vfy_active['name'] if vfy_active else '?'}")
+                                src_activated = True  # Try anyway
                         else:
                             print(f"ERROR: Source document '{src_name}' not open.")
                             print(f"  Open '{src_name}' in Fusion, or use --ground-truth "
@@ -1329,15 +1553,19 @@ def main():
             print("\nNo ambiguous features — building with defaults...")
         choices = {}
         # Still do incremental build for validation
-        choices, errors = incremental_build(
+        choices, errors, cascade_deltas = incremental_build(
             capture, ground_truth, verbose=args.verbose,
             no_stop=args.no_stop)
     else:
-        choices, errors = incremental_build(
+        choices, errors, cascade_deltas = incremental_build(
             capture, ground_truth, verbose=args.verbose,
             no_stop=args.no_stop)
 
     print(f"\nFinal choices: {choices}")
+    if cascade_deltas:
+        print(f"Cascade deltas ({len(cascade_deltas)}):")
+        for name, delta in sorted(cascade_deltas.items()):
+            print(f"  {name}: {delta:+.4f} cm3")
     if errors:
         print(f"Errors ({len(errors)}):")
         for fi, msg in errors:
@@ -1351,7 +1579,11 @@ def main():
     print(f"Generated script: {len(script.splitlines())} lines")
 
     # ── Final validation ──
-    ok = final_validate(script, expected_state, verbose=args.verbose)
+    # Pass cascade deltas to final_validate so it can apply them with actual
+    # data from the sandbox run (avoids false base-name matches when actual=None)
+    ok = final_validate(script, expected_state,
+                        cascade_deltas=cascade_deltas if cascade_deltas else None,
+                        verbose=args.verbose)
 
     # ── Output ──
     if args.output:

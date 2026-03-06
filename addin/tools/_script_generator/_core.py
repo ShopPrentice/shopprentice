@@ -100,10 +100,21 @@ class _CoreMixin:
                     if resolved != inp_name:
                         inputs[ii] = resolved
 
-            # Mirror: fix input bodies
+            # Mirror: fix input bodies (skip feature names for Adjust mirrors)
             if ftype == "Mirror":
+                is_adjust = feat.get("computeOption") == "Adjust"
                 inputs = feat.get("inputBodies", [])
+                # Collect feature names for Adjust mirror detection
+                feat_names = set()
+                if is_adjust:
+                    for pi in range(fi):
+                        pf = timeline[pi]
+                        if pf.get("type") in ("Extrude", "Sweep", "SplitBody",
+                                                "RectangularPattern"):
+                            feat_names.add(pf.get("name", ""))
                 for ii, inp_name in enumerate(inputs):
+                    if is_adjust and inp_name in feat_names:
+                        continue  # Feature name, not body name
                     resolved = self._resolve_body_at(timeline, inp_name, fi)
                     if resolved != inp_name:
                         inputs[ii] = resolved
@@ -549,6 +560,12 @@ class _CoreMixin:
                     else:
                         self._w(f'{bv} = find_body("{bn}")')
                     self._register_body(bn, bv)
+                # Register feature for Adjust mirror lookups
+                if t == "Extrude" and name:
+                    fvar = self._var(f"_feat_{name}_{comp_name}" if comp_name else f"_feat_{name}")
+                    c_ref = self.components.get(comp_name, "root") if comp_name and comp_name != self._root_name else "root"
+                    self._w(f'{fvar} = {c_ref}.features.extrudeFeatures.itemByName("{name}")')
+                    self.feats[name] = fvar
 
             elif t == "Remove":
                 removed = feat.get("removedBody", "")

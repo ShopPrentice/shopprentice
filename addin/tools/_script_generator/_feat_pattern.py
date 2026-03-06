@@ -96,13 +96,10 @@ class _PatternMixin:
             adx, ady, adz = abs(dx), abs(dy), abs(dz)
             if ady >= adx and ady >= adz:
                 sort_attr = "y"
-                sign = 1 if dy >= 0 else -1
             elif adz >= adx and adz >= ady:
                 sort_attr = "z"
-                sign = 1 if dz >= 0 else -1
             else:
                 sort_attr = "x"
-                sign = 1 if dx >= 0 else -1
             # Find new bodies created by pattern
             self._w("_pat_copies = []")
             self._w("for _i in range(comp.bRepBodies.count):")
@@ -112,8 +109,9 @@ class _PatternMixin:
             self.ind += 1
             self._w("_pat_copies.append(_b)")
             self.ind -= 2
+            # Sort ascending by coordinate — matches capture's patternCopies order
             self._w(f"_pat_copies.sort(key=lambda _b:"
-                     f" {sign} * getattr(_b.boundingBox.minPoint, '{sort_attr}'))")
+                     f" getattr(_b.boundingBox.minPoint, '{sort_attr}'))")
             for i, bn in enumerate(pattern_copies):
                 bv = self._body_var(bn)
                 self._register_body(bn, bv)

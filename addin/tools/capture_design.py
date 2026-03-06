@@ -48,11 +48,18 @@ def _capture_all_bodies(root_comp):
         if occ:
             try:
                 t = occ.transform
-                info["transform"] = [
-                    round(t.translation.x, 4),
-                    round(t.translation.y, 4),
-                    round(t.translation.z, 4),
-                ]
+                # Store full 4x4 matrix in row-major order using getCell
+                # for unambiguous layout: [r00,r01,r02,tx, r10,r11,r12,ty, ...]
+                cells = []
+                is_identity = True
+                for row in range(4):
+                    for col in range(4):
+                        val = t.getCell(row, col)
+                        cells.append(round(val, 6))
+                        if abs(val - (1.0 if row == col else 0.0)) > 1e-9:
+                            is_identity = False
+                if not is_identity:
+                    info["transform"] = cells
             except:
                 pass
         for child_occ in comp.occurrences:
@@ -76,11 +83,18 @@ def _capture_component_tree(root_comp):
         if occ:
             try:
                 t = occ.transform
-                info["transform"] = [
-                    round(t.translation.x, 4),
-                    round(t.translation.y, 4),
-                    round(t.translation.z, 4),
-                ]
+                # Store full 4x4 matrix in row-major order using getCell
+                # for unambiguous layout: [r00,r01,r02,tx, r10,r11,r12,ty, ...]
+                cells = []
+                is_identity = True
+                for row in range(4):
+                    for col in range(4):
+                        val = t.getCell(row, col)
+                        cells.append(round(val, 6))
+                        if abs(val - (1.0 if row == col else 0.0)) > 1e-9:
+                            is_identity = False
+                if not is_identity:
+                    info["transform"] = cells
             except:
                 pass
         for child_occ in comp.occurrences:
@@ -326,6 +340,24 @@ def handler() -> dict:
                         pass
                     out["timeline"].append(feat_info)
                     continue
+            except:
+                pass
+
+            # CopyPasteBody (when item.entity succeeds)
+            try:
+                if entity.objectType == "adsk::fusion::CopyPasteBody":
+                    cpb = adsk.fusion.CopyPasteBody.cast(entity)
+                    if cpb:
+                        src_names = [cpb.sourceBody.item(i).name
+                                     for i in range(cpb.sourceBody.count)]
+                        out_names = [cpb.bodies.item(i).name
+                                     for i in range(cpb.bodies.count)]
+                        feat_info["type"] = "CopyPasteBody"
+                        feat_info["name"] = cpb.name
+                        feat_info["sourceBody"] = src_names
+                        feat_info["bodies"] = out_names
+                        out["timeline"].append(feat_info)
+                        continue
             except:
                 pass
 

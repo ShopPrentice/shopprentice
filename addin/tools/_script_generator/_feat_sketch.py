@@ -191,6 +191,24 @@ class _SketchMixin:
         # Track plane's owning component for cross-component proxy
         self._plane_comps[var] = comp_name or self._root_name
 
+    @staticmethod
+    def _sketch_entity_pt(entity_ref, curves):
+        """Return (x, y) sketch coordinate for a dimension entity reference."""
+        if not entity_ref or entity_ref.get("type") != "SketchPoint":
+            return None
+        ci = entity_ref.get("curveIndex")
+        role = entity_ref.get("role")
+        if ci is None or ci >= len(curves):
+            return entity_ref.get("position")  # fallback
+        c = curves[ci]
+        if role == "start":
+            return c.get("start")
+        elif role == "end":
+            return c.get("end")
+        elif role == "center":
+            return c.get("center")
+        return None
+
     def _resolve_planar_entity(self, info):
         """Resolve a captured planar entity reference to a code expression."""
         if not info:
@@ -212,8 +230,7 @@ class _SketchMixin:
             body_name = info.get("body", "")
             pof = info.get("pointOnFace", [0, 0, 0])
             bv = self._body_ref(body_name)
-            return (f"find_face_near({bv}, "
-                    f"adsk.core.Point3D.create({pof[0]}, {pof[1]}, {pof[2]}))")
+            return f"find_face_near({bv}, {pof[0]}, {pof[1]}, {pof[2]})"
         return "comp.xYConstructionPlane"
 
     def _feat_sketch(self, f):
@@ -1184,6 +1201,49 @@ class _SketchMixin:
                 else:
                     self._c(f"TODO: SketchFixedSpline[{i}] has no control points")
 
+        constraints = feat.get("constraints", [])
+        _early_ci = set()
+
+        # Pin construction lines referenced by angular dims with an
+        # explicit H distance dimension.  Without this, the construction
+        # line collapses (endpoint drifts to near the shared start point)
+        # before its H/V constraint is applied in the constraint phase.
+        # addFix() fails on shared-endpoint lines and on SketchPoints,
+        # so we use a distance dimension to lock the horizontal extent.
+        _pinned_const = set()   # curve indices with explicit pin dim
+        if dims:
+            _const_curves = {}  # curveIndex → curve dict
+            for _ci2, _c2 in enumerate(feat.get("curves", [])):
+                if _c2.get("isConstruction") and _c2.get("type") == "Line":
+                    _const_curves[_ci2] = _c2
+            if _const_curves:
+                _to_pin = set()
+                for _d2 in dims:
+                    if _d2.get("type") == "SketchAngularDimension":
+                        for _key in ("lineOne", "lineTwo"):
+                            _ref = _d2.get(_key, {})
+                            if isinstance(_ref, dict):
+                                _ci3 = _ref.get("curveIndex")
+                                if _ci3 is not None and _ci3 in _const_curves:
+                                    _to_pin.add(_ci3)
+                if _to_pin:
+                    self._w(f"_pd = {var}.sketchDimensions")
+                    for _ci3 in sorted(_to_pin):
+                        if _ci3 not in curve_vars:
+                            continue
+                        _cv = curve_vars[_ci3]
+                        _cc = _const_curves[_ci3]
+                        _s = _cc.get("start", [0, 0])
+                        _e = _cc.get("end", [0, 0])
+                        _hdist = abs(_e[0] - _s[0])
+                        if _hdist < 0.001:
+                            continue  # vertical — skip
+                        self._w(f"try: _pd.addDistanceDimension("
+                                f"{_cv}.startSketchPoint, {_cv}.endSketchPoint, "
+                                f"H, P(0, 0, 0)).parameter.value = {round(_hdist, 6)}")
+                        self._w(f"except: pass")
+                        _pinned_const.add(_ci3)
+
         # Emit dimensions FIRST, then geometric constraints.
         # Dimension + on-line coincident together determine point position.
         # Dimension first: sets distance along axis. Coincident second:
@@ -1200,6 +1260,21 @@ class _SketchMixin:
                     e1 = d.get("entityOne")
                     e2 = d.get("entityTwo")
                     orient = d.get("orientation", "Horizontal")
+                    # Downgrade Aligned → H/V when endpoints are axis-aligned
+                    # (minor component < 0.01). Aligned produces less stable
+                    # constraint solving than H/V for such pairs.
+                    if orient == "Aligned" and e1 and e2:
+                        # Use original curves (before BRepFace filtering) for index lookup
+                        _orig = feat.get("curves", [])
+                        p1 = self._sketch_entity_pt(e1, _orig)
+                        p2 = self._sketch_entity_pt(e2, _orig)
+                        if p1 and p2:
+                            dx = abs(p1[0] - p2[0])
+                            dy = abs(p1[1] - p2[1])
+                            if dy < 0.01 and dx > 0.01:
+                                orient = "Horizontal"
+                            elif dx < 0.01 and dy > 0.01:
+                                orient = "Vertical"
                     orient_map = {
                         "Horizontal": "H",
                         "Vertical": "V",
@@ -1257,9 +1332,31 @@ class _SketchMixin:
                     l1_code = self._resolve_sketch_entity_ref(l1, curve_vars, var, _proj_curve_pts)
                     l2_code = self._resolve_sketch_entity_ref(l2, curve_vars, var, _proj_curve_pts)
                     if l1_code and l2_code:
+                        # Compute text point in the correct angular quadrant.
+                        # The midpoint of the two "far" endpoints (not the
+                        # shared intersection) lies between the two lines.
+                        _txt = "P(0, 0, 0)"
+                        _orig = feat.get("curves", [])
+                        _l1i = l1.get("curveIndex") if isinstance(l1, dict) else None
+                        _l2i = l2.get("curveIndex") if isinstance(l2, dict) else None
+                        if (_l1i is not None and _l2i is not None
+                                and _l1i < len(_orig) and _l2i < len(_orig)):
+                            _c1 = _orig[_l1i]
+                            _c2 = _orig[_l2i]
+                            s1, e1 = _c1.get("start"), _c1.get("end")
+                            s2, e2 = _c2.get("start"), _c2.get("end")
+                            if s1 and e1 and s2 and e2:
+                                # Find the shared point (start/start)
+                                # and use midpoint of the far ends
+                                _mx = (e1[0] + e2[0]) / 2
+                                _my = (e1[1] + e2[1]) / 2
+                                if _has_coord_xf:
+                                    _txt = f"P(*_xf({round(_mx, 4)}, {round(_my, 4)}), 0)"
+                                else:
+                                    _txt = f"P({round(_mx, 4)}, {round(_my, 4)}, 0)"
                         self._w(f"try:")
                         self.ind += 1
-                        self._w(f'd.addAngularDimension({l1_code}, {l2_code}, P(0, 0, 0)).parameter.expression = "{expr}"')
+                        self._w(f'd.addAngularDimension({l1_code}, {l2_code}, {_txt}).parameter.expression = "{expr}"')
                         self.ind -= 1
                         self._w(f"except: pass  # skip if already constrained")
                     else:
@@ -1268,10 +1365,11 @@ class _SketchMixin:
                 else:
                     self._c(f"TODO: dim[{di}] {dtype}: {expr} = {d.get('value', 0)}")
 
-        constraints = feat.get("constraints", [])
         if constraints and any(isinstance(c, dict) for c in constraints):
             self._w(f"gc = {var}.geometricConstraints")
             for ci, c in enumerate(constraints):
+                if ci in _early_ci:
+                    continue  # Already emitted before dimensions
                 if isinstance(c, str):
                     # Legacy format (just type name, no targets)
                     continue

@@ -109,7 +109,10 @@ class _BaseMixin:
             elif t == "Combine":
                 self.needs.add("combine")
             elif t == "Mirror":
-                self.needs.add("mirror_bodies")
+                if f.get("computeOption") == "Adjust":
+                    self.needs.add("mirror_feats")
+                else:
+                    self.needs.add("mirror_bodies")
 
     # ── Header / Footer ──
 
@@ -404,6 +407,19 @@ class _BaseMixin:
             self._w("coll = adsk.core.ObjectCollection.create()")
             self._w("for b in bodies: coll.add(b)")
             self._w("inp = comp.features.mirrorFeatures.createInput(coll, plane)")
+            self._w("m = comp.features.mirrorFeatures.add(inp)")
+            self._w("m.name = name")
+            self._w("return m")
+            self.ind -= 1
+
+        if "mirror_feats" in self.needs:
+            self._w()
+            self._w('def mirror_feats(comp, entities, plane, name="Mir"):')
+            self.ind += 1
+            self._w("coll = adsk.core.ObjectCollection.create()")
+            self._w("for e in entities: coll.add(e)")
+            self._w("inp = comp.features.mirrorFeatures.createInput(coll, plane)")
+            self._w("inp.computeOption = adsk.fusion.PatternComputeOptions.AdjustPatternCompute")
             self._w("m = comp.features.mirrorFeatures.add(inp)")
             self._w("m.name = name")
             self._w("return m")

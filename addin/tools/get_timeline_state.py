@@ -51,11 +51,20 @@ def _capture_all_bodies(root_comp):
         if occ:
             try:
                 t = occ.transform
-                info["transform"] = [
-                    round(t.translation.x, 4),
-                    round(t.translation.y, 4),
-                    round(t.translation.z, 4),
-                ]
+                # Store full 4x4 matrix for rotation support.
+                # Row-major: [r00,r01,r02,tx, r10,r11,r12,ty, r20,r21,r22,tz, 0,0,0,1]
+                # Store full 4x4 matrix in row-major order using getCell
+                # for unambiguous layout: [r00,r01,r02,tx, r10,r11,r12,ty, ...]
+                cells = []
+                is_identity = True
+                for row in range(4):
+                    for col in range(4):
+                        val = t.getCell(row, col)
+                        cells.append(round(val, 6))
+                        if abs(val - (1.0 if row == col else 0.0)) > 1e-9:
+                            is_identity = False
+                if not is_identity:
+                    info["transform"] = cells
             except:
                 pass
         for child_occ in comp.occurrences:

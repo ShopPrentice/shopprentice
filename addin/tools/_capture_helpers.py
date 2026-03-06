@@ -1416,15 +1416,8 @@ def _capture_rectangular_pattern(pat, design=None):
         ca = adsk.fusion.ConstructionAxis.cast(axis)
         if ca:
             info["axisOne"] = ca.name
-            try:
-                line = ca.geometry
-                info["directionOne"] = [round(line.direction.x, 6), round(line.direction.y, 6), round(line.direction.z, 6)]
-            except:
-                pass
-        else:
-            direction = _extract_linear_direction(axis)
-            if direction:
-                info["directionOne"] = direction
+        # Don't set directionOne from entity — its natural direction may not
+        # match the pattern's actual direction. Sign comes from body positions.
     except:
         pass
 
@@ -1471,44 +1464,48 @@ def _capture_rectangular_pattern(pat, design=None):
         except:
             pass
 
-    def _try_bodies_and_direction():
-        """Capture bodies list and infer direction from bbox displacement.
+    def _try_bodies():
+        """Capture bodies list from pat.bodies.
 
         Must be called inside rollTo so pat.bodies returns ALL copies
         (at end-of-timeline, downstream Combines may consume pattern bodies).
+        Direction inference is deferred to end-of-timeline copy detection
+        where both seed and copies have reliable bounding boxes.
         """
         body_names = [pat.bodies.item(i).name for i in range(pat.bodies.count)]
         if body_names:
             info["bodies"] = body_names
-        # Infer actual direction from body bounding-box displacements.
-        # More reliable than directionOneEntity.geometry, which may report
-        # the entity's own orientation rather than the pattern axis.
-        bodies = [pat.bodies.item(i) for i in range(pat.bodies.count)]
-        if len(bodies) >= 2:
-            b0 = bodies[0].boundingBox
-            b1 = bodies[1].boundingBox
-            dx = b1.minPoint.x - b0.minPoint.x
-            dy = b1.minPoint.y - b0.minPoint.y
-            dz = b1.minPoint.z - b0.minPoint.z
-            adx, ady, adz = abs(dx), abs(dy), abs(dz)
-            if adx >= ady and adx >= adz and adx > 0.001:
-                info["directionOne"] = [1.0 if dx > 0 else -1.0, 0.0, 0.0]
-            elif ady >= adx and ady >= adz and ady > 0.001:
-                info["directionOne"] = [0.0, 1.0 if dy > 0 else -1.0, 0.0]
-            elif adz > 0.001:
-                info["directionOne"] = [0.0, 0.0, 1.0 if dz > 0 else -1.0]
+
+    def _try_direction_entity():
+        """Try to read directionOneEntity inside rollTo.
+
+        Only captures axis NAME (for identification), NOT the direction vector.
+        The entity's natural direction may not match the pattern's actual direction
+        (e.g., pattern may use -X on the xConstructionAxis). Direction sign is
+        always inferred from body positions at end-of-timeline.
+        """
+        if "axisOne" in info:
+            return  # Already captured
+        try:
+            axis = pat.directionOneEntity
+            ca = adsk.fusion.ConstructionAxis.cast(axis)
+            if ca:
+                info["axisOne"] = ca.name
+        except:
+            pass
 
     if design:
         try:
             with _roll_to_feature(pat, design):
                 _try_inputs()
-                _try_bodies_and_direction()
+                _try_bodies()
+                _try_direction_entity()
         except:
             _try_inputs()
-            _try_bodies_and_direction()
+            _try_bodies()
     else:
         _try_inputs()
-        _try_bodies_and_direction()
+        _try_bodies()
 
     # Fallback: if bodies weren't captured inside rollTo
     if "bodies" not in info:
@@ -1553,14 +1550,72 @@ def _capture_rectangular_pattern(pat, design=None):
                                 round(b.boundingBox.minPoint.z, 4)],
                     })
             if copies:
-                # Sort by position along pattern direction for stable ordering
+                # Infer direction from seed body → nearest copy at end-of-timeline.
+                # Only used as FALLBACK when directionOneEntity wasn't readable.
+                # Body positions are in component-local space, which may differ
+                # from world space if the occurrence has rotation.
+                input_names_list = info.get("inputs", [])
+                if input_names_list:
+                    seed_min = None
+                    for bi in range(comp.bRepBodies.count):
+                        b = comp.bRepBodies.item(bi)
+                        if b.name == input_names_list[0]:
+                            seed_min = [round(b.boundingBox.minPoint.x, 4),
+                                        round(b.boundingBox.minPoint.y, 4),
+                                        round(b.boundingBox.minPoint.z, 4)]
+                            break
+                    if seed_min:
+                        nearest = min(copies, key=lambda c:
+                            sum(abs(a - b) for a, b in zip(c["min"], seed_min)))
+                        dx = nearest["min"][0] - seed_min[0]
+                        dy = nearest["min"][1] - seed_min[1]
+                        dz = nearest["min"][2] - seed_min[2]
+                        adx, ady, adz = abs(dx), abs(dy), abs(dz)
+                        if adx >= ady and adx >= adz and adx > 0.001:
+                            info["directionOne"] = [1.0 if dx > 0 else -1.0, 0.0, 0.0]
+                        elif ady >= adx and ady >= adz and ady > 0.001:
+                            info["directionOne"] = [0.0, 1.0 if dy > 0 else -1.0, 0.0]
+                        elif adz > 0.001:
+                            info["directionOne"] = [0.0, 0.0, 1.0 if dz > 0 else -1.0]
+
+                # Transform direction from component-local to world space.
+                # comp.bRepBodies gives positions in the component's local
+                # coordinate system. If the occurrence has a rotation, the
+                # local direction differs from world direction.
+                if "directionOne" in info and design:
+                    try:
+                        root = design.rootComponent
+                        if comp != root:
+                            for occ in root.allOccurrences:
+                                if occ.component == comp:
+                                    xf = occ.transform
+                                    dir_vec = adsk.core.Vector3D.create(
+                                        info["directionOne"][0],
+                                        info["directionOne"][1],
+                                        info["directionOne"][2])
+                                    dir_vec.transformBy(xf)
+                                    d = [dir_vec.x, dir_vec.y, dir_vec.z]
+                                    adx2, ady2, adz2 = abs(d[0]), abs(d[1]), abs(d[2])
+                                    if adx2 >= ady2 and adx2 >= adz2 and adx2 > 0.001:
+                                        info["directionOne"] = [1.0 if d[0] > 0 else -1.0, 0.0, 0.0]
+                                    elif ady2 >= adx2 and ady2 >= adz2 and ady2 > 0.001:
+                                        info["directionOne"] = [0.0, 1.0 if d[1] > 0 else -1.0, 0.0]
+                                    elif adz2 > 0.001:
+                                        info["directionOne"] = [0.0, 0.0, 1.0 if d[2] > 0 else -1.0]
+                                    break
+                    except:
+                        pass
+
+                # Sort by position along pattern axis for stable ordering
                 d = info.get("directionOne", [1, 0, 0])
                 ax = 0 if abs(d[0]) >= abs(d[1]) and abs(d[0]) >= abs(d[2]) else (
                      1 if abs(d[1]) >= abs(d[2]) else 2)
                 copies.sort(key=lambda c: c["min"][ax])
                 info["patternCopies"] = [c["name"] for c in copies]
-    except:
-        pass
+    except Exception as e:
+        import traceback
+        app = adsk.core.Application.get()
+        app.log(f"Pattern copy detection error: {e}\n{traceback.format_exc()}")
 
     return info
 

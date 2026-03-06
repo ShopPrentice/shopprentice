@@ -320,24 +320,45 @@ class _ModifiersMixin:
         plane_info = f.get("mirrorPlane", {})
         bodies = f.get("bodies", [])
         input_bodies = f.get("inputBodies", [])
+        compute = f.get("computeOption", "NewBody")
 
         # Resolve plane (handles component scoping + cross-component proxy)
         mirror_comp = f.get("component", "")
         plane_code = self._resolve_plane_proxied(plane_info, mirror_comp)
 
-        # Resolve inputs
-        if input_bodies:
-            input_code = self._body_list(input_bodies)
-        else:
-            # Fallback: bodies that already exist in self.bodies are the inputs
-            known = [bn for bn in bodies if bn in self.bodies]
-            if known:
-                input_code = self._body_list(known)
+        if compute == "Adjust":
+            # Adjust mirror: inputs can be features or bodies.
+            # Try features first (feature names from self.feats), fall back to bodies.
+            feat_refs = []
+            body_refs = []
+            for inp_name in input_bodies:
+                if inp_name in self.feats:
+                    feat_refs.append(self.feats[inp_name])
+                else:
+                    body_refs.append(self._body_ref(inp_name))
+            if feat_refs and not body_refs:
+                input_code = f"[{', '.join(feat_refs)}]"
+                self._w(f"{var} = mirror_feats(comp, {input_code}, {plane_code}, \"{name}\")")
+            elif body_refs and not feat_refs:
+                input_code = f"[{', '.join(body_refs)}]"
+                self._w(f"{var} = mirror_feats(comp, {input_code}, {plane_code}, \"{name}\")")
             else:
-                self._c("TODO: mirror inputs unknown")
-                input_code = "[]"
-
-        self._w(f"{var} = mirror_bodies(comp, {input_code}, {plane_code}, \"{name}\")")
+                # Mixed — use bodies (safer)
+                all_refs = feat_refs + body_refs
+                input_code = f"[{', '.join(all_refs)}]"
+                self._w(f"{var} = mirror_feats(comp, {input_code}, {plane_code}, \"{name}\")")
+        else:
+            # Body-level mirror (NewBody)
+            if input_bodies:
+                input_code = self._body_list(input_bodies)
+            else:
+                known = [bn for bn in bodies if bn in self.bodies]
+                if known:
+                    input_code = self._body_list(known)
+                else:
+                    self._c("TODO: mirror inputs unknown")
+                    input_code = "[]"
+            self._w(f"{var} = mirror_bodies(comp, {input_code}, {plane_code}, \"{name}\")")
 
         self.feats[name] = var
         for i, bn in enumerate(bodies):
@@ -387,15 +408,125 @@ class _ModifiersMixin:
             tools_code = "[]"
 
         var = self._var(name)
-        self._w(f'{var} = combine(comp, {tc}, {tools_code}, {op_code}, {keep}, "{name}")')
 
-        # CUT may split the target into extra bodies — register only NEW ones
-        # (exclude the target body and tool bodies which already exist)
+        # For CUT that expects a split, save tool BB BEFORE the combine
+        # (the tool body is consumed by isKeepToolBodies=False).
         output_bodies = f.get("outputBodies", [])
         known = {target} | set(tools)
         new_bodies = [bn for bn in output_bodies if bn not in known]
-        if new_bodies:
-            # Find the new bodies by index in the output list
+        if new_bodies and op_code == "CUT" and tools:
+            first_tool = tools[0]
+            first_tc = tool_comps[0] if tool_comps else None
+            tool_ref = self._body_ref(first_tool, component=first_tc)
+            self._w(f"_pre_cut_tool_bb = {tool_ref}.boundingBox")
+            # Snapshot body names before the combine
+            self._w(f"_pre_cut_names = set()")
+            self._w(f"for _bi in range(comp.bRepBodies.count): _pre_cut_names.add(comp.bRepBodies.item(_bi).name)")
+
+        self._w(f'{var} = combine(comp, {tc}, {tools_code}, {op_code}, {keep}, "{name}")')
+
+        if new_bodies and op_code == "CUT":
+            n_expected = len(new_bodies)
+            # Check if the CUT produced the expected split
+            self._w(f"if {var} is not None and {var}.bodies.count > {n_expected}:")
+            self.ind += 1
+            for bn in new_bodies:
+                idx = output_bodies.index(bn)
+                bv = self._body_var(bn)
+                self._register_body(bn, bv)
+                self._w(f'{bv} = {var}.bodies.item({idx})')
+                self._w(f'{bv}.name = "{bn}"')
+            self.ind -= 1
+            self._w(f"else:")
+            self.ind += 1
+            self._c("CUT did not split (coincident face issue) — 2-plane SplitBody fallback")
+            self._w(f"_tbb = _pre_cut_tool_bb")
+            self._w(f"_dx = _tbb.maxPoint.x - _tbb.minPoint.x")
+            self._w(f"_dy = _tbb.maxPoint.y - _tbb.minPoint.y")
+            self._w(f"_dz = _tbb.maxPoint.z - _tbb.minPoint.z")
+            # Determine thin axis + split offsets at runtime
+            self._w(f"if _dy <= _dx and _dy <= _dz:")
+            self.ind += 1
+            self._w(f'_off_min, _off_max, _base_pl, _ax = _tbb.minPoint.y, _tbb.maxPoint.y, comp.xZConstructionPlane, "y"')
+            self.ind -= 1
+            self._w(f"elif _dx <= _dy and _dx <= _dz:")
+            self.ind += 1
+            self._w(f'_off_min, _off_max, _base_pl, _ax = _tbb.minPoint.x, _tbb.maxPoint.x, comp.yZConstructionPlane, "x"')
+            self.ind -= 1
+            self._w(f"else:")
+            self.ind += 1
+            self._w(f'_off_min, _off_max, _base_pl, _ax = _tbb.minPoint.z, _tbb.maxPoint.z, comp.xYConstructionPlane, "z"')
+            self.ind -= 1
+            # Create two construction planes at tool min/max faces
+            self._w(f"_pl_inp1 = comp.constructionPlanes.createInput()")
+            self._w(f"_pl_inp1.setByOffset(_base_pl, adsk.core.ValueInput.createByReal(_off_min))")
+            self._w(f"_pln1 = comp.constructionPlanes.add(_pl_inp1)")
+            self._w(f"_pl_inp2 = comp.constructionPlanes.createInput()")
+            self._w(f"_pl_inp2.setByOffset(_base_pl, adsk.core.ValueInput.createByReal(_off_max))")
+            self._w(f"_pln2 = comp.constructionPlanes.add(_pl_inp2)")
+            # First split at min face
+            self._w(f"try:")
+            self.ind += 1
+            self._w(f"_spi = comp.features.splitBodyFeatures.createInput({tc}, _pln1, False)")
+            self._w(f"comp.features.splitBodyFeatures.add(_spi)")
+            self.ind -= 1
+            self._w(f"except: pass")
+            # Second split at max face — try target first, then auto-named pieces only
+            self._w(f"try:")
+            self.ind += 1
+            self._w(f"_spi2 = comp.features.splitBodyFeatures.createInput({tc}, _pln2, False)")
+            self._w(f"comp.features.splitBodyFeatures.add(_spi2)")
+            self.ind -= 1
+            self._w(f"except:")
+            self.ind += 1
+            self._c("Target didn't span max plane — try auto-named pieces from first split")
+            self._w(f"for _bi in range(comp.bRepBodies.count):")
+            self.ind += 1
+            self._w(f"_b = comp.bRepBodies.item(_bi)")
+            self._w(f"if _b.name not in _pre_cut_names:")
+            self.ind += 1
+            self._w(f"try:")
+            self.ind += 1
+            self._w(f"_spi2 = comp.features.splitBodyFeatures.createInput(_b, _pln2, False)")
+            self._w(f"comp.features.splitBodyFeatures.add(_spi2)")
+            self._w(f"break")
+            self.ind -= 1
+            self._w(f"except: pass")
+            self.ind -= 3
+            # Do NOT delete planes — SplitBody features depend on them
+            # Delete pocket pieces (near-zero volume, not in pre-CUT snapshot)
+            self._w(f"for _bi in range(comp.bRepBodies.count - 1, -1, -1):")
+            self.ind += 1
+            self._w(f"_b = comp.bRepBodies.item(_bi)")
+            self._w(f"if _b.name not in _pre_cut_names and _b.volume < 1.0:")
+            self.ind += 1
+            self._w(f"try: comp.features.removeFeatures.add(_b)")
+            self._w(f"except: pass")
+            self.ind -= 2
+            # Collect remaining new bodies, sort by position on thin axis
+            self._w(f"_new_bodies = []")
+            self._w(f"for _bi in range(comp.bRepBodies.count):")
+            self.ind += 1
+            self._w(f"_b = comp.bRepBodies.item(_bi)")
+            self._w(f"if _b.name not in _pre_cut_names:")
+            self.ind += 1
+            self._w(f"_new_bodies.append(_b)")
+            self.ind -= 2
+            self._w(f"_new_bodies.sort(key=lambda _b: getattr(_b.boundingBox.minPoint, _ax))")
+            for bn in new_bodies:
+                bv = self._body_var(bn)
+                self._register_body(bn, bv)
+                self._w(f'if _new_bodies:')
+                self.ind += 1
+                self._w(f'{bv} = _new_bodies.pop(0)')
+                self._w(f'{bv}.name = "{bn}"')
+                self.ind -= 1
+                self._w(f'else:')
+                self.ind += 1
+                self._w(f'{bv} = find_body("{bn}", comp)')
+                self.ind -= 1
+            self.ind -= 1
+        elif new_bodies:
             for bn in new_bodies:
                 idx = output_bodies.index(bn)
                 bv = self._body_var(bn)
