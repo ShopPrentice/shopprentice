@@ -64,11 +64,67 @@ class _SketchMixin:
                 base_code = base_map[base]
             elif base in self.planes:
                 base_code = self.planes[base]
-            elif not base and self.planes:
-                # No base captured — use the most recently created plane
-                last_plane = list(self.planes.values())[-1]
-                base_code = last_plane
-                self._c(f"No base plane captured — using last plane: {last_plane}")
+            elif not base:
+                # No base captured — infer from target normal + rotation axis.
+                # For setByAngle: base_normal × target_normal ∥ rotation_axis
+                # (the rotation axis is perpendicular to both normals).
+                normal = f.get("normal", [0, 0, 1])
+                # Compute rotation axis direction from linear entity
+                lin = f.get("linearEntity", {})
+                rot_dir = None
+                if lin.get("type") == "SketchLine" and lin.get("parentSketch"):
+                    sk_name = lin["parentSketch"]
+                    sk_feat = None
+                    for tf in self.cap.get("timeline", []):
+                        if tf.get("type") == "Sketch" and tf.get("name") == sk_name:
+                            sk_feat = tf
+                            break
+                    if sk_feat and sk_feat.get("sketchOrigin") and sk_feat.get("sketchXDir") and sk_feat.get("sketchYDir"):
+                        o = sk_feat["sketchOrigin"]
+                        xd = sk_feat["sketchXDir"]
+                        yd = sk_feat["sketchYDir"]
+                        sv = lin.get("start", [0, 0, 0])
+                        ev = lin.get("end", [0, 0, 0])
+                        s3 = [o[i] + sv[0]*xd[i] + sv[1]*yd[i] for i in range(3)]
+                        e3 = [o[i] + ev[0]*xd[i] + ev[1]*yd[i] for i in range(3)]
+                        dx = e3[0]-s3[0]; dy = e3[1]-s3[1]; dz = e3[2]-s3[2]
+                        dl = (dx*dx + dy*dy + dz*dz)**0.5
+                        if dl > 0.001:
+                            rot_dir = [dx/dl, dy/dl, dz/dl]
+                if rot_dir:
+                    # Score each standard plane: cross(std_normal, target_normal)
+                    # should be parallel to rot_dir.
+                    std_planes = [
+                        ("comp.xYConstructionPlane", [0, 0, 1]),
+                        ("comp.xZConstructionPlane", [0, 1, 0]),
+                        ("comp.yZConstructionPlane", [1, 0, 0]),
+                    ]
+                    best_code, best_score = "comp.xYConstructionPlane", -1
+                    for code, sn in std_planes:
+                        # cross product of std_normal × target_normal
+                        cx = sn[1]*normal[2] - sn[2]*normal[1]
+                        cy = sn[2]*normal[0] - sn[0]*normal[2]
+                        cz = sn[0]*normal[1] - sn[1]*normal[0]
+                        cl = (cx*cx + cy*cy + cz*cz)**0.5
+                        if cl < 0.001:
+                            continue  # parallel normals, 0° rotation
+                        # alignment: |dot(cross, rot_dir)| / |cross|
+                        dot = abs(cx*rot_dir[0] + cy*rot_dir[1] + cz*rot_dir[2])
+                        score = dot / cl
+                        if score > best_score:
+                            best_score = score
+                            best_code = code
+                    base_code = best_code
+                else:
+                    # Fallback: pick by dominant normal component
+                    ax, ay, az = abs(normal[0]), abs(normal[1]), abs(normal[2])
+                    if az >= ay and az >= ax:
+                        base_code = "comp.xYConstructionPlane"
+                    elif ay >= ax:
+                        base_code = "comp.xZConstructionPlane"
+                    else:
+                        base_code = "comp.yZConstructionPlane"
+                self._c(f"No base plane captured — inferred from normal + axis")
             else:
                 base_code = "comp.xYConstructionPlane"
             # Resolve the linear entity (edge to rotate around)
@@ -251,11 +307,13 @@ class _SketchMixin:
             c["_origIdx"] = ci
         plane_info = f.get("plane", {})
 
-        # Enrich BRepFace plane_info with computed normal/pointOnFace from sketch axes
-        # when the capture couldn't get face geometry (downstream features alter faces)
+        # Enrich BRepFace plane_info with computed normal/pointOnFace from sketch axes.
+        # Always compute from sketch axes when available — the capture's pointOnFace
+        # may be in root coordinates (from the original occurrence transform), but the
+        # generator needs component-local coordinates for find_face_near on the
+        # component body.  The enriched value from sketchOrigin + profile center
+        # is always in the correct component-local space.
         if (plane_info.get("type") == "BRepFace"
-                and not plane_info.get("pointOnFace")
-                and not plane_info.get("normal")
                 and f.get("sketchXDir") and f.get("sketchYDir") and f.get("sketchOrigin")):
             xd = f["sketchXDir"]
             yd = f["sketchYDir"]
@@ -266,18 +324,49 @@ class _SketchMixin:
                 round(xd[2]*yd[0] - xd[0]*yd[2], 6),
                 round(xd[0]*yd[1] - xd[1]*yd[0], 6),
             ]
-            # Compute a point ON the face from the first curve's midpoint in world coords.
-            # sketchOrigin can be far from the face (e.g. at Z=0 for a face at Z=260).
-            first_curve = curves[0] if curves else None
-            if first_curve and first_curve.get("start") and first_curve.get("end"):
-                s = first_curve["start"]
-                e = first_curve["end"]
-                mx, my = (s[0]+e[0])/2, (s[1]+e[1])/2  # midpoint in sketch space
+            # Compute a point ON the face from the center of all profile bboxes
+            # in world coords.  Using the first curve's midpoint is fragile —
+            # it can land on a face boundary modified by a prior extrude,
+            # causing find_face_near to pick the wrong face.  The profile-
+            # region centroid is safely interior to the intended face.
+            profiles = f.get("profiles", [])
+            non_ref_curves = [c for c in curves if not c.get("isReference")]
+            if profiles:
+                # Use center of all profile bounding boxes
+                # Profile bbox format: {"min": [x,y], "max": [x,y]} or
+                # {"boundingBox": {"min": [x,y], "max": [x,y]}}
+                def _pbbox(p):
+                    bb = p.get("boundingBox", p)
+                    return bb.get("min", [0, 0]), bb.get("max", [0, 0])
+                all_min_x = min(_pbbox(p)[0][0] for p in profiles)
+                all_max_x = max(_pbbox(p)[1][0] for p in profiles)
+                all_min_y = min(_pbbox(p)[0][1] for p in profiles)
+                all_max_y = max(_pbbox(p)[1][1] for p in profiles)
+                mx = (all_min_x + all_max_x) / 2
+                my = (all_min_y + all_max_y) / 2
                 plane_info["pointOnFace"] = [
                     round(origin[0] + mx*xd[0] + my*yd[0], 4),
                     round(origin[1] + mx*xd[1] + my*yd[1], 4),
                     round(origin[2] + mx*xd[2] + my*yd[2], 4),
                 ]
+            elif non_ref_curves:
+                # Fallback: center of all non-reference curves' endpoints
+                all_sx = [c["start"][0] for c in non_ref_curves if c.get("start")]
+                all_sy = [c["start"][1] for c in non_ref_curves if c.get("start")]
+                all_ex = [c["end"][0] for c in non_ref_curves if c.get("end")]
+                all_ey = [c["end"][1] for c in non_ref_curves if c.get("end")]
+                all_x = all_sx + all_ex
+                all_y = all_sy + all_ey
+                if all_x and all_y:
+                    mx = (min(all_x) + max(all_x)) / 2
+                    my = (min(all_y) + max(all_y)) / 2
+                    plane_info["pointOnFace"] = [
+                        round(origin[0] + mx*xd[0] + my*yd[0], 4),
+                        round(origin[1] + mx*xd[1] + my*yd[1], 4),
+                        round(origin[2] + mx*xd[2] + my*yd[2], 4),
+                    ]
+                else:
+                    plane_info["origin"] = origin
             else:
                 plane_info["origin"] = origin
 
@@ -311,8 +400,70 @@ class _SketchMixin:
                 and "sketchYDir" in f):
             non_ref = [c for c in curves if not c.get("isReference")]
             refs = [c for c in curves if c.get("isReference")]
+
+            # Forward-reference check: if the face body hasn't been created yet
+            # (e.g., sketch is the first feature in a new component), the body
+            # face doesn't exist in the scratch doc.  Fall back to construction
+            # plane at the sketch origin position.
+            _fb = plane_info.get("body", "")
+            _fc = f.get("component", "")
+            _fwd_ref = False
+            if _fc and _fb and _fc != self._root_name:
+                _fk = f"{_fc}:{_fb}"
+                # Only trigger cplane fallback when the body truly doesn't
+                # exist yet — not when it's in a different component.
+                _body_exists = (_fk in self.bodies
+                                or _fb in self.bodies
+                                or any(k.endswith(f":{_fb}")
+                                       for k in self.bodies))
+                if not _body_exists:
+                    self._c(f"Forward ref: {_fb} not yet in {_fc} — cplane")
+                    plane_code, curves = self._brep_face_to_cplane(f, curves)
+                    # Remove face boundary refs — no face body on cplane
+                    curves = [c for c in curves if not (
+                        c.get("isReference")
+                        and c.get("projectedFrom", {}).get("type") == "BRepFace"
+                    )]
+                    # _brep_face_to_cplane already transformed curve coords
+                    # to the cplane's standard axes. Set _coord_transform to
+                    # match the cplane axes (not the original face axes).
+                    xd = f.get("sketchXDir", [1, 0, 0])
+                    yd = f.get("sketchYDir", [0, 1, 0])
+                    fn = [xd[1]*yd[2]-xd[2]*yd[1],
+                          xd[2]*yd[0]-xd[0]*yd[2],
+                          xd[0]*yd[1]-xd[1]*yd[0]]
+                    ax, ay, az = abs(fn[0]), abs(fn[1]), abs(fn[2])
+                    if az >= ay and az >= ax:
+                        cp_xd, cp_yd = [1, 0, 0], [0, 1, 0]
+                        cp_off = f.get("sketchOrigin", [0, 0, 0])[2]
+                        cp_origin = [0, 0, cp_off]
+                    elif ay >= ax:
+                        cp_xd, cp_yd = [1, 0, 0], [0, 0, 1]
+                        cp_off = f.get("sketchOrigin", [0, 0, 0])[1]
+                        cp_origin = [0, cp_off, 0]
+                    else:
+                        cp_xd, cp_yd = [0, 1, 0], [0, 0, 1]
+                        cp_off = f.get("sketchOrigin", [0, 0, 0])[0]
+                        cp_origin = [cp_off, 0, 0]
+                    f["_coord_transform"] = {
+                        "cap_xdir": cp_xd,
+                        "cap_ydir": cp_yd,
+                        "cap_origin": cp_origin,
+                    }
+                    # Check if the cplane normal is opposite to the original
+                    # face normal — extrudes need their direction flipped.
+                    if az >= ay and az >= ax:
+                        if fn[2] < 0:
+                            f["_cplane_extrude_flip"] = True
+                    elif ay >= ax:
+                        if fn[1] < 0:
+                            f["_cplane_extrude_flip"] = True
+                    else:
+                        if fn[0] < 0:
+                            f["_cplane_extrude_flip"] = True
+                    _fwd_ref = True
+
             self._brep_face_sketches[name] = plane_info
-            # Check if any ref is an explicit body/edge projection
             has_body_proj = any(
                 c.get("projectedFrom", {}).get("type") == "BRepBody"
                 for c in refs
@@ -321,7 +472,9 @@ class _SketchMixin:
                 c.get("projectedFrom", {}).get("type") == "BRepEdge"
                 for c in refs
             )
-            if has_body_proj:
+            if _fwd_ref:
+                pass  # already handled via cplane above
+            elif has_body_proj:
                 # Body projections: use find_face for accurate intersection
                 # geometry on beveled/tapered faces.
                 plane_code = self._resolve_plane(plane_info)
@@ -338,6 +491,7 @@ class _SketchMixin:
                 f["_coord_transform"] = {
                     "cap_xdir": f.get("sketchXDir", [1, 0, 0]),
                     "cap_ydir": f.get("sketchYDir", [0, 1, 0]),
+                    "cap_origin": f.get("sketchOrigin"),
                 }
                 is_on_face = True
             elif refs and not has_edge_proj:
@@ -370,6 +524,7 @@ class _SketchMixin:
                 f["_coord_transform"] = {
                     "cap_xdir": f.get("sketchXDir", [1, 0, 0]),
                     "cap_ydir": f.get("sketchYDir", [0, 1, 0]),
+                    "cap_origin": f.get("sketchOrigin"),
                 }
                 is_on_face = True
                 # If cross-body refs exist, use native face sketch so the
@@ -450,6 +605,8 @@ class _SketchMixin:
                         is_on_face = False
                         # Cplane sketch doesn't need root for face proxy access
                         self._current_sketch_comp = "comp"
+                    else:
+                        f["_use_native_face"] = True
             else:
                 # Edge projections or no refs → use cplane
                 plane_code, curves = self._brep_face_to_cplane(f, curves)
@@ -463,6 +620,7 @@ class _SketchMixin:
                 f["_coord_transform"] = {
                     "cap_xdir": f.get("sketchXDir", [1, 0, 0]),
                     "cap_ydir": f.get("sketchYDir", [0, 1, 0]),
+                    "cap_origin": f.get("sketchOrigin"),
                 }
 
         # Record which component the sketch was created in for cross-component detection
@@ -544,13 +702,24 @@ class _SketchMixin:
             self._w(f"_m01 = _cap_yd[0]*_act_xd.x + _cap_yd[1]*_act_xd.y + _cap_yd[2]*_act_xd.z")
             self._w(f"_m10 = _cap_xd[0]*_act_yd.x + _cap_xd[1]*_act_yd.y + _cap_xd[2]*_act_yd.z")
             self._w(f"_m11 = _cap_yd[0]*_act_yd.x + _cap_yd[1]*_act_yd.y + _cap_yd[2]*_act_yd.z")
+            # Origin delta: face-based sketches may have different origins
+            # when the face geometry differs between capture and rebuild.
+            cap_origin = coord_xf.get("cap_origin")
+            if cap_origin:
+                self._w(f"_cap_o = ({cap_origin[0]}, {cap_origin[1]}, {cap_origin[2]})")
+                self._w(f"_act_o = {var}.origin")
+                self._w(f"_do = (_cap_o[0]-_act_o.x, _cap_o[1]-_act_o.y, _cap_o[2]-_act_o.z)")
+                self._w(f"_dox = _do[0]*_act_xd.x + _do[1]*_act_xd.y + _do[2]*_act_xd.z")
+                self._w(f"_doy = _do[0]*_act_yd.x + _do[1]*_act_yd.y + _do[2]*_act_yd.z")
+            else:
+                self._w(f"_dox, _doy = 0, 0")
             # Transform corners from capture space to actual space.
             # Compute w/h from parametric expressions, then transform the
             # capture-space rectangle to actual-space coordinates.
             self._w(f'_w0, _h0 = ev("{w_expr}"), ev("{h_expr}")')
             self._w(f'_x0c, _y0c = ev("{x0_expr}"), ev("{y0_expr}")')
-            self._w(f"_c1x, _c1y = _x0c*_m00 + _y0c*_m01, _x0c*_m10 + _y0c*_m11")
-            self._w(f"_c2x, _c2y = (_x0c+_w0)*_m00 + (_y0c+_h0)*_m01, (_x0c+_w0)*_m10 + (_y0c+_h0)*_m11")
+            self._w(f"_c1x, _c1y = _x0c*_m00 + _y0c*_m01 + _dox, _x0c*_m10 + _y0c*_m11 + _doy")
+            self._w(f"_c2x, _c2y = (_x0c+_w0)*_m00 + (_y0c+_h0)*_m01 + _dox, (_x0c+_w0)*_m10 + (_y0c+_h0)*_m11 + _doy")
             self._w(f"x0, y0 = min(_c1x, _c2x), min(_c1y, _c2y)")
             self._w(f"w, h = abs(_c2x - _c1x), abs(_c2y - _c1y)")
         else:
@@ -564,13 +733,24 @@ class _SketchMixin:
         self._w("gc.addHorizontal(rect[0]); gc.addHorizontal(rect[2])")
         self._w("gc.addVertical(rect[1]); gc.addVertical(rect[3])")
         self._w(f"d = {var}.sketchDimensions")
+        if coord_xf:
+            # When coordinate transform swaps axes, w and h may be exchanged.
+            # Match dimension expressions to actual w/h at runtime.
+            self._w(f'_wex, _hex = "{w_expr}", "{h_expr}"')
+            self._w(f"if abs(w - _h0) < abs(w - _w0): _wex, _hex = _hex, _wex")
         self._w("d.addDistanceDimension(rect[0].startSketchPoint, rect[0].endSketchPoint,")
         self.ind += 1
-        self._w(f'H, P(x0 + w/2, y0 - 1, 0)).parameter.expression = "{w_expr}"')
+        if coord_xf:
+            self._w(f'H, P(x0 + w/2, y0 - 1, 0)).parameter.expression = _wex')
+        else:
+            self._w(f'H, P(x0 + w/2, y0 - 1, 0)).parameter.expression = "{w_expr}"')
         self.ind -= 1
         self._w("d.addDistanceDimension(rect[1].startSketchPoint, rect[1].endSketchPoint,")
         self.ind += 1
-        self._w(f'V, P(x0 + w + 1, y0 + h/2, 0)).parameter.expression = "{h_expr}"')
+        if coord_xf:
+            self._w(f'V, P(x0 + w + 1, y0 + h/2, 0)).parameter.expression = _hex')
+        else:
+            self._w(f'V, P(x0 + w + 1, y0 + h/2, 0)).parameter.expression = "{h_expr}"')
         self.ind -= 1
         if coord_xf:
             # When coordinate transform is active, the position in actual
@@ -606,36 +786,34 @@ class _SketchMixin:
                 self._w(f'V, P(x0 - 1, y0/2, 0)).parameter.expression = "{abs_y0}"')
                 self.ind -= 1
         prof = f"{var}_prof"
-        if on_face:
-            # BRepFace auto-projects boundary → multiple profiles. Select smallest.
-            self._w(f"_best_pi, _best_a = 0, float('inf')")
-            self._w(f"for _pi in range({var}.profiles.count):")
-            self.ind += 1
-            self._w(f"_bb = {var}.profiles.item(_pi).boundingBox")
-            self._w(f"_a = abs(_bb.maxPoint.x-_bb.minPoint.x)*abs(_bb.maxPoint.y-_bb.minPoint.y)")
-            self._w(f"if _a < _best_a: _best_a, _best_pi = _a, _pi")
-            self.ind -= 1
-            self._w(f"{prof} = {var}.profiles.item(_best_pi)")
-        else:
-            self._w(f"{prof} = {var}.profiles.item(0)")
-        self.profiles[name] = prof
+        prof_count = feat.get("profileCount", 1)
+        if prof_count > 0:
+            if on_face:
+                # BRepFace auto-projects boundary → multiple profiles. Select smallest.
+                self._w(f"_best_pi, _best_a = 0, float('inf')")
+                self._w(f"for _pi in range({var}.profiles.count):")
+                self.ind += 1
+                self._w(f"_bb = {var}.profiles.item(_pi).boundingBox")
+                self._w(f"_a = abs(_bb.maxPoint.x-_bb.minPoint.x)*abs(_bb.maxPoint.y-_bb.minPoint.y)")
+                self._w(f"if _a < _best_a: _best_a, _best_pi = _a, _pi")
+                self.ind -= 1
+                self._w(f"{prof} = {var}.profiles.item(_best_pi) if {var}.profiles.count > 0 else None")
+            else:
+                self._w(f"{prof} = {var}.profiles.item(0) if {var}.profiles.count > 0 else None")
+            self.profiles[name] = prof
 
-    def _emit_sketch_coord_transform(self, var, cap_xdir, cap_ydir, plane_info):
+    def _emit_sketch_coord_transform(self, var, cap_xdir, cap_ydir, plane_info,
+                                      cap_origin=None):
         """Emit runtime code to compute the transform from captured sketch space
         to the actual reconstructed sketch space.
 
-        The captured sketch has axes (cap_xdir, cap_ydir). The reconstructed
-        sketch on the same face may have different axes. We compute the 2x2
-        transform matrix at runtime by reading the actual sketch's xDirection
-        and yDirection, then computing how to map (cap_sx, cap_sy) → (act_sx, act_sy).
+        The captured sketch has axes (cap_xdir, cap_ydir) and origin cap_origin.
+        The reconstructed sketch may have different axes AND a different origin
+        (face-based sketches place the origin at the projection of the model
+        origin onto the face plane, which can shift when face geometry differs).
 
-        Both coordinate systems share the same origin (the face reference point)
-        and the same plane — only the in-plane axes may differ (rotation/reflection).
-        The transform is: actual_model = cap_sx * cap_xdir + cap_sy * cap_ydir
-                          act_sx = dot(actual_model, act_xdir)
-                          act_sy = dot(actual_model, act_ydir)
-        Which gives a 2x2 matrix: [[dot(cap_x,act_x), dot(cap_y,act_x)],
-                                    [dot(cap_x,act_y), dot(cap_y,act_y)]]
+        The transform handles both axis rotation/reflection and origin translation:
+            act_coord = M * cap_coord + origin_delta
         """
         # Emit the captured axes as constants
         self._w(f"# Coordinate transform: captured sketch axes -> actual sketch axes")
@@ -649,9 +827,18 @@ class _SketchMixin:
         self._w(f"_m01 = _cap_yd[0]*_act_xd.x + _cap_yd[1]*_act_xd.y + _cap_yd[2]*_act_xd.z")
         self._w(f"_m10 = _cap_xd[0]*_act_yd.x + _cap_xd[1]*_act_yd.y + _cap_xd[2]*_act_yd.z")
         self._w(f"_m11 = _cap_yd[0]*_act_yd.x + _cap_yd[1]*_act_yd.y + _cap_yd[2]*_act_yd.z")
+        # Origin delta: project (cap_origin - act_origin) into actual sketch axes
+        if cap_origin:
+            self._w(f"_cap_o = ({cap_origin[0]}, {cap_origin[1]}, {cap_origin[2]})")
+            self._w(f"_act_o = {var}.origin")
+            self._w(f"_do = (_cap_o[0]-_act_o.x, _cap_o[1]-_act_o.y, _cap_o[2]-_act_o.z)")
+            self._w(f"_dox = _do[0]*_act_xd.x + _do[1]*_act_xd.y + _do[2]*_act_xd.z")
+            self._w(f"_doy = _do[0]*_act_yd.x + _do[1]*_act_yd.y + _do[2]*_act_yd.z")
+        else:
+            self._w(f"_dox, _doy = 0, 0")
         self._w(f"def _xf(sx, sy):")
         self.ind += 1
-        self._w(f"return (sx * _m00 + sy * _m01, sx * _m10 + sy * _m11)")
+        self._w(f"return (sx * _m00 + sy * _m01 + _dox, sx * _m10 + sy * _m11 + _doy)")
         self.ind -= 1
 
     def _emit_raw_sketch(self, var, name, plane_code, curves, dims, feat, on_face=False):
@@ -666,15 +853,17 @@ class _SketchMixin:
             plane_info = feat.get("plane", {})
             pof = plane_info.get("pointOnFace", [0, 0, 0])
             normal = plane_info.get("normal", [0, 0, 0])
-            self._w(f"_native_face = find_face_in_comp({sketch_comp}, "
-                    f"{pof[0]}, {pof[1]}, {pof[2]}, "
-                    f"{normal[0]}, {normal[1]}, {normal[2]})")
             body_name = plane_info.get("body", "")
+            # Search the specific body's face first to avoid picking a face
+            # on a different body in the same component (e.g., post1 vs scarf1).
             # Always use find_body for face lookup — body variables can become
             # stale after RectangularPattern consumes the original body.
             bv = f'find_body("{body_name}")' if body_name else "None"
-            self._w(f"if not _native_face: _native_face = find_face_near("
+            self._w(f"_native_face = find_face_near("
                     f"{bv}, {pof[0]}, {pof[1]}, {pof[2]}, "
+                    f"{normal[0]}, {normal[1]}, {normal[2]})")
+            self._w(f"if not _native_face: _native_face = find_face_in_comp({sketch_comp}, "
+                    f"{pof[0]}, {pof[1]}, {pof[2]}, "
                     f"{normal[0]}, {normal[1]}, {normal[2]})")
             self._w(f"{var} = {sketch_comp}.sketches.add(_native_face)")
         else:
@@ -688,7 +877,8 @@ class _SketchMixin:
         coord_xf = feat.get("_coord_transform")
         if coord_xf:
             _has_coord_xf = True
-            self._emit_sketch_coord_transform(var, coord_xf["cap_xdir"], coord_xf["cap_ydir"], feat.get("plane", {}))
+            self._emit_sketch_coord_transform(var, coord_xf["cap_xdir"], coord_xf["cap_ydir"], feat.get("plane", {}),
+                                                  cap_origin=coord_xf.get("cap_origin"))
         else:
             # Identity transform — _xf passthrough for dimension references
             self._w(f"def _xf(sx, sy): return (sx, sy)")
@@ -759,7 +949,16 @@ class _SketchMixin:
                             bodies_var = f"_bodies_{self._var(bname)}"
                             self._w(f"{bodies_var} = []")
                             if self._current_sketch_comp == "root":
-                                # Sketch in root: use proxied bodies via occurrences
+                                # Sketch in root: check root's own bodies first
+                                self._w(f"for _bi in range(root.bRepBodies.count):")
+                                self.ind += 1
+                                self._w(f'if root.bRepBodies.item(_bi).name == "{bname}":')
+                                self.ind += 1
+                                self._w(f"{bodies_var}.append(root.bRepBodies.item(_bi))")
+                                self.ind -= 2
+                                # Fallback: proxied bodies via occurrences (multi-component)
+                                self._w(f"if not {bodies_var}:")
+                                self.ind += 1
                                 self._w(f"for _occ in root.allOccurrences:")
                                 self.ind += 1
                                 self._w(f"for _bi in range(_occ.bRepBodies.count):")
@@ -767,7 +966,7 @@ class _SketchMixin:
                                 self._w(f'if _occ.bRepBodies.item(_bi).name == "{bname}":')
                                 self.ind += 1
                                 self._w(f"{bodies_var}.append(_occ.bRepBodies.item(_bi))")
-                                self.ind -= 3
+                                self.ind -= 4
                             else:
                                 # Sketch in comp: use native or cross-component bodies
                                 body_comp = pf.get("bodyComponent")
@@ -842,6 +1041,32 @@ class _SketchMixin:
             self.ind -= 1
             _has_body_projs = True
 
+        # Project ConstructionPlane references explicitly.
+        # Native face sketches auto-project face boundary but NOT construction
+        # planes.  Without explicit projection, _nearest_proj_curve creates a
+        # drawn fallback line that changes profile topology.
+        _cp_proj_done = set()
+        for c in feat.get("curves", []):
+            if not (c.get("isReference")
+                    and c.get("projectedFrom", {}).get("type") == "ConstructionPlane"):
+                continue
+            cp_name = c["projectedFrom"].get("name", "")
+            if not cp_name or cp_name in _cp_proj_done:
+                continue
+            _cp_proj_done.add(cp_name)
+            comp_name = feat.get("component", "")
+            cp_var = None
+            if comp_name:
+                scoped = f"{comp_name}:{cp_name}"
+                if scoped in self.planes:
+                    cp_var = self.planes[scoped]
+            if not cp_var and cp_name in self.planes:
+                cp_var = self.planes[cp_name]
+            if cp_var:
+                self._c(f"Project construction plane '{cp_name}'")
+                self._w(f"{var}.project({cp_var})")
+                _has_body_projs = True
+
         # Pre-compute which reference curves need runtime resolution.
         # This is checked early so we know whether to emit _nearest_proj.
         _proj_curve_pts = {}  # (origIdx, role) → (x, y) in capture space
@@ -915,7 +1140,31 @@ class _SketchMixin:
             self._w(f"if _d < best_d: best, best_d = _c, _d")
             self.ind -= 1
             # Reject matches with large distance — prevents matching wrong curve
-            self._w(f"if best_d > 10.0: best = None")
+            self._w(f"if best_d > 10.0:")
+            self.ind += 1
+            # Secondary match: same infinite line (parallel direction,
+            # small point-to-line distance).  Construction plane projections
+            # may have different extent/endpoints than the capture.
+            self._w(f"best, best_d = None, 1e10")
+            self._w(f"_dx, _dy = ex - sx, ey - sy")
+            self._w(f"_len = (_dx*_dx + _dy*_dy)**0.5")
+            self._w(f"if _len > 0.001:")
+            self.ind += 1
+            self._w(f"_ux, _uy = _dx/_len, _dy/_len")
+            self._w(f"for _sx, _sy, _ex, _ey, _c in _proj_curves:")
+            self.ind += 1
+            self._w(f"_rdx, _rdy = _ex - _sx, _ey - _sy")
+            self._w(f"_rlen = (_rdx*_rdx + _rdy*_rdy)**0.5")
+            self._w(f"if _rlen < 0.001: continue")
+            # Check if directions are parallel (cross product ≈ 0)
+            self._w(f"_cross = abs(_ux*_rdy/_rlen - _uy*_rdx/_rlen)")
+            self._w(f"if _cross > 0.05: continue")
+            # Point-to-line distance from query start to reference line
+            self._w(f"_ptd = abs((sx-_sx)*(-_rdy/_rlen) + (sy-_sy)*(_rdx/_rlen))")
+            self._w(f"if _ptd < best_d: best, best_d = _c, _ptd")
+            self.ind -= 2
+            self._w(f"if best_d > 1.0: best = None")
+            self.ind -= 1
             self._w(f"if best is None:")
             self.ind += 1
             # Share endpoints between fallback lines to form closed loops
@@ -1015,6 +1264,10 @@ class _SketchMixin:
                     ex, ey = c["end"]
                     _register_pt((round(sx, 3), round(sy, 3)), f"proj{i}.startSketchPoint")
                     _register_pt((round(ex, 3), round(ey, 3)), f"proj{i}.endSketchPoint")
+                elif pf.get("type") == "ConstructionPlane":
+                    # Projected above in the ConstructionPlane pass.
+                    # _nearest_proj_curve will find it among reference curves.
+                    pass
                 else:
                     self._c(f"curve[{i}] is a projected reference (source not captured)")
                 continue
@@ -1200,6 +1453,57 @@ class _SketchMixin:
                         self._w(f"fsp{i}.isConstruction = True")
                 else:
                     self._c(f"TODO: SketchFixedSpline[{i}] has no control points")
+
+        # ── Face boundary T-junction fix ──
+        # In face-based sketches, drawn curve endpoints that lie on a face
+        # boundary edge (mid-edge, not at a vertex) need a coincident
+        # constraint to create a proper T-junction.  Without this, Fusion
+        # treats the endpoint as free-floating near the edge, so the profile
+        # region doesn't split — causing downstream CUT extrudes to select
+        # the wrong (merged) profile.
+        if feat.get("_use_native_face"):
+            _fb_edges = []
+            for _fbi, _fbc in enumerate(feat.get("curves", [])):
+                if (_fbc.get("isReference")
+                        and _fbc.get("projectedFrom", {}).get("type") == "BRepFace"):
+                    _fb_oi = _fbc.get("_origIdx", _fbi)
+                    if _fb_oi in curve_vars and _fbc.get("start") and _fbc.get("end"):
+                        _fb_edges.append((_fbc["start"], _fbc["end"], _fb_oi))
+            if _fb_edges:
+                for _di, _dc in enumerate(curves):
+                    if _dc.get("isReference") or _dc.get("type") != "Line":
+                        continue
+                    _d_oi = _dc.get("_origIdx", _di)
+                    if _d_oi not in curve_vars:
+                        continue
+                    _dcv = curve_vars[_d_oi]
+                    for _pt_side, _ppx, _ppy in [
+                        ("start", _dc.get("start", [0, 0])[0], _dc.get("start", [0, 0])[1]),
+                        ("end", _dc.get("end", [0, 0])[0], _dc.get("end", [0, 0])[1]),
+                    ]:
+                        for (_es, _ee, _e_oi) in _fb_edges:
+                            _edx = _ee[0] - _es[0]
+                            _edy = _ee[1] - _es[1]
+                            _elen2 = _edx * _edx + _edy * _edy
+                            if _elen2 < 0.001:
+                                continue
+                            _cross = abs((_ppx - _es[0]) * _edy
+                                         - (_ppy - _es[1]) * _edx)
+                            if _cross / (_elen2 ** 0.5) > 0.01:
+                                continue
+                            _dot = ((_ppx - _es[0]) * _edx
+                                    + (_ppy - _es[1]) * _edy)
+                            _t = _dot / _elen2
+                            if _t < 0.01 or _t > 0.99:
+                                continue  # at vertex, not mid-edge
+                            _sp_code = (f"{_dcv}.startSketchPoint"
+                                        if _pt_side == "start"
+                                        else f"{_dcv}.endSketchPoint")
+                            _ecv = curve_vars[_e_oi]
+                            self._w(f"try: {var}.geometricConstraints"
+                                    f".addCoincident({_sp_code}, {_ecv})")
+                            self._w(f"except: pass")
+                            break
 
         constraints = feat.get("constraints", [])
         _early_ci = set()
@@ -1462,8 +1766,9 @@ class _SketchMixin:
         # uses the captured profileIndex to select the correct profile.
         prof = f"{var}_prof"
         prof_count = feat.get("profileCount", 1)
-        self._w(f"{prof} = {var}.profiles.item(0)  # {prof_count} profile(s)")
-        self.profiles[name] = prof
+        if prof_count > 0:
+            self._w(f"{prof} = {var}.profiles.item(0) if {var}.profiles.count > 0 else None  # {prof_count} profile(s)")
+            self.profiles[name] = prof
 
     def _find_online_constraint(self, feat, curve_idx, role):
         """Find if a curve endpoint has a coincident-on-line constraint.

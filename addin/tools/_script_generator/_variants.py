@@ -100,7 +100,8 @@ class _VariantsMixin:
         return variants
 
     def _extrude_variants(self, feat):
-        """Generate extrude variants: direction flip and/or sequential multi-profile."""
+        """Generate extrude variants: direction flip, sequential multi-profile,
+        profile-index search, and face-following offset."""
         dist = feat.get("distance", "1 cm")
         is_negative = dist.startswith("-(") and dist.endswith(")")
 
@@ -119,7 +120,47 @@ class _VariantsMixin:
             if sk_owner == "root":
                 needs_sequential_variant = True
 
-        if not is_negative and not needs_sequential_variant:
+        # Detect unknown profile index: profileIndex not set AND the sketch
+        # has >1 profile. Search all profile indices.
+        # Also triggers when profileIndices is empty ([]) — capture didn't
+        # record which profile was used, so we must search.
+        profile_ambiguous = False
+        num_profiles = 1
+        if (not feat.get("profileIndices") and "profileIndex" not in feat
+                and feat.get("sketch")):
+            sketch_name = feat.get("sketch", "")
+            sketch_comp = feat.get("sketchComponent", feat.get("component", ""))
+            feat_idx = feat.get("index", len(self.cap.get("timeline", [])))
+            for ti, tf in enumerate(self.cap.get("timeline", [])):
+                if ti >= feat_idx:
+                    break
+                if (tf.get("type") == "Sketch" and tf.get("name") == sketch_name
+                        and tf.get("component", "") == sketch_comp):
+                    num_profiles = tf.get("profileCount", 1)
+            if num_profiles > 1:
+                profile_ambiguous = True
+
+        # Detect face-following offset: face-based sketch reused by
+        # multiple extrudes. The sketch plane may have moved with the face.
+        # Whether offset is needed depends on profile overlap with the face
+        # region modified by prior extrudes — we can't determine this
+        # statically, so we try both with and without offset as variants.
+        needs_offset_variant = False
+        offset_expr = None
+        sketch = feat.get("sketch", "")
+        sketch_comp_key = feat.get("sketchComponent", feat.get("component", ""))
+        sk_off_key = f"{sketch_comp_key}:{sketch}" if sketch_comp_key else sketch
+        is_face = (sk_off_key in self._brep_face_sketches
+                   or sketch in self._brep_face_sketches)
+        if is_face:
+            prior = (self._face_sketch_extrude_dists.get(sk_off_key)
+                     or self._face_sketch_extrude_dists.get(sketch, []))
+            if prior:
+                needs_offset_variant = True
+                offset_expr = " + ".join(f"({d})" for d in prior)
+
+        if (not is_negative and not needs_sequential_variant
+                and not profile_ambiguous and not needs_offset_variant):
             # Not ambiguous
             saved = self._save_state()
             with self._capture_output() as lines:
@@ -129,13 +170,24 @@ class _VariantsMixin:
             return [(lines, "default", state)]
 
         variants = []
-        # Variant 0: default (ObjectCollection for multi, unwrap negative if present)
+        # Variant 0: default (no offset)
         saved = self._save_state()
         with self._capture_output() as lines:
             self._feat_extrude(feat)
         state0 = self._save_state()
         self._restore_state(saved)
-        variants.append((lines, "default", state0))
+        variants.append((lines, "default (profile 0)", state0))
+
+        if needs_offset_variant:
+            # Variant: with face-following offset
+            f2 = copy.deepcopy(feat)
+            f2["_offset_expr"] = offset_expr
+            saved = self._save_state()
+            with self._capture_output() as lines:
+                self._feat_extrude(f2)
+            state_off = self._save_state()
+            self._restore_state(saved)
+            variants.append((lines, f"profile 0 + offset", state_off))
 
         if is_negative:
             # Variant: keep as positive (don't unwrap)
@@ -160,6 +212,29 @@ class _VariantsMixin:
             state2 = self._save_state()
             self._restore_state(saved)
             variants.append((lines, "sequential multi-profile", state2))
+
+        if profile_ambiguous:
+            # Try each non-default profile index, with and without offset
+            for pi in range(1, num_profiles):
+                f2 = copy.deepcopy(feat)
+                f2["profileIndex"] = pi
+                f2["profileIndices"] = [pi]
+                saved = self._save_state()
+                with self._capture_output() as lines:
+                    self._feat_extrude(f2)
+                state_pi = self._save_state()
+                self._restore_state(saved)
+                variants.append((lines, f"profile {pi}", state_pi))
+
+                if needs_offset_variant:
+                    f3 = copy.deepcopy(f2)
+                    f3["_offset_expr"] = offset_expr
+                    saved = self._save_state()
+                    with self._capture_output() as lines:
+                        self._feat_extrude(f3)
+                    state_pi_off = self._save_state()
+                    self._restore_state(saved)
+                    variants.append((lines, f"profile {pi} + offset", state_pi_off))
 
         return variants
 
@@ -240,6 +315,7 @@ class _VariantsMixin:
             "_brep_face_sketches": dict(self._brep_face_sketches),
             "_sketch_owners": dict(self._sketch_owners),
             "_flipped_planes": set(self._flipped_planes),
+            "_face_sketch_extrude_dists": {k: list(v) for k, v in self._face_sketch_extrude_dists.items()},
         }
 
     def _restore_state(self, state):
@@ -252,3 +328,4 @@ class _VariantsMixin:
         self._brep_face_sketches = dict(state["_brep_face_sketches"])
         self._sketch_owners = dict(state.get("_sketch_owners", {}))
         self._flipped_planes = set(state.get("_flipped_planes", set()))
+        self._face_sketch_extrude_dists = {k: list(v) for k, v in state.get("_face_sketch_extrude_dists", {}).items()}

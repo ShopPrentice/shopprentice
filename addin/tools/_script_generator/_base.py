@@ -45,6 +45,11 @@ class _BaseMixin:
 
         self._flipped_planes = set()  # reserved for future use
 
+        # Track prior extrude distances for each face-based sketch.
+        # Used to compute OffsetStartDefinition for sketch face-following variants.
+        # Dict: sketch_key → list of distance strings (e.g., ["0.25 in", "0.25 in"])
+        self._face_sketch_extrude_dists = {}
+
         # Current feature's component (set before each handler dispatch)
         self._current_comp = ""
 
@@ -111,6 +116,9 @@ class _BaseMixin:
             elif t == "Mirror":
                 if f.get("computeOption") == "Adjust":
                     self.needs.add("mirror_feats")
+                    # Body-only Adjust mirrors use mirror_bodies for
+                    # predictable body ordering — need both helpers.
+                    self.needs.add("mirror_bodies")
                 else:
                     self.needs.add("mirror_bodies")
 
@@ -131,6 +139,19 @@ class _BaseMixin:
         self._w("params = design.userParameters")
 
     def _footer(self):
+        # Re-apply parametric expressions for deferred params (model param deps now exist)
+        if getattr(self, "_deferred_params", None):
+            self._section("DEFERRED PARAMETER EXPRESSIONS")
+            for p in self._deferred_params:
+                c = p.get("comment", "").replace("\n", " ").replace("\r", "").replace('"', '\\"')
+                self._w("try:")
+                self.ind += 1
+                self._w(f'params.itemByName("{p["name"]}").expression = "{p["expression"]}"')
+                self.ind -= 1
+                self._w("except Exception:")
+                self.ind += 1
+                self._w("pass")
+                self.ind -= 1
         self._section("FIT VIEW")
         self._w("cam = app.activeViewport.camera")
         self._w("cam.isFitView = True")
@@ -145,19 +166,35 @@ class _BaseMixin:
         self._section("PARAMETERS")
         names = {p["name"] for p in params}
 
-        primary, derived = [], []
+        # Known Fusion units / math tokens that are NOT parameter references
+        _UNITS = {"in", "mm", "cm", "m", "ft", "deg", "rad", "pi"}
+
+        primary, derived, deferred = [], [], []
         for p in params:
             expr = p["expression"]
-            is_ref = any(
-                pn != p["name"] and re.search(r"\b" + re.escape(pn) + r"\b", expr)
-                for pn in names
-            )
-            (derived if is_ref else primary).append(p)
+            # Find all identifiers in expression
+            idents = set(re.findall(r"\b([a-zA-Z_]\w*)\b", expr))
+            refs_user = idents & names - {p["name"]}
+            refs_external = idents - names - _UNITS - {p["name"]}
+            if refs_external:
+                # Depends on model params not yet available — use literal value
+                deferred.append(p)
+            elif refs_user:
+                derived.append(p)
+            else:
+                primary.append(p)
 
         self._param_block(primary)
         if derived:
             self._w()
             self._param_block(derived)
+        if deferred:
+            self._w()
+            self._w("# Deferred: depend on model parameters created by features")
+            self._param_block_literal(deferred)
+            self._deferred_params = deferred  # for post-feature expression update
+        else:
+            self._deferred_params = []
 
     def _param_block(self, params):
         self._w("for name, expr, unit, comment in [")
@@ -170,6 +207,26 @@ class _BaseMixin:
         self.ind += 1
         self._w("params.add(name, adsk.core.ValueInput.createByString(expr), unit, comment)")
         self.ind -= 1
+
+    def _param_block_literal(self, params):
+        """Create params with literal values (for expressions with model param deps)."""
+        for p in params:
+            val = p.get("value", 0)
+            unit = p["unit"]
+            c = p.get("comment", "").replace("\n", " ").replace("\r", "").replace('"', '\\"')
+            # value is in internal units (cm/rad); convert to a literal expression
+            if unit in ("in",):
+                literal = f"{val / 2.54} in"
+            elif unit in ("mm",):
+                literal = f"{val * 10} mm"
+            elif unit in ("deg",):
+                import math as _m
+                literal = f"{_m.degrees(val)} deg"
+            elif unit in ("ft",):
+                literal = f"{val / 30.48} ft"
+            else:
+                literal = f"{val} cm" if unit else str(val)
+            self._w(f'params.add("{p["name"]}", adsk.core.ValueInput.createByString("{literal}"), "{unit}", "{c}")')
 
     # ── Helpers ──
 

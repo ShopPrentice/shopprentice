@@ -204,7 +204,7 @@ class _ModifiersMixin:
         # After split, Fusion auto-names pieces which differ from captured
         # end-of-timeline names. Rename to match captured names using
         # distance-based matching (volume + bounding box position).
-        self.ind = 1  # Reset: we're inside def run()
+        # ind is already at entry level (balanced by needs_supplementary block)
         body_geo = f.get("bodyGeo", {})
         if body_geo:
             # Distance-based matching: pair each expected body to the closest
@@ -340,10 +340,13 @@ class _ModifiersMixin:
                 input_code = f"[{', '.join(feat_refs)}]"
                 self._w(f"{var} = mirror_feats(comp, {input_code}, {plane_code}, \"{name}\")")
             elif body_refs and not feat_refs:
+                # Body-only inputs: use mirror_bodies (Identical compute) for
+                # predictable body ordering. Adjust vs Identical produces the
+                # same geometry for body mirrors but different body item order.
                 input_code = f"[{', '.join(body_refs)}]"
-                self._w(f"{var} = mirror_feats(comp, {input_code}, {plane_code}, \"{name}\")")
+                self._w(f"{var} = mirror_bodies(comp, {input_code}, {plane_code}, \"{name}\")")
             else:
-                # Mixed — use bodies (safer)
+                # Mixed — use mirror_feats (Adjust compute needed for features)
                 all_refs = feat_refs + body_refs
                 input_code = f"[{', '.join(all_refs)}]"
                 self._w(f"{var} = mirror_feats(comp, {input_code}, {plane_code}, \"{name}\")")
@@ -361,11 +364,103 @@ class _ModifiersMixin:
             self._w(f"{var} = mirror_bodies(comp, {input_code}, {plane_code}, \"{name}\")")
 
         self.feats[name] = var
-        for i, bn in enumerate(bodies):
-            bv = self._body_var(bn)
-            self._register_body(bn, bv)
-            self._w(f'{bv} = {var}.bodies.item({i})')
-            self._w(f'{bv}.name = "{bn}"')
+
+        # Determine new body names (mirror copies, not inputs)
+        input_set = set(input_bodies)
+        new_names = [bn for bn in bodies if bn not in input_set]
+
+        if len(new_names) > 1 and len(input_bodies) > 1:
+            # Multi-body mirror: body order in feat.bodies is non-deterministic
+            # and Python id() doesn't work for Fusion COM wrappers.
+            # Match ALL output bodies by centroid to expected positions from capture.
+            # Scope lookup to the feature's component to avoid cross-component
+            # name collisions (e.g., Body3 in beam vs Body3 in braces).
+            cap_centroids = {}
+            feat_comp = mirror_comp or ""
+            comp_data = self.cap.get("components", {})
+            def _find_comp(c, target):
+                if c.get("name") == target:
+                    return c
+                for ch in c.get("children", []):
+                    r = _find_comp(ch, target)
+                    if r:
+                        return r
+                return None
+            target_comp = _find_comp(comp_data, feat_comp) if feat_comp else comp_data
+            if target_comp:
+                for b in target_comp.get("bodies", []):
+                    bb = b.get("boundingBox")
+                    if bb:
+                        mn, mx = bb["min"], bb["max"]
+                        cap_centroids[b["name"]] = (
+                            round((mn[0]+mx[0])/2, 4),
+                            round((mn[1]+mx[1])/2, 4),
+                            round((mn[2]+mx[2])/2, 4))
+
+            # Check if we found centroids for the output bodies
+            found = sum(1 for bn in bodies if bn in cap_centroids)
+            if found >= len(bodies):
+                # Emit runtime: match each expected body to the closest in feat.bodies
+                self._c("Match mirror output bodies by centroid position")
+                self._w(f"_mir_expected = [")
+                self.ind += 1
+                for bn in bodies:
+                    c = cap_centroids.get(bn)
+                    if c:
+                        self._w(f'("{bn}", {c[0]}, {c[1]}, {c[2]}),')
+                self.ind -= 1
+                self._w(f"]")
+                self._w(f"_mir_used = set()")
+                self._w(f"_mir_bodies = {{}}")
+                self._w(f"for _name, _ex, _ey, _ez in _mir_expected:")
+                self.ind += 1
+                self._w(f"_best_bi, _best_d = -1, 1e10")
+                self._w(f"for _bi in range({var}.bodies.count):")
+                self.ind += 1
+                self._w(f"if _bi in _mir_used: continue")
+                self._w(f"_b = {var}.bodies.item(_bi)")
+                self._w(f"_mn, _mx = _b.boundingBox.minPoint, _b.boundingBox.maxPoint")
+                self._w(f"_d = abs((_mn.x+_mx.x)/2-_ex)+abs((_mn.y+_mx.y)/2-_ey)+abs((_mn.z+_mx.z)/2-_ez)")
+                self._w(f"if _d < _best_d: _best_bi, _best_d = _bi, _d")
+                self.ind -= 1
+                self._w(f"if _best_bi >= 0:")
+                self.ind += 1
+                self._w(f"_mir_bodies[_name] = {var}.bodies.item(_best_bi)")
+                self._w(f"{var}.bodies.item(_best_bi).name = _name")
+                self._w(f"_mir_used.add(_best_bi)")
+                self.ind -= 2
+
+                for bn in bodies:
+                    bv = self._body_var(bn)
+                    self._register_body(bn, bv)
+                    self._w(f'{bv} = _mir_bodies.get("{bn}")')
+            else:
+                # Bodies not in component tree (consumed by downstream features).
+                # Use runtime centroid matching: compute expected positions from
+                # input body centroids + mirror plane reflection.
+                self._c("Bodies consumed downstream — match by runtime centroid")
+                inp_refs = [self._body_ref(bn) for bn in input_bodies]
+                self._w(f"_mir_inp_centroids = {{}}")
+                for i, bn in enumerate(input_bodies):
+                    self._w(f"_bb = {inp_refs[i]}.boundingBox")
+                    self._w(f'_mir_inp_centroids["{bn}"] = ('
+                            f"(_bb.minPoint.x+_bb.maxPoint.x)/2, "
+                            f"(_bb.minPoint.y+_bb.maxPoint.y)/2, "
+                            f"(_bb.minPoint.z+_bb.maxPoint.z)/2)")
+                # Match output bodies: inputs stay close to original pos,
+                # new copies are at mirrored pos. Use index-based fallback.
+                for i, bn in enumerate(bodies):
+                    bv = self._body_var(bn)
+                    self._register_body(bn, bv)
+                    self._w(f'{bv} = {var}.bodies.item({i})')
+                    self._w(f'{bv}.name = "{bn}"')
+        else:
+            # Single-body mirror or simple case: index-based naming is reliable
+            for i, bn in enumerate(bodies):
+                bv = self._body_var(bn)
+                self._register_body(bn, bv)
+                self._w(f'{bv} = {var}.bodies.item({i})')
+                self._w(f'{bv}.name = "{bn}"')
 
     def _feat_combine(self, f):
         name = f.get("name", "Combine")

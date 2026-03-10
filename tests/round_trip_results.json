@@ -6,83 +6,37 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 3.4
+          "time": 9.7
         },
         {
           "step": "capture_original",
-          "time": 2.6
+          "time": 4.0
         },
         {
           "step": "export_script",
-          "time": 1.8
+          "time": 4.2
         },
         {
           "step": "execute_export",
-          "time": 2.7
+          "time": 2.1
         },
         {
           "step": "capture_replica",
-          "time": 2.5
+          "time": 3.8
         }
       ],
       "originalBodies": {
-        "Beam": 472.7124
+        "Rail": 288.0
       },
-      "exportedLines": 324,
+      "exportedLines": 289,
       "replicaBodies": {
-        "Beam": 472.7124
+        "Rail": 288.0
       },
       "comparisons": [
         {
-          "body": "Beam",
-          "original": 472.7124,
-          "replica": 472.7124,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_brep_face_sketch_FAILED": {
-    "passed": true,
-    "details": {
-      "name": "fixture_brep_face_sketch_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 4.9
-        },
-        {
-          "step": "capture_original",
-          "time": 5.7
-        },
-        {
-          "step": "export_script",
-          "time": 2.7
-        },
-        {
-          "step": "execute_export",
-          "time": 6.8
-        },
-        {
-          "step": "capture_replica",
-          "time": 6.1
-        }
-      ],
-      "originalBodies": {
-        "Beam": 472.7124
-      },
-      "exportedLines": 706,
-      "replicaBodies": {
-        "Beam": 472.7124
-      },
-      "comparisons": [
-        {
-          "body": "Beam",
-          "original": 472.7124,
-          "replica": 472.7124,
+          "body": "Rail",
+          "original": 288.0,
+          "replica": 288.0,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
@@ -98,83 +52,37 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 2.0
+          "time": 1.8
         },
         {
           "step": "capture_original",
-          "time": 2.1
+          "time": 5.1
         },
         {
           "step": "export_script",
-          "time": 1.5
-        },
-        {
-          "step": "execute_export",
-          "time": 2.3
-        },
-        {
-          "step": "capture_replica",
-          "time": 2.2
-        }
-      ],
-      "originalBodies": {
-        "Box": 189.3217
-      },
-      "exportedLines": 236,
-      "replicaBodies": {
-        "Box": 189.3217
-      },
-      "comparisons": [
-        {
-          "body": "Box",
-          "original": 189.3217,
-          "replica": 189.3217,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_combine_FAILED": {
-    "passed": true,
-    "details": {
-      "name": "fixture_combine_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 4.9
-        },
-        {
-          "step": "capture_original",
-          "time": 5.9
-        },
-        {
-          "step": "export_script",
-          "time": 2.0
-        },
-        {
-          "step": "execute_export",
-          "time": 6.4
-        },
-        {
-          "step": "capture_replica",
           "time": 5.7
+        },
+        {
+          "step": "execute_export",
+          "time": 2.2
+        },
+        {
+          "step": "capture_replica",
+          "time": 5.4
         }
       ],
       "originalBodies": {
-        "Box": 189.3217
+        "Board": 210.0
       },
-      "exportedLines": 625,
+      "exportedLines": 319,
       "replicaBodies": {
-        "Box": 189.3217
+        "Board": 210.0
       },
       "comparisons": [
         {
-          "body": "Box",
-          "original": 189.3217,
-          "replica": 189.3217,
+          "body": "Board",
+          "original": 210.0,
+          "replica": 210.0,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
@@ -190,105 +98,48 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.9
+          "time": 2.0
         },
         {
           "step": "capture_original",
-          "time": 1.9
+          "time": 2.6
         },
         {
           "step": "export_script",
-          "time": 1.2
+          "time": 2.4
         },
         {
           "step": "execute_export",
-          "time": 2.3
+          "time": 2.1
         },
         {
           "step": "capture_replica",
-          "time": 1.9
+          "time": 2.6
         }
       ],
       "originalBodies": {
-        "Leg_L": 108.0,
-        "Leg_R": 108.0
+        "Base": 160.0,
+        "Post": 90.0
       },
-      "exportedLines": 210,
+      "exportedLines": 283,
       "replicaBodies": {
-        "Leg_L": 108.0,
-        "Leg_R": 108.0
+        "Base": 160.0,
+        "Post": 90.0
       },
       "comparisons": [
         {
-          "body": "Leg_L",
-          "original": 108.0,
-          "replica": 108.0,
+          "body": "Base",
+          "original": 160.0,
+          "replica": 160.0,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
           "status": "OK"
         },
         {
-          "body": "Leg_R",
-          "original": 108.0,
-          "replica": 108.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_component_FAILED": {
-    "passed": true,
-    "details": {
-      "name": "fixture_component_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 4.7
-        },
-        {
-          "step": "capture_original",
-          "time": 5.3
-        },
-        {
-          "step": "export_script",
-          "time": 1.6
-        },
-        {
-          "step": "execute_export",
-          "time": 6.2
-        },
-        {
-          "step": "capture_replica",
-          "time": 5.8
-        }
-      ],
-      "originalBodies": {
-        "Leg_L": 108.0,
-        "Leg_R": 108.0
-      },
-      "exportedLines": 592,
-      "replicaBodies": {
-        "Leg_L": 108.0,
-        "Leg_R": 108.0
-      },
-      "comparisons": [
-        {
-          "body": "Leg_L",
-          "original": 108.0,
-          "replica": 108.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Leg_R",
-          "original": 108.0,
-          "replica": 108.0,
+          "body": "Post",
+          "original": 90.0,
+          "replica": 90.0,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
@@ -304,83 +155,59 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.9
+          "time": 1.8
         },
         {
           "step": "capture_original",
-          "time": 1.9
+          "time": 2.5
         },
         {
           "step": "export_script",
-          "time": 1.2
+          "time": 2.3
         },
         {
           "step": "execute_export",
-          "time": 3.4
+          "time": 2.0
         },
         {
           "step": "capture_replica",
-          "time": 0.7
+          "time": 2.3
         }
       ],
       "originalBodies": {
-        "Box": 64.0
+        "Pin": 0.5655,
+        "Pin (1)": 0.5655,
+        "Pin (2)": 0.5655
       },
-      "exportedLines": 192,
+      "exportedLines": 204,
       "replicaBodies": {
-        "Box": 64.0
+        "Pin": 0.5655,
+        "Pin (1)": 0.5655,
+        "Pin (2)": 0.5655
       },
       "comparisons": [
         {
-          "body": "Box",
-          "original": 64.0,
-          "replica": 64.0,
+          "body": "Pin",
+          "original": 0.5655,
+          "replica": 0.5655,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
           "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_construction_axis_FAILED": {
-    "passed": true,
-    "details": {
-      "name": "fixture_construction_axis_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 4.7
         },
         {
-          "step": "capture_original",
-          "time": 4.8
+          "body": "Pin (1)",
+          "original": 0.5655,
+          "replica": 0.5655,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         },
         {
-          "step": "export_script",
-          "time": 1.6
-        },
-        {
-          "step": "execute_export",
-          "time": 6.2
-        },
-        {
-          "step": "capture_replica",
-          "time": 5.6
-        }
-      ],
-      "originalBodies": {
-        "Box": 64.0
-      },
-      "exportedLines": 581,
-      "replicaBodies": {
-        "Box": 64.0
-      },
-      "comparisons": [
-        {
-          "body": "Box",
-          "original": 64.0,
-          "replica": 64.0,
+          "body": "Pin (2)",
+          "original": 0.5655,
+          "replica": 0.5655,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
@@ -396,147 +223,52 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 3.3
+          "time": 2.0
         },
         {
           "step": "capture_original",
-          "time": 1.3
+          "time": 2.7
         },
         {
           "step": "export_script",
-          "time": 1.3
+          "time": 2.4
         },
         {
           "step": "execute_export",
-          "time": 3.0
+          "time": 2.2
         },
         {
           "step": "capture_replica",
-          "time": 0.7
-        }
-      ],
-      "originalBodies": {
-        "Peg": 2.3562,
-        "Peg (1)": 2.3562,
-        "Peg (2)": 2.3562,
-        "Peg (3)": 2.3562
-      },
-      "exportedLines": 197,
-      "replicaBodies": {
-        "Peg": 2.3562,
-        "Peg (1)": 2.3562,
-        "Peg (2)": 2.3562,
-        "Peg (3)": 2.3562
-      },
-      "comparisons": [
-        {
-          "body": "Peg",
-          "original": 2.3562,
-          "replica": 2.3562,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Peg (1)",
-          "original": 2.3562,
-          "replica": 2.3562,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Peg (2)",
-          "original": 2.3562,
-          "replica": 2.3562,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Peg (3)",
-          "original": 2.3562,
-          "replica": 2.3562,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_construction_plane_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_construction_plane_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 4.6
-        },
-        {
-          "step": "capture_original",
-          "time": 1.4
-        },
-        {
-          "step": "export_script",
-          "time": 5.0
-        },
-        {
-          "step": "execute_export",
-          "time": 6.5
-        },
-        {
-          "step": "capture_replica",
-          "time": 0.9
+          "time": 2.5
         }
       ],
       "originalBodies": {
         "Plate1": 48.0,
         "Plate2": 48.0
       },
-      "exportedLines": 586,
+      "exportedLines": 287,
       "replicaBodies": {
-        "Peg": 2.3562,
-        "Peg (1)": 2.3562,
-        "Peg (2)": 2.3562,
-        "Peg (3)": 2.3562
+        "Plate1": 48.0,
+        "Plate2": 48.0
       },
       "comparisons": [
         {
           "body": "Plate1",
           "original": 48.0,
-          "replica": null,
-          "status": "MISSING"
+          "replica": 48.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         },
         {
           "body": "Plate2",
           "original": 48.0,
-          "replica": null,
-          "status": "MISSING"
-        },
-        {
-          "body": "Peg",
-          "replica": 2.3562,
-          "status": "EXTRA"
-        },
-        {
-          "body": "Peg (1)",
-          "replica": 2.3562,
-          "status": "EXTRA"
-        },
-        {
-          "body": "Peg (2)",
-          "replica": 2.3562,
-          "status": "EXTRA"
-        },
-        {
-          "body": "Peg (3)",
-          "replica": 2.3562,
-          "status": "EXTRA"
+          "replica": 48.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         }
       ]
     }
@@ -548,70 +280,48 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 2.6
+          "time": 2.2
         },
         {
           "step": "capture_original",
-          "time": 4.7
+          "time": 2.6
         },
         {
           "step": "export_script",
-          "time": 6.2
+          "time": 2.6
         },
         {
           "step": "execute_export",
-          "time": 4.6
+          "time": 2.1
         },
         {
           "step": "capture_replica",
-          "time": 4.8
+          "time": 2.5
         }
       ],
       "originalBodies": {
-        "Board": 200.0,
-        "Domino0": 6.0,
-        "Domino1": 6.0,
-        "Domino2": 6.0
+        "Base": 240.0,
+        "Wedge": 48.0
       },
-      "exportedLines": 448,
+      "exportedLines": 297,
       "replicaBodies": {
-        "Board": 200.0,
-        "Domino0": 6.0,
-        "Domino1": 6.0,
-        "Domino2": 6.0
+        "Base": 240.0,
+        "Wedge": 48.0
       },
       "comparisons": [
         {
-          "body": "Board",
-          "original": 200.0,
-          "replica": 200.0,
+          "body": "Base",
+          "original": 240.0,
+          "replica": 240.0,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
           "status": "OK"
         },
         {
-          "body": "Domino0",
-          "original": 6.0,
-          "replica": 6.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Domino1",
-          "original": 6.0,
-          "replica": 6.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Domino2",
-          "original": 6.0,
-          "replica": 6.0,
+          "body": "Wedge",
+          "original": 48.0,
+          "replica": 48.0,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
@@ -627,70 +337,37 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 2.0
+          "time": 1.8
         },
         {
           "step": "capture_original",
-          "time": 8.6
+          "time": 0.7
         },
         {
           "step": "export_script",
-          "time": 8.1
+          "time": 0.8
         },
         {
           "step": "execute_export",
-          "time": 9.3
+          "time": 1.8
         },
         {
           "step": "capture_replica",
-          "time": 9.5
+          "time": 0.9
         }
       ],
       "originalBodies": {
-        "Board": 200.0,
-        "Domino0": 6.0,
-        "Domino1": 6.0,
-        "Domino2": 6.0
+        "MidPlate": 24.0
       },
-      "exportedLines": 830,
+      "exportedLines": 217,
       "replicaBodies": {
-        "Board": 200.0,
-        "Domino0": 6.0,
-        "Domino1": 6.0,
-        "Domino2": 6.0
+        "MidPlate": 24.0
       },
       "comparisons": [
         {
-          "body": "Board",
-          "original": 200.0,
-          "replica": 200.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Domino0",
-          "original": 6.0,
-          "replica": 6.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Domino1",
-          "original": 6.0,
-          "replica": 6.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Domino2",
-          "original": 6.0,
-          "replica": 6.0,
+          "body": "MidPlate",
+          "original": 24.0,
+          "replica": 24.0,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
@@ -706,83 +383,48 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 2.2
+          "time": 2.1
         },
         {
           "step": "capture_original",
-          "time": 2.7
+          "time": 5.2
         },
         {
           "step": "export_script",
-          "time": 2.2
+          "time": 5.0
         },
         {
           "step": "execute_export",
-          "time": 3.0
+          "time": 2.4
         },
         {
           "step": "capture_replica",
-          "time": 2.5
+          "time": 5.3
         }
       ],
       "originalBodies": {
-        "Rail": 297.0
+        "Block": 425.6456,
+        "SymBody": 16.0
       },
-      "exportedLines": 334,
+      "exportedLines": 367,
       "replicaBodies": {
-        "Rail": 297.0
+        "Block": 425.6456,
+        "SymBody": 16.0
       },
       "comparisons": [
         {
-          "body": "Rail",
-          "original": 297.0,
-          "replica": 297.0,
+          "body": "Block",
+          "original": 425.6456,
+          "replica": 425.6456,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
           "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_extrude_FAILED": {
-    "passed": true,
-    "details": {
-      "name": "fixture_extrude_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 4.8
         },
         {
-          "step": "capture_original",
-          "time": 5.8
-        },
-        {
-          "step": "export_script",
-          "time": 2.9
-        },
-        {
-          "step": "execute_export",
-          "time": 6.8
-        },
-        {
-          "step": "capture_replica",
-          "time": 6.5
-        }
-      ],
-      "originalBodies": {
-        "Rail": 297.0
-      },
-      "exportedLines": 719,
-      "replicaBodies": {
-        "Rail": 297.0
-      },
-      "comparisons": [
-        {
-          "body": "Rail",
-          "original": 297.0,
-          "replica": 297.0,
+          "body": "SymBody",
+          "original": 16.0,
+          "replica": 16.0,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
@@ -802,79 +444,33 @@
         },
         {
           "step": "capture_original",
-          "time": 1.5
+          "time": 4.1
         },
         {
           "step": "export_script",
-          "time": 0.5
+          "time": 3.9
         },
         {
           "step": "execute_export",
-          "time": 3.1
+          "time": 2.2
         },
         {
           "step": "capture_replica",
-          "time": 0.3
+          "time": 4.0
         }
       ],
       "originalBodies": {
-        "Arch": 219.3982
+        "Beam": 472.7124
       },
-      "exportedLines": 190,
+      "exportedLines": 370,
       "replicaBodies": {
-        "Arch": 219.3982
+        "Beam": 472.7124
       },
       "comparisons": [
         {
-          "body": "Arch",
-          "original": 219.3982,
-          "replica": 219.3982,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_face_arch_cut_FAILED": {
-    "passed": true,
-    "details": {
-      "name": "fixture_face_arch_cut_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 5.1
-        },
-        {
-          "step": "capture_original",
-          "time": 3.5
-        },
-        {
-          "step": "export_script",
-          "time": 1.6
-        },
-        {
-          "step": "execute_export",
-          "time": 6.2
-        },
-        {
-          "step": "capture_replica",
-          "time": 5.4
-        }
-      ],
-      "originalBodies": {
-        "Arch": 219.3982
-      },
-      "exportedLines": 579,
-      "replicaBodies": {
-        "Arch": 219.3982
-      },
-      "comparisons": [
-        {
-          "body": "Arch",
-          "original": 219.3982,
-          "replica": 219.3982,
+          "body": "Beam",
+          "original": 472.7124,
+          "replica": 472.7124,
           "deltaPct": 0.0,
           "bbDelta": 0.0,
           "bbStatus": "OK",
@@ -890,29 +486,29 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.7
+          "time": 2.0
         },
         {
           "step": "capture_original",
-          "time": 11.6
+          "time": 3.1
         },
         {
           "step": "export_script",
-          "time": 1.2
+          "time": 3.1
         },
         {
           "step": "execute_export",
-          "time": 3.9
+          "time": 1.9
         },
         {
           "step": "capture_replica",
-          "time": 1.9
+          "time": 3.4
         }
       ],
       "originalBodies": {
         "Box": 189.3217
       },
-      "exportedLines": 242,
+      "exportedLines": 248,
       "replicaBodies": {
         "Box": 189.3217
       },
@@ -929,66 +525,18 @@
       ]
     }
   },
-  "fixture_fillet_chamfer_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_fillet_chamfer_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 6.4
-        },
-        {
-          "step": "capture_original",
-          "time": 2.5
-        },
-        {
-          "step": "export_script",
-          "time": 7.1
-        },
-        {
-          "step": "execute_export",
-          "time": 7.4
-        },
-        {
-          "step": "capture_replica",
-          "time": 1.4
-        }
-      ],
-      "originalBodies": {
-        "Box": 189.3217
-      },
-      "exportedLines": 644,
-      "replicaBodies": {
-        "Plank": 360.0
-      },
-      "comparisons": [
-        {
-          "body": "Box",
-          "original": 189.3217,
-          "replica": null,
-          "status": "MISSING"
-        },
-        {
-          "body": "Plank",
-          "replica": 360.0,
-          "status": "EXTRA"
-        }
-      ]
-    }
-  },
   "fixture_mirror": {
-    "passed": false,
+    "passed": true,
     "details": {
       "name": "fixture_mirror",
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 3.1
+          "time": 1.9
         },
         {
           "step": "capture_original",
-          "time": 1.1
+          "time": 2.4
         },
         {
           "step": "export_script",
@@ -996,117 +544,40 @@
         },
         {
           "step": "execute_export",
-          "time": 4.1
+          "time": 2.1
         },
         {
           "step": "capture_replica",
-          "time": 1.3
+          "time": 3.4
         }
       ],
       "originalBodies": {
         "Leg_L": 108.0,
         "Leg_R": 108.0
       },
-      "exportedLines": 266,
+      "exportedLines": 230,
       "replicaBodies": {
-        "Bottom": 24.0,
-        "Middle": 72.0,
-        "Top": 24.0
-      },
-      "comparisons": [
-        {
-          "body": "Leg_L",
-          "original": 108.0,
-          "replica": null,
-          "status": "MISSING"
-        },
-        {
-          "body": "Leg_R",
-          "original": 108.0,
-          "replica": null,
-          "status": "MISSING"
-        },
-        {
-          "body": "Bottom",
-          "replica": 24.0,
-          "status": "EXTRA"
-        },
-        {
-          "body": "Middle",
-          "replica": 72.0,
-          "status": "EXTRA"
-        },
-        {
-          "body": "Top",
-          "replica": 24.0,
-          "status": "EXTRA"
-        }
-      ]
-    }
-  },
-  "fixture_mirror_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_mirror_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 5.9
-        },
-        {
-          "step": "capture_original",
-          "time": 1.4
-        },
-        {
-          "step": "export_script",
-          "time": 7.3
-        },
-        {
-          "step": "execute_export",
-          "time": 7.7
-        },
-        {
-          "step": "capture_replica",
-          "time": 2.5
-        }
-      ],
-      "originalBodies": {
         "Leg_L": 108.0,
         "Leg_R": 108.0
       },
-      "exportedLines": 648,
-      "replicaBodies": {
-        "Bottom": 24.0,
-        "Middle": 72.0,
-        "Top": 24.0
-      },
       "comparisons": [
         {
           "body": "Leg_L",
           "original": 108.0,
-          "replica": null,
-          "status": "MISSING"
+          "replica": 108.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         },
         {
           "body": "Leg_R",
           "original": 108.0,
-          "replica": null,
-          "status": "MISSING"
-        },
-        {
-          "body": "Bottom",
-          "replica": 24.0,
-          "status": "EXTRA"
-        },
-        {
-          "body": "Middle",
-          "replica": 72.0,
-          "status": "EXTRA"
-        },
-        {
-          "body": "Top",
-          "replica": 24.0,
-          "status": "EXTRA"
+          "replica": 108.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         }
       ]
     }
@@ -1118,75 +589,29 @@
       "steps": [
         {
           "step": "execute_fixture",
+          "time": 2.0
+        },
+        {
+          "step": "capture_original",
+          "time": 2.4
+        },
+        {
+          "step": "export_script",
+          "time": 2.5
+        },
+        {
+          "step": "execute_export",
+          "time": 1.8
+        },
+        {
+          "step": "capture_replica",
           "time": 2.6
-        },
-        {
-          "step": "capture_original",
-          "time": 0.9
-        },
-        {
-          "step": "export_script",
-          "time": 0.8
-        },
-        {
-          "step": "execute_export",
-          "time": 3.9
-        },
-        {
-          "step": "capture_replica",
-          "time": 1.5
         }
       ],
       "originalBodies": {
         "Box": 64.0
       },
-      "exportedLines": 192,
-      "replicaBodies": {
-        "Box": 64.0
-      },
-      "comparisons": [
-        {
-          "body": "Box",
-          "original": 64.0,
-          "replica": 64.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_move_FAILED": {
-    "passed": true,
-    "details": {
-      "name": "fixture_move_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 6.4
-        },
-        {
-          "step": "capture_original",
-          "time": 1.0
-        },
-        {
-          "step": "export_script",
-          "time": 1.0
-        },
-        {
-          "step": "execute_export",
-          "time": 10.9
-        },
-        {
-          "step": "capture_replica",
-          "time": 0.8
-        }
-      ],
-      "originalBodies": {
-        "Box": 64.0
-      },
-      "exportedLines": 581,
+      "exportedLines": 204,
       "replicaBodies": {
         "Box": 64.0
       },
@@ -1210,23 +635,23 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 3.6
+          "time": 2.0
         },
         {
           "step": "capture_original",
-          "time": 0.3
+          "time": 2.6
         },
         {
           "step": "export_script",
-          "time": 1.5
+          "time": 2.5
         },
         {
           "step": "execute_export",
-          "time": 1.5
+          "time": 1.9
         },
         {
           "step": "capture_replica",
-          "time": 0.5
+          "time": 2.4
         }
       ],
       "originalBodies": {
@@ -1235,86 +660,7 @@
         "Peg (2)": 2.3562,
         "Peg (3)": 2.3562
       },
-      "exportedLines": 197,
-      "replicaBodies": {
-        "Peg": 2.3562,
-        "Peg (1)": 2.3562,
-        "Peg (2)": 2.3562,
-        "Peg (3)": 2.3562
-      },
-      "comparisons": [
-        {
-          "body": "Peg",
-          "original": 2.3562,
-          "replica": 2.3562,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Peg (1)",
-          "original": 2.3562,
-          "replica": 2.3562,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Peg (2)",
-          "original": 2.3562,
-          "replica": 2.3562,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Peg (3)",
-          "original": 2.3562,
-          "replica": 2.3562,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_pattern_FAILED": {
-    "passed": true,
-    "details": {
-      "name": "fixture_pattern_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 2.1
-        },
-        {
-          "step": "capture_original",
-          "time": 0.3
-        },
-        {
-          "step": "export_script",
-          "time": 0.3
-        },
-        {
-          "step": "execute_export",
-          "time": 4.0
-        },
-        {
-          "step": "capture_replica",
-          "time": 0.6
-        }
-      ],
-      "originalBodies": {
-        "Peg": 2.3562,
-        "Peg (1)": 2.3562,
-        "Peg (2)": 2.3562,
-        "Peg (3)": 2.3562
-      },
-      "exportedLines": 586,
+      "exportedLines": 207,
       "replicaBodies": {
         "Peg": 2.3562,
         "Peg (1)": 2.3562,
@@ -1368,23 +714,23 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 3.7
+          "time": 2.9
         },
         {
           "step": "capture_original",
-          "time": 1.7
+          "time": 10.4
         },
         {
           "step": "export_script",
-          "time": 2.3
+          "time": 10.6
         },
         {
           "step": "execute_export",
-          "time": 1.8
+          "time": 3.2
         },
         {
           "step": "capture_replica",
-          "time": 2.1
+          "time": 10.7
         }
       ],
       "originalBodies": {
@@ -1393,86 +739,7 @@
         "Domino1": 6.0,
         "Domino2": 6.0
       },
-      "exportedLines": 448,
-      "replicaBodies": {
-        "Board": 200.0,
-        "Domino0": 6.0,
-        "Domino1": 6.0,
-        "Domino2": 6.0
-      },
-      "comparisons": [
-        {
-          "body": "Board",
-          "original": 200.0,
-          "replica": 200.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Domino0",
-          "original": 6.0,
-          "replica": 6.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Domino1",
-          "original": 6.0,
-          "replica": 6.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        },
-        {
-          "body": "Domino2",
-          "original": 6.0,
-          "replica": 6.0,
-          "deltaPct": 0.0,
-          "bbDelta": 0.0,
-          "bbStatus": "OK",
-          "status": "OK"
-        }
-      ]
-    }
-  },
-  "fixture_pattern_cut_FAILED": {
-    "passed": true,
-    "details": {
-      "name": "fixture_pattern_cut_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 3.9
-        },
-        {
-          "step": "capture_original",
-          "time": 1.9
-        },
-        {
-          "step": "export_script",
-          "time": 1.3
-        },
-        {
-          "step": "execute_export",
-          "time": 4.4
-        },
-        {
-          "step": "capture_replica",
-          "time": 2.4
-        }
-      ],
-      "originalBodies": {
-        "Board": 200.0,
-        "Domino0": 6.0,
-        "Domino1": 6.0,
-        "Domino2": 6.0
-      },
-      "exportedLines": 830,
+      "exportedLines": 496,
       "replicaBodies": {
         "Board": 200.0,
         "Domino0": 6.0,
@@ -1526,29 +793,29 @@
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 3.7
+          "time": 2.3
         },
         {
           "step": "capture_original",
-          "time": 0.8
+          "time": 4.0
         },
         {
           "step": "export_script",
-          "time": 0.5
+          "time": 4.0
         },
         {
           "step": "execute_export",
-          "time": 2.8
+          "time": 2.1
         },
         {
           "step": "capture_replica",
-          "time": 0.8
+          "time": 4.3
         }
       ],
       "originalBodies": {
         "Rail": 297.0
       },
-      "exportedLines": 334,
+      "exportedLines": 370,
       "replicaBodies": {
         "Rail": 297.0
       },
@@ -1565,14 +832,14 @@
       ]
     }
   },
-  "fixture_projection_FAILED": {
-    "passed": false,
+  "fixture_raw_sketch": {
+    "passed": true,
     "details": {
-      "name": "fixture_projection_FAILED",
+      "name": "fixture_raw_sketch",
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 3.5
+          "time": 2.0
         },
         {
           "step": "capture_original",
@@ -1584,133 +851,103 @@
         },
         {
           "step": "execute_export",
-          "time": 0.3
-        }
-      ],
-      "originalBodies": {
-        "Rail": 297.0
-      },
-      "exportedLines": 719,
-      "error": "export execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
-    }
-  },
-  "fixture_raw_sketch": {
-    "passed": false,
-    "details": {
-      "name": "fixture_raw_sketch",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 1.3
+          "time": 1.9
         },
         {
-          "step": "capture_original",
-          "time": 0.5
-        },
-        {
-          "step": "export_script",
-          "time": 0.5
-        },
-        {
-          "step": "execute_export",
-          "time": 0.3
+          "step": "capture_replica",
+          "time": 0.8
         }
       ],
       "originalBodies": {
         "Arch": 219.3982
       },
-      "exportedLines": 579,
-      "error": "export execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
-    }
-  },
-  "fixture_raw_sketch_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_raw_sketch_FAILED",
-      "steps": [
+      "exportedLines": 200,
+      "replicaBodies": {
+        "Arch": 219.3982
+      },
+      "comparisons": [
         {
-          "step": "execute_fixture",
-          "time": 0.3
+          "body": "Arch",
+          "original": 219.3982,
+          "replica": 219.3982,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         }
-      ],
-      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
-    }
-  },
-  "fixture_raw_sketch_FAILED_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_raw_sketch_FAILED_FAILED",
-      "steps": [
-        {
-          "step": "execute_fixture",
-          "time": 0.2
-        }
-      ],
-      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
+      ]
     }
   },
   "fixture_sketch_proj": {
-    "passed": false,
+    "passed": true,
     "details": {
       "name": "fixture_sketch_proj",
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.4
+          "time": 1.8
         },
         {
           "step": "capture_original",
-          "time": 0.7
+          "time": 3.1
         },
         {
           "step": "export_script",
-          "time": 0.7
+          "time": 3.5
         },
         {
           "step": "execute_export",
-          "time": 0.2
+          "time": 2.2
+        },
+        {
+          "step": "capture_replica",
+          "time": 3.2
         }
       ],
       "originalBodies": {
         "Plank": 360.0
       },
-      "exportedLines": 644,
-      "error": "export execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
-    }
-  },
-  "fixture_sketch_proj_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_sketch_proj_FAILED",
-      "steps": [
+      "exportedLines": 286,
+      "replicaBodies": {
+        "Plank": 360.0
+      },
+      "comparisons": [
         {
-          "step": "execute_fixture",
-          "time": 0.3
+          "body": "Plank",
+          "original": 360.0,
+          "replica": 360.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         }
-      ],
-      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
+      ]
     }
   },
   "fixture_split_body": {
-    "passed": false,
+    "passed": true,
     "details": {
       "name": "fixture_split_body",
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.5
+          "time": 2.1
         },
         {
           "step": "capture_original",
-          "time": 0.8
+          "time": 4.2
         },
         {
           "step": "export_script",
-          "time": 0.8
+          "time": 4.0
         },
         {
           "step": "execute_export",
-          "time": 0.3
+          "time": 2.1
+        },
+        {
+          "step": "capture_replica",
+          "time": 4.2
         }
       ],
       "originalBodies": {
@@ -1718,204 +955,293 @@
         "Middle": 72.0,
         "Top": 24.0
       },
-      "exportedLines": 648,
-      "error": "export execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
-    }
-  },
-  "fixture_split_body_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_split_body_FAILED",
-      "steps": [
+      "exportedLines": 278,
+      "replicaBodies": {
+        "Bottom": 24.0,
+        "Middle": 72.0,
+        "Top": 24.0
+      },
+      "comparisons": [
         {
-          "step": "execute_fixture",
-          "time": 0.2
+          "body": "Bottom",
+          "original": 24.0,
+          "replica": 24.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
+        },
+        {
+          "body": "Middle",
+          "original": 72.0,
+          "replica": 72.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
+        },
+        {
+          "body": "Top",
+          "original": 24.0,
+          "replica": 24.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         }
-      ],
-      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
+      ]
     }
   },
   "fixture_sweep": {
-    "passed": false,
+    "passed": true,
     "details": {
       "name": "fixture_sweep",
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.4
+          "time": 2.0
         },
         {
           "step": "capture_original",
-          "time": 0.5
+          "time": 2.5
         },
         {
           "step": "export_script",
-          "time": 0.5
+          "time": 2.4
         },
         {
           "step": "execute_export",
-          "time": 0.2
+          "time": 2.2
+        },
+        {
+          "step": "capture_replica",
+          "time": 2.5
         }
       ],
       "originalBodies": {
         "Rail": 180.0,
         "Bead": 15.708
       },
-      "exportedLines": 619,
-      "error": "export execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
-    }
-  },
-  "fixture_sweep_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_sweep_FAILED",
-      "steps": [
+      "exportedLines": 247,
+      "replicaBodies": {
+        "Rail": 180.0,
+        "Bead": 15.708
+      },
+      "comparisons": [
         {
-          "step": "execute_fixture",
-          "time": 0.3
+          "body": "Bead",
+          "original": 15.708,
+          "replica": 15.708,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
+        },
+        {
+          "body": "Rail",
+          "original": 180.0,
+          "replica": 180.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         }
-      ],
-      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
+      ]
     }
   },
   "fixture_sweep_partial": {
-    "passed": false,
+    "passed": true,
     "details": {
       "name": "fixture_sweep_partial",
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.3
+          "time": 2.0
         },
         {
           "step": "capture_original",
-          "time": 0.5
+          "time": 2.4
         },
         {
           "step": "export_script",
-          "time": 0.5
+          "time": 2.5
         },
         {
           "step": "execute_export",
-          "time": 0.3
+          "time": 2.2
+        },
+        {
+          "step": "capture_replica",
+          "time": 2.3
         }
       ],
       "originalBodies": {
         "Bar": 270.0,
         "Bead": 11.3097
       },
-      "exportedLines": 619,
-      "error": "export execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
-    }
-  },
-  "fixture_sweep_partial_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_sweep_partial_FAILED",
-      "steps": [
+      "exportedLines": 247,
+      "replicaBodies": {
+        "Bar": 270.0,
+        "Bead": 11.3097
+      },
+      "comparisons": [
         {
-          "step": "execute_fixture",
-          "time": 0.2
+          "body": "Bar",
+          "original": 270.0,
+          "replica": 270.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
+        },
+        {
+          "body": "Bead",
+          "original": 11.3097,
+          "replica": 11.3097,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         }
-      ],
-      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
+      ]
     }
   },
   "fixture_two_side_extrude": {
-    "passed": false,
+    "passed": true,
     "details": {
       "name": "fixture_two_side_extrude",
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.4
+          "time": 1.9
         },
         {
           "step": "capture_original",
-          "time": 0.4
+          "time": 0.9
         },
         {
           "step": "export_script",
-          "time": 0.4
+          "time": 1.0
         },
         {
           "step": "execute_export",
-          "time": 0.3
+          "time": 1.9
+        },
+        {
+          "step": "capture_replica",
+          "time": 0.9
         }
       ],
       "originalBodies": {
         "Web": 453.7086
       },
-      "exportedLines": 577,
-      "error": "export execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
-    }
-  },
-  "fixture_two_side_extrude_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_two_side_extrude_FAILED",
-      "steps": [
+      "exportedLines": 200,
+      "replicaBodies": {
+        "Web": 453.7086
+      },
+      "comparisons": [
         {
-          "step": "execute_fixture",
-          "time": 0.2
+          "body": "Web",
+          "original": 453.7086,
+          "replica": 453.7086,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         }
-      ],
-      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
+      ]
     }
   },
   "fixture_xz_face_sketch": {
-    "passed": false,
+    "passed": true,
     "details": {
       "name": "fixture_xz_face_sketch",
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 1.4
+          "time": 1.9
         },
         {
           "step": "capture_original",
-          "time": 0.7
+          "time": 4.0
         },
         {
           "step": "export_script",
-          "time": 0.8
+          "time": 4.6
         },
         {
           "step": "execute_export",
-          "time": 0.3
+          "time": 2.0
+        },
+        {
+          "step": "capture_replica",
+          "time": 4.1
         }
       ],
       "originalBodies": {
         "Slab": 438.0
       },
-      "exportedLines": 646,
-      "error": "export execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
-    }
-  },
-  "fixture_xz_face_sketch_FAILED": {
-    "passed": false,
-    "details": {
-      "name": "fixture_xz_face_sketch_FAILED",
-      "steps": [
+      "exportedLines": 288,
+      "replicaBodies": {
+        "Slab": 438.0
+      },
+      "comparisons": [
         {
-          "step": "execute_fixture",
-          "time": 0.2
+          "body": "Slab",
+          "original": 438.0,
+          "replica": 438.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
         }
-      ],
-      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
+      ]
     }
   },
   "fixture_yz_face_sketch": {
-    "passed": false,
+    "passed": true,
     "details": {
       "name": "fixture_yz_face_sketch",
       "steps": [
         {
           "step": "execute_fixture",
-          "time": 0.1
+          "time": 2.0
+        },
+        {
+          "step": "capture_original",
+          "time": 4.5
+        },
+        {
+          "step": "export_script",
+          "time": 4.0
+        },
+        {
+          "step": "execute_export",
+          "time": 2.2
+        },
+        {
+          "step": "capture_replica",
+          "time": 4.2
         }
       ],
-      "error": "fixture execution: Traceback (most recent call last):\n  File \"/Users/frankzha/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion/tools/execute_script.py\", line 186, in handler\n    res = app.e"
+      "originalBodies": {
+        "Post": 231.0
+      },
+      "exportedLines": 289,
+      "replicaBodies": {
+        "Post": 231.0
+      },
+      "comparisons": [
+        {
+          "body": "Post",
+          "original": 231.0,
+          "replica": 231.0,
+          "deltaPct": 0.0,
+          "bbDelta": 0.0,
+          "bbStatus": "OK",
+          "status": "OK"
+        }
+      ]
     }
   }
 }

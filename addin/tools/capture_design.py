@@ -148,7 +148,23 @@ def handler() -> dict:
         out["components"] = _capture_component_tree(design.rootComponent)
 
         # 3. Timeline Features
+        # Expand all timeline groups so every feature is accessible.
+        # Iterate backwards so index shifts from expansion don't affect
+        # items we haven't visited yet.
         tl = design.timeline
+        _expanded_any = False
+        for gi in range(tl.count - 1, -1, -1):
+            gitem = tl.item(gi)
+            if gitem.isGroup:
+                try:
+                    if not gitem.isExpanded:
+                        gitem.isExpanded = True
+                        _expanded_any = True
+                except AttributeError:
+                    pass
+        if _expanded_any:
+            adsk.doEvents()
+
         for idx in range(tl.count):
             item = tl.item(idx)
             try:
@@ -330,12 +346,44 @@ def handler() -> dict:
                 out["timeline"].append(feat_info)
                 continue
 
-            # Snapshot
+            # Snapshot (Capture Position) — records joint positions that move
+            # component occurrences.  Capture the occurrence transforms at this
+            # marker position so the generator can emit the corresponding moves.
             try:
                 if entity.objectType == "adsk::fusion::Snapshot":
                     feat_info["type"] = "Snapshot"
                     try:
                         feat_info["name"] = entity.name
+                    except:
+                        pass
+                    # Roll marker to just after this feature to read transforms
+                    try:
+                        tl.markerPosition = idx + 1
+                        adsk.doEvents()
+                        transforms = {}
+                        for occ in design.rootComponent.allOccurrences:
+                            t = occ.transform
+                            is_identity = True
+                            for row in range(4):
+                                for col in range(4):
+                                    if abs(t.getCell(row, col) - (1.0 if row == col else 0.0)) > 1e-9:
+                                        is_identity = False
+                                        break
+                                if not is_identity:
+                                    break
+                            if not is_identity:
+                                # Store full 4x4 row-major matrix to preserve
+                                # rotation, not just translation.
+                                matrix = []
+                                for row in range(4):
+                                    for col in range(4):
+                                        matrix.append(round(t.getCell(row, col), 6))
+                                transforms[occ.component.name] = matrix
+                        if transforms:
+                            feat_info["transforms"] = transforms
+                        # Restore to end
+                        tl.markerPosition = tl.count
+                        adsk.doEvents()
                     except:
                         pass
                     out["timeline"].append(feat_info)

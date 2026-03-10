@@ -66,6 +66,14 @@ class _ExtrudeMixin:
         name = f.get("name", "Extrude")
         fvar = self._var(name)
 
+        # Face-based extrude with inaccessible profile — can't reconstruct
+        if f.get("profileType") in ("BRepFace", "Inaccessible"):
+            self._c(f"TODO: face-based or inaccessible profile extrude '{name}'")
+            self.feats[name] = "None"
+            for bn in f.get("bodies", []):
+                self._register_body(bn, "None")
+            return
+
         op = f.get("operation", "NewBody")
         dist = f.get("distance", "1 cm")
         sketch = f.get("sketch", "")
@@ -104,13 +112,83 @@ class _ExtrudeMixin:
                     break
                 if tf.get("type") == "Sketch" and tf.get("name") == sketch:
                     sketch_feat = tf
+        # Cross-component cplane direction fix: when the sketch is on a
+        # BRepFace from another component, the generator creates a construction
+        # plane instead.  The cplane normal (XDir × YDir) may be opposite to
+        # the face normal, requiring an extrude direction flip.
+        # Forward-reference detection: if the face body doesn't exist yet,
+        # the sketch also lacks face boundary profiles → reduce multi-profile.
+        _fwd_ref_cplane = False
+        if sketch_feat:
+            _sk_plane = sketch_feat.get("plane", {})
+            if _sk_plane.get("type") == "BRepFace":
+                _sk_comp = sketch_feat.get("component", "")
+                _sk_body = _sk_plane.get("body", "")
+                if _sk_comp and _sk_body and _sk_comp != self._root_name:
+                    _sk_fk = f"{_sk_comp}:{_sk_body}"
+                    # Check if body exists in same component, any component,
+                    # or not at all.
+                    _in_same_comp = _sk_fk in self.bodies
+                    _in_any_comp = (_in_same_comp
+                                    or _sk_body in self.bodies
+                                    or any(k.endswith(f":{_sk_body}")
+                                           for k in self.bodies))
+                    # Direction flip needed only when generator used a cplane
+                    # instead of the native face.  Determine this from sketch
+                    # characteristics (can't rely on _use_native_face flag due
+                    # to deep-copy of timeline in Generator.__init__).
+                    # Native face is used when: body exists in some component,
+                    # no body/edge projections, and not full boundary overlap.
+                    _sk_refs = [c for c in sketch_feat.get("curves", [])
+                                if c.get("isReference")]
+                    _has_bproj = any(
+                        c.get("projectedFrom", {}).get("type") == "BRepBody"
+                        for c in _sk_refs)
+                    _has_eproj = any(
+                        c.get("projectedFrom", {}).get("type") == "BRepEdge"
+                        for c in _sk_refs)
+                    # Body projections → cplane used; edge projections → cplane;
+                    # forward-ref (body not in any comp) → cplane.
+                    # Otherwise native face → no direction flip needed.
+                    _used_cplane = (not _in_any_comp
+                                    or _has_bproj or _has_eproj)
+                    if _used_cplane:
+                        _xd = sketch_feat.get("sketchXDir", [1, 0, 0])
+                        _yd = sketch_feat.get("sketchYDir", [0, 1, 0])
+                        _fn = [_xd[1]*_yd[2]-_xd[2]*_yd[1],
+                               _xd[2]*_yd[0]-_xd[0]*_yd[2],
+                               _xd[0]*_yd[1]-_xd[1]*_yd[0]]
+                        _ax, _ay, _az = abs(_fn[0]), abs(_fn[1]), abs(_fn[2])
+                        if _az >= _ay and _az >= _ax:
+                            if _fn[2] < 0: flipped = not flipped
+                        elif _ay >= _ax:
+                            if _fn[1] < 0: flipped = not flipped
+                        else:
+                            if _fn[0] < 0: flipped = not flipped
+                    if not _in_any_comp:
+                        _fwd_ref_cplane = True
+            # Fallback: flag set during full script generation
+            if sketch_feat.get("_cplane_extrude_flip"):
+                flipped = not flipped
         cap_profiles = sketch_feat.get("profiles", []) if sketch_feat else []
         profile_indices = f.get("profileIndices", [pidx])
+        # Forward-reference cplane: face boundary profiles don't exist on the
+        # cplane sketch, so reduce multi-profile to single profile.
+        if _fwd_ref_cplane and len(profile_indices) > 1:
+            profile_indices = [profile_indices[0]]
         target_profs = [
             next((p for p in cap_profiles if p.get("index") == idx), None)
             for idx in profile_indices
         ]
         target_profs = [t for t in target_profs if t is not None]
+
+        # When sketchError prevents profile access, captured bboxes may be from
+        # sketch creation time — not the extrude's timeline position.  Face sketch
+        # boundaries auto-update when JOINs/CUTs modify the body, so bbox matching
+        # against stale data picks the wrong profile.  Fall through to direct
+        # profile-index selection from the rebuilt sketch's actual profiles.
+        if f.get("sketchError"):
+            target_profs = []
 
         # Look up sketch variable by component-scoped key first
         sk_key = f"{sketch_comp}:{sketch}" if sketch_comp else sketch
@@ -148,6 +226,16 @@ class _ExtrudeMixin:
                 self._w(f"_m01 = _cy[0]*_ax.x + _cy[1]*_ax.y + _cy[2]*_ax.z")
                 self._w(f"_m10 = _cx[0]*_ay.x + _cx[1]*_ay.y + _cx[2]*_ay.z")
                 self._w(f"_m11 = _cy[0]*_ay.x + _cy[1]*_ay.y + _cy[2]*_ay.z")
+                # Origin delta for profile BB matching
+                cap_origin = sketch_feat.get("sketchOrigin") if sketch_feat else None
+                if cap_origin:
+                    self._w(f"_co = ({cap_origin[0]}, {cap_origin[1]}, {cap_origin[2]})")
+                    self._w(f"_ao = {sk_var}.origin")
+                    self._w(f"_od = (_co[0]-_ao.x, _co[1]-_ao.y, _co[2]-_ao.z)")
+                    self._w(f"_odx = _od[0]*_ax.x + _od[1]*_ax.y + _od[2]*_ax.z")
+                    self._w(f"_ody = _od[0]*_ay.x + _od[1]*_ay.y + _od[2]*_ay.z")
+                else:
+                    self._w(f"_odx, _ody = 0, 0")
 
             if is_multi:
                 if cross_comp_multi:
@@ -165,8 +253,8 @@ class _ExtrudeMixin:
                 t_mxx, t_mxy = round(mx[0], 4), round(mx[1], 4)
                 if has_xf:
                     self._c(f"Match profile by bbox (transformed): ({t_mnx}, {t_mny}) to ({t_mxx}, {t_mxy})")
-                    self._w(f"_t1 = ({t_mnx}*_m00 + {t_mny}*_m01, {t_mnx}*_m10 + {t_mny}*_m11)")
-                    self._w(f"_t2 = ({t_mxx}*_m00 + {t_mxy}*_m01, {t_mxx}*_m10 + {t_mxy}*_m11)")
+                    self._w(f"_t1 = ({t_mnx}*_m00 + {t_mny}*_m01 + _odx, {t_mnx}*_m10 + {t_mny}*_m11 + _ody)")
+                    self._w(f"_t2 = ({t_mxx}*_m00 + {t_mxy}*_m01 + _odx, {t_mxx}*_m10 + {t_mxy}*_m11 + _ody)")
                     self._w(f"_t_mnx, _t_mny = min(_t1[0], _t2[0]), min(_t1[1], _t2[1])")
                     self._w(f"_t_mxx, _t_mxy = max(_t1[0], _t2[0]), max(_t1[1], _t2[1])")
                     t_ref = ("_t_mnx", "_t_mny", "_t_mxx", "_t_mxy")
@@ -194,6 +282,14 @@ class _ExtrudeMixin:
             # JOIN into it to produce a single merged body (matching the
             # ObjectCollection behavior that creates one body from N profiles).
             if cross_comp_multi:
+                # Track face-based sketch usage for offset computation
+                _sk_off_key = f"{sketch_comp}:{sketch}" if sketch_comp else sketch
+                _is_face_sk = (_sk_off_key in self._brep_face_sketches
+                               or sketch in self._brep_face_sketches)
+                if _is_face_sk:
+                    dists = self._face_sketch_extrude_dists.get(_sk_off_key, [])
+                    dists.append(f.get("distance", dist))
+                    self._face_sketch_extrude_dists[_sk_off_key] = dists
                 self._w(f"_ext_results = []")
                 self._w(f"for _idx, _mi in enumerate(_matched_pis):")
                 self.ind += 1
@@ -230,17 +326,36 @@ class _ExtrudeMixin:
             if is_multi:
                 prof = "_prof_coll"
             else:
-                prof = f"{sk_var}.profiles.item(_best_pi)"
+                prof = f"{sk_var}.profiles.item(_best_pi) if {sk_var}.profiles.count > 0 else None"
         elif sketch in self.profiles:
             prof = self.profiles[sketch]
         elif sk_var:
-            prof = f"{sk_var}.profiles.item({pidx})"
+            prof = f"{sk_var}.profiles.item({pidx}) if {sk_var} and {sk_var}.profiles.count > {pidx} else None"
         else:
             self._c(f"TODO: sketch '{sketch}' not tracked")
             prof = "None"
 
         self._w(f"inp = comp.features.extrudeFeatures.createInput({prof}, {op_code})")
         self._emit_extrude_extent(f, dist, taper, flipped)
+
+        # Face-following sketch offset: when a face-based sketch is reused
+        # by multiple extrudes, Fusion's parametric model moves the sketch
+        # with the face. Whether offset is needed depends on profile overlap
+        # (handled as a variant in _extrude_variants).
+        # Here we just track the distance for variant computation and apply
+        # the offset if _offset_expr was set by the variant system.
+        sk_offset_key = f"{sketch_comp}:{sketch}" if sketch_comp else sketch
+        is_face_sketch = (sk_offset_key in self._brep_face_sketches
+                          or sketch in self._brep_face_sketches)
+        offset_expr = f.get("_offset_expr")
+        if offset_expr:
+            self._w(f"inp.startExtent = adsk.fusion.OffsetStartDefinition.create(")
+            self._w(f'    adsk.core.ValueInput.createByString("{offset_expr}"))')
+        if is_face_sketch:
+            dists = self._face_sketch_extrude_dists.get(sk_offset_key, [])
+            dists.append(f.get("distance", dist))
+            self._face_sketch_extrude_dists[sk_offset_key] = dists
+
         self._emit_extrude_participants(f, op, bodies, participants, dist, sketch)
 
         self._w(f"{fvar} = comp.features.extrudeFeatures.add(inp)")
@@ -334,17 +449,24 @@ class _ExtrudeMixin:
             # Try to resolve full bounding boxes for each profileDims entry
             pd_bboxes = []
             if pdims and cap_profiles:
+                used_cp = set()
                 for pd in pdims:
                     tw, th = pd[0], pd[1]
                     best_cp, best_d = None, 1e10
-                    for cp in cap_profiles:
+                    for ci, cp in enumerate(cap_profiles):
+                        if ci in used_cp:
+                            continue
                         cpw = abs(cp["max"][0] - cp["min"][0])
                         cph = abs(cp["max"][1] - cp["min"][1])
                         d = abs(cpw - tw) + abs(cph - th)
                         if d < best_d:
                             best_d = d
-                            best_cp = cp
-                    pd_bboxes.append(best_cp if best_cp and best_d < 0.01 else None)
+                            best_cp = (ci, cp)
+                    if best_cp and best_d < 0.01:
+                        used_cp.add(best_cp[0])
+                        pd_bboxes.append(best_cp[1])
+                    else:
+                        pd_bboxes.append(None)
             use_bbox = pd_bboxes and all(b is not None for b in pd_bboxes)
             # Get sketch axes for coordinate transform
             cap_xd = sketch_feat.get("sketchXDir") if sketch_feat else None

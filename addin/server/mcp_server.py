@@ -188,7 +188,7 @@ class SimpleMCPServer:
         if app:
             app.log(f"Posted {operation_type} execution task {task_id} to main thread")
 
-        timeout = 300  # 5 minute timeout
+        timeout = 600  # 10 minute timeout
         start_time = time.time()
 
         while time.time() - start_time < timeout:

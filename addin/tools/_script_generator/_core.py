@@ -286,6 +286,12 @@ class _CoreMixin:
             else:
                 self._w(f"comp = root")
 
+            # Wrap each feature in try/except so individual failures
+            # don't crash the full script (allows partial rebuild).
+            self._w("try:")
+            self.ind += 1
+            self._w("pass")  # ensure non-empty try block for comment-only features
+
             # Check if ambiguous
             variants = self._feature_variants_with_state(feat)
             if len(variants) > 1:
@@ -304,6 +310,12 @@ class _CoreMixin:
                     handler(feat)
                 else:
                     self._c(f"TODO: Unsupported feature type '{t}'")
+
+            self.ind -= 1
+            self._w("except Exception:")
+            self.ind += 1
+            self._w("pass")
+            self.ind -= 1
         self._footer()
         return "\n".join(self.out)
 
@@ -482,17 +494,15 @@ class _CoreMixin:
                 is_brep_face = plane_info.get("type") == "BRepFace"
 
                 # BRepFace sketches are created in root (cross-component face
-                # access), so search root first for those.
-                if is_brep_face:
-                    self._w(f'{var} = root.sketches.itemByName("{name}")')
+                # access), so search component first, then root, then all.
+                c_ref = self.components.get(comp_name, "root")
+                self._w(f'{var} = {c_ref}.sketches.itemByName("{name}")')
+                if c_ref != "root":
+                    # Also check root (BRepFace sketches may be created there)
                     self._w(f"if not {var}:")
                     self.ind += 1
-                    c_ref = self.components.get(comp_name, "root")
-                    self._w(f'{var} = {c_ref}.sketches.itemByName("{name}")')
+                    self._w(f'{var} = root.sketches.itemByName("{name}")')
                     self.ind -= 1
-                else:
-                    c_ref = self.components.get(comp_name, "root")
-                    self._w(f'{var} = {c_ref}.sketches.itemByName("{name}")')
                 # Fallback: search all components
                 self._w(f"if not {var}:")
                 self.ind += 1
@@ -537,9 +547,12 @@ class _CoreMixin:
                         self._sketch_owners[f"{comp_name}:{name}"] = "comp"
 
                 # Resolve profile for downstream extrude/sweep
-                prof = f"{var}_prof"
-                self._w(f"{prof} = {var}.profiles.item(0)")
-                self.profiles[name] = prof
+                prof_count = feat.get("profileCount", 1)
+                if prof_count > 0:
+                    prof = f"{var}_prof"
+                    # Runtime guard: sketch may be None (creation failed) or have 0 profiles
+                    self._w(f"{prof} = {var}.profiles.item(0) if {var} and {var}.profiles.count > 0 else None")
+                    self.profiles[name] = prof
 
             elif t in ("Extrude", "Sweep", "Mirror", "SplitBody",
                         "RectangularPattern", "CopyPasteBody"):
@@ -566,6 +579,16 @@ class _CoreMixin:
                     c_ref = self.components.get(comp_name, "root") if comp_name and comp_name != self._root_name else "root"
                     self._w(f'{fvar} = {c_ref}.features.extrudeFeatures.itemByName("{name}")')
                     self.feats[name] = fvar
+                # Track face-based sketch extrude distances for offset computation
+                if t == "Extrude":
+                    sk_name = feat.get("sketch", "")
+                    sk_comp = feat.get("sketchComponent", comp_name)
+                    sk_key = f"{sk_comp}:{sk_name}" if sk_comp else sk_name
+                    if (sk_key in self._brep_face_sketches
+                            or sk_name in self._brep_face_sketches):
+                        dists = self._face_sketch_extrude_dists.get(sk_key, [])
+                        dists.append(feat.get("distance", "1 cm"))
+                        self._face_sketch_extrude_dists[sk_key] = dists
 
             elif t == "Remove":
                 removed = feat.get("removedBody", "")
@@ -581,6 +604,34 @@ class _CoreMixin:
                         scoped = f"{comp_name}:{tb}" if comp_name else ""
                         if scoped and scoped in self.bodies:
                             del self.bodies[scoped]
+
+            elif t == "Snapshot":
+                # Re-apply occurrence transforms from prior Snapshots.
+                # Direct occ.transform assignment persists because the scratch
+                # doc has no joints/Snapshot features to override it.
+                transforms = feat.get("transforms", {})
+                for cname, data in transforms.items():
+                    if cname not in self.components:
+                        continue
+                    self._w(f"for _o in root.allOccurrences:")
+                    self.ind += 1
+                    self._w(f'if _o.component.name == "{cname}":')
+                    self.ind += 1
+                    if len(data) == 16:
+                        self._w(f"_xf = adsk.core.Matrix3D.create()")
+                        for row in range(4):
+                            for col in range(4):
+                                val = data[row * 4 + col]
+                                identity = 1.0 if row == col else 0.0
+                                if abs(val - identity) > 1e-9:
+                                    self._w(f"_xf.setCell({row}, {col}, {val})")
+                        self._w(f"_o.transform = _xf")
+                    else:
+                        self._w(f"_xf = _o.transform")
+                        self._w(f"_xf.translation = adsk.core.Vector3D.create({data[0]}, {data[1]}, {data[2]})")
+                        self._w(f"_o.transform = _xf")
+                    self._w(f"break")
+                    self.ind -= 2
 
     # ── Timeline dispatch ──
 

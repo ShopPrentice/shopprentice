@@ -235,8 +235,6 @@ def _capture_sketch(sk, design=None):
 
     # Structured sketch plane
     plane = _capture_sketch_plane(sk, design)
-    if plane:
-        info["plane"] = plane
 
     # Sketch coordinate system — always capture for coordinate transforms
     try:
@@ -245,6 +243,25 @@ def _capture_sketch(sk, design=None):
         info["sketchYDir"] = [round(sk.yDirection.x, 6), round(sk.yDirection.y, 6), round(sk.yDirection.z, 6)]
     except:
         pass
+
+    # If referencePlane returned None, infer plane from sketch axes.
+    # normal = cross(xDir, yDir), origin = sketchOrigin.
+    if plane is None and "sketchOrigin" in info and "sketchXDir" in info and "sketchYDir" in info:
+        xd = info["sketchXDir"]
+        yd = info["sketchYDir"]
+        normal = [
+            round(xd[1]*yd[2] - xd[2]*yd[1], 6),
+            round(xd[2]*yd[0] - xd[0]*yd[2], 6),
+            round(xd[0]*yd[1] - xd[1]*yd[0], 6),
+        ]
+        plane = {
+            "type": "InferredPlane",
+            "normal": normal,
+            "origin": info["sketchOrigin"],
+        }
+
+    if plane:
+        info["plane"] = plane
 
     # Check if any curves are projected references — if so, need rollTo
     # for accurate edge vertex positions (downstream features may alter topology)
@@ -436,6 +453,25 @@ def _capture_sketch(sk, design=None):
             for pi in range(spline.fitPoints.count):
                 fp = spline.fitPoints.item(pi)
                 pts.append([round(fp.geometry.x, 4), round(fp.geometry.y, 4)])
+            # Densify: sample additional points along the spline evaluator
+            # for higher-fidelity reproduction when reconstructing the sketch.
+            if len(pts) >= 2:
+                try:
+                    geom = spline.geometry  # NurbsCurve3D in sketch space
+                    ev = geom.evaluator
+                    ok, sp_param, ep_param = ev.getParameterExtents()
+                    if ok:
+                        n_target = max(15, len(pts))
+                        dense_pts = []
+                        for si in range(n_target):
+                            t = sp_param + (ep_param - sp_param) * si / (n_target - 1)
+                            ok_pt, pt = ev.getPointAtParameter(t)
+                            if ok_pt:
+                                dense_pts.append([round(pt.x, 4), round(pt.y, 4)])
+                        if len(dense_pts) >= len(pts):
+                            pts = dense_pts
+                except:
+                    pass
             spline_info = {
                 "type": "FittedSpline",
                 "fitPoints": pts,
@@ -891,7 +927,7 @@ def _capture_extrude(ext, idx, tl, design=None):
             pass
         # Profile index matching
         _match_profile_index(ext, sk_found, info)
-    elif "sketchError" not in info:
+    elif "sketchError" not in info and info.get("profileType") not in ("BRepFace", "Inaccessible"):
         info["sketchError"] = "no sketch found (all strategies failed)"
 
     body_names = [b.name for b in ext.bodies]
@@ -1031,8 +1067,10 @@ def _find_sketch_for_extrude(ext, idx, tl, info):
     """Multi-strategy sketch finding for an extrude feature (with timeline)."""
     sk_found = _find_sketch_from_profile(ext, info)
 
-    # Strategy: walk timeline backwards
-    if not sk_found:
+    # Strategy: walk timeline backwards (skip for face-based profiles only).
+    # Inaccessible profiles still need sketch name — the variant search
+    # system will try all profile indices at build time.
+    if not sk_found and info.get("profileType") != "BRepFace":
         try:
             for back_idx in range(idx - 1, -1, -1):
                 back_item = tl.item(back_idx)
@@ -1085,6 +1123,15 @@ def _find_sketch_from_profile(ext, info):
                         pass
                 if sk_found:
                     break
+            # If no sketch found, check if profile items are BRepFaces
+            if not sk_found:
+                try:
+                    f0 = adsk.fusion.BRepFace.cast(profiles_coll.item(0))
+                    if f0:
+                        info["profileType"] = "BRepFace"
+                        return None
+                except:
+                    pass
         else:
             try:
                 p = adsk.fusion.Profile.cast(profile)
@@ -1097,7 +1144,21 @@ def _find_sketch_from_profile(ext, info):
                     sk_found = profile.parentSketch
                 except:
                     pass
+            # Check BRepFace
+            if not sk_found:
+                try:
+                    face = adsk.fusion.BRepFace.cast(profile)
+                    if face:
+                        info["profileType"] = "BRepFace"
+                        return None
+                except:
+                    pass
     except Exception as e:
+        # InternalValidationError at end-of-timeline often means a face-based
+        # extrude whose profile can't be read.  Mark it so timeline walk-back
+        # doesn't incorrectly assign a sketch.
+        if "InternalValidationError" in str(e):
+            info["profileType"] = "Inaccessible"
         info["sketchError"] = f"profile access: {e}"
 
     return sk_found
@@ -1464,17 +1525,48 @@ def _capture_rectangular_pattern(pat, design=None):
         except:
             pass
 
-    def _try_bodies():
-        """Capture bodies list from pat.bodies.
+    def _try_bodies_and_direction():
+        """Capture bodies and infer direction inside rollTo.
 
         Must be called inside rollTo so pat.bodies returns ALL copies
         (at end-of-timeline, downstream Combines may consume pattern bodies).
-        Direction inference is deferred to end-of-timeline copy detection
-        where both seed and copies have reliable bounding boxes.
+        Also infers direction from body positions inside rollTo where copies
+        are guaranteed to exist.
         """
         body_names = [pat.bodies.item(i).name for i in range(pat.bodies.count)]
         if body_names:
             info["bodies"] = body_names
+
+        # Infer direction from the directionOneEntity geometry.
+        # pat.bodies only returns 1 body (the input) — copies are invisible
+        # both in pat.bodies and comp.bRepBodies during rollTo.
+        # The axis entity (edge or construction axis) gives direction.
+        if "directionOne" not in info:
+            try:
+                axis = pat.directionOneEntity
+                direction = None
+                ca = adsk.fusion.ConstructionAxis.cast(axis)
+                if ca:
+                    line = ca.geometry
+                    direction = [line.direction.x, line.direction.y, line.direction.z]
+                else:
+                    edge = adsk.fusion.BRepEdge.cast(axis)
+                    if edge:
+                        sp = edge.startVertex.geometry
+                        ep = edge.endVertex.geometry
+                        direction = [ep.x - sp.x, ep.y - sp.y, ep.z - sp.z]
+                if direction:
+                    adx = abs(direction[0])
+                    ady = abs(direction[1])
+                    adz = abs(direction[2])
+                    if adx >= ady and adx >= adz and adx > 0.001:
+                        info["directionOne"] = [1.0 if direction[0] > 0 else -1.0, 0.0, 0.0]
+                    elif ady >= adx and ady >= adz and ady > 0.001:
+                        info["directionOne"] = [0.0, 1.0 if direction[1] > 0 else -1.0, 0.0]
+                    elif adz > 0.001:
+                        info["directionOne"] = [0.0, 0.0, 1.0 if direction[2] > 0 else -1.0]
+            except:
+                pass
 
     def _try_direction_entity():
         """Try to read directionOneEntity inside rollTo.
@@ -1498,51 +1590,83 @@ def _capture_rectangular_pattern(pat, design=None):
         try:
             with _roll_to_feature(pat, design):
                 _try_inputs()
-                _try_bodies()
+                _try_bodies_and_direction()
                 _try_direction_entity()
         except:
             _try_inputs()
-            _try_bodies()
+            _try_bodies_and_direction()
     else:
         _try_inputs()
-        _try_bodies()
+        _try_bodies_and_direction()
 
     # Fallback: if bodies weren't captured inside rollTo
     if "bodies" not in info:
         info["bodies"] = [b.name for b in pat.bodies]
+
+    # Transform rollTo direction from component-local to world space
+    if "directionOne" in info and design:
+        try:
+            comp = pat.parentComponent
+            root = design.rootComponent
+            if comp != root:
+                for occ in root.allOccurrences:
+                    if occ.component == comp:
+                        xf = occ.transform
+                        dir_vec = adsk.core.Vector3D.create(
+                            info["directionOne"][0],
+                            info["directionOne"][1],
+                            info["directionOne"][2])
+                        dir_vec.transformBy(xf)
+                        d = [dir_vec.x, dir_vec.y, dir_vec.z]
+                        ad = [abs(d[0]), abs(d[1]), abs(d[2])]
+                        if ad[0] >= ad[1] and ad[0] >= ad[2] and ad[0] > 0.001:
+                            info["directionOne"] = [1.0 if d[0] > 0 else -1.0, 0.0, 0.0]
+                        elif ad[1] >= ad[0] and ad[1] >= ad[2] and ad[1] > 0.001:
+                            info["directionOne"] = [0.0, 1.0 if d[1] > 0 else -1.0, 0.0]
+                        elif ad[2] > 0.001:
+                            info["directionOne"] = [0.0, 0.0, 1.0 if d[2] > 0 else -1.0]
+                        break
+        except:
+            pass
 
     # Pattern copy detection: scan component bodies at END-OF-TIMELINE.
     # rollTo(True) doesn't make pattern copies visible in comp.bRepBodies
     # (Fusion API quirk), but they ARE visible at end-of-timeline.
     try:
         comp = pat.parentComponent
-        input_names = set(info.get("inputs", []))
-        # Get input body volume (at end-of-timeline, may differ from rollTo vol
-        # due to downstream CUTs, but copies should still match each other)
-        input_vols = {}
-        for bi in range(comp.bRepBodies.count):
-            b = comp.bRepBodies.item(bi)
-            if b.name in input_names:
-                input_vols[b.name] = b.volume
-        # If input body was consumed by downstream Combine, use volume from
-        # any copy (all copies have identical volume at creation)
-        if not input_vols:
-            # Use first non-input body as reference volume
+        # Use body names (from "bodies") for seed identification.
+        # "inputs" contains feature names (e.g. "Extrude2") which don't match
+        # body names (e.g. "Body1"), so they can't be used for body lookup.
+        seed_body_names = info.get("bodies", [])
+        # Find seed body: first body matching bodies[0] in the component.
+        # Store index because Fusion API proxy objects are new wrappers each
+        # call — `is` comparison fails even for the same underlying entity.
+        seed_idx = -1
+        seed_min = None
+        ref_vol = None
+        if seed_body_names:
             for bi in range(comp.bRepBodies.count):
                 b = comp.bRepBodies.item(bi)
-                input_vols["_ref"] = b.volume
+                if b.name == seed_body_names[0]:
+                    seed_idx = bi
+                    ref_vol = b.volume
+                    seed_min = [round(b.boundingBox.minPoint.x, 4),
+                                round(b.boundingBox.minPoint.y, 4),
+                                round(b.boundingBox.minPoint.z, 4)]
+                    break
+        # Fallback: use first body's volume as reference
+        if ref_vol is None:
+            for bi in range(comp.bRepBodies.count):
+                ref_vol = comp.bRepBodies.item(bi).volume
                 break
-        # Find copies: same volume as input (within tolerance), not input name
-        if input_vols:
-            # Copies start identical to input. Downstream CUTs may modify
-            # some copies (up to ~5% volume change). Use 5% tolerance.
-            ref_vol = next(iter(input_vols.values()))
+        # Find copies: same volume as seed (within 5% tolerance), exclude seed
+        if ref_vol and ref_vol > 0:
             copies = []
             for bi in range(comp.bRepBodies.count):
-                b = comp.bRepBodies.item(bi)
-                if b.name in input_names:
+                if bi == seed_idx:
                     continue
-                if ref_vol > 0 and abs(b.volume - ref_vol) / ref_vol < 0.05:
+                b = comp.bRepBodies.item(bi)
+                if abs(b.volume - ref_vol) / ref_vol < 0.05:
                     copies.append({
                         "name": b.name,
                         "min": [round(b.boundingBox.minPoint.x, 4),
@@ -1554,29 +1678,19 @@ def _capture_rectangular_pattern(pat, design=None):
                 # Only used as FALLBACK when directionOneEntity wasn't readable.
                 # Body positions are in component-local space, which may differ
                 # from world space if the occurrence has rotation.
-                input_names_list = info.get("inputs", [])
-                if input_names_list:
-                    seed_min = None
-                    for bi in range(comp.bRepBodies.count):
-                        b = comp.bRepBodies.item(bi)
-                        if b.name == input_names_list[0]:
-                            seed_min = [round(b.boundingBox.minPoint.x, 4),
-                                        round(b.boundingBox.minPoint.y, 4),
-                                        round(b.boundingBox.minPoint.z, 4)]
-                            break
-                    if seed_min:
-                        nearest = min(copies, key=lambda c:
-                            sum(abs(a - b) for a, b in zip(c["min"], seed_min)))
-                        dx = nearest["min"][0] - seed_min[0]
-                        dy = nearest["min"][1] - seed_min[1]
-                        dz = nearest["min"][2] - seed_min[2]
-                        adx, ady, adz = abs(dx), abs(dy), abs(dz)
-                        if adx >= ady and adx >= adz and adx > 0.001:
-                            info["directionOne"] = [1.0 if dx > 0 else -1.0, 0.0, 0.0]
-                        elif ady >= adx and ady >= adz and ady > 0.001:
-                            info["directionOne"] = [0.0, 1.0 if dy > 0 else -1.0, 0.0]
-                        elif adz > 0.001:
-                            info["directionOne"] = [0.0, 0.0, 1.0 if dz > 0 else -1.0]
+                if seed_min:
+                    nearest = min(copies, key=lambda c:
+                        sum(abs(a - b) for a, b in zip(c["min"], seed_min)))
+                    dx = nearest["min"][0] - seed_min[0]
+                    dy = nearest["min"][1] - seed_min[1]
+                    dz = nearest["min"][2] - seed_min[2]
+                    adx, ady, adz = abs(dx), abs(dy), abs(dz)
+                    if adx >= ady and adx >= adz and adx > 0.001:
+                        info["directionOne"] = [1.0 if dx > 0 else -1.0, 0.0, 0.0]
+                    elif ady >= adx and ady >= adz and ady > 0.001:
+                        info["directionOne"] = [0.0, 1.0 if dy > 0 else -1.0, 0.0]
+                    elif adz > 0.001:
+                        info["directionOne"] = [0.0, 0.0, 1.0 if dz > 0 else -1.0]
 
                 # Transform direction from component-local to world space.
                 # comp.bRepBodies gives positions in the component's local

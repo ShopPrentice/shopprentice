@@ -40,22 +40,34 @@ def generate_script(capture):
 
 
 def get_ambiguous_features(capture):
-    """Return list of {index, name, type, variants} for ambiguous features."""
+    """Return list of {index, name, type, variants} for ambiguous features.
+
+    Advances generator state after each feature (using default variant)
+    so that accumulated tracking (e.g., face-sketch extrude distances)
+    is available for subsequent features' ambiguity detection.
+    """
     g = _Generator(capture)
     g._scan_needs()
     result = []
     for fi, feat in enumerate(g.cap.get("timeline", [])):
         if feat.get("isRolledBack"):
             continue
-        variants = g._feature_variants(feat)
-        if len(variants) > 1:
+        # Set component context so _register_body adds component-scoped keys
+        # (e.g., "posts:scarf1") — needed for forward-ref detection in sketches.
+        g._current_comp = feat.get("component", "")
+        variants_ws = g._feature_variants_with_state(feat)
+        if len(variants_ws) > 1:
             result.append({
                 "index": fi,
                 "name": feat.get("name", ""),
                 "type": feat.get("type", ""),
-                "variantCount": len(variants),
-                "descriptions": [v[1] for v in variants],
+                "variantCount": len(variants_ws),
+                "descriptions": [v[1] for v in variants_ws],
             })
+        # Advance state with default variant so subsequent features
+        # see accumulated tracking (e.g., face-sketch extrude distances)
+        if variants_ws:
+            g._restore_state(variants_ws[0][2])
     return result
 
 
@@ -83,6 +95,33 @@ def generate_prefix_script(capture):
         Standalone Fusion 360 Python script text.
     """
     return _Generator(capture).generate_prefix_script()
+
+
+def count_feature_variants(capture, feature_index):
+    """Return the number of variants for a single feature.
+
+    Faster than get_ambiguous_features (doesn't process all features).
+    """
+    g = _Generator(capture)
+    g._scan_needs()
+    timeline = capture.get("timeline", [])
+    if feature_index < 0 or feature_index >= len(timeline):
+        return 1
+    feat = timeline[feature_index]
+    # Advance state through prior features so accumulated tracking
+    # (face-sketch extrude distances, etc.) is available.
+    for fi, f in enumerate(timeline):
+        if fi >= feature_index:
+            break
+        if f.get("isRolledBack"):
+            continue
+        g._current_comp = f.get("component", "")
+        variants_ws = g._feature_variants_with_state(f)
+        if variants_ws:
+            g._restore_state(variants_ws[0][2])
+    g._current_comp = feat.get("component", "")
+    variants = g._feature_variants_with_state(feat)
+    return len(variants)
 
 
 def generate_feature_script(capture, feature_index, choices=None):

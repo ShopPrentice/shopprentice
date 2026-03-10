@@ -50,7 +50,14 @@ class _GeometryMixin:
             body_name = plane_info.get("body", "")
             normal = plane_info.get("normal")
             pof = plane_info.get("pointOnFace")
-            bv = self._body_ref(body_name)
+            # Check if body name is ambiguous (appears in multiple components).
+            # If so and we have pointOnFace+normal, search ALL bodies instead
+            # of relying on name-based resolution which may pick the wrong one.
+            scoped_count = sum(
+                1 for k in self.bodies if k.endswith(f":{body_name}")
+            )
+            ambiguous = scoped_count > 1
+            bv = "None" if (ambiguous and pof and normal) else self._body_ref(body_name)
             if pof:
                 # Use pointOnFace + normal for precise face selection.
                 n = normal or [0, 0, 0]
@@ -67,6 +74,30 @@ class _GeometryMixin:
                 axis, direction = self._normal_to_axis(normal)
                 return f'find_face({bv}, "{axis}", {direction})'
             return f'find_face_near({bv}, 0, 0, 0)'
+
+        if ptype == "InferredPlane":
+            # Sketch plane inferred from axes when referencePlane was None.
+            # Create an offset construction plane from the nearest standard plane.
+            normal = plane_info.get("normal", [0, 0, 1])
+            origin = plane_info.get("origin", [0, 0, 0])
+            ax, ay, az = abs(normal[0]), abs(normal[1]), abs(normal[2])
+            if az >= ay and az >= ax:
+                base = "comp.xYConstructionPlane"
+                offset = origin[2]
+            elif ay >= ax:
+                base = "comp.xZConstructionPlane"
+                offset = origin[1]
+            else:
+                base = "comp.yZConstructionPlane"
+                offset = origin[0]
+            # If offset is near zero, use the standard plane directly
+            if abs(offset) < 0.001:
+                return base
+            # Create a named offset plane using the off_plane helper
+            plane_var = self._var(f"_inferred_pl_{len(self.planes)}")
+            self._w(f'{plane_var} = off_plane(comp, {base}, "{round(offset, 4)} cm", "_inferred_{len(self.planes)}")')
+            self.planes[f"_inferred_{len(self.planes)}"] = plane_var
+            return plane_var
 
         return "root.xYConstructionPlane"
 

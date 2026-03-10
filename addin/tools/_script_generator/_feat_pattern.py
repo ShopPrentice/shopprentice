@@ -50,11 +50,15 @@ class _PatternMixin:
                           if dist_type == "Spacing"
                           else "adsk.fusion.PatternDistanceType.ExtentPatternDistanceType")
 
-        # Input bodies
+        # Input bodies — use body names (not feature names) for lookup
         self._w("pat_coll = adsk.core.ObjectCollection.create()")
-        if inputs:
+        if bodies:
+            for body_name in bodies:
+                bv = self._body_ref(body_name, component=f.get("component"))
+                self._w(f"pat_coll.add({bv})")
+        elif inputs:
             for inp_name in inputs:
-                bv = self._body_ref(inp_name)
+                bv = self._body_ref(inp_name, component=f.get("component"))
                 self._w(f"pat_coll.add({bv})")
         else:
             self._c("TODO: pattern input bodies not captured")
@@ -109,7 +113,9 @@ class _PatternMixin:
             self.ind += 1
             self._w("_pat_copies.append(_b)")
             self.ind -= 2
-            # Sort ascending by coordinate — matches capture's patternCopies order
+            # Sort ascending by coordinate — capture's patternCopies lists copies
+            # from most-displaced to least-displaced, which matches ascending sort
+            # for both positive and negative direction patterns.
             self._w(f"_pat_copies.sort(key=lambda _b:"
                      f" getattr(_b.boundingBox.minPoint, '{sort_attr}'))")
             for i, bn in enumerate(pattern_copies):
@@ -144,4 +150,36 @@ class _PatternMixin:
         self.components[name] = f"{var}_c"
 
     def _feat_snapshot(self, f):
-        self._c("Snapshot (informational only, no code needed)")
+        transforms = f.get("transforms", {})
+        if not transforms:
+            self._c("Snapshot (no transform data)")
+            return
+        self._c(f"Snapshot: move occurrences")
+        for comp_name, data in transforms.items():
+            if comp_name not in self.components:
+                self._c(f"TODO: Unknown component '{comp_name}' for transform")
+                continue
+            # Set occurrence transform directly. This persists across timeline
+            # marker moves because the occurrence is not timeline-controlled
+            # (no joints or Snapshot feature in the scratch doc).
+            self._w(f"for _o in root.allOccurrences:")
+            self.ind += 1
+            self._w(f'if _o.component.name == "{comp_name}":')
+            self.ind += 1
+            if len(data) == 16:
+                # Full 4x4 row-major matrix (includes rotation)
+                self._w(f"_xf = adsk.core.Matrix3D.create()")
+                for row in range(4):
+                    for col in range(4):
+                        val = data[row * 4 + col]
+                        identity = 1.0 if row == col else 0.0
+                        if abs(val - identity) > 1e-9:
+                            self._w(f"_xf.setCell({row}, {col}, {val})")
+                self._w(f"_o.transform = _xf")
+            else:
+                # Legacy: [tx, ty, tz] translation only
+                self._w(f"_xf = _o.transform")
+                self._w(f"_xf.translation = adsk.core.Vector3D.create({data[0]}, {data[1]}, {data[2]})")
+                self._w(f"_o.transform = _xf")
+            self._w(f"break")
+            self.ind -= 2
