@@ -6,6 +6,8 @@ A parametric pergola and deck structure modeled in Fusion 360. 90"W x 60"D pergo
 
 ![Pergola front](screenshots/front.png)
 
+![Post joint close-up](screenshots/joint.png)
+
 ## Regenerated Model
 
 Unlike the other examples in this repo, **this script was not hand-written or AI-generated from a prompt.** It was **reverse-engineered from an existing Fusion 360 design** using the capture-and-rebuild pipeline:

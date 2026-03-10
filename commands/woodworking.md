@@ -31,6 +31,20 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
 8. **Build order matters.** Cut grooves and dados **before** joining corner joinery (dovetails, box joints). Side boards span only their initial footprint before tails are joined; groove tool bodies that extend beyond the board only CUT the material that exists at that moment. When tails are later joined, they attach ungrooved — producing clean, stopped grooves at corners with zero extra geometry. This "implicit stopped groove" technique eliminates manual stop calculations.
 
+## Topic Reference
+
+This skill is modular. The core (this file) covers fundamentals needed for every project. Read additional topic files based on your project's needs:
+
+| Topic | When to Read | File |
+|-------|-------------|------|
+| **Joinery** | Any project with joints (Phase 2+) | `woodworking/joinery.md` |
+| **Angled Construction** | Splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | `woodworking/angled-construction.md` |
+| **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | `woodworking/details-and-finishing.md` |
+| **MCP Advanced** | Modifying existing designs, sync, selection-driven workflow | `woodworking/mcp-advanced.md` |
+| **Specific Joint Types** | Dovetails, box joints, dominos, etc. | `joinery/<type>.md` (see table in `woodworking/joinery.md`) |
+
+**Read the topic file BEFORE writing code** that uses those techniques. The core skill provides the routing — the topic files provide the implementation details.
+
 ## Parameter Planning
 
 Choosing which values are user parameters vs. derived is critical. The goal: adjusting any single parameter always produces a clean, valid model — no broken geometry, no asymmetric gaps, no overlapping bodies.
@@ -313,95 +327,13 @@ Using `ObjectCollection` causes `TypeError`. Using no participant bodies causes 
 
 ### Fillet and Chamfer Features
 
-Phase 3 detail features that soften or break edges. Both require selecting edges from existing bodies — all structural geometry and joinery must be built first.
+> **Full reference:** `woodworking/details-and-finishing.md` — edge selection strategies, chamfer types, code patterns, sizing constraints.
 
-**API asymmetry (CRITICAL):**
+Quick reference:
 - **Fillet:** `filletFeatures.createInput()` → `inp.addConstantRadiusEdgeSet(edges, radius, propagate)`
 - **Chamfer:** `chamferFeatures.createInput2()` → `inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(edges, distance, propagate)`
-
-Note: chamfer uses `createInput2()` (not `createInput()`) and has a nested `.chamferEdgeSets` collection before the add method.
-
-#### Edge Selection Strategies
-
-Edges must be selected programmatically. Three patterns by increasing specificity:
-
-**1. All edges of a body** — full-body chamfer/fillet (e.g., lid):
-```python
-edges = adsk.core.ObjectCollection.create()
-for edge in body.edges:
-    edges.add(edge)
-```
-
-**2. Edges at a coordinate** — edge ring at a specific plane (e.g., top edges, bottom edges):
-```python
-edges = adsk.core.ObjectCollection.create()
-target_z = ev("box_height")
-for i in range(body.edges.count):
-    e = body.edges.item(i)
-    sv, ev2 = e.startVertex.geometry, e.endVertex.geometry
-    if abs(sv.z - target_z) < 0.01 and abs(ev2.z - target_z) < 0.01:
-        edges.add(e)
-```
-
-**3. Edges of a face** — when the design intent is "fillet this face" (e.g., seat-to-leg transitions):
-```python
-face = af.find_face(body, "z", +1)  # top face
-edges = adsk.core.ObjectCollection.create()
-added = set()
-for i in range(face.edges.count):
-    edge = face.edges.item(i)
-    if edge.tempId not in added:
-        edges.add(edge)
-        added.add(edge.tempId)
-```
-
-**CRITICAL:** The fillet/chamfer API requires `BRepEdge` objects, never `BRepFace`. When the design intent is "fillet a face," iterate the face's edges and add them. Use `tempId` to deduplicate shared edges between adjacent faces.
-
-#### Chamfer Types
-
-| Type | Method | Use For |
-|------|--------|---------|
-| Equal distance | `addEqualDistanceChamferEdgeSet(edges, dist, propagate)` | Most common — uniform bevel |
-| Two distances | `addTwoDistanceChamferEdgeSet(edges, d1, d2, propagate)` | Asymmetric bevel |
-| Distance + angle | `addDistanceAndAngleChamferEdgeSet(edges, dist, angle, propagate)` | Angled cuts |
-
-#### Code Patterns
-
-```python
-# Fillet — constant radius
-fillet_inp = comp.features.filletFeatures.createInput()
-fillet_inp.addConstantRadiusEdgeSet(
-    edges,
-    adsk.core.ValueInput.createByString("fl_r"),
-    True)  # propagate to tangent edges
-fillet = comp.features.filletFeatures.add(fillet_inp)
-fillet.name = "SeatFillet"
-
-# Chamfer — equal distance
-ch_inp = comp.features.chamferFeatures.createInput2()
-ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
-    edges,
-    adsk.core.ValueInput.createByString("ch_d"),
-    True)  # propagate
-ch = comp.features.chamferFeatures.add(ch_inp)
-ch.name = "LidChamfer"
-```
-
-#### Parameters
-
-Use 2-letter prefixes consistent with joinery conventions:
-```python
-params.add("fl_r", VI("0.125 in"), "in", "Fillet radius")
-params.add("ch_d", VI("0.125 in"), "in", "Chamfer distance")
-```
-
-Common woodworking values: fillet 1/16"–1/4" (comfort, softening), chamfer 1/8"–1/4" (visual detail, splinter prevention).
-
-#### Sizing Constraints
-
-- Fillet radius must be less than half the smallest adjacent face dimension — too large and the fillet fails.
-- Chamfer distance must be less than the shortest edge length on any affected face.
-- When in doubt, start small (1/8") and let the user adjust via Change Parameters.
+- Note: chamfer uses `createInput2()` (not `createInput()`) and has a nested `.chamferEdgeSets` collection.
+- The API requires `BRepEdge` objects, never `BRepFace`. Iterate face edges and deduplicate via `tempId`.
 
 ## Standard Helpers
 
@@ -583,187 +515,15 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 ## Joinery Rules
 
-### Combine-Based Joinery (CRITICAL)
+> **Full reference:** `woodworking/joinery.md` — combine-based joinery, tooling bodies, edge rabbets, cross-component CUT, bulk CUT, timeline ordering, keepTool, M&T, T&G, gap filling, and reference table for 10+ joint types in `joinery/*.md`.
 
-**Never draw separate mortise/socket sketches.** Build the tenon/tail as a separate body, then use Fusion 360 **Combine** to cut the receiving board. The tenon body IS the cutting tool — one shape guarantees the mortise exactly matches.
+**Core principle:** Never draw separate mortise/socket sketches. Build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), then JOIN to the owner. The body IS the cutting tool — one shape, perfect fit.
 
-This applies to **all** joint types:
-- **Mortise & tenon**: tenon body cuts the mortise, then joins the shelf
-- **Dovetails**: tail body cuts the socket, then joins the top board
-- **Tongue & groove**: tongue body cuts the groove, then joins the slat
-- **Panel grooves**: panel body (with tongues from edge rabbets) cuts the groove in each receiving board via Combine CUT (`keepTool=True`). The tongue-board overlap IS the groove — guaranteed perfect fit. Through tongues produce through grooves; stopped tongues produce stopped grooves. No separate groove sketches needed.
+**Timeline order:** CUT first (root, assembly proxies), JOIN second (owning component).
 
-### Tooling Body Pattern for Grooves
+**Cross-component:** Use `body.createForAssemblyContext(occ)` for CUT in root. Bulk CUT all tools in one Combine.
 
-> **When a groove receives a paneled body with tongues** (bottoms, lids, drawer bottoms), use the panel body itself as the cutting tool instead (see **Panel grooves** under Combine-Based Joinery above). The tooling body approach below is for standalone grooves that don't receive a panel — dados for fixed shelves, rabbets for backs, etc.
-
-For grooves, dados, and rabbets, use a **tooling body** — a NewBody extrude that represents the material to remove:
-
-1. Extrude a tooling body (NewBody) that spans the full groove path — intentionally extending beyond the target board's boundaries
-2. Combine CUT the tooling body into the target board (`keep_tool=False`)
-3. Only the intersection is removed — the board's edges act as implicit stops
-
-```python
-# Groove tooling body spans full width — only cuts where board exists
-_, pr = sketch_rect_model(groove_plane,
-    ("board_thick - groove_depth", "0 in", "groove_up"),
-    {"x": "groove_depth", "y": "box_width"},
-    "BGL_Sk")
-groove_tool = ext_new(pr, "bottom_tongue", "BGL")
-combine(left_body, groove_tool.bodies.item(0), CUT, False, "BGL_Cut")
-```
-
-**Why this works:** The tooling body extends beyond the board edges, but Combine CUT only removes the intersection. Combined with the "grooves before joinery" build order (design philosophy point 7), this produces perfectly stopped grooves at corners without calculating stop positions.
-
-**Stopped grooves for through-prevention:** When a groove must NOT be visible from the board's end (e.g., front/back bottom grooves hidden behind side boards), explicitly stop the groove by shortening its X span:
-```python
-# Stopped both sides — starts at board_thick, ends at box_length - board_thick
-("board_thick", "board_thick - groove_depth", "groove_up"),
-{"x": "box_length - 2 * board_thick", "y": "groove_depth"},
-```
-
-### Edge Rabbet Pattern for Floating Panels
-
-For bottom panels, lids, and drawer bottoms that sit in grooves with a rabbeted edge, use a pure subtractive **edge rabbet** approach — start with a full board, then cut each edge:
-
-1. **Full board (NewBody):** Extrude at tongue footprint (extends into groove area), full panel thickness
-2. **Edge rabbet CUTs:** One per edge direction — **always through cuts** (full board length). Removes `groove_up` from one face of the tongue strip.
-3. **Mirror** symmetric edges (front↔back, left↔right) across midplanes
-
-```python
-# 1. Full board at tongue footprint, full bottom_thick
-_, pr = sketch_rect_model(comp, root.xYConstructionPlane,
-    ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
-    {"x": "box_length - 2*board_thick + 2*groove_depth",
-     "y": "box_width - 2*board_thick + 2*groove_depth"},
-    "Bottom_Sk")
-bot_ext = ext_new(comp, pr, "bottom_thick", "Bottom")
-bot_body = bot_ext.bodies.item(0)
-bot_body.name = "Bottom"
-
-# 2a. Front edge rabbet CUT (through: full X extent of board)
-_, pr = sketch_rect_model(comp, root.xYConstructionPlane,
-    ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
-    {"x": "box_length - 2*board_thick + 2*groove_depth",
-     "y": "groove_depth"},
-    "BotRab_F_Sk")
-rab_f = ext_op(comp, pr, "groove_up", CUT, bot_body, "BotRab_F")
-
-# 2b. Mirror front → back across Y midplane
-mirror_feats(comp, [rab_f], y_mid_pl, "BotRab_MirrorY")
-
-# 2c. Left edge rabbet CUT (through: full Y extent of board)
-_, pr = sketch_rect_model(comp, root.xYConstructionPlane,
-    ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
-    {"x": "groove_depth",
-     "y": "box_width - 2*board_thick + 2*groove_depth"},
-    "BotRab_L_Sk")
-rab_l = ext_op(comp, pr, "groove_up", CUT, bot_body, "BotRab_L")
-
-# 2d. Mirror left → right across X midplane
-mirror_feats(comp, [rab_l], x_mid_pl, "BotRab_MirrorX")
-```
-
-**Pure subtractive — no JOIN step.** Woodworkers never add material back; they only remove it. Corner notches where two rabbets intersect are naturally handled — the double-cut IS the corner notch.
-
-**Rabbets are always through cuts.** With hand tools, a through rabbet is a single pass with a rabbet plane — stopping the cut mid-board is unnecessary extra work. The "stopped" concept applies to **grooves in case boards** (so the groove slot doesn't show on the board's end face), NOT to rabbets on panels. See "Stopped grooves for through-prevention" above.
-
-**Asymmetric variation (sliding lids):** For a lid that slides out one side, skip the rabbet on the open edge — the full-thickness board slides freely in the groove.
-
-### Cross-Component CUT via Assembly Proxies
-
-When tenons live in component A (e.g., Shelves) but need to cut mortises in component B (e.g., Sides), use **assembly context proxies** in root:
-
-```python
-# Get proxies for bodies in their assembly context
-shelf_proxy = shelf_body.createForAssemblyContext(shelves_occ)
-side_proxy  = left_side.createForAssemblyContext(sides_occ)
-
-# CUT in root component using proxies
-combine(root, side_proxy, [shelf_proxy], CUT, True, "ShelfMortise")
-```
-
-This keeps features in their owning components while performing cross-component boolean operations in root. The proxies are persistent — create them once and reuse across multiple CUT operations.
-
-### Bulk CUT (Preferred Over Per-Item CUT)
-
-When multiple tool bodies (e.g., all patterned shelves) need to cut the same target, pass **all tools in a single Combine** rather than looping:
-
-```python
-# Collect ALL shelf body proxies (template + pattern copies)
-all_shelf_proxies = [b.createForAssemblyContext(shelves_occ)
-                     for b in all_shelf_bodies]
-
-# ONE CUT feature creates ALL mortises at once
-combine(root, left_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortL")
-```
-
-This produces a single CUT feature in the timeline instead of N separate features. Cleaner, faster, and parametric — when the pattern count changes, the CUT automatically picks up new bodies.
-
-### Timeline Ordering for CUT + JOIN
-
-When the same body serves as both a CUT tool (to create a socket/mortise) and a JOIN target (to merge into its parent):
-
-1. **CUT first** (in root, via assembly proxies, `keepTool=True`) — the tool bodies survive
-2. **JOIN second** (in the owning component) — the tool bodies merge into the parent
-
-```python
-# Step 1: Tail bodies cut sockets in side boards (tails survive)
-combine(root, side_proxy, tail_proxies, CUT, True, "DT_Socket")
-
-# Step 2: Tail bodies join into top board (tails consumed)
-combine(top_comp, top_body, all_tails, JOIN, False, "DT_Join")
-```
-
-### keepTool for Visible Loose Tenons (Dominos, Dowels)
-
-Loose tenon joints (dominos, dowels) have a **separate body** that remains visible after assembly — unlike integral tenons which JOIN into their parent board. When a loose tenon CUTs mortises in two boards:
-
-- **Both CUTs must use `keepTool=True`** so the tenon body survives.
-- If either CUT uses `keepTool=False`, the tenon body is consumed — only invisible mortise pockets remain.
-
-```python
-# Domino cuts mortise in board A (tenon survives)
-combine(board_a, domino_body, CUT, True, "DM_CutA")
-# Domino cuts mortise in board B (tenon STILL survives)
-combine(board_b, domino_body, CUT, True, "DM_CutB")
-# Result: both mortises cut, domino body visible between boards
-```
-
-### Mortise and Tenon
-- At corners where tenons from two directions enter the same post, stagger them in Z to prevent collision.
-
-### Tongue and Groove
-- Frame grooves: centered on rail thickness, receive slat tongues
-- Inter-slat T&G: one side groove, other side tongue, consistent across all slats
-- Edge tongues: first/last slat gets a tongue into the leg/post groove
-
-### Gap Filling
-When `floor(space / element_width)` leaves a remainder, add a gap-filling piece:
-- Width = `space - element_width * count` (parametric expression)
-- Position = `offset + element_width * count`
-- Use `participantBodies` on ALL cut/join operations
-- Only build if gap > 0.01 cm at script time
-- Mirror gap features to opposite side
-
-### Additional Joinery Types
-
-For joints beyond M&T, T&G, and gap filling, read the corresponding reference file from `joinery/` before generating code:
-
-| Joint | File | Prefix | Use For |
-|-------|------|--------|---------|
-| Dado & Rabbet | `joinery/dado-rabbet.md` | `dr_` | Shelves, case backs, drawer bottoms |
-| Lap Joint | `joinery/lap-joint.md` | `lj_` | Frames, cross braces, lattice |
-| Box Joint | `joinery/box-joint.md` | `bj_` | Boxes, drawers, decorative corners |
-| Bridle Joint | `joinery/bridle-joint.md` | `br_` | Frame corners, open mortise T-connections |
-| Dowel Joint | `joinery/dowel-joint.md` | `dw_` | Edge joining, panel glue-ups, face frames |
-| Spline Joint | `joinery/spline-joint.md` | `sp_` | Reinforced miters, decorative accents |
-| Miter Joint | `joinery/miter-joint.md` | `mj_` | Picture frames, trim, hidden end grain |
-| Dovetail | `joinery/dovetail.md` | `dt_` | Drawer fronts, premium boxes, visible joints |
-| Pocket Hole | `joinery/pocket-hole.md` | `ph_` | Face frames, quick assemblies, tabletops |
-| Domino Joint | `joinery/domino-joint.md` | `dm_` | Hidden structural connections, kick boards, shelf-to-back |
-
-Each file includes parameters, geometry workflow, replication strategy, pitfalls, and a code snippet. All follow the same conventions: `ValueInput.createByString`, Sketch > Extrude, `participantBodies = [body]` as Python list, 2-letter parameter prefixes.
+**Loose tenons (dominos):** Both CUTs must use `keepTool=True` or the body disappears.
 
 ## Component Structure Template
 
@@ -980,60 +740,13 @@ This is like `git bisect` for the modeling timeline — fast, cheap, and precise
 
 ### Modifying an Existing Design
 
-When the user asks to change an existing design (e.g., "make the shelves wider"):
+> **Full reference:** `woodworking/mcp-advanced.md` — provenance checking, selection-driven interaction, change detection, script sync, sandbox mode.
 
-**Step 1: Check provenance** — call `get_document_status` first:
-
-- `tracked=false` → The agent can't safely modify this design incrementally. It wasn't built by a known script in this session. Ask the user: "I can't safely modify this design incrementally. Would you like me to create a new script for it?"
-- `tracked=true`, `needsSync=true` → Provenance was restored from disk (e.g. after add-in restart or document reopen). The script and model may have diverged. Call `sync_script` to reconcile before proceeding.
-- `tracked=true`, `pendingChanges > 0` → The user made UI changes since the last sync. Call `sync_script` to reconcile, then proceed.
-- `tracked=true`, `pendingChanges == 0` → Proceed directly.
-
-**Step 2: Apply the change:**
-
-**For dimension changes** (most common) — use `modify_parameters` for fast incremental tuning:
-
-1. Call `capture_design` to understand the current model state — parameters, bodies, timeline.
-2. Call `modify_parameters` to change the relevant parameter expression(s).
-3. Fusion does **incremental recomputation** — only affected features recompute.
-4. Validate with `capture_design`.
-5. **Good** → update the `.py` source file to match the new expression.
-6. **Bad** → revert via `modify_parameters` with the old expression.
-
-**For structural changes** (add a component, change joinery type) — read the tracked script, make targeted changes, and re-run with `execute_script(clean=true)`. This deletes the existing model and rebuilds from the modified script. The entire operation is one transaction — **the user can Ctrl+Z to revert to the previous state**.
-
-### Selection-Driven Interaction
-
-When the user points at something in Fusion 360 and asks about it:
-
-1. Call `get_selection` to read what they've selected.
-2. Use the structured entity info (type, name, dimensions) to understand their intent.
-3. If they want a change, use `modify_parameters` for dimension tweaks or `execute_script` for structural changes.
-4. Use `set_selection` to highlight the result or related entities.
-
-### Change Detection
-
-When iterating on a design with the user making manual changes in Fusion 360:
-
-1. Call `get_changes` once at the start (or after a script run) to capture a baseline.
-2. When the user says "I changed something" or between iterations, call `get_changes` again.
-3. The diff tells you exactly what moved — parameter expression changes, sketch dimension edits, body additions/removals, and timeline feature count delta.
-4. Use the diff to decide next steps: `modify_parameters` to adjust related dimensions, or `execute_script` if structural changes are needed.
-
-This avoids re-reading the full design with `capture_design` when you only need to know what changed.
-
-### Script Sync (after UI tweaks)
-
-When the user tweaks a design in the Fusion UI and you need to update the `.py` script to match:
-
-1. Call `sync_script` — no arguments needed. It reads the tracked script from the DocumentTracker and diffs the reference model parameter snapshot against the current state automatically.
-2. The tool auto-patches user parameter expression changes (e.g., `tt_shoulder` from `"0.375 in"` to `"0.3 in"`) and returns the patched script.
-3. For changes that need agent help (`needsAgent`), apply each one to the patched script:
-   - `featureParameterChanged` — update hardcoded expressions near the feature's `.name = "..."` line (scriptContext shows where).
-   - `featureRemoved` — delete the code block that created the feature (scriptContext shows the code).
-   - `featureAdded` — generate new code from the capture data and insert it at the appropriate timeline position.
-4. Write the updated script to the file.
-5. Re-execute via `execute_script(clean=true)` to verify the model matches.
+Quick reference:
+- **Dimension changes:** `get_document_status` → `modify_parameters` → `capture_design` to validate → update `.py` file.
+- **Structural changes:** Read tracked script → edit → `execute_script(clean=true)`.
+- **UI tweaks:** `sync_script` auto-patches parameter expression changes, reports feature-level edits for agent.
+- **Sandbox:** `execute_script(sandbox=true)` runs in throwaway document for safe validation.
 
 ### Example Flow
 
