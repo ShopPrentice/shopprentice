@@ -83,34 +83,42 @@ When a constraint chain has N terms, at most N-1 can be independent. Choose the 
 
 ## Design-First Planning
 
-Before writing any code, output the modeling plan as a **text-only response**. Do NOT write the script in the same response as the plan.
+Before writing any code, output a **high-level plan** covering all components and their build order. This is a single text-only response — no file writes, no code blocks longer than 5 lines.
 
-1. **Plan response** — output the step list as text. No file writes, no code blocks longer than 5 lines.
-2. **Build response** — in the NEXT response, write the script to a file and execute it.
+Then, before each component's build cycle, output a **component plan** with the specific features for that component.
 
-Structure the plan like this:
+### High-Level Plan (one response, before any code)
 
 ```
 Components: Sides, Shelves, Top, Kick
+Build order: Sides → Shelves → Top → Kick → Cross-component CUTs → Details
 
-1. Sides component
-   - Extrude left side board (NewBody)
-   - Extrude right side board (NewBody)
+Parameters: board_thick, shelf_depth, shelf_count, total_height, ...
+Midplanes: XMid (total_length/2), YMid (total_width/2)
+Joinery: M&T shelves into sides, dado for kick
+```
 
-2. Shelves component
-   - Construction planes: YMid, XMid, shelf offset
-   - Extrude ONE shelf body (NewBody)
-   - Extrude ONE tenon (NewBody)
-   - Mirror tenon across YMid → back tenon
-   - Mirror [tenon + mirror] across XMid → right side tenons
-   - JOIN all 4 tenons into shelf body
-   - Body pattern shelf along Z (count=n_shelves, spacing=shelf_spacing)
+### Component Plan (one response per component, before its build cycle)
 
-3. Shelf mortises (root, assembly proxies)
-   - CUT left side with ALL shelf proxies (keepTool=True)
-   - CUT right side with ALL shelf proxies (keepTool=True)
+```
+Shelves component (cycle 3):
+  - Construction planes: shelf offset
+  - Extrude ONE shelf body (NewBody)
+  - Extrude ONE tenon (NewBody)
+  - Mirror tenon across YMid → back tenon
+  - Mirror [tenon + mirror] across XMid → right side tenons
+  - JOIN all 4 tenons into shelf body
+  - Body pattern shelf along Z (count=n_shelves, spacing=shelf_spacing)
+  Expected: n_shelves bodies in Shelves component
+```
 
-4. ... (continue for each component)
+### Cross-Component Plan (after all components built)
+
+```
+Cross-component CUTs (root):
+  - CUT left side with ALL shelf proxies (keepTool=True)
+  - CUT right side with ALL shelf proxies (keepTool=True)
+  - CUT sides with kick proxies
 ```
 
 Each step maps to exactly one Fusion 360 feature. No Python loops, no batch logic — just the sequence a designer would follow in the timeline.
@@ -610,24 +618,77 @@ Name every feature and body for a readable timeline and easy debugging:
 
 ## Incremental Build Strategy
 
-Complex furniture (10+ bodies, 3+ joint systems) should be built in phases. Each phase is a complete standalone script that creates a new document and builds from scratch, adding one layer of complexity. **Small pieces** (boxes, trays — < ~8 bodies, 1-2 joint types) can be built in a single monolithic script.
+Models are built **one component at a time**. Each component gets its own plan → build → validate cycle, keeping conversation context bounded regardless of total model complexity. The script file grows on disk between components, but each conversation cycle only deals with the current component's features.
 
-### Phases
+**Small pieces** (boxes, trays — < ~8 bodies, 1-2 joint types) can be built in a single pass.
 
-| Phase | What to build |
-|-------|--------------|
-| 1. Structure | All boards/panels in correct positions, no joinery. Verify orientation and dimensions. |
-| 2. Joinery | Add tenons/tails as bodies, mirrors, patterns, JOINs. Add CUT operations for mortises/sockets. |
-| 3. Details | Chamfers, fillets, decorative cutouts. Select edges by coordinate or face (see Fillet and Chamfer Features). Use parametric radius/distance expressions. Always last — geometry must be fully built before edge selection. |
+### Build Order
+
+```
+1. Plan ALL components upfront (high-level, one response)
+2. For each component (separate plan → build → validate cycle):
+   a. Shared parameters + helpers  (first component only)
+   b. Component creation + construction planes
+   c. Body extrudes + internal mirrors/patterns
+   d. Internal joinery (JOINs within the component)
+   e. Validate with capture_design
+3. Cross-component operations (root-level, one cycle):
+   a. Assembly proxy CUTs (mortises, dados, grooves)
+   b. Validate body count and interference
+4. Details (final cycle):
+   a. Fillets, chamfers, decorative cutouts
+   b. Validate → screenshot → present to user
+```
+
+### Why Component-by-Component
+
+The conversation context is the bottleneck, not the script. Each component cycle adds ~5-15 features worth of code, errors, and validation to the conversation. After the cycle completes and the agent moves to the next component, only the script file carries forward — the conversation context for previous components can be compressed.
+
+**Phase-based (old, hits token limits on complex models):**
+```
+Phase 1: ALL structure (all components) → huge script + debug context
+Phase 2: ALL joinery (all components) → even bigger
+Phase 3: ALL details → biggest
+```
+
+**Component-based (scales to any complexity):**
+```
+Component A: structure + internal joinery → bounded context → done
+Component B: structure + internal joinery → bounded context → done
+...
+Cross-component: CUTs → bounded context → done
+Details: fillets → bounded context → done
+```
 
 ### Rules
 
-1. **One phase per script execution.** Never combine all phases into one massive script.
-2. **Validate and auto-proceed.** After each phase, validate with `capture_design` (see Execution + Validation Loop). If validation passes, immediately proceed to the next phase. Do NOT wait for user approval between phases.
-3. **Each phase script is standalone.** It creates all parameters, helpers, and geometry from scratch. Phase 2 includes phase 1's structure plus joinery.
-4. **Same file, growing content.** Update the same `.py` file for each phase.
-5. **Show final result.** Take a screenshot only after the last phase and present it to the user.
-6. **Plan before code, always in separate responses.** Before each phase, output the step list as text. Then write the script and execute in the next response. Never combine plan + full script in one response.
+1. **One component per build cycle.** Plan the component, write its section of the script, execute, validate. Don't combine multiple components in one cycle.
+2. **Validate after each component.** Call `capture_design` to verify body count, positions, and volumes for the component just built.
+3. **Auto-proceed on success.** If validation passes, immediately plan the next component. Do NOT wait for user approval between components.
+4. **Same file, growing content.** All components accumulate in the same `.py` file. Each cycle appends to the existing script.
+5. **Each script execution rebuilds from scratch.** The full script runs every time (document reuse pattern). This is fast — Fusion rebuilds a 100-feature timeline in seconds.
+6. **Plan before code, always in separate responses.** Before each component, output its step list as text. Then write the code and execute in the next response.
+7. **Cross-component operations are a separate cycle.** After all components are built, one final cycle adds root-level CUTs via assembly proxies.
+8. **Details are the last cycle.** Fillets and chamfers require all geometry to exist first.
+9. **Show final result.** Screenshot only after the last cycle (details or cross-component, whichever is last).
+
+### What Goes Where
+
+| Where | What |
+|-------|------|
+| **First component cycle** | Document preamble, shared parameters, shared helpers, midplanes |
+| **Each component cycle** | `make_comp`, component-local planes, extrudes, internal mirrors/patterns/JOINs |
+| **Cross-component cycle** | Assembly proxy creation, root-level Combine CUTs (`keepTool=True`) |
+| **Details cycle** | Fillets, chamfers (edge selection by coordinate or face) |
+
+### Keeping Each Cycle Bounded
+
+When writing code for a new component, do NOT re-read the entire script. Instead:
+- Read only the last ~20 lines (to see where to append)
+- Know the parameter names and body names from the plan (established in the first cycle)
+- Append the new component's code block
+
+When debugging, focus only on the current component's features — don't re-analyze earlier components that already validated.
 
 ### Document Reuse Pattern
 
@@ -705,19 +766,18 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 
 ### Execution + Validation Loop
 
-After generating each phase's script, run this loop:
+After generating each component's code, run this loop:
 
-1. **Execute** — call `execute_script` to run the script in Fusion 360.
-2. **On error** — the `content` field contains the full Python stack trace. Analyze, fix the script, and re-execute (see Error Retry Rules below).
+1. **Execute** — call `execute_script` to run the full script in Fusion 360. The script rebuilds from scratch each time (document reuse pattern).
+2. **On error** — the `content` field contains the full Python stack trace. Analyze, fix only the current component's code, and re-execute (see Error Retry Rules below).
 3. **On success — validate with `capture_design`:**
    - Call `capture_design` to get the actual model state.
-   - Compare body count and names against what the phase intended. Flag unexpected merges, missing bodies, or orphan bodies.
-   - Check bounding boxes — are bodies in the right positions and orientations?
-   - Check volumes — are they reasonable for the given dimensions?
-   - Report a brief summary: `"Phase 1 OK: 6 bodies [Front, Back, Left, Right, Top, Bottom], all bounding boxes correct."`
+   - Verify body count and names for the component just built. Earlier components should still be correct (unchanged code).
+   - Check bounding boxes and volumes for the new bodies.
+   - Report a brief summary: `"Shelves OK: 5 bodies [shelf_0..shelf_4], positions correct. Total: 12 bodies."`
 4. **If validation fails** — use `get_timeline_state` to bisect the timeline and pinpoint the problem feature (see Diagnosing with Timeline Rollback below). Fix and re-execute.
-5. **Auto-proceed** to the next phase if validation passes.
-6. **Screenshot only at the end** — after the final phase succeeds and validates, take one screenshot with `get_screenshot` and present it to the user.
+5. **Auto-proceed** to the next component if validation passes.
+6. **Screenshot only at the end** — after the final cycle (details or cross-component) succeeds and validates, take one screenshot with `get_screenshot` and present it to the user.
 
 ### Diagnosing with Timeline Rollback
 
@@ -751,18 +811,28 @@ Quick reference:
 ### Example Flow
 
 ```
-Response 1 (plan): Phase 1 step list — components, boards, positions
-Response 2 (build): write bookshelf.py (boards only)
-  → execute → capture_design → validate 6 bodies, positions OK → auto-proceed
+Response 1 (plan): High-level plan — all components, build order, joinery strategy
 
-Response 3 (plan): Phase 2 step list — tenons, mirrors, CUTs
-Response 4 (build): update bookshelf.py (structure + mortise & tenon)
-  → execute → capture_design → validate body count (tenons joined), mortises cut
-  → body count wrong? → get_timeline_state to bisect → find bad feature → fix → retry
+Response 2 (plan): Case component — Front, Back, Left, Right boards
+Response 3 (build): write box.py (preamble + params + helpers + Case component)
+  → execute → capture_design → validate 4 bodies, positions OK → auto-proceed
+
+Response 4 (plan): Bottom component — panel + edge rabbets
+Response 5 (build): append Bottom code to box.py
+  → execute → capture_design → validate Bottom body + 4 Case bodies → auto-proceed
+
+Response 6 (plan): Lid component — panel + edge rabbets
+Response 7 (build): append Lid code to box.py
+  → execute → capture_design → validate 6 bodies total → auto-proceed
+
+Response 8 (plan): Cross-component CUTs — panel grooves, dovetails
+Response 9 (build): append root-level CUTs to box.py
+  → execute → capture_design → validate mortises cut, body count correct
+  → body count wrong? → get_timeline_state to bisect → fix → retry
   → validation OK → auto-proceed
 
-Response 5 (plan): Phase 3 step list — chamfers, fillets
-Response 6 (build): update bookshelf.py (structure + M&T + chamfers)
+Response 10 (plan): Details — lid chamfer, edge fillets
+Response 11 (build): append details to box.py
   → execute → capture_design → validate → screenshot → present to user
 ```
 
