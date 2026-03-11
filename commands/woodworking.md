@@ -366,6 +366,9 @@ def run(context):
     edges = af.find_edges(shelf, "z")    # linear edges aligned with axis
     h, v = af.probe_sketch_axes(sk)      # model axis → sketch H/V
     p = af.smallest_profile(sk)          # smallest-area profile in sketch
+    # For annular CUTs (shoulder ring around tenon), select the LARGER profile:
+    # shoulder = max((sk.profiles.item(i) for i in range(sk.profiles.count)),
+    #                key=lambda p: p.areaProperties().area)
 
     # Sketches
     sk, prof = af.sketch_rect(comp, plane, "0 cm", "0 cm", "w", "d",
@@ -377,7 +380,7 @@ def run(context):
 
     # Feature builders
     f = af.ext_new(comp, prof, "board_thick", "FrontBoard")
-    f = af.ext_new_sym(comp, prof, "board_thick", "Rail")
+    f = af.ext_new_sym(comp, prof, "board_thick / 2", "Rail")  # total = board_thick
     f = af.ext_op(comp, prof, "groove_depth", CUT, body, "Groove", flip=True)
     pl = af.off_plane(comp, base_plane, "box_width / 2", "YMid")
     af.combine(comp, target, [tool1, tool2], CUT, True, "Mortise")
@@ -426,6 +429,20 @@ sk, prof = af.sketch_rect_model(comp, comp.xZConstructionPlane,
 - `model_size`: `{axis: expr, axis: expr}` — 2 model-axis size expressions
 - Returns: `(sketch, profile)`
 
+**Limitation — position dimensions are always positive.** `sketch_rect_model` uses `addDistanceDimension` for the x-offset and y-offset from the sketch origin, which measures absolute distance (always positive). This works correctly when the rectangle is near the origin or in the positive quadrant. For bodies at arbitrary model positions (e.g., splay-adjusted stretchers offset from origin), the position dimensions can reflect coordinates to the wrong side.
+
+**Workaround:** For arbitrarily-positioned rectangles, use a manual sketch with `modelToSketchSpace` for approximate placement and only width/height dimensions (always positive, no position dimensions):
+
+```python
+sk = root.sketches.add(plane)
+m2s = sk.modelToSketchSpace
+s0 = m2s(P(x0_val, y0_val, z_val))
+s1 = m2s(P(x1_val, y1_val, z_val))
+rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
+    P(s0.x, s0.y, 0), P(s1.x, s1.y, 0))
+# H/V constraints + width/height dimensions only — no position dimensions
+```
+
 ### Feature Builder Reference (`af.*`)
 
 All feature builders take `comp` as first arg. Available via `from helpers import af`.
@@ -433,7 +450,7 @@ All feature builders take `comp` as first arg. Available via `from helpers impor
 | Function | Signature | Returns | Notes |
 |----------|-----------|---------|-------|
 | `ext_new` | `(comp, prof, dist, name)` | ExtrudeFeature | Body via `f.bodies.item(0)` |
-| `ext_new_sym` | `(comp, prof, dist, name)` | ExtrudeFeature | Symmetric about sketch plane |
+| `ext_new_sym` | `(comp, prof, dist, name)` | ExtrudeFeature | Symmetric about sketch plane. **`dist` is the HALF-thickness** — extends `dist` on each side, creating a body of total thickness `2 × dist`. Use `"board_t / 2"` for a body of thickness `board_t`. |
 | `ext_op` | `(comp, prof, dist_expr, op, body, name, flip)` | ExtrudeFeature | `flip=True` for NegativeExtentDirection (CUT into body on face sketches) |
 | `off_plane` | `(comp, base, expr, name)` | ConstructionPlane | Offset construction plane |
 | `combine` | `(comp, target, tool_bodies, op, keep_tool, name)` | CombineFeature | `tool_bodies` accepts single body or list |
@@ -533,6 +550,8 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Loose tenons (dominos):** Both CUTs must use `keepTool=True` or the body disappears.
 
+**Shouldered mortise-and-tenon:** Build the rail at full length (shoulder-to-shoulder + 2 × tenon length). Shoulder CUT each end face to leave a centered tenon. Then CUT the rail into the mortise piece — the reduced tenon creates a correctly-sized mortise pocket. Apply shoulder CUTs BEFORE mirroring so the mirror propagates them. Full reference: `joinery/mortise-tenon.md`.
+
 ## Component Structure Template
 
 Table / Bookshelf:
@@ -615,6 +634,9 @@ Name every feature and body for a readable timeline and easy debugging:
 | Fillet fails — radius too large | Fillet radius exceeds half the smallest adjacent face dimension | Reduce `fl_r`; keep it < half the shortest edge on any affected face |
 | Fillet/chamfer selects wrong edges | Edge coordinate filter matches unintended edges (e.g., groove interior edges) | Add `edge.body.name` check; filter by both coordinate AND body |
 | Fillet API rejects BRepFace | `addConstantRadiusEdgeSet` requires edges, not faces | Iterate `face.edges`, deduplicate via `tempId`, add individual edges |
+| Symmetric extrude body 2× too thick | Passed full thickness to `ext_new_sym` — it applies `dist` to EACH side | Pass half-thickness: `ext_new_sym(comp, prof, "board_t / 2", ...)` |
+| `sketch_rect_model` places body on wrong side of origin | Position dimensions use absolute distance — negative coordinates reflect to positive | Use manual sketch with `modelToSketchSpace` + width/height dimensions only (no position dimensions) |
+| Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `joinery/mortise-tenon.md`) |
 
 ## Incremental Build Strategy
 
