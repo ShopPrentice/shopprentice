@@ -101,6 +101,46 @@ If the finding is a stable pattern (confirmed across 2+ builds), add it to `MEMO
 | Planned (no file) | Draft | File created with plausible content, but not yet built. |
 | Planned (no file) | Tested | File created AND validated through a real build in the same session. |
 
+## Skill Validation
+
+After updating the skill files, validate that the documentation is sufficient to guide a fresh build without prior knowledge of the project.
+
+### Process
+
+1. **Design a similar-but-different project** that exercises the same techniques as the build you just completed. Change the piece type, dimensions, and proportions — but keep the same structural challenges (e.g., if you built a counter stool with splayed legs and angled tenons, test with a bar-height side table with splayed legs and angled tenons).
+
+2. **Launch a subagent** (via the Agent tool) with a design brief for the new piece. The subagent:
+   - Invokes `/woodworking` to load the skill
+   - Plans and generates the full script
+   - Writes the script to a file (e.g., `/tmp/validation_<name>.py`)
+   - Does NOT have MCP access — it only generates code
+
+3. **Execute the generated script** yourself via MCP (`execute_script`) on a scratch document. Validate with `capture_design`.
+
+4. **Assess results:**
+   - **Script runs clean, correct body count** → skill documentation is sufficient
+   - **Script has errors** → identify whether the cause is a documentation gap (missing technique, unclear instruction, wrong build order) vs. a one-off bug (typo, wrong variable name)
+   - **Documentation gaps** → update the skill files and re-run validation
+
+### Design Brief Template
+
+> Build me a [piece]: [key dimensions], [number] splayed legs ([angles]), [stretcher/rail arrangement] with [joint type], [other joints] connecting [parts], [detail features]. Use `/woodworking`.
+
+Keep the brief at the same level of detail a real user would provide — don't over-specify implementation details.
+
+### What This Tests
+
+- Routing tables lead to the right topic/joinery files
+- Build order is correct for the techniques involved
+- Technique descriptions are complete enough to generate working code
+- Pitfall warnings prevent known errors
+- Parameter planning guidance produces correct expressions
+
+### When to Skip
+
+- Trivial changes (typo fixes, wording improvements, status promotions without new content)
+- Changes only to memory or routing — no new technique content
+
 ## Anti-Patterns
 
 - **Don't write speculative pitfalls.** "This might fail if..." — either we saw it fail or we didn't. Document what happened.
