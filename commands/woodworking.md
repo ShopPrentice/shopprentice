@@ -35,15 +35,35 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
 This skill is modular. The core (this file) covers fundamentals needed for every project. Read additional topic files based on your project's needs:
 
-| Topic | When to Read | File |
-|-------|-------------|------|
-| **Joinery** | Any project with joints (Phase 2+) | `woodworking/joinery.md` |
-| **Angled Construction** | Splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | `woodworking/angled-construction.md` |
-| **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | `woodworking/details-and-finishing.md` |
-| **MCP Advanced** | Modifying existing designs, sync, selection-driven workflow | `woodworking/mcp-advanced.md` |
-| **Specific Joint Types** | Dovetails, box joints, dominos, etc. | `joinery/<type>.md` (see table in `woodworking/joinery.md`) |
+### Topic Files
 
-**Read the topic file BEFORE writing code** that uses those techniques. The core skill provides the routing — the topic files provide the implementation details.
+| Topic | When to Read | Status | File |
+|-------|-------------|--------|------|
+| **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | Tested (counter stool) | `woodworking/angled-construction.md` |
+| **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | Planned — inline quick reference below | `woodworking/details-and-finishing.md` |
+| **MCP Advanced** | Modifying existing designs, sync, selection-driven workflow | Planned — inline quick reference below | `woodworking/mcp-advanced.md` |
+
+### Joinery Reference Files
+
+Read the specific joint file **before writing joinery code**. Each file has parameters, geometry workflow, replication strategy, and pitfalls.
+
+**Status key:** "Tested" means the technique was built end-to-end in a real model, hitting and resolving actual API pitfalls. "Draft" means the file has plausible instructions but hasn't been validated through a real build — expect missing pitfalls and possible wrong API sequences. When using a Draft file, validate each step with `capture_design` and be ready to debug.
+
+| Joint | When to Read | Status | File |
+|-------|-------------|--------|------|
+| **Mortise & Tenon** | Leg-to-rail, stretcher-to-leg, frame-and-panel, table aprons, any rail-into-post connection | Tested (counter stool — shouldered & angled variants) | `joinery/mortise-tenon.md` |
+| **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `joinery/domino-joint.md` |
+| **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `joinery/dovetail.md` |
+| **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `joinery/box-joint.md` |
+| **Dado & Rabbet** | Shelves into sides, case backs, drawer bottoms, any panel-into-groove connection | Tested (bookshelf) | `joinery/dado-rabbet.md` |
+| **Bridle Joint** | Frame corners, T-connections, open mortise-and-tenon at end of a rail | Draft | `joinery/bridle-joint.md` |
+| **Lap Joint** | Flat frames, cross braces, grid assemblies, half-lap at crossings | Draft | `joinery/lap-joint.md` |
+| **Miter Joint** | Picture frames, trim, hidden end grain at corners | Draft | `joinery/miter-joint.md` |
+| **Spline Joint** | Reinforced miters, decorative accents across a joint line | Draft | `joinery/spline-joint.md` |
+| **Dowel Joint** | Edge joining, panel glue-ups, face frames — round-peg alignment | Draft | `joinery/dowel-joint.md` |
+| **Pocket Hole** | Face frames, quick assemblies, tabletop attachment — screw-based | Draft | `joinery/pocket-hole.md` |
+
+**Read the topic/joinery file BEFORE writing code** that uses those techniques. The core skill provides the routing — the reference files provide the implementation details. For Draft files, treat instructions as a starting point and validate aggressively.
 
 ## Parameter Planning
 
@@ -540,7 +560,7 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 ## Joinery Rules
 
-> **Full reference:** `woodworking/joinery.md` — combine-based joinery, tooling bodies, edge rabbets, cross-component CUT, bulk CUT, timeline ordering, keepTool, M&T, T&G, gap filling, and reference table for 10+ joint types in `joinery/*.md`.
+> **Joint-specific references:** See the Joinery Reference Files table in Topic Reference above. Each `joinery/*.md` file has full parameters, workflow, and pitfalls for that joint type.
 
 **Core principle:** Never draw separate mortise/socket sketches. Build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), then JOIN to the owner. The body IS the cutting tool — one shape, perfect fit.
 
@@ -548,7 +568,7 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Cross-component:** Use `body.createForAssemblyContext(occ)` for CUT in root. Bulk CUT all tools in one Combine.
 
-**Loose tenons (dominos):** Both CUTs must use `keepTool=True` or the body disappears.
+**Loose tenons (dominos):** Both CUTs must use `keepTool=True` or the body disappears. **Cross-section is a STADIUM (rounded ends), never a rectangle** — use `sketch_slot` from `joinery/domino-joint.md`. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `joinery/domino-joint.md`.
 
 **Shouldered mortise-and-tenon:** Build the rail at full length (shoulder-to-shoulder + 2 × tenon length). Shoulder CUT each end face to leave a centered tenon. Then CUT the rail into the mortise piece — the reduced tenon creates a correctly-sized mortise pocket. Apply shoulder CUTs BEFORE mirroring so the mirror propagates them. Full reference: `joinery/mortise-tenon.md`.
 
@@ -637,6 +657,7 @@ Name every feature and body for a readable timeline and easy debugging:
 | Symmetric extrude body 2× too thick | Passed full thickness to `ext_new_sym` — it applies `dist` to EACH side | Pass half-thickness: `ext_new_sym(comp, prof, "board_t / 2", ...)` |
 | `sketch_rect_model` places body on wrong side of origin | Position dimensions use absolute distance — negative coordinates reflect to positive | Use manual sketch with `modelToSketchSpace` + width/height dimensions only (no position dimensions) |
 | Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `joinery/mortise-tenon.md`) |
+| Domino has square corners (rectangular cross-section) | Used `sketch_rect` instead of `sketch_slot` for domino void body | **Always use `sketch_slot`** — real Festool dominos have stadium (rounded-end) cross-sections. See `joinery/domino-joint.md` for the full implementation. |
 
 ## Incremental Build Strategy
 
@@ -652,8 +673,9 @@ Models are built **one component at a time**. Each component gets its own plan �
    a. Shared parameters + helpers  (first component only)
    b. Component creation + construction planes
    c. Body extrudes + internal mirrors/patterns
-   d. Internal joinery (JOINs within the component)
-   e. Validate with capture_design
+   d. Splay moves if this component connects to splayed members (see angled-construction.md "Stretcher Splay Matching")
+   e. Internal joinery (JOINs within the component)
+   f. Validate with capture_design
 3. Cross-component operations (root-level, one cycle):
    a. Assembly proxy CUTs (mortises, dados, grooves)
    b. Validate body count and interference

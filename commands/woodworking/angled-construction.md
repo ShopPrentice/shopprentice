@@ -237,6 +237,88 @@ str_y_c = ev("seat_w") - ev("leg_inset_y") + sy  # back leg row
 str_z_c = ev("str_h")
 ```
 
+## Non-Perpendicular Joinery
+
+### The Gap Problem
+
+When a stretcher meets a splayed leg, the standard flat shoulder CUT leaves a gap. The shoulder face is perpendicular to the stretcher axis, but the leg surface is tilted by the splay angle. At 6 deg splay, this gap is ~0.09"--0.18" -- visible and structurally weak.
+
+### Solution: Leg CUT + Sweep Tenon
+
+Instead of cutting shoulders from the stretcher ends, CUT the leg FROM the stretcher to create an angled mating face. Then sweep a tenon from that angled face along the stretcher axis. The shoulder naturally sits flush against the splayed leg.
+
+See `joinery/mortise-tenon.md` section "Angled M&T Variant" for the complete 6-step technique.
+
+### Key Points
+
+- Use `angled_tenon_end()` instead of `shoulder_cut_end()` when any rail meets a post at a non-perpendicular angle
+- The leg is the CUT tool with `keepTool=True` -- it is not modified
+- Sweep uses `PerpendicularOrientationType` -- the tenon follows the stretcher axis
+- Apply before mirror -- mirrored stretchers inherit the angled geometry
+- Existing mortise CUTs work unchanged -- the tenon creates an angled mortise pocket
+
+## Stretcher Splay Matching
+
+### When to Use
+
+When stretchers connect splayed legs and the stretcher sides should be **parallel to the adjacent leg faces** — not horizontal. This is a refined look where the stretcher follows the leg geometry. Without this, the stretcher-to-leg junction shows a visible wedge gap between the flat stretcher side and the angled leg face.
+
+### Technique: Move Before Joinery
+
+Add a **Move (free rotation)** to the stretcher body **after extrude but before `angled_tenon_end`**:
+
+1. Stretcher tilts to match the leg splay angle
+2. `angled_tenon_end`'s leg CUT creates a shoulder face accounting for both the stretcher tilt and leg splay
+3. Mirror features propagate the tilt automatically
+
+**Key insight — rotation axis = stretcher's long axis.** A back stretcher runs in X and rotates around X (for Y-splay `splay_w`). A side stretcher runs in Y and rotates around Y (for X-splay `splay`). Since rotation is around the stretcher's own long axis, sweep paths along that axis are unaffected — only the cross-section tilts.
+
+### Pivot at Stretcher Center
+
+Unlike legs (where the pivot is at the inner edge to stay embedded in the seat), stretchers pivot at their **own center** — the point that should stay fixed is the stretcher's centroid at its splay-adjusted position:
+
+```python
+# Back stretcher: rotate -splay_w around X, pivot at (bstr_y_c, bstr_z_c)
+angle_bs = -ev("splay_w")
+c_bs, s_bs = math.cos(angle_bs), math.sin(angle_bs)
+ty_bs = bstr_y_c - (bstr_y_c * c_bs + bstr_z_c * s_bs)
+tz_bs = bstr_z_c - (-bstr_y_c * s_bs + bstr_z_c * c_bs)
+xf_bs = adsk.core.Matrix3D.create()
+xf_bs.setWithArray([
+    1.0,  0.0,   0.0,   0.0,
+    0.0,  c_bs,  s_bs,  ty_bs,
+    0.0, -s_bs,  c_bs,  tz_bs,
+    0.0,  0.0,   0.0,   1.0
+])
+```
+
+For a side stretcher (runs in Y), use the Y-axis rotation matrix with `+splay` and pivot at `(sstr_x_c, sstr_z_c)`.
+
+### Angle Sign Convention
+
+| Stretcher | Runs in | Rotates around | Angle | Effect |
+|-----------|---------|----------------|-------|--------|
+| Back (large Y) | X | X | `-splay_w` | Bottom tilts toward +Y → matches back legs' outward lean |
+| Side (small X) | Y | Y | `+splay` | Bottom tilts toward -X → matches left legs' outward lean |
+
+The front stretcher (mirror of back across YMid) and right stretcher (mirror of left across XMid) inherit the correct tilt direction from their mirror source.
+
+### Interference After Tilting
+
+Tilting a stretcher can push its surface into adjacent bodies. **Always run `check_interference` after adding splay moves.** Common case: a footrest sitting directly above the front stretcher — the tilted stretcher's top edge rises by `str_w/2 × sin(splay_angle)` and may intersect the footrest. Fix with a trim CUT:
+
+```python
+af.combine(root, footrest_body, [front_stretcher], CUT, True, "FR_FStrTrim")
+```
+
+### Build Order
+
+```
+Extrude stretcher → Splay Move → angled_tenon_end (both ends) → Mirror → Mortise CUTs
+```
+
+The Move must come after extrude (body must exist) and before `angled_tenon_end` (so the leg CUT + sweep tenon account for the tilted orientation).
+
 ## SplitBody
 
 ### When to Use
@@ -383,6 +465,8 @@ for i in range(root.bRepBodies.count):
 | Splay angle changes don't update | Move feature matrix baked at script time | Expected limitation — splay angles are design-time constants |
 | H/V constraint on trapezoid side line | Taper lines are intentionally angled | Only add `addHorizontal` on top/bottom edges, never on the angled sides |
 | Dimension uses `addDistanceDimension` for splay but value is negative | Distance dimensions are always positive | Use the `splay_shift` parameter directly — it's always positive (derived from `tan(splay)`) |
+| Tilted stretcher intersects footrest/rail | Splay Move raises stretcher edge into adjacent body | Run `check_interference` after splay moves; add trim CUT if non-zero |
+| Splay Move after `angled_tenon_end` — wrong shoulder | Move tilts the already-cut shoulder face | Move must come BEFORE `angled_tenon_end` — the tenon technique needs to see the tilted body |
 
 ## Complete Build Sequence for Splayed-Leg Piece
 
@@ -401,8 +485,10 @@ for i in range(root.bRepBodies.count):
 7. Stretchers:
    a. Splay-adjusted derived params for each stretcher
    b. Extrude stretcher at full length (includes tenon protrusion)
-   c. Shoulder CUT both ends (see joinery/mortise-tenon.md)
-   d. Mirror if symmetric (shoulders propagate)
-   e. CUT stretcher into legs (creates mortise pockets)
+   c. (Optional) Splay Move — tilt stretcher to match leg angle (see "Stretcher Splay Matching")
+   d. Angled tenon (for splayed legs) or shoulder CUT both ends (see joinery/mortise-tenon.md)
+   e. Mirror if symmetric (splay + shoulders propagate)
+   f. Trim CUT adjacent bodies if splay creates interference (footrest, rails)
+   g. CUT stretcher into legs (creates mortise pockets)
 8. Details: chamfers on seat edges and leg bottoms
 ```
