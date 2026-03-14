@@ -237,6 +237,19 @@ str_y_c = ev("seat_w") - ev("leg_inset_y") + sy  # back leg row
 str_z_c = ev("str_h")
 ```
 
+### Stretcher Sketch vs. Extrude Dimension Mapping
+
+Stretchers are sketched on a **horizontal construction plane** (XY offset at `str_h`). On this plane, the sketch spans X and Y while `ext_new_sym` extrudes in Z. For a tall, thin stretcher (shelf-style), the **height** (tall dimension) must go on the extrude, not the sketch cross-axis:
+
+| Stretcher runs in | Sketch long axis | Sketch cross-axis | `ext_new_sym` (Z) |
+|---|---|---|---|
+| X (back/front) | X = `str_len` | Y = `str_t` (thickness) | `str_w / 2` (half-height) |
+| Y (side) | Y = `str_len` | X = `str_t` (thickness) | `str_w / 2` (half-height) |
+
+**Common mistake:** putting `str_w` (the larger "width/height" dimension) on the sketch cross-axis and `str_t` on the extrude. This produces a stretcher that is deep (into the table) instead of tall, and causes stretcher-to-stretcher interference at leg corners where two 3.5"-deep stretchers overlap inside a 1.5" leg.
+
+**Rule of thumb:** On a horizontal construction plane, the extrude direction is Z (vertical). A stretcher's visible height is vertical → it goes on the extrude. The thin dimension faces the table interior → it goes on the sketch cross-axis.
+
 ## Non-Perpendicular Joinery
 
 ### The Gap Problem
@@ -467,6 +480,8 @@ for i in range(root.bRepBodies.count):
 | Dimension uses `addDistanceDimension` for splay but value is negative | Distance dimensions are always positive | Use the `splay_shift` parameter directly — it's always positive (derived from `tan(splay)`) |
 | Tilted stretcher intersects footrest/rail | Splay Move raises stretcher edge into adjacent body | Run `check_interference` after splay moves; add trim CUT if non-zero |
 | Splay Move after `angled_tenon_end` — wrong shoulder | Move tilts the already-cut shoulder face | Move must come BEFORE `angled_tenon_end` — the tenon technique needs to see the tilted body |
+| Stretcher 3.5" deep × 0.75" tall (swapped) | Put `str_w` (height) on sketch cross-axis, `str_t` on extrude | Sketch cross-axis = `str_t` (thickness), extrude = `str_w / 2` (half-height). See "Sketch vs. Extrude Dimension Mapping" |
+| Stretcher-to-stretcher interference at corners | Two thick stretchers overlap inside a leg | Swap to correct dims (above); run `check_interference` after stretcher extrudes |
 
 ## Complete Build Sequence for Splayed-Leg Piece
 

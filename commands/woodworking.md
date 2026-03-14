@@ -41,7 +41,7 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 |-------|-------------|--------|------|
 | **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | Tested (counter stool) | `woodworking/angled-construction.md` |
 | **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | Planned — inline quick reference below | `woodworking/details-and-finishing.md` |
-| **MCP Advanced** | Modifying existing designs, sync, selection-driven workflow | Planned — inline quick reference below | `woodworking/mcp-advanced.md` |
+| **MCP Advanced** | Modifying existing designs, fixing dimensions, adding features to built models, delete-and-rebuild timeline sections | Tested (bar side table) | `woodworking/mcp-advanced.md` |
 
 ### Joinery Reference Files
 
