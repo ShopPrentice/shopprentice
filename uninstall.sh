@@ -70,42 +70,6 @@ with open(path, 'w') as f:
 " 2>/dev/null && removed+=("fusion360 MCP from $CLAUDE_SETTINGS")
 fi
 
-# --- Remove autofusion block from Codex AGENTS.md ---
-AGENTS_FILE="$HOME/.codex/AGENTS.md"
-START_MARKER="<!-- autofusion:start -->"
-END_MARKER="<!-- autofusion:end -->"
-
-if [ -f "$AGENTS_FILE" ] && grep -q "$START_MARKER" "$AGENTS_FILE"; then
-    awk -v start="$START_MARKER" -v end="$END_MARKER" '
-        $0 == start { skip=1; next }
-        $0 == end { skip=0; next }
-        !skip { print }
-    ' "$AGENTS_FILE" > "$AGENTS_FILE.tmp"
-    mv "$AGENTS_FILE.tmp" "$AGENTS_FILE"
-    # Remove file if empty (only whitespace)
-    if [ ! -s "$AGENTS_FILE" ] || ! grep -q '[^[:space:]]' "$AGENTS_FILE"; then
-        rm "$AGENTS_FILE"
-        removed+=("$AGENTS_FILE (empty, removed)")
-    else
-        removed+=("autofusion section from $AGENTS_FILE")
-    fi
-fi
-
-# --- Remove fusion360 MCP from Codex config.toml ---
-CODEX_CONFIG="$HOME/.codex/config.toml"
-if [ -f "$CODEX_CONFIG" ] && grep -q '\[mcp_servers\.fusion360\]' "$CODEX_CONFIG"; then
-    # Remove the [mcp_servers.fusion360] section and its key-value lines
-    awk '
-        /^\[mcp_servers\.fusion360\]/ { skip=1; next }
-        skip && /^\[/ { skip=0 }
-        skip && /^[a-z]/ { next }
-        skip && /^$/ { next }
-        !skip { print }
-    ' "$CODEX_CONFIG" > "$CODEX_CONFIG.tmp"
-    mv "$CODEX_CONFIG.tmp" "$CODEX_CONFIG"
-    removed+=("fusion360 MCP from $CODEX_CONFIG")
-fi
-
 # --- Summary ---
 echo
 if [ ${#removed[@]} -eq 0 ]; then

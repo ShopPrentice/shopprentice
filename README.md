@@ -20,6 +20,45 @@ AutoFusion agent:
 
 Every dimension uses parameter expressions — change any value in Modify > Change Parameters and the entire model updates.
 
+## Install
+
+One command — no clone needed:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/YLZha/autofusion/main/install.sh | bash
+```
+
+This installs the `/woodworking` skill for Claude Code and optionally sets up the MCP server for live Fusion 360 execution.
+
+### Options
+
+```bash
+# Explicit flags
+curl ... | bash -s -- --claude-code     # skill only
+curl ... | bash -s -- --mcp             # MCP server only
+curl ... | bash -s -- --all             # skill + MCP
+
+# No flags = auto-detect + MCP
+```
+
+### Local install (from a clone)
+
+```bash
+git clone https://github.com/YLZha/autofusion.git
+cd autofusion
+./install.sh            # auto-detect + MCP
+./install.sh --all      # everything
+```
+
+## Usage
+
+```
+/woodworking
+Build a 48" x 18" coffee table with tapered legs and a slatted top
+```
+
+The agent can also work from images — show it a photo or sketch of a piece and it will extract dimensions, proportions, and joint types to generate the parametric model.
+
 ## Examples
 
 Each folder under `examples/` contains a complete Fusion 360 project with screenshots, a README, and the parametric Python script:
@@ -40,6 +79,11 @@ Each folder under `examples/` contains a complete Fusion 360 project with screen
 <td align="center"><a href="examples/pergola-rebuild/"><img src="examples/pergola-rebuild/screenshots/overview.png" width="200" /><br /><b>Pergola + Deck</b></a><br />43 bodies, scarf joints (rebuilt)</td>
 <td align="center"><a href="examples/counter-stool/"><br /><b>Counter Stool</b></a><br />Splayed legs, dominos, stretchers</td>
 </tr>
+<tr>
+<td align="center"><a href="examples/tv-console/"><img src="examples/tv-console/screenshots/iso-top-left.png" width="200" /><br /><b>TV Console</b></a><br />Interlocking M&T, dovetails, dominos</td>
+<td></td>
+<td></td>
+</tr>
 </table>
 
 ### Rebuilt from existing designs
@@ -52,63 +96,6 @@ The **Step Stool** and **Pergola** examples were not generated from a text promp
 2. Add a `README.md` with screenshots and build spec
 3. Add the `.py` Fusion 360 script
 4. Commit
-
-## Install
-
-One command — no clone needed:
-
-```bash
-curl -sSL https://raw.githubusercontent.com/YLZha/autofusion/main/install.sh | bash
-```
-
-This auto-detects which tools you have installed (Claude Code, Codex CLI) and sets up accordingly.
-
-### Options
-
-```bash
-# Explicit tool selection
-curl ... | bash -s -- --claude-code
-curl ... | bash -s -- --codex
-curl ... | bash -s -- --codex --mcp
-
-# Everything: both tools + MCP live execution
-curl ... | bash -s -- --all
-```
-
-### Local install (from a clone)
-
-```bash
-git clone https://github.com/YLZha/autofusion.git
-cd autofusion
-./install.sh            # auto-detect tools
-./install.sh --all      # all tools + MCP
-```
-
-## Supported Tools
-
-| Tool | What gets installed | Invoke with |
-|------|-------------------|-------------|
-| **Claude Code** | `/woodworking` skill in `~/.claude/commands/` | `/woodworking` then describe your piece |
-| **OpenAI Codex CLI** | System instructions in `~/.codex/AGENTS.md` | Describe your piece (instructions are always active) |
-
-## Usage
-
-### Claude Code
-
-```
-/woodworking
-Build a 48" x 18" coffee table with tapered legs and a slatted top
-```
-
-The agent can also work from images — show it a photo or sketch of a piece and it will extract dimensions, proportions, and joint types to generate the parametric model.
-
-### Codex CLI
-
-```
-Build a 48" x 18" coffee table with tapered legs and a slatted top
-```
-
-The autofusion instructions are loaded automatically from `AGENTS.md`.
 
 ## Capabilities
 
@@ -190,7 +177,7 @@ curl -sSL https://raw.githubusercontent.com/YLZha/autofusion/main/install.sh | b
 cd ~/.autofusion/repo && ./install.sh --mcp
 ```
 
-The installer symlinks the `addin/` directory into Fusion 360's AddIns folder and configures MCP for your detected tools.
+The installer symlinks the `addin/` directory into Fusion 360's AddIns folder and configures MCP for Claude Code.
 
 After install, enable it in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
 
@@ -208,17 +195,9 @@ After install, enable it in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
 | `check_interference` | Detect body collisions for joinery validation |
 | `suppress_features` | Toggle timeline features on/off for diagnostics |
 | `get_changes` | Snapshot & diff — detect parameter, dimension, body, and feature count changes |
-| `sync_script` | Auto-sync Fusion UI changes back to a Python script — patches parameter expressions, reports feature-level changes |
-| `get_document_status` | Check if active document was built by a known script (provenance tracking) |
 | `manage_documents` | List, create, close, or switch between open documents |
 | `export_script` | Export the current script |
 | `reload_addin` | Hot-reload all add-in modules without restarting Fusion |
-
-### Document Provenance
-
-AutoFusion tracks which script built each document. After executing a script, subsequent calls to `get_document_status` report whether the document has pending UI changes. `sync_script` auto-patches parameter expression changes back into the script and reports structural changes for the agent to apply.
-
-**Modification workflow:** `get_document_status` > `sync_script` (if needed) > `modify_parameters` for dimension tweaks or `execute_script(clean=true)` for structural changes.
 
 ### Verify
 
@@ -231,16 +210,16 @@ curl http://localhost:9100/tools           # lists all 16 tools
 
 ```
 autofusion/
-  addin/              Fusion 360 add-in (MCP server + 16 tools)
+  addin/              Fusion 360 add-in (MCP server + tools)
     helpers/           Runtime helpers (af.py — sketch, extrude, combine utilities)
       templates/       Reusable joinery templates (domino, mortise_tenon, dovetail, etc.)
-    server/            MCP server, document tracker, action log
+    server/            MCP server and action log
     tools/             MCP tool implementations
       _script_generator/  Search-based script generation engine
   commands/            Claude Code skill definitions
   woodworking/         Skill topic files (joinery, angled construction, details)
   joinery/             12 joint type reference guides
-  examples/            9 complete furniture projects with scripts + screenshots
+  examples/            10 complete furniture projects with scripts + screenshots
   tools/               Utility scripts (search_build, generate, simulate)
   tests/               Round-trip test suite (22 fixtures, 38+ tests)
   mcp/                 MCP setup and configuration
@@ -252,7 +231,7 @@ autofusion/
 cd ~/.autofusion/repo && git pull && ./install.sh
 ```
 
-This pulls the latest skill, joinery references, and re-installs to all detected tools.
+This pulls the latest skill and joinery references.
 
 ## Uninstall
 
@@ -260,7 +239,7 @@ This pulls the latest skill, joinery references, and re-installs to all detected
 ~/.autofusion/repo/uninstall.sh
 ```
 
-Removes all autofusion-installed files: `~/.autofusion/`, the Claude Code skill, Codex AGENTS.md content, and MCP configurations.
+Removes all autofusion-installed files: `~/.autofusion/`, the Claude Code skill, and MCP configurations.
 
 ## License
 

@@ -6,7 +6,7 @@ Run Fusion 360 scripts and inspect designs directly from Claude Code using the A
 
 - Fusion 360 installed and running
 - Node.js (for `npx mcp-remote` proxy)
-- Claude Code or Codex CLI with MCP support
+- Claude Code with MCP support
 
 ## Install
 
@@ -37,11 +37,10 @@ Then in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
 | `get_changes` | Snapshot & diff — detect parameter, dimension, body, and feature count changes since last call |
 | `sync_script` | Auto-sync Fusion UI changes back to a Python script — patches parameter expressions, reports feature-level changes |
 
-## Claude Code / Codex Config
+## Claude Code Config
 
-The installer (`./install.sh --mcp`) auto-configures this. To set it up manually:
+The installer (`./install.sh --mcp`) auto-configures this. To set it up manually, add to `~/.claude/settings.json`:
 
-**Claude Code** — add to `~/.claude/settings.json`:
 ```json
 {
   "mcpServers": {
@@ -51,13 +50,6 @@ The installer (`./install.sh --mcp`) auto-configures this. To set it up manually
     }
   }
 }
-```
-
-**Codex CLI** — add to `~/.codex/config.toml`:
-```toml
-[mcp_servers.fusion360]
-command = "npx"
-args = ["mcp-remote", "http://localhost:9100/"]
 ```
 
 ## Workflow with `/woodworking`
