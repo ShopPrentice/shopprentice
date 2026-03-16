@@ -122,26 +122,39 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 
 ### Joinery
 
-10 joint types with parametric modeling guides. The AI reads the relevant reference when a design needs that joint:
+12 joint types with parametric modeling guides and reusable Python templates for complex joints. The AI checks for a template first, then reads the reference file for orientation rules and sizing constraints.
 
-| Joint | File | Best For |
-|-------|------|----------|
-| Mortise & Tenon | Inline in skill | Shelves, rails, stretchers |
-| Tongue & Groove | Inline in skill | Slats, panel infill |
-| Dado & Rabbet | [joinery/dado-rabbet.md](joinery/dado-rabbet.md) | Shelves, case backs |
-| Lap Joint | [joinery/lap-joint.md](joinery/lap-joint.md) | Frames, cross braces |
-| Box Joint | [joinery/box-joint.md](joinery/box-joint.md) | Boxes, drawers |
-| Bridle Joint | [joinery/bridle-joint.md](joinery/bridle-joint.md) | Frame corners |
-| Dowel Joint | [joinery/dowel-joint.md](joinery/dowel-joint.md) | Panel glue-ups |
-| Spline Joint | [joinery/spline-joint.md](joinery/spline-joint.md) | Reinforced miters |
-| Miter Joint | [joinery/miter-joint.md](joinery/miter-joint.md) | Picture frames, trim |
-| Dovetail | [joinery/dovetail.md](joinery/dovetail.md) | Drawer fronts, premium boxes |
-| Pocket Hole | [joinery/pocket-hole.md](joinery/pocket-hole.md) | Face frames, quick assembly |
-| Domino Joint | [joinery/domino-joint.md](joinery/domino-joint.md) | Hidden structural connections |
+**Templates** (`addin/helpers/templates/`) encapsulate complex joinery into single function calls — handling sketch geometry, CUT/JOIN operations, mirror/pattern replication, and parameter setup:
+
+| Template | Best For |
+|----------|----------|
+| `mortise_tenon` | Rail-to-leg, shelf-to-side |
+| `domino` | M&T replacement, edge jointing, case T-joints |
+| `dovetail` | Box corners, drawer fronts |
+| `half_blind_dovetail` | Drawer fronts (hides end grain) |
+| `splayed_legs` | Compound-splayed legs with floor trim |
+| `dovetailed_drawer` | Complete drawer box |
+
+**Reference files** (`joinery/`) provide orientation rules, sizing constraints, and variant selection for all joint types:
+
+| Joint | Reference | Template | Best For |
+|-------|-----------|----------|----------|
+| Mortise & Tenon | Inline in skill | `mortise_tenon` | Shelves, rails, stretchers |
+| Tongue & Groove | Inline in skill | — | Slats, panel infill |
+| Dado & Rabbet | [joinery/dado-rabbet.md](joinery/dado-rabbet.md) | — (inline) | Shelves, case backs |
+| Lap Joint | [joinery/lap-joint.md](joinery/lap-joint.md) | — | Frames, cross braces |
+| Box Joint | [joinery/box-joint.md](joinery/box-joint.md) | — | Boxes, drawers |
+| Bridle Joint | [joinery/bridle-joint.md](joinery/bridle-joint.md) | — | Frame corners |
+| Dowel Joint | [joinery/dowel-joint.md](joinery/dowel-joint.md) | — | Panel glue-ups |
+| Spline Joint | [joinery/spline-joint.md](joinery/spline-joint.md) | — | Reinforced miters |
+| Miter Joint | [joinery/miter-joint.md](joinery/miter-joint.md) | — | Picture frames, trim |
+| Dovetail | [joinery/dovetail.md](joinery/dovetail.md) | `dovetail` | Drawer fronts, premium boxes |
+| Pocket Hole | [joinery/pocket-hole.md](joinery/pocket-hole.md) | — | Face frames, quick assembly |
+| Domino Joint | [joinery/domino-joint.md](joinery/domino-joint.md) | `domino` | Hidden structural connections |
 
 All joinery uses the **combine-based** approach: build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), then JOIN to the owner. One shape, perfect fit.
 
-See [joinery/README.md](joinery/README.md) for the full selection guide and conventions.
+See [joinery/README.md](joinery/README.md) for the full selection guide, template usage, and conventions.
 
 ### Angled Construction
 
@@ -219,6 +232,7 @@ curl http://localhost:9100/tools           # lists all 16 tools
 autofusion/
   addin/              Fusion 360 add-in (MCP server + 16 tools)
     helpers/           Runtime helpers (af.py — sketch, extrude, combine utilities)
+      templates/       Reusable joinery templates (domino, mortise_tenon, dovetail, etc.)
     server/            MCP server, document tracker, action log
     tools/             MCP tool implementations
       _script_generator/  Search-based script generation engine

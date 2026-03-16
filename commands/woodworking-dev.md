@@ -40,6 +40,19 @@ After completing a build (or a build session with notable discoveries), when the
 
 Joinery files live at: `/Users/frankzha/.autofusion/repo/joinery/`
 
+### Joinery templates (reusable Python modules in addin/helpers/templates/)
+
+| Template | Status | Used In |
+|----------|--------|---------|
+| `domino.py` | Tested | bookshelf, counter stool |
+| `mortise_tenon.py` | Tested | bookshelf |
+| `dovetail.py` | Tested | pencil box, wrap box, dresser |
+| `half_blind_dovetail.py` | Tested | dresser |
+| `splayed_legs.py` | Tested | counter stool |
+| `dovetailed_drawer.py` | Tested | dresser |
+
+Templates encapsulate complex joinery (4+ features with variant logic) into single function calls. Simple joints (dado/rabbet, T&G) are written inline. See `joinery/README.md` for the "When NOT to template" guidance.
+
 ### Context from the build
 
 - The model script we just built (e.g., `counter_stool.py`)

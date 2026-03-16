@@ -2,11 +2,30 @@
 
 Read this file when the project involves joinery (Phase 2+). For specific joint types beyond the ones covered inline here, read the corresponding file from `joinery/`.
 
+## Templates (Preferred for Complex Joints)
+
+For joints with 4+ features and variant logic, use reusable Python templates from `addin/helpers/templates/`. Templates handle sketch geometry, CUT/JOIN operations, mirror/pattern replication, and parameter setup in a single function call.
+
+```python
+from helpers.templates import domino, mortise_tenon
+
+# Domino grid — creates template void + body pattern + bulk CUT
+domino.grid(comp, plane, start=(...), step_axis="x", step_expr="dm_sp",
+            count_expr="dm_count", long_axis="x", long_expr="dm_w",
+            short_expr="dm_t", depth_expr="dm_d",
+            body_a=shelf, body_b=back, name="ShDm", ev=ctx.ev)
+
+# M&T — blind mortise + tenon with optional shoulder
+mortise_tenon.blind(comp, rail_body, leg_body, face_axis="y", ...)
+```
+
+**Check for a template first.** If one exists, use it. Only write inline for simple joints (dado, rabbet, T&G) or joints without templates. See `joinery/README.md` for the full template table.
+
 ## Combine-Based Joinery (CRITICAL)
 
 **Never draw separate mortise/socket sketches.** Build the tenon/tail as a separate body, then use Fusion 360 **Combine** to cut the receiving board. The tenon body IS the cutting tool — one shape guarantees the mortise exactly matches.
 
-This applies to **all** joint types:
+This applies to **all** joint types (whether using templates or inline code):
 - **Mortise & tenon**: tenon body cuts the mortise, then joins the shelf
 - **Dovetails**: tail body cuts the socket, then joins the top board
 - **Tongue & groove**: tongue body cuts the groove, then joins the slat
@@ -169,17 +188,17 @@ When `floor(space / element_width)` leaves a remainder, add a gap-filling piece:
 
 ## Additional Joint Types
 
-For joints beyond M&T, T&G, and gap filling, read the corresponding reference file from `joinery/` before generating code:
+For joints beyond M&T, T&G, and gap filling, **check for a template first** (`from helpers.templates import <name>`), then read the reference file for orientation rules and sizing constraints:
 
-| Joint | File | Prefix | Use For |
-|-------|------|--------|---------|
-| Dado & Rabbet | `joinery/dado-rabbet.md` | `dr_` | Shelves, case backs, drawer bottoms |
-| Lap Joint | `joinery/lap-joint.md` | `lj_` | Frames, cross braces, lattice |
-| Box Joint | `joinery/box-joint.md` | `bj_` | Boxes, drawers, decorative corners |
-| Bridle Joint | `joinery/bridle-joint.md` | `br_` | Frame corners, open mortise T-connections |
-| Dowel Joint | `joinery/dowel-joint.md` | `dw_` | Edge joining, panel glue-ups, face frames |
-| Spline Joint | `joinery/spline-joint.md` | `sp_` | Reinforced miters, decorative accents |
-| Miter Joint | `joinery/miter-joint.md` | `mj_` | Picture frames, trim, hidden end grain |
-| Dovetail | `joinery/dovetail.md` | `dt_` | Drawer fronts, premium boxes, visible joints |
-| Pocket Hole | `joinery/pocket-hole.md` | `ph_` | Face frames, quick assemblies, tabletops |
-| Domino Joint | `joinery/domino-joint.md` | `dm_` | Hidden structural connections, kick boards |
+| Joint | File | Template | Prefix | Use For |
+|-------|------|----------|--------|---------|
+| Dado & Rabbet | `joinery/dado-rabbet.md` | — (inline) | `dr_` | Shelves, case backs, drawer bottoms |
+| Lap Joint | `joinery/lap-joint.md` | — | `lj_` | Frames, cross braces, lattice |
+| Box Joint | `joinery/box-joint.md` | — | `bj_` | Boxes, drawers, decorative corners |
+| Bridle Joint | `joinery/bridle-joint.md` | — | `br_` | Frame corners, open mortise T-connections |
+| Dowel Joint | `joinery/dowel-joint.md` | — | `dw_` | Edge joining, panel glue-ups, face frames |
+| Spline Joint | `joinery/spline-joint.md` | — | `sp_` | Reinforced miters, decorative accents |
+| Miter Joint | `joinery/miter-joint.md` | — | `mj_` | Picture frames, trim, hidden end grain |
+| Dovetail | `joinery/dovetail.md` | `dovetail` | `dt_` | Drawer fronts, premium boxes, visible joints |
+| Pocket Hole | `joinery/pocket-hole.md` | — | `ph_` | Face frames, quick assemblies, tabletops |
+| Domino Joint | `joinery/domino-joint.md` | `domino` | `dm_` | Hidden structural connections, kick boards |
