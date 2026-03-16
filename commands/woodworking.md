@@ -554,7 +554,7 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Cross-component:** Use `body.createForAssemblyContext(occ)` for CUT in root. Bulk CUT all tools in one Combine.
 
-**Loose tenons (dominos):** Both CUTs must use `keepTool=True` or the body disappears. **Cross-section is a STADIUM (rounded ends), never a rectangle** — use `sketch_slot` from `joinery/domino-joint.md`. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `joinery/domino-joint.md`.
+**Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `helpers/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `joinery/domino-joint.md`.
 
 **Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `helpers/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`af.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `joinery/mortise-tenon.md`.
 
