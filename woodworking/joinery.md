@@ -194,7 +194,7 @@ For joints beyond M&T, T&G, and gap filling, **check for a template first** (`fr
 |-------|------|----------|--------|---------|
 | Dado & Rabbet | `joinery/dado-rabbet.md` | — (inline) | `dr_` | Shelves, case backs, drawer bottoms |
 | Lap Joint | `joinery/lap-joint.md` | — | `lj_` | Frames, cross braces, lattice |
-| Box Joint | `joinery/box-joint.md` | — | `bj_` | Boxes, drawers, decorative corners |
+| Box Joint | `joinery/box-joint.md` | `finger_joint` | `bj_` | Boxes, drawers, decorative corners |
 | Bridle Joint | `joinery/bridle-joint.md` | — | `br_` | Frame corners, open mortise T-connections |
 | Dowel Joint | `joinery/dowel-joint.md` | — | `dw_` | Edge joining, panel glue-ups, face frames |
 | Spline Joint | `joinery/spline-joint.md` | — | `sp_` | Reinforced miters, decorative accents |

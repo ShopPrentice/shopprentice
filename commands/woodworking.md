@@ -566,6 +566,7 @@ Reusable templates for joints that involve 4+ features with variant logic. For s
 |----------|----------|---------------|
 | `mortise_tenon` | Rail-to-leg, shelf-to-side, any blind/through M&T | `define_params()`, `blind()`, `through()`, `bulk_cut_mortises()` |
 | `domino` | M&T replacement, edge jointing, case/panel T-joints | `single()`, `grid()`, `four_corners()` |
+| `finger_joint` | Boxes, drawers, decorative interlocking corners | `define_params()`, `box()` |
 | `dovetail` | Box corners, drawer fronts, decorative joints | `define_params()`, `corner()`, `box()` |
 | `half_blind_dovetail` | Drawer fronts (hides end grain) | `define_params()`, `box()` |
 | `splayed_legs` | 4 compound-splayed legs with floor trim | `define_params()`, `build()`, `splay_offset()` |

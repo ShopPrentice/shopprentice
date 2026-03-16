@@ -1,5 +1,22 @@
 # Box Joint
 
+## Template
+
+Use `from helpers.templates import finger_joint` for box/finger joints. The template handles sketch geometry, JOIN/CUT operations, mirror/pattern replication for 1/2/4-corner boxes, and supports any joint axis orientation.
+
+```python
+from helpers.templates import finger_joint
+
+fp = finger_joint.define_params(params, prefix="fj",
+    finger_w="0.375 in", finger_count="8",
+    joint_h_expr="box_height", thick_expr="board_thick")
+
+finger_joint.box(comp, front, left,
+                 x_mid, y_mid, thick_expr="board_thick",
+                 right=right, back=back,
+                 prefix="fj", name="FJ", ev=ctx.ev)
+```
+
 ## Overview
 
 A **box joint** (finger joint) uses interlocking rectangular fingers cut into the ends of two boards. The alternating pins and slots create a large glue surface area and strong mechanical interlock.
@@ -7,6 +24,8 @@ A **box joint** (finger joint) uses interlocking rectangular fingers cut into th
 **When to use:** Box and drawer construction, decorative corners, any right-angle joint where visible end grain is acceptable or desired. Box joints are easier to model parametrically than dovetails while providing comparable strength.
 
 **Strength:** High. The interlocking fingers resist pulling apart in all directions, and the large face-grain-to-face-grain glue surface provides excellent bond strength.
+
+**Typical sizing:** Finger width < board thickness (narrow fingers). Common: 3/8" fingers on 3/4" stock.
 
 ## Variants
 

@@ -130,6 +130,7 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 |----------|----------|
 | `mortise_tenon` | Rail-to-leg, shelf-to-side |
 | `domino` | M&T replacement, edge jointing, case T-joints |
+| `finger_joint` | Boxes, drawers, decorative corners |
 | `dovetail` | Box corners, drawer fronts |
 | `half_blind_dovetail` | Drawer fronts (hides end grain) |
 | `splayed_legs` | Compound-splayed legs with floor trim |
@@ -143,7 +144,7 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 | Tongue & Groove | Inline in skill | — | Slats, panel infill |
 | Dado & Rabbet | [joinery/dado-rabbet.md](joinery/dado-rabbet.md) | — (inline) | Shelves, case backs |
 | Lap Joint | [joinery/lap-joint.md](joinery/lap-joint.md) | — | Frames, cross braces |
-| Box Joint | [joinery/box-joint.md](joinery/box-joint.md) | — | Boxes, drawers |
+| Box Joint | [joinery/box-joint.md](joinery/box-joint.md) | `finger_joint` | Boxes, drawers |
 | Bridle Joint | [joinery/bridle-joint.md](joinery/bridle-joint.md) | — | Frame corners |
 | Dowel Joint | [joinery/dowel-joint.md](joinery/dowel-joint.md) | — | Panel glue-ups |
 | Spline Joint | [joinery/spline-joint.md](joinery/spline-joint.md) | — | Reinforced miters |

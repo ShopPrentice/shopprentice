@@ -30,7 +30,7 @@ After completing a build (or a build session with notable discoveries), when the
 | `joinery/domino-joint.md` | Tested |
 | `joinery/dovetail.md` | Tested |
 | `joinery/dado-rabbet.md` | Tested |
-| `joinery/box-joint.md` | Draft |
+| `joinery/box-joint.md` | Tested (template) |
 | `joinery/bridle-joint.md` | Draft |
 | `joinery/lap-joint.md` | Draft |
 | `joinery/miter-joint.md` | Draft |
@@ -46,6 +46,7 @@ Joinery files live at: `/Users/frankzha/.autofusion/repo/joinery/`
 |----------|--------|---------|
 | `domino.py` | Tested | bookshelf, counter stool |
 | `mortise_tenon.py` | Tested | bookshelf |
+| `finger_joint.py` | Tested | (test fixture) |
 | `dovetail.py` | Tested | pencil box, wrap box, dresser |
 | `half_blind_dovetail.py` | Tested | dresser |
 | `splayed_legs.py` | Tested | counter stool |

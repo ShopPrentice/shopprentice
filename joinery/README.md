@@ -10,6 +10,7 @@ Reusable Python templates in `addin/helpers/templates/` encapsulate complex join
 |----------|--------|---------------|----------|
 | `mortise_tenon` | `from helpers.templates import mortise_tenon` | `define_params()`, `blind()`, `through()`, `bulk_cut_mortises()` | Rail-to-leg, shelf-to-side |
 | `domino` | `from helpers.templates import domino` | `single()`, `grid()`, `four_corners()` | M&T replacement, edge jointing, case T-joints |
+| `finger_joint` | `from helpers.templates import finger_joint` | `define_params()`, `box()` | Boxes, drawers, decorative corners |
 | `dovetail` | `from helpers.templates import dovetail` | `define_params()`, `corner()`, `box()` | Box corners, drawer fronts |
 | `half_blind_dovetail` | `from helpers.templates import half_blind_dovetail` | `define_params()`, `box()` | Drawer fronts (hides end grain) |
 | `splayed_legs` | `from helpers.templates import splayed_legs` | `define_params()`, `build()`, `splay_offset()` | 4 compound-splayed legs with floor trim |
@@ -27,7 +28,7 @@ Dado/rabbet joints (2-3 features) and tongue & groove (inline in skill) are simp
 |-------|-----------|----------|----------|----------|
 | Dado & Rabbet | [dado-rabbet.md](dado-rabbet.md) | — (inline) | Medium | Shelves, case backs, drawer bottoms |
 | Lap Joint | [lap-joint.md](lap-joint.md) | — | Medium | Frames, flat assemblies, cross braces |
-| Box Joint | [box-joint.md](box-joint.md) | — | High | Boxes, drawers, decorative corners |
+| Box Joint | [box-joint.md](box-joint.md) | `finger_joint` | High | Boxes, drawers, decorative corners |
 | Bridle Joint | [bridle-joint.md](bridle-joint.md) | — | High | Frame corners, T-connections |
 | Dowel Joint | [dowel-joint.md](dowel-joint.md) | — | Medium | Edge joining, panel glue-ups, face frames |
 | Spline Joint | [spline-joint.md](spline-joint.md) | — | Medium | Reinforced miters, decorative accents |
