@@ -4,7 +4,10 @@
 
 A **Festool Domino joint** is a loose tenon system: a flat oval wafer (domino) inserted into matching mortise pockets routed in both mating pieces. Unlike traditional mortise-and-tenon where the tenon is integral to one board, the domino is a separate piece that bridges the joint.
 
-**When to use:** Hidden structural connections where traditional M&T is overkill or where the joint should be invisible from the outside. Kick boards, rail-to-panel, shelf-to-back, face frame assembly. Ideal for joints that don't need decorative expression.
+**When to use:** Three primary scenarios:
+1. **M&T replacement** — Leg-to-seat, post-to-top, kick-to-side. Use `four_corners` for symmetric 4-leg joints, `single` for individual connections.
+2. **Edge jointing** — Aligning boards side-by-side (tabletops, panels). Dominos ensure alignment during glue-up. Wide face parallel to board surface.
+3. **Case/panel joints** — Side-to-back, shelf-to-back, any T-joint where one board's edge meets another board's face. Like bookshelf sides connecting to back panel.
 
 **Strength:** High. The domino provides mechanical interlock and large glue surface within the mortise pockets. Comparable to traditional mortise-and-tenon for most furniture applications.
 
@@ -55,10 +58,18 @@ params.add("dm_back_d", adsk.core.ValueInput.createByString("10 mm"), "in", "")
 
 ## Orientation Rule
 
-The domino long axis (`dm_<joint>_h`) should run parallel to the **longer dimension** of the mating surface. This maximizes glue area and mechanical interlock.
+**The wide face of the domino must always be parallel to the board surface.** This maximizes glue area and mechanical interlock.
 
-- **Kick end face** (board_thick × kick_height): taller than wide → `vertical=True`
-- **Shelf back edge** (inner_width × board_thick): wider than tall → `vertical=False`
+In practice, this means the `long_axis` should be chosen so the domino's wide dimension lies in the plane of the board face — never perpendicular to it.
+
+| Joint Type | Board Surface | Long Axis | Why |
+|-----------|---------------|-----------|-----|
+| Edge joint (boards flat on XY) | XY plane | X (along board length) | Wide face lies flat in the board surface |
+| Kick end face (board_thick × kick_height) | XZ plane | Z (vertical, along height) | Wide face parallel to side panel |
+| Shelf-to-back (inner_width × board_thick) | XY plane | X (along width) | Wide face parallel to shelf surface |
+| Side-to-back T-joint | XZ plane | Z (along height) | Wide face parallel to both boards at the joint |
+
+**Never orient the domino so its wide face is perpendicular to the board surface** — that would create a weak joint with minimal glue contact on the face.
 
 ## Geometry Workflow
 

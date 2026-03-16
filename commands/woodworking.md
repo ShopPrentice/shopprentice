@@ -51,11 +51,11 @@ Read the specific joint file **before writing joinery code**. Each file has para
 
 | Joint | When to Read | Status | File |
 |-------|-------------|--------|------|
-| **Mortise & Tenon** | Leg-to-rail, stretcher-to-leg, frame-and-panel, table aprons, any rail-into-post connection | Tested (counter stool — shouldered & angled variants) | `joinery/mortise-tenon.md` |
+| **Mortise & Tenon** | Leg-to-rail, stretcher-to-leg, frame-and-panel, table aprons, any rail-into-post connection | Tested (counter stool — blind, through & angled variants) | `joinery/mortise-tenon.md` |
 | **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `joinery/domino-joint.md` |
 | **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `joinery/dovetail.md` |
 | **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `joinery/box-joint.md` |
-| **Dado & Rabbet** | Shelves into sides, case backs, drawer bottoms, any panel-into-groove connection | Tested (bookshelf) | `joinery/dado-rabbet.md` |
+| **Dado & Rabbet** | Shelves into sides, case backs, drawer bottoms, any panel-into-groove connection | Tested (bookshelf, template fixtures — through/stopped dado, rabbet, panel groove) | `joinery/dado-rabbet.md` |
 | **Bridle Joint** | Frame corners, T-connections, open mortise-and-tenon at end of a rail | Draft | `joinery/bridle-joint.md` |
 | **Lap Joint** | Flat frames, cross braces, grid assemblies, half-lap at crossings | Draft | `joinery/lap-joint.md` |
 | **Miter Joint** | Picture frames, trim, hidden end grain at corners | Draft | `joinery/miter-joint.md` |
@@ -155,7 +155,7 @@ Set this BEFORE accessing `design.userParameters`. Without it: `RuntimeError: th
 - `TemporaryBRepManager` — creates static geometry inside `BaseFeature` blocks. Parameters exist in Change Parameters but changing them does NOT update geometry.
 - `createByReal(value_in_cm)` for parameter creation — shows confusing cm values in the UI.
 - Python `int()` at script time for pattern counts — use `floor()` in parameter expressions instead.
-- **Python `for` loops for geometry replication** — use Rectangular Pattern or Mirror features instead. A `for` loop creates N independent features that don't update when count changes. A pattern is one parametric feature that recomputes automatically. **Exception:** Bodies with CUT/JOIN in their timeline history MUST use `for` loops — body patterns replay those operations, creating ghost bodies (see Body Pattern Ghost Bodies under Replication Strategy).
+- **Python `for` loops for geometry replication** — use Rectangular Pattern or Mirror features instead. A `for` loop creates N independent features that don't update when count changes. A pattern is one parametric feature that recomputes automatically. **Note:** Bodies with CUT/JOIN history create ghost bodies when patterned — see Body Pattern Ghost Bodies under Replication Strategy for how to handle this.
 
 ### User Parameters
 Create with `ValueInput.createByString("60 in")` so Change Parameters shows readable values:
@@ -235,29 +235,14 @@ Also available as `af.probe_sketch_axes(sk)`.
 
 **CRITICAL: `probe_sketch_axes` returns axis names but NOT signs.** On non-XY construction planes, a model axis can map to the *negative* sketch direction. For example, on an XZ-offset plane, model +Z maps to sketch -Y. If you build dimension expressions assuming positive mapping, geometry lands at mirrored positions.
 
-**Fix — probe signs with a delta point:**
+**Fix — use `af.probe_sketch_signs(sk)`** which returns `(h_axis, v_axis, h_sign, v_sign)`. Use the sign when building offset expressions:
 ```python
-def probe_sketch_signs(sk):
-    """Return (h_axis, v_axis, h_sign, v_sign) for a sketch.
-    h/v_sign is +1 if increasing model coordinate → increasing sketch coordinate, else -1."""
-    h_axis, v_axis = probe_sketch_axes(sk)
-    P = adsk.core.Point3D
-    sc = sk.modelToSketchSpace(P.create(0, 0, 0))
-    delta = {"x": P.create(1, 0, 0), "y": P.create(0, 1, 0), "z": P.create(0, 0, 1)}
-    sd_h = sk.modelToSketchSpace(delta[h_axis])
-    sd_v = sk.modelToSketchSpace(delta[v_axis])
-    h_sign = 1 if (sd_h.x - sc.x) > 0 else -1
-    v_sign = 1 if (sd_v.y - sc.y) > 0 else -1
-    return h_axis, v_axis, h_sign, v_sign
-```
-
-Use the sign when building offset expressions. If `v_sign` is negative, an expression like `center - half_length` must become `center + half_length` in sketch space:
-```python
+h_axis, v_axis, h_sign, v_sign = af.probe_sketch_signs(sk)
 op = " - " if v_sign > 0 else " + "
 offset_expr = v_center_expr + op + "half_length"
 ```
 
-`sketch_rect_model` already handles this internally (it converts two model-space corners via `modelToSketchSpace`, so signs are implicit). You only need explicit sign detection for custom sketch geometry like stadium shapes (slots, arcs) where you build offset expressions manually.
+`sketch_rect_model` and `sketch_slot_model` handle signs internally. You only need explicit sign detection for custom sketch geometry where you build offset expressions manually.
 
 **Sketch plane preference (follow this order):**
 
@@ -385,18 +370,25 @@ def run(context):
     at = af.find_face_at(shelf, "z", 3.0)  # face at specific coordinate
     edges = af.find_edges(shelf, "z")    # linear edges aligned with axis
     h, v = af.probe_sketch_axes(sk)      # model axis → sketch H/V
+    h, v, hs, vs = af.probe_sketch_signs(sk)  # + sign detection
     p = af.smallest_profile(sk)          # smallest-area profile in sketch
-    # For annular CUTs (shoulder ring around tenon), select the LARGER profile:
-    # shoulder = max((sk.profiles.item(i) for i in range(sk.profiles.count)),
-    #                key=lambda p: p.areaProperties().area)
 
-    # Sketches
+    # Sketches — rectangles
     sk, prof = af.sketch_rect(comp, plane, "0 cm", "0 cm", "w", "d",
                                name="Sk", ev=ctx.ev)
     sk2, prof2 = af.sketch_rect_model(comp, plane,
                                        ("x0", "y0", "z0"),
                                        {"x": "width", "z": "height"},
                                        name="Sk2", ev=ctx.ev)
+
+    # Sketches — stadium shapes (domino mortises, slot joints)
+    sk3, prof3 = af.sketch_slot(comp, plane, "cx", "cy",
+                                 "dm_l", "dm_w", vertical=True,
+                                 name="DM_Sk", ev=ctx.ev)
+    sk4, prof4 = af.sketch_slot_model(comp, plane,
+                                       ("cx", "cy", "cz"), "z",
+                                       "dm_l", "dm_w",
+                                       name="DM_Sk", ev=ctx.ev)
 
     # Feature builders
     f = af.ext_new(comp, prof, "board_thick", "FrontBoard")
@@ -419,7 +411,7 @@ All helpers accept explicit objects (body, component, sketch) rather than relyin
 - `find_face` uses `pointOnFace` coordinate, not normal sign (handles both-direction normals correctly)
 - `DesignContext.find_body/find_bodies` walks all descendant components recursively
 
-**What's NOT in af.py** (write these inline when needed): `sketch_slot`, `probe_sketch_signs`, project-specific face finders (e.g., `find_top_face`).
+**What's NOT in af.py** (write these inline when needed): project-specific face finders (e.g., `find_top_face`), `angled_tenon_end`, `splay_center`.
 
 ### `ev()` — Dual-Mode Parameter Access
 
@@ -480,6 +472,9 @@ All feature builders take `comp` as first arg. Available via `from helpers impor
 | `make_comp` | `(root_comp, name)` | Occurrence | Component via `occ.component` |
 | `feat_pattern` | `(comp, feat, axis, count_expr, spacing_expr, name)` | RectangularPatternFeature | Feature pattern along axis |
 | `body_pattern` | `(comp, body, axis, count_expr, spacing_expr, name)` | RectangularPatternFeature | **WARNING:** replays full feature tree — creates ghost bodies if template has CUT/JOIN history. Use Python `for` loop instead for complex bodies. |
+| `sketch_slot` | `(comp, plane, cx_expr, cy_expr, long_expr, short_expr, vertical, name, ev)` | (sketch, profile) | Stadium shape in sketch-space coords. Use for domino mortises. |
+| `sketch_slot_model` | `(comp, plane, model_center, long_model_axis, long_expr, short_expr, name, ev)` | (sketch, profile) | Stadium shape in model-space coords with auto sign detection. |
+| `probe_sketch_signs` | `(sk)` | (h_axis, v_axis, h_sign, v_sign) | Extends `probe_sketch_axes` with sign detection for non-XY planes. |
 
 ## Replication Strategy
 
@@ -510,26 +505,17 @@ pat_input = pat_feats.createInput(body_coll,
     adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
 ```
 
-### Body Pattern Ghost Bodies (CRITICAL)
+### Body Pattern Ghost Bodies
 
-`RectangularPatternFeature` replays the **entire feature history** of the template body — including CUT and JOIN operations that reference it. When a CUT uses `keepTool=True`, each pattern instance creates a duplicate tool body ("ghost body"), inflating the body count (e.g., 3× per instance instead of 1×).
+`RectangularPatternFeature` replays the **entire feature history** of the template body — including CUT and JOIN operations that reference it, even those added later or in different timelines (root vs component). When a CUT uses `keepTool=True`, each pattern instance creates a duplicate tool body ("ghost body"), inflating the body count.
 
-**When body_pattern is safe:** Bodies with only NewBody extrudes and Mirror (no CUT/JOIN in their history). Example: plain shelf boards before mortise CUTs.
+**When body_pattern is safe:** Bodies with only NewBody extrudes and Mirror (no CUT/JOIN in their history, and none added later). Example: dovetail tail bodies before any CUT/JOIN.
 
-**When body_pattern creates ghosts:** Any body that has been used as a CUT tool with `keepTool=True`, or that has had CUT/JOIN operations applied to it. Example: domino loose tenons that CUT two boards.
+**When body_pattern creates ghosts:** Any body that is or will be a CUT tool with `keepTool=True`, or that has CUT/JOIN operations applied to it at any point in the timeline. Example: shelf body CUT by domino voids → pattern creates ghost void copies at each shelf position.
 
-**Fix:** For complex parts with CUT/JOIN in their history, use a Python `for` loop to create each instance independently. All dimensions stay parametric via parameter expressions; only the count is evaluated at script time with `int(ev("count_param"))`.
+**Ghost bodies are geometrically harmless.** They sit at the same position as the intentional copies and produce identical CUT pockets. The model geometry is correct. Always prefer patterns over Python loops for parametric count updates.
 
-```python
-# WRONG — ghost bodies from keepTool=True CUTs in template history
-body_pattern(domino_body, axis, "dm_count", "dm_spacing")
-
-# RIGHT — independent instances, no ghost bodies
-for i in range(int(ev("dm_count"))):
-    offset = f"dm_start + {i} * dm_spacing"
-    _, pr = sketch_slot_model(comp, plane, (offset, cy, cz), ...)
-    ext_new(pr, "dm_depth", f"DM_{i}")
-```
+**Handling ghosts in validation:** Ghost void bodies overlap with their originals, producing interferences. Filter these from `check_interference` results — exclude pairs where both bodies are void/tool bodies (identifiable by naming convention, e.g. `ShDm_*`). Real interferences involve structural bodies (boards, panels), not void-on-void overlaps.
 
 ### Mirror + Pattern Limitation (CRITICAL)
 Fusion 360 CANNOT properly mirror a `RectangularPatternFeature`. When you mirror features that include a pattern, only the template body gets mirrored -- pattern copies are lost.
@@ -570,7 +556,22 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Loose tenons (dominos):** Both CUTs must use `keepTool=True` or the body disappears. **Cross-section is a STADIUM (rounded ends), never a rectangle** — use `sketch_slot` from `joinery/domino-joint.md`. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `joinery/domino-joint.md`.
 
-**Shouldered mortise-and-tenon:** Build the rail at full length (shoulder-to-shoulder + 2 × tenon length). Shoulder CUT each end face to leave a centered tenon. Then CUT the rail into the mortise piece — the reduced tenon creates a correctly-sized mortise pocket. Apply shoulder CUTs BEFORE mirroring so the mirror propagates them. Full reference: `joinery/mortise-tenon.md`.
+**Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `helpers/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`af.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `joinery/mortise-tenon.md`.
+
+### Joinery Templates (`from helpers.templates import ...`)
+
+Reusable templates for joints that involve 4+ features with variant logic. For simpler joints (dado, rabbet, T&G), use inline `af` helpers directly — a sketch + CUT is 2 features, not worth templating.
+
+| Template | Use Case | Key Functions |
+|----------|----------|---------------|
+| `mortise_tenon` | Rail-to-leg, shelf-to-side, any blind/through M&T | `define_params()`, `blind()`, `through()`, `bulk_cut_mortises()` |
+| `domino` | M&T replacement, edge jointing, case/panel T-joints | `single()`, `grid()`, `four_corners()` |
+| `dovetail` | Box corners, drawer fronts, decorative joints | `define_params()`, `corner()`, `box()` |
+| `half_blind_dovetail` | Drawer fronts (hides end grain) | `define_params()`, `box()` |
+| `splayed_legs` | 4 compound-splayed legs with floor trim | `define_params()`, `build()`, `splay_offset()` |
+| `dovetailed_drawer` | Complete drawer box (half-blind front + through back) | `define_params()`, `build()`, `pattern()` |
+
+**When NOT to use templates:** Dado/rabbet (just `sketch_rect_model` + `ext_op CUT` — 2 features). Angled M&T (use inline `angled_tenon_end` from `woodworking/angled-construction.md`). Tongue & groove (inline pattern from `woodworking/joinery.md`).
 
 ## Component Structure Template
 
@@ -645,7 +646,7 @@ Name every feature and body for a readable timeline and easy debugging:
 | Cut/Join affects wrong body | No `participantBodies` specified | Use `ext_input.participantBodies = [body]` |
 | `TypeError` on participantBodies | Passed `ObjectCollection` instead of list | Use Python `[body]` list |
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
-| Body pattern creates 2-3× expected bodies | `keepTool=True` CUTs in template history create ghost duplicates at each pattern instance | Use Python `for` loop for bodies with CUT/JOIN history (see Body Pattern Ghost Bodies) |
+| Body pattern creates extra bodies | `keepTool=True` CUTs in template history create ghost duplicates at each pattern instance | Ghost bodies are harmless — keep patterns for parametric counts. Filter ghost overlaps from `check_interference` by excluding void-on-void pairs. |
 | Sketch geometry at mirrored/wrong position on non-XY plane | `probe_sketch_axes` gives axis name but not sign; model +Z → sketch -Y on XZ planes | Use `probe_sketch_signs` or `modelToSketchSpace` for approximate positions, flip offset operator based on sign |
 | Loose tenon (domino) bodies disappear | Second CUT used `keepTool=False`, consuming the body | Use `keepTool=True` on ALL CUTs for visible loose tenon joints |
 | Rectangle deforms when parameter changes | `addTwoPointRectangle` lacks explicit H/V geometric constraints | Add `addHorizontal`/`addVertical` on all 4 lines after creation. Apply same rule to any sketch line that should stay H or V. |
@@ -654,6 +655,8 @@ Name every feature and body for a readable timeline and easy debugging:
 | Fillet fails — radius too large | Fillet radius exceeds half the smallest adjacent face dimension | Reduce `fl_r`; keep it < half the shortest edge on any affected face |
 | Fillet/chamfer selects wrong edges | Edge coordinate filter matches unintended edges (e.g., groove interior edges) | Add `edge.body.name` check; filter by both coordinate AND body |
 | Fillet API rejects BRepFace | `addConstantRadiusEdgeSet` requires edges, not faces | Iterate `face.edges`, deduplicate via `tempId`, add individual edges |
+| `InternalValidationError: face` on sketch | CUT/JOIN modifies body topology, invalidating BRepFace references | Re-find face with `af.find_face()` after each CUT/JOIN before next sketch |
+| Face-sketch extrudes wrong profile | `profiles.item(0)` is the outer region on face sketches (face minus rectangle) | Use `af.smallest_profile(sk)` to get the inner drawn rectangle |
 | Symmetric extrude body 2× too thick | Passed full thickness to `ext_new_sym` — it applies `dist` to EACH side | Pass half-thickness: `ext_new_sym(comp, prof, "board_t / 2", ...)` |
 | `sketch_rect_model` places body on wrong side of origin | Position dimensions use absolute distance — negative coordinates reflect to positive | Use manual sketch with `modelToSketchSpace` + width/height dimensions only (no position dimensions) |
 | Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `joinery/mortise-tenon.md`) |
