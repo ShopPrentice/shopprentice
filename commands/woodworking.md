@@ -31,6 +31,18 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
 8. **Build order matters.** Cut grooves and dados **before** joining corner joinery (dovetails, box joints). Side boards span only their initial footprint before tails are joined; groove tool bodies that extend beyond the board only CUT the material that exists at that moment. When tails are later joined, they attach ungrooved — producing clean, stopped grooves at corners with zero extra geometry. This "implicit stopped groove" technique eliminates manual stop calculations.
 
+9. **Think in grain direction and mechanical interlock.** Wood is a directional fiber material — fibers (bonded by lignin) run parallel to the longest dimension of each part: leg fibers in Z, rail fibers in X or Y, stretcher fibers along their length. This has three consequences for every joint:
+   - **End grain glue is weak.** Where fiber ends meet a surface (end grain to side grain), glue alone provides almost no holding force.
+   - **Mechanical joints use fiber strength.** When a tenon sits inside a mortise, the wood fibers of both pieces resist pulling apart — strong even without glue.
+   - **Side grain to side grain glue is strong.** A tenon inside a socket creates side-grain contact surfaces where glue forms a bond as strong as the wood itself.
+
+   **During planning, audit every connection:** wherever two parts meet, ask "if I built this in real wood, would gravity or use pull it apart?" If the answer is yes, there must be a physical joint — M&T, domino, dovetail, etc. — not just touching surfaces. The model must show the interlock: a tenon body occupying a mortise void, a tail body filling a socket. A CUT that creates a void is only half the joint — the mating piece must physically fill it.
+
+   **Grain direction determines joint choice:**
+   - **Long grain to long grain** (parallel fibers meeting side-to-side) — glue alone is sufficient (edge-joining boards for a panel).
+   - **End grain to side grain** (fiber ends meeting a surface) — mechanical joint required (rail into leg = M&T, board corner = dovetail).
+   - **End grain to end grain** — weakest possible bond. Always reinforce with a cross-grain element (spline, domino, biscuit).
+
 ## Topic Reference
 
 This skill is modular. The core (this file) covers fundamentals needed for every project. Read additional topic files based on your project's needs:
@@ -45,7 +57,7 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 
 ### Joinery Reference Files
 
-Read the specific joint file **before writing joinery code**. Each file has parameters, geometry workflow, replication strategy, and pitfalls.
+Read the specific joint file **before writing joinery code**. Each file has parameters, geometry workflow, replication strategy, and pitfalls. Choose the joint type based on grain orientation at the interface (rule 9) — end-grain-to-side-grain connections need mechanical interlock (M&T, dovetail, domino), while long-grain-to-long-grain can use glue alone.
 
 **Status key:** "Tested" means the technique was built end-to-end in a real model, hitting and resolving actual API pitfalls. "Draft" means the file has plausible instructions but hasn't been validated through a real build — expect missing pitfalls and possible wrong API sequences. When using a Draft file, validate each step with `capture_design` and be ready to debug.
 
@@ -116,6 +128,11 @@ Build order: Sides → Shelves → Top → Kick → Cross-component CUTs → Det
 Parameters: board_thick, shelf_depth, shelf_count, total_height, ...
 Midplanes: XMid (total_length/2), YMid (total_width/2)
 Joinery: M&T shelves into sides, dado for kick
+
+Grain & joints:
+  Sides: grain in Z (vertical) — end grain meets shelf side grain → M&T
+  Shelves: grain in X (horizontal) — tenons into side mortises
+  Kick: grain in X — dado into sides (cross-grain housing)
 ```
 
 ### Component Plan (one response per component, before its build cycle)
@@ -557,6 +574,16 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 **Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `helpers/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `joinery/domino-joint.md`.
 
 **Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `helpers/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`af.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `joinery/mortise-tenon.md`.
+
+**Tenon collision at corners — interlock, don't shorten.** When two rails meet in the same leg from perpendicular directions, their tenons collide inside the mortise. The naive fix — shortening one tenon — sacrifices bonding surface and therefore joint strength (less side-grain glue area, less fiber interlock). Instead, notch both tenons so they weave past each other at full depth:
+
+- **Front/back rail tenon:** notch the CENTER half (`mt_tw / 2`, centered) from the tenon's end face, cutting `mt_tt` deep through the full tenon thickness. The notch extends `mt_td - leg_size / 2 + mt_tt / 2` into the tenon from its end (the portion that overlaps the perpendicular tenon's path). This leaves the top and bottom quarters as material.
+- **Side rail tenon:** notch both top AND bottom quarters (`mt_tw / 4` each), same depth and extent. This leaves the middle half of the side tenon as material.
+- Result: front rail keeps top+bottom quarters, side rail keeps the middle half — they interlock perfectly with zero collision. Both tenons penetrate the full `mt_td` into the leg, maximizing glue surface. The leg mortise (created by CUTting the notched rail bodies) automatically gets the correct complementary shape.
+
+**When to apply:** Any corner where two or more tenons enter the same post/leg from different directions — table legs, frame corners, bed posts. The specific notch pattern depends on how many rails meet: 2 rails = one gets top notch, other gets top+bottom; 3 rails meeting = divide the tenon height into thirds, etc.
+
+**Implementation:** Add notch CUTs after shoulder CUTs but before mirroring the rail. Use construction planes at the tenon's side face (offset from the rail's build plane by `leg_size / 2 - mt_tt / 2`). The notch rectangle dimensions reference `mt_tw / 4` and the derived notch depth expression. When the rail is mirrored, the notches mirror correctly. Tested (TV console).
 
 ### Joinery Templates (`from helpers.templates import ...`)
 
