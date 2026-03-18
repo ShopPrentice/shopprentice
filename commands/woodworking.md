@@ -601,6 +601,39 @@ Reusable templates for joints that involve 4+ features with variant logic. For s
 
 **When NOT to use templates:** Dado/rabbet (just `sketch_rect_model` + `ext_op CUT` — 2 features). Angled M&T (use inline `angled_tenon_end` from `woodworking/angled-construction.md`). Tongue & groove (inline pattern from `woodworking/joinery.md`).
 
+### Hardware Templates (`from helpers.templates import ...`)
+
+Templates for furniture hardware that create mortise pockets (CUT) and visual hardware bodies. The hardware body IS the mortise tool — CUT with `keepTool=True` creates both the recess and the visual representation.
+
+| Template | Use Case | Key Functions |
+|----------|----------|---------------|
+| `butt_hinge` | Box lids, cabinet doors, chest lids | `define_params(size="small/medium/large")`, `mortise()` |
+| `pull` | Drawer fronts, cabinet doors, box lids | `define_params(style="bar_3in/bar_4in/knob")`, `install()` |
+| `chest_lock` | Jewelry boxes, blanket chests, tool chests | `define_params(size="small/medium/large")`, `lock_mortise()`, `keyhole()`, `strike()` |
+
+**Trigger phrases:** hinges, pulls, knobs, handles, locks, latches, hardware, mounting holes, bolt holes, keyhole, strike plate, hinge mortise, leaf recess.
+
+**Usage pattern (parametric templates):**
+1. `define_params()` with size/style preset or custom dimensions
+2. Call `mortise()` / `install()` for each hardware piece — takes a plane, origin, and size_map
+3. Each function creates the hardware body AND CUTs its pocket in one operation
+
+**STEP-based hardware install** (`from helpers import hardware`):
+
+For McMaster-Carr STEP hinges, use `hardware.install_butt_hinge()` — one call handles import, rotation, fold, and rebate CUTs into both boards:
+
+```python
+hardware.install_butt_hinge(
+    part_id="1603a3", comp=comp,
+    back_body=back, lid_body=lid,                # lid styles
+    # door_body=door, case_body=side,             # door styles
+    pin_position=("box_l / 4", "box_w", "box_h"),
+    style="lid_surface",  # lid_surface|lid_flush|door_surface|door_flush
+    ev=ctx.ev, name="H1")
+```
+
+See `hardware/README.md` for pin_position meaning per style and ASCII diagrams.
+
 ## Component Structure Template
 
 Table / Bookshelf:

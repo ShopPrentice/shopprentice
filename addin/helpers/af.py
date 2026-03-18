@@ -36,7 +36,12 @@ class DesignContext:
         self.units = self.design.unitsManager
 
     def ev(self, expr):
-        """Evaluate parameter name or expression string to float (cm)."""
+        """Evaluate parameter name or expression string to float (cm).
+
+        Also accepts int/float (returned as-is, assumed cm).
+        """
+        if isinstance(expr, (int, float)):
+            return float(expr)
         p = self.params.itemByName(expr)
         return p.value if p else self.units.evaluateExpression(expr, "cm")
 
@@ -240,6 +245,10 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
     gc.addVertical(rect[3])
 
     # Parametric dimensions in model-axis expressions
+    def _to_expr(v):
+        """Convert value to expression string. Floats become 'N cm'."""
+        return f"{v} cm" if isinstance(v, (int, float)) else v
+
     d = sk.sketchDimensions
     axis_to_origin = {
         "x": model_origin[0], "y": model_origin[1], "z": model_origin[2]}
@@ -252,19 +261,19 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
     d.addDistanceDimension(
         rect[0].startSketchPoint, rect[0].endSketchPoint,
         H, Point3D.create(mid_x, sk_o.y + dy, 0)
-    ).parameter.expression = model_size[h_axis]
+    ).parameter.expression = _to_expr(model_size[h_axis])
     d.addDistanceDimension(
         rect[1].startSketchPoint, rect[1].endSketchPoint,
         V, Point3D.create(sk_f.x - dx, mid_y, 0)
-    ).parameter.expression = model_size[v_axis]
+    ).parameter.expression = _to_expr(model_size[v_axis])
     d.addDistanceDimension(
         sk.originPoint, rect[0].startSketchPoint,
         H, Point3D.create(sk_o.x / 2, sk_o.y + 2 * dy, 0)
-    ).parameter.expression = axis_to_origin[h_axis]
+    ).parameter.expression = _to_expr(axis_to_origin[h_axis])
     d.addDistanceDimension(
         sk.originPoint, rect[0].startSketchPoint,
         V, Point3D.create(sk_o.x + dx, sk_o.y / 2, 0)
-    ).parameter.expression = axis_to_origin[v_axis]
+    ).parameter.expression = _to_expr(axis_to_origin[v_axis])
 
     return sk, sk.profiles.item(0)
 
@@ -759,6 +768,57 @@ def _find_body_recursive(comp, name):
         if result:
             return result
     return None
+
+
+def apply_appearance(body, appearance_name="Brass - Polished",
+                     library_name="Fusion Appearance Library"):
+    """Apply a named appearance from a material library to a body.
+
+    Copies the appearance into the active design (if not already present)
+    and assigns it to the body. Common appearance names:
+      "Brass - Polished", "Brass - Matte", "Bronze - Polished",
+      "Steel - Satin", "Aluminum - Satin", "Oak", "Walnut"
+
+    Args:
+        body: BRepBody to apply appearance to.
+        appearance_name: Name in the library (e.g. "Brass - Polished").
+        library_name: Material library name (default: Fusion Appearance Library).
+
+    Returns:
+        The applied Appearance, or None if not found.
+    """
+    app = adsk.core.Application.get()
+    design = adsk.fusion.Design.cast(app.activeProduct)
+
+    # Check if already copied into design
+    safe_name = appearance_name.replace(" ", "_").replace("-", "_")
+    for i in range(design.appearances.count):
+        a = design.appearances.item(i)
+        if a.name == safe_name:
+            body.appearance = a
+            return a
+
+    # Find in library
+    lib = None
+    for i in range(app.materialLibraries.count):
+        if app.materialLibraries.item(i).name == library_name:
+            lib = app.materialLibraries.item(i)
+            break
+    if lib is None:
+        return None
+
+    source = None
+    for i in range(lib.appearances.count):
+        a = lib.appearances.item(i)
+        if a.name == appearance_name:
+            source = a
+            break
+    if source is None:
+        return None
+
+    local = design.appearances.addByCopy(source, safe_name)
+    body.appearance = local
+    return local
 
 
 def _collect_bodies_recursive(comp, pattern, results):

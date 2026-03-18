@@ -1,12 +1,15 @@
 """Test fixture for finger joint (box joint) template.
 
-Tests define_params and box() with 6 configurations:
+Tests define_params (derived count via floor) and box() with 6 configs:
   B1: 1-corner finger joint (2 boards: front + left)
   B2: 2-corner finger joints (3 boards: front + left + right)
   B3: 4-corner finger joints, joint along Z (default)
   B4: 4-corner, narrow fingers (finger_w < board_thick)
   B5: 4-corner, joint along X (box "lying flat")
   B6: 4-corner, joint along Y (box "on its side")
+
+Count is derived: floor(joint_h / (2 * finger_w)) keeps all fingers within the board.
+The pin board's last finger fills the remaining gap (may be wider than finger_w).
 
 Each box is in its own component. For 2+ corners, right finger board
 is created by mirroring left across x_mid.
@@ -276,10 +279,10 @@ def run(context):
     ctx = af.DesignContext(design)
 
     # ================================================================
-    # FIXTURE 1: 1-corner — 8x6x4, 0.5" thick, 4 fingers, 0.375" wide
+    # FIXTURE 1: 1-corner — 8x6x4, 0.5" thick, 0.375" fingers
     # ================================================================
     print("=" * 50)
-    print("FIXTURE 1: 1-corner box 8x6x4, 4 fingers")
+    print("FIXTURE 1: 1-corner box 8x6x4, 0.375\" fingers")
     print("=" * 50)
 
     params.add("b1_l", VI("8 in"), "in", "Box 1 length")
@@ -288,7 +291,7 @@ def run(context):
     params.add("b1_t", VI("0.5 in"), "in", "Box 1 thickness")
 
     finger_joint.define_params(params, prefix="fj1",
-        finger_w="0.375 in", finger_count="4",
+        finger_w="0.375 in",
         joint_h_expr="b1_h", thick_expr="b1_t")
 
     r1 = build_box(root, "B1", "b1_l", "b1_w", "b1_h", "b1_t",
@@ -297,10 +300,10 @@ def run(context):
     print("Box 1: PASS\n")
 
     # ================================================================
-    # FIXTURE 2: 2-corner — 8x5x6, 0.5" thick, 6 fingers
+    # FIXTURE 2: 2-corner — 8x5x6, 0.5" thick, 0.375" fingers
     # ================================================================
     print("=" * 50)
-    print("FIXTURE 2: 2-corner box 8x5x6, 6 fingers")
+    print("FIXTURE 2: 2-corner box 8x5x6, 0.375\" fingers")
     print("=" * 50)
 
     params.add("b2_l", VI("8 in"), "in", "Box 2 length")
@@ -310,7 +313,7 @@ def run(context):
     params.add("b2_y", VI("b1_w + 2 in"), "in", "Box 2 Y offset")
 
     finger_joint.define_params(params, prefix="fj2",
-        finger_w="0.375 in", finger_count="6",
+        finger_w="0.375 in",
         joint_h_expr="b2_h", thick_expr="b2_t")
 
     r2 = build_box(root, "B2", "b2_l", "b2_w", "b2_h", "b2_t",
@@ -320,10 +323,10 @@ def run(context):
     print("Box 2: PASS\n")
 
     # ================================================================
-    # FIXTURE 3: 4-corner — 10x8x6, 0.5" thick, 5 fingers
+    # FIXTURE 3: 4-corner — 10x8x6, 0.5" thick, 0.5" fingers
     # ================================================================
     print("=" * 50)
-    print("FIXTURE 3: 4-corner box 10x8x6, 5 fingers")
+    print("FIXTURE 3: 4-corner box 10x8x6, 0.5\" fingers")
     print("=" * 50)
 
     params.add("b3_l", VI("10 in"), "in", "Box 3 length")
@@ -333,7 +336,7 @@ def run(context):
     params.add("b3_y", VI("b2_y + b2_w + 2 in"), "in", "Box 3 Y offset")
 
     finger_joint.define_params(params, prefix="fj3",
-        finger_w="0.5 in", finger_count="5",
+        finger_w="0.5 in",
         joint_h_expr="b3_h", thick_expr="b3_t")
 
     r3 = build_box(root, "B3", "b3_l", "b3_w", "b3_h", "b3_t",
@@ -355,7 +358,7 @@ def run(context):
     params.add("b4_x", VI("b3_l + 2 in"), "in", "Box 4 X offset")
 
     finger_joint.define_params(params, prefix="fj4",
-        finger_w="0.25 in", finger_count="8",
+        finger_w="0.25 in",
         joint_h_expr="b4_h", thick_expr="b4_t")
 
     r4 = build_box(root, "B4", "b4_l", "b4_w", "b4_h", "b4_t",
@@ -377,7 +380,7 @@ def run(context):
     params.add("b5_y", VI("b3_y + b3_w + 2 in"), "in", "Box 5 Y offset")
 
     finger_joint.define_params(params, prefix="fj5",
-        finger_w="0.375 in", finger_count="7",
+        finger_w="0.375 in",
         joint_h_expr="b5_l", thick_expr="b5_t")
 
     r5 = build_box(root, "B5", "b5_l", "b5_w", "b5_h", "b5_t",
@@ -401,7 +404,7 @@ def run(context):
     params.add("b6_y", VI("b5_y"), "in", "Box 6 Y offset")
 
     finger_joint.define_params(params, prefix="fj6",
-        finger_w="0.375 in", finger_count="8",
+        finger_w="0.375 in",
         joint_h_expr="b6_w", thick_expr="b6_t")
 
     r6 = build_box(root, "B6", "b6_l", "b6_w", "b6_h", "b6_t",

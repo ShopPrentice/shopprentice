@@ -15,9 +15,9 @@ Three entry points:
 Usage:
     from helpers.templates import finger_joint
 
-    # Define parameters
+    # Define parameters (count derived from joint height)
     fp = finger_joint.define_params(params, prefix="fj",
-        finger_w="0.375 in", finger_count="8",
+        finger_w="0.375 in",
         joint_h_expr="box_height", thick_expr="board_thick")
 
     # 4-corner box
@@ -47,20 +47,21 @@ METADATA = {
     "not_for": ["drawer fronts (shows end grain on both boards)"],
     "params": {
         "fj_finger_w": "Width of each finger (same on both boards)",
-        "fj_count": "Number of fingers on the finger board",
+        "fj_count": "Derived: floor(joint_h / (2 * finger_w)) — fingers within board",
         "fj_pitch": "Derived: 2 * finger_w (spacing between same-board fingers)",
     },
 }
 
 
 def define_params(params, prefix="fj", finger_w="0.375 in",
-                  finger_count="8", joint_h_expr="open_height",
+                  joint_h_expr="open_height",
                   thick_expr="board_thick"):
     """Define finger joint parameters.
 
-    No angle — fingers are rectangular. The count represents how many
-    fingers the "finger board" (left/right) gets. The slot board
-    (front/back) gets interlocking fingers automatically via CUT.
+    No angle — fingers are rectangular. Count is derived from joint
+    height and finger width using floor() so all fingers stay within
+    the board. The pin board's last finger fills the remaining gap
+    (may be wider than finger_w).
 
     Typical sizing: finger_w < board_thick (narrow fingers).
 
@@ -68,7 +69,6 @@ def define_params(params, prefix="fj", finger_w="0.375 in",
         params: design.userParameters
         prefix: Parameter name prefix (e.g. "fj").
         finger_w: Finger width expression.
-        finger_count: Number of fingers on finger board.
         joint_h_expr: Joint height expression (board dimension along joint).
         thick_expr: Board thickness expression.
 
@@ -78,11 +78,15 @@ def define_params(params, prefix="fj", finger_w="0.375 in",
     VI = adsk.core.ValueInput.createByString
     p = prefix
 
-    # Independent params
+    # Independent param
     params.add(f"{p}_finger_w", VI(finger_w), "in", "Finger width")
-    params.add(f"{p}_count", VI(finger_count), "", "Number of fingers")
 
-    # Derived
+    # Derived — count fills the edge with complete finger pairs.
+    # The pin board's last finger fills the remaining space at the top
+    # (may be wider than finger_w). Both boards end at joint_h.
+    params.add(f"{p}_count",
+               VI(f"floor({joint_h_expr} / (2 * {p}_finger_w))"),
+               "", "Number of fingers (derived)")
     params.add(f"{p}_pitch",
                VI(f"2 * {p}_finger_w"),
                "in", "Finger pitch (derived)")

@@ -1,0 +1,111 @@
+{
+  "parts": {
+    "1603a2": {
+      "name": "McMaster 1603A2 Brass Surface-Mount Hinge",
+      "category": "hinge",
+      "step_file": "hinges/1603A2.step",
+      "assembly_step": "assemblies/hinge_1603A2_with_screws.step",
+      "dimensions": {
+        "length": "0.75 in",
+        "leaf_width": "0.313 in",
+        "leaf_thickness": "0.116 in",
+        "pin_diameter": "0.066 in",
+        "screw_hole_diameter": "0.086 in",
+        "holes_per_leaf": 1
+      },
+      "anchor": {
+        "origin": [0, 0, 0],
+        "axes": {"pin": "x", "leaf_a": "+z", "leaf_b": "-z"}
+      },
+      "screw": "92114a079",
+      "mcmaster_pn": "1603A2",
+      "notes": "Small brass surface-mount hinge. Good for jewelry boxes, small lids under 6 inches."
+    },
+    "1603a3": {
+      "name": "McMaster 1603A3 Brass Surface-Mount Hinge",
+      "category": "hinge",
+      "step_file": "hinges/1603A3.step",
+      "assembly_step": "assemblies/hinge_1603A3_with_screws.step",
+      "dimensions": {
+        "length": "1.0 in",
+        "leaf_width": "0.375 in",
+        "leaf_thickness": "0.116 in",
+        "pin_diameter": "0.066 in",
+        "screw_hole_diameter": "0.086 in",
+        "holes_per_leaf": 1
+      },
+      "anchor": {
+        "origin": [0, 0, 0],
+        "axes": {"pin": "x", "leaf_a": "+z", "leaf_b": "-z"}
+      },
+      "screw": "92114a079",
+      "mcmaster_pn": "1603A3",
+      "notes": "Medium brass surface-mount hinge. Good for boxes 6-12 inches, small chests."
+    },
+    "1603a7": {
+      "name": "McMaster 1603A7 Brass Surface-Mount Hinge",
+      "category": "hinge",
+      "step_file": "hinges/1603A7.step",
+      "assembly_step": "assemblies/hinge_1603A7_with_screws.step",
+      "dimensions": {
+        "length": "2.0 in",
+        "leaf_width": "0.5 in",
+        "leaf_thickness": "0.166 in",
+        "pin_diameter": "0.086 in",
+        "screw_hole_diameter": "0.212 in",
+        "holes_per_leaf": 3
+      },
+      "anchor": {
+        "origin": [0, 0, 0],
+        "axes": {"pin": "x", "leaf_a": "+z", "leaf_b": "-z"}
+      },
+      "screw": "92114a196",
+      "mcmaster_pn": "1603A7",
+      "notes": "Large brass surface-mount hinge. Good for chests, blanket boxes, lids over 12 inches."
+    },
+    "92114a079": {
+      "name": "McMaster 92114A079 #2 x 3/8\" Brass Flat Head Wood Screw",
+      "category": "screw",
+      "step_file": "screws/92114A079.step",
+      "dimensions": {
+        "screw_size": "#2",
+        "length": "0.375 in",
+        "head_diameter": "0.172 in",
+        "shank_diameter": "0.086 in"
+      },
+      "anchor": {
+        "origin": [0, 0, 0]
+      },
+      "mcmaster_pn": "92114A079",
+      "notes": "Brass Phillips flat head wood screw. For 1603A2 and 1603A3 hinges."
+    },
+    "92114a196": {
+      "name": "McMaster 92114A196 #8 x 5/8\" Brass Flat Head Wood Screw",
+      "category": "screw",
+      "step_file": "screws/92114A196.step",
+      "dimensions": {
+        "screw_size": "#8",
+        "length": "0.625 in",
+        "head_diameter": "0.332 in",
+        "shank_diameter": "0.166 in"
+      },
+      "anchor": {
+        "origin": [0, 0, 0]
+      },
+      "mcmaster_pn": "92114A196",
+      "notes": "Brass Phillips flat head wood screw. For 1603A7 hinges."
+    }
+  },
+  "selection_guide": {
+    "hinge": {
+      "description": "Choose hinge size based on lid length. Use 2 hinges per lid, spaced 1/5 from each edge.",
+      "rules": [
+        {"max_lid_length": "6 in", "recommended": "1603a2", "reason": "Small hinge for jewelry boxes and small lids"},
+        {"max_lid_length": "12 in", "recommended": "1603a3", "reason": "Medium hinge for standard boxes"},
+        {"max_lid_length": "999 in", "recommended": "1603a7", "reason": "Large hinge for chests and blanket boxes"}
+      ],
+      "spacing": "Place hinges at 1/5 and 4/5 of the lid length. For a single centered hinge, place at 1/2.",
+      "installation": "Pin axis at the joint line between back board top edge and lid back edge. Each leaf mortised flush into its respective board surface."
+    }
+  }
+}

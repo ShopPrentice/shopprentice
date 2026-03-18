@@ -52,7 +52,15 @@ Joinery files live at: `/Users/frankzha/.autofusion/repo/joinery/`
 | `splayed_legs.py` | Tested | counter stool |
 | `dovetailed_drawer.py` | Tested | dresser |
 
-Templates encapsulate complex joinery (4+ features with variant logic) into single function calls. Simple joints (dado/rabbet, T&G) are written inline. See `joinery/README.md` for the "When NOT to template" guidance.
+#### Hardware templates
+
+| Template | Status | Used In |
+|----------|--------|---------|
+| `butt_hinge.py` | Tested | (test fixture) |
+| `pull.py` | Tested | (test fixture) |
+| `chest_lock.py` | Tested | (test fixture) |
+
+Templates encapsulate complex joinery (4+ features with variant logic) into single function calls. Simple joints (dado/rabbet, T&G) are written inline. Hardware templates create mortise pockets + visual hardware bodies using the "if it fits, it CUTs" principle.
 
 ### Context from the build
 
