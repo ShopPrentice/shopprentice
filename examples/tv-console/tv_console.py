@@ -64,6 +64,11 @@ def run(context):
         ("dm_cl_long",  "40 mm",  "in", "Domino long dimension"),
         ("dm_cl_depth", "20 mm",  "in", "Domino depth per side"),
         ("dm_cl_count", "3",      "",   "Dominos per cleat"),
+        # Dominos (divider-to-case)
+        ("dm_dv_short", "6 mm",   "in", "Divider domino short"),
+        ("dm_dv_long",  "30 mm",  "in", "Divider domino long"),
+        ("dm_dv_depth", "12 mm",  "in", "Divider domino depth per side"),
+        ("dm_dv_count", "3",      "",   "Dominos per divider edge"),
     ]
     for name, expr, unit, desc in shared:
         params.add(name, VI(expr), unit, desc)
@@ -93,6 +98,9 @@ def run(context):
         # Domino spacing (cleat-to-case)
         ("dm_cl_sp",   "(console_d - leg_size - rail_thick) / (dm_cl_count + 1)",
                                                        "in", "Domino spacing along cleat"),
+        # Domino spacing (divider-to-case)
+        ("dm_dv_sp",   "(console_d - back_thick) / (dm_dv_count + 1)",
+                                                       "in", "Domino spacing along divider"),
         # Midplanes
         ("mid_x",      "console_w / 2",               "in", "X midplane"),
         ("mid_y",      "console_d / 2",                "in", "Y midplane"),
@@ -239,6 +247,42 @@ def run(context):
                "Dado_Bot")
     af.combine(case_c, top_body, [div1_body, div2_body], CUT, True,
                "Dado_Top")
+
+    # ── Dominos: Divider-to-Case Top & Bottom ─────────────────────
+    # Dominos at the divider edge / case board interface.
+    # long_axis = "y" (parallel to divider grain/depth).
+    # Build inside case_c (same component, no proxies needed).
+    first_dv_dm_y = "dm_dv_sp"
+
+    for div_body, div_cx, div_name in [
+        (div1_body, "div1_x + divider_thick / 2", "DmDv1"),
+        (div2_body, "div2_x + divider_thick / 2", "DmDv2"),
+    ]:
+        # Bottom interface (Z = case_z + board_thick)
+        dm_bot_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+            "case_z + board_thick", f"{div_name}_BotPl")
+        dm_bot_pl.isLightBulbOn = False
+        domino.grid(case_c, dm_bot_pl,
+            start=(div_cx, first_dv_dm_y, "case_z + board_thick"),
+            step_axis="y", step_expr="dm_dv_sp", count_expr="dm_dv_count",
+            long_axis="y",
+            long_expr="dm_dv_long", short_expr="dm_dv_short",
+            depth_expr="dm_dv_depth",
+            body_a=div_body, body_b=bot_body,
+            name=f"{div_name}_Bot", ev=ev)
+
+        # Top interface (Z = case_z + board_thick + case_h)
+        dm_top_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+            "case_z + board_thick + case_h", f"{div_name}_TopPl")
+        dm_top_pl.isLightBulbOn = False
+        domino.grid(case_c, dm_top_pl,
+            start=(div_cx, first_dv_dm_y, "case_z + board_thick + case_h"),
+            step_axis="y", step_expr="dm_dv_sp", count_expr="dm_dv_count",
+            long_axis="y",
+            long_expr="dm_dv_long", short_expr="dm_dv_short",
+            depth_expr="dm_dv_depth",
+            body_a=div_body, body_b=top_body,
+            name=f"{div_name}_Top", ev=ev)
 
     # ── Frame Component ────────────────────────────────────────────
     frame_occ = af.make_comp(root, "Frame")

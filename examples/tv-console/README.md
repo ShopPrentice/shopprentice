@@ -11,28 +11,49 @@ A parametric TV console modeled in Fusion 360 via Python script. 60"W x 18"D, do
   <img src="screenshots/right.png" width="49%" />
 </p>
 
-### Joinery Detail — Frame + Cleats + Dominos (transparent case)
-
-Transparent view reveals the leg frame with interlocking M&T joints, cleats with blind tenons through the rails, and domino loose tenons connecting cleats to the case bottom.
-
-![Frame detail — iso top-left](screenshots/frame-detail-iso-top-left.png)
-
-![Frame detail — iso bottom-right](screenshots/frame-detail-iso-bottom-right.png)
-
-### Joinery Detail — Case + Drawers (transparent)
-
-Through dovetails at case corners, half-blind dovetails at drawer fronts, through dovetails at drawer backs, bottom panel grooves.
-
-<p float="left">
-  <img src="screenshots/case-detail-iso-top-right.png" width="49%" />
-  <img src="screenshots/case-detail-right.png" width="49%" />
-</p>
-
 ### Full Transparent Views
+
+All bodies at 0.15 opacity — reveals internal joinery, mortise pockets, and hidden connections.
 
 <p float="left">
   <img src="screenshots/transparent-iso-top-left.png" width="49%" />
   <img src="screenshots/transparent-iso-bottom-right.png" width="49%" />
+</p>
+
+### Joinery Detail — Frame + Cleats
+
+Interlocking M&T at leg corners, cleat blind tenons through rails, domino loose tenons at cleat-to-case interface.
+
+<p float="left">
+  <img src="screenshots/frame-detail-iso-top-left.png" width="49%" />
+  <img src="screenshots/frame-detail-iso-bottom-right.png" width="49%" />
+</p>
+
+### Joinery Detail — Case Dovetails + Hinges
+
+Through dovetails at case corners. Flush-mount brass hinges with gap-aware rebate mortises on inset doors.
+
+<p float="left">
+  <img src="screenshots/detail-dovetail-corner.png" width="49%" />
+  <img src="screenshots/detail-door-hinge.png" width="49%" />
+</p>
+
+### Joinery Detail — Divider Dominos + Drawers
+
+Domino loose tenons connecting dividers to top and bottom boards. Half-blind dovetails at drawer fronts, through dovetails at backs.
+
+<p float="left">
+  <img src="screenshots/detail-divider-dominos.png" width="49%" />
+  <img src="screenshots/detail-drawer-dovetails.png" width="49%" />
+</p>
+
+### Joinery Detail — Cleat Dominos + Case Bottom
+
+Domino voids straddling the cleat top / case bottom interface. Case dovetails and back rabbet visible.
+
+<p float="left">
+  <img src="screenshots/detail-cleat-dominos.png" width="49%" />
+  <img src="screenshots/case-detail-iso-top-right.png" width="49%" />
 </p>
 
 ## Example Prompt
