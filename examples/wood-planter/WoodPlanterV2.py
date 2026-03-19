@@ -770,7 +770,7 @@ def run(context):
     # ==============================================================
     #  7. EPILOGUE
     # ==============================================================
-    all_comps = [legs_c, lr_c, sr_c, slats_c, bt_c]
+    all_comps = [leg_c, lr_c, sr_c, slats_c, bt_c]
     for comp in all_comps:
         for sk in comp.sketches:
             sk.isVisible = False
