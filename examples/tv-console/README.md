@@ -1,6 +1,6 @@
 # TV Console
 
-A parametric TV console modeled in Fusion 360 via Python script. 60"W x 18"D, dovetailed case with 3-drawer center section and side door panels, M&T leg frame with interlocking tenons, cleats connecting case to frame with blind tenons and Festool Domino joints.
+A parametric TV console modeled in Fusion 360 via Python script. 60"W x 18"D, dovetailed case with 3-drawer center section and side door panels with flush-mount McMaster-Carr brass hinges, M&T leg frame with interlocking tenons, cleats connecting case to frame with blind tenons and Festool Domino joints.
 
 ![TV Console — iso top-left](screenshots/iso-top-left.png)
 
@@ -130,6 +130,14 @@ All exposed as User Parameters (Modify > Change Parameters):
 | `door_thick` | 0.75 in | Door panel thickness |
 | `door_gap` | 0.0625 in | Door inset gap |
 
+### Door Hinges
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `door_gap` | 0.0625 in | Door reveal gap (hinge rebate auto-computed) |
+
+Hinges are McMaster 1603A3 brass butt hinges, auto-selected by `recommend_hinge()` based on door height. Installed at 1/4 and 3/4 of case height on each door.
+
 ### Case Dovetails
 
 | Parameter | Default | Description |
@@ -149,7 +157,7 @@ All exposed as User Parameters (Modify > Change Parameters):
 | **Case** | 7 | Top, Bottom, Left, Right, Back, 2 Dividers. Through dovetails at corners, back rabbet. |
 | **Frame** | 8 | 4 Legs, Front/Back Rails, 2 Side Rails. Interlocking M&T at all 4 corners. |
 | **Drawers** | 15 | 3 drawer boxes (5 bodies each). Half-blind dovetails at front, through at back, bottom grooves. |
-| **Doors** | 2 | Left + Right inset door panels (mirror). |
+| **Doors** | 2 | Left + Right inset door panels (mirror). Flush-mount McMaster 1603A3 brass hinges with gap-aware rebate mortises. |
 | **Cleats** | 4 | 4 cleats with blind tenons through front/back rails. |
 | **Root** | 12 | 12 domino loose tenons (3 per cleat) connecting cleats to case bottom. |
 
@@ -161,6 +169,7 @@ All exposed as User Parameters (Modify > Change Parameters):
 - **Through dovetails** — Independent construction at each case corner (not mirrored) for correct CUT/JOIN targeting.
 - **Dovetailed drawer boxes** — Half-blind dovetails at front (hides end grain), through dovetails at back, bottom panel in grooves cut before dovetails (implicit stopped grooves).
 - **Wood grain direction** — Every joint designed with grain direction in mind. Fibers parallel to longest dimension; all connections use mechanical interlock (M&T, domino, dovetail) rather than relying on weak end-grain-to-side-grain glue bonds.
+- **Door hinges** — McMaster 1603A3 brass butt hinges installed via `hardware.install_butt_hinge()` with `door_flush` style and 1/16" reveal gap. Geometry-based rebate mortises auto-sized to leaf overlap, open at the front edge. Left and right doors get symmetric cuts (offset direction auto-detected).
 
 ### Screenshot Techniques
 
