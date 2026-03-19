@@ -199,6 +199,27 @@ def handler(script: str, sandbox: bool = False, clean: bool = False) -> dict:
         # Clean existing model before rebuilding (all in one transaction for Ctrl+Z revert)
         if clean and transaction_started:
             _clean_design()
+            # Ensure design supports components (Part Design docs only allow one)
+            import adsk.fusion
+            design = adsk.fusion.Design.cast(app.activeProduct)
+            if design and design.rootComponent.occurrences.count == 0:
+                try:
+                    # Test if we can create components — fails on Part Design docs
+                    test_occ = design.rootComponent.occurrences.addNewComponent(
+                        adsk.core.Matrix3D.create())
+                    test_occ.component.name = "_test"
+                    test_occ.deleteMe()
+                except Exception:
+                    # Part Design doc — abort transaction, create proper Fusion Design doc
+                    app.executeTextCommand('PTransaction.Abort')
+                    transaction_started = False
+                    doc = app.activeDocument
+                    if doc and not doc.isSaved:
+                        doc.close(False)
+                    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+                    transacted_doc = app.activeDocument
+                    app.executeTextCommand('PTransaction.Start "Execute Prompt Script"')
+                    transaction_started = True
 
         res = app.executeTextCommand(f'Python.Run "{temp_file}"')
 

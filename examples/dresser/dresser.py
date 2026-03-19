@@ -21,20 +21,19 @@ Build order:
            + drawer loop (boards, grooves, pulls, dovetails)
   Phase 2: Case dovetails (top/bottom-to-sides) + back rabbet
 """
-import adsk.core, adsk.fusion, math, traceback
+import adsk.core, adsk.fusion, math
 
 
 def run(context):
     app = adsk.core.Application.get()
-    ui = app.userInterface
-    try:
-        _run(app)
-    except Exception:
-        ui.messageBox(traceback.format_exc())
+    _run(app)
 
 
 def _run(app):
     print(">>> Script starting")
+    from helpers import af
+    from helpers.templates import dovetailed_drawer
+
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root = design.rootComponent
@@ -62,18 +61,9 @@ def _run(app):
         # Drawers
         ("n_drawers",       "3",        ""),
         ("drawer_gap",      "0.125 in", "in"),
-        ("drawer_front_thick", "0.75 in", "in"),
-        ("drawer_side_thick",  "0.5 in",  "in"),
-        ("drawer_bottom_thick","0.25 in", "in"),
-        # Drawer dovetails
-        ("dd_tail_w",       "0.75 in",  "in"),
-        ("dd_tail_count",   "5",        ""),
         # Pull groove
         ("pull_depth",      "0.375 in", "in"),
         ("pull_h",          "0.75 in",  "in"),
-        # Bottom groove
-        ("bg_depth",        "0.25 in",  "in"),
-        ("bg_up",           "0.25 in",  "in"),
         # Kick dominos
         ("dm_kc_d",         "12 mm",    "in"),   # kick corner: depth per side
         ("dm_kc_h",         "1.5 in",   "in"),   # kick corner: domino long dim
@@ -96,22 +86,26 @@ def _run(app):
         # Drawer derived
         ("inner_w",     "case_w - 2 * board_thick",                    "in"),
         ("usable_h",    "case_h - kick_h - bot_thick - top_thick",      "in"),
-        ("drawer_h",    "(usable_h - (n_drawers + 1) * drawer_gap) / n_drawers", "in"),
-        ("drawer_w",    "inner_w - 2 * drawer_gap",                    "in"),
-        ("drawer_d",    "case_d - back_thick - 2 * drawer_gap",        "in"),
-        ("drawer_pitch","drawer_h + drawer_gap",                        "in"),
-        # Drawer dovetail derived
-        ("dd_pin_w",    "drawer_h / dd_tail_count - dd_tail_w",        "in"),
-        ("dd_pitch",    "drawer_h / dd_tail_count",                    "in"),
-        ("dd_narrow_f", "dd_tail_w - 2 * drawer_front_thick * tan(dt_angle)", "in"),
-        ("dd_narrow_b", "dd_tail_w - 2 * drawer_side_thick * tan(dt_angle)",  "in"),
-        ("dd_zbase",    "kick_h + bot_thick + drawer_gap",                     "in"),
         # Kick domino spacing
         ("dm_kb_f_sp", "(case_w - 2 * kick_inset - 2 * board_thick) / (dm_kb_f_count + 1)",   "in"),
         ("dm_kb_s_sp", "(case_d - kick_inset - 2 * board_thick) / (dm_kb_s_count + 1)",     "in"),
         ("dm_kb_b_sp", "(case_w - 2 * kick_inset - 2 * board_thick) / (dm_kb_b_count + 1)", "in"),
     ]:
         params.add(pname, adsk.core.ValueInput.createByString(expr), unit, "")
+    # Drawer template params (half-blind front, through back dovetails)
+    dovetailed_drawer.define_params(params, prefix="dd",
+        drawer_w="inner_w - 2 * drawer_gap",
+        drawer_d="case_d - back_thick - 2 * drawer_gap",
+        drawer_h="(usable_h - (n_drawers + 1) * drawer_gap) / n_drawers",
+        front_thick="0.75 in", side_thick="0.5 in",
+        bottom_thick="0.25 in",
+        bg_depth="0.25 in", bg_up="0.25 in",
+        dt_angle="8 deg", dt_tail_w="0.75 in",
+        front_tail_count="5", back_tail_count="5",
+        x_offset="board_thick + drawer_gap",
+        z_offset="kick_h + bot_thick + drawer_gap")
+    params.add("drawer_pitch",
+               adsk.core.ValueInput.createByString("dd_h + drawer_gap"), "in", "")
     print(">>> Parameters done")
 
     # ==============================================================
@@ -734,184 +728,24 @@ def _run(app):
     print(">>> Kick-to-bottom dominos done")
 
     # ----------------------------------------------------------
-    #  5. DRAWERS  (Drawers component)
-    #     Each drawer built independently in a loop — fully parametric.
+    #  5. DRAWERS  (Drawers component, via dovetailed_drawer template)
+    #     Half-blind dovetails at front, through dovetails at back,
+    #     bottom panel in grooves, pull groove on front face.
     # ----------------------------------------------------------
+    dd_result = dovetailed_drawer.build(drawers_c, prefix="dd", ev=ev)
+    dd_front = dd_result["front"]
 
-    d_pl = off_plane(drawers_c, drawers_c.xYConstructionPlane,
-                     "kick_h + bot_thick + drawer_gap", "Dr_Pl")
-    bg_pl = off_plane(drawers_c, drawers_c.xYConstructionPlane,
-                      "kick_h + bot_thick + drawer_gap + bg_up", "DrBG_Pl")
+    # Pull groove on front face (template doesn't include this)
+    pull_pl = af.off_plane(drawers_c, drawers_c.xYConstructionPlane,
+                           "dd_zo", "Pull_Pl")
+    _, pr = af.sketch_rect_model(drawers_c, pull_pl,
+        ("dd_xo", "-pull_depth", "dd_zo"),
+        {"x": "dd_w", "y": "pull_depth"}, "Pull_Sk", ev)
+    af.ext_op(drawers_c, pr, "pull_h", CUT, dd_front, "PullGroove")
 
-    # -- Template drawer boards --
-    _, pr = sketch_rect(drawers_c, d_pl,
-        "board_thick + drawer_gap", "0 in",
-        "drawer_w", "drawer_front_thick", "DrFront_Sk")
-    dr_front = ext_new(drawers_c, pr, "drawer_h", "DrFront").bodies.item(0)
-    dr_front.name = "Dr_Front"
-
-    _, pr = sketch_rect(drawers_c, d_pl,
-        "board_thick + drawer_gap", "drawer_d - drawer_side_thick",
-        "drawer_w", "drawer_side_thick", "DrBack_Sk")
-    dr_back = ext_new(drawers_c, pr, "drawer_h", "DrBack").bodies.item(0)
-    dr_back.name = "Dr_Back"
-
-    _, pr = sketch_rect(drawers_c, d_pl,
-        "board_thick + drawer_gap", "0 in",
-        "drawer_side_thick", "drawer_d", "DrLeft_Sk")
-    dr_left = ext_new(drawers_c, pr, "drawer_h", "DrLeft").bodies.item(0)
-    dr_left.name = "Dr_Left"
-
-    _, pr = sketch_rect(drawers_c, d_pl,
-        "board_thick + drawer_gap + drawer_w - drawer_side_thick", "0 in",
-        "drawer_side_thick", "drawer_d", "DrRight_Sk")
-    dr_right = ext_new(drawers_c, pr, "drawer_h", "DrRight").bodies.item(0)
-    dr_right.name = "Dr_Right"
-
-    _, pr = sketch_rect(drawers_c, bg_pl,
-        "board_thick + drawer_gap + drawer_side_thick - bg_depth",
-        "drawer_front_thick - bg_depth",
-        "drawer_w - 2 * drawer_side_thick + 2 * bg_depth",
-        "drawer_d - drawer_front_thick - drawer_side_thick + 2 * bg_depth",
-        "DrBottom_Sk")
-    dr_bot = ext_new(drawers_c, pr, "drawer_bottom_thick", "DrBottom").bodies.item(0)
-    dr_bot.name = "Dr_Bottom"
-
-    # -- Bottom grooves (CUT) --
-    zbg = "kick_h + bot_thick + drawer_gap + bg_up"
-    _, pr = sketch_rect_model(drawers_c, bg_pl,
-        ("board_thick + drawer_gap", "drawer_front_thick - bg_depth", zbg),
-        {"x": "drawer_w", "y": "bg_depth"}, "DrBGF_Sk")
-    ext_op(drawers_c, pr, "drawer_bottom_thick", CUT, dr_front, "DrBGF")
-
-    _, pr = sketch_rect_model(drawers_c, bg_pl,
-        ("board_thick + drawer_gap", "drawer_d - drawer_side_thick", zbg),
-        {"x": "drawer_w", "y": "bg_depth"}, "DrBGB_Sk")
-    ext_op(drawers_c, pr, "drawer_bottom_thick", CUT, dr_back, "DrBGB")
-
-    _, pr = sketch_rect_model(drawers_c, bg_pl,
-        ("board_thick + drawer_gap + drawer_side_thick - bg_depth",
-         "drawer_front_thick", zbg),
-        {"x": "bg_depth", "y": "drawer_d - drawer_front_thick"}, "DrBGL_Sk")
-    ext_op(drawers_c, pr, "drawer_bottom_thick", CUT, dr_left, "DrBGL")
-
-    _, pr = sketch_rect_model(drawers_c, bg_pl,
-        ("board_thick + drawer_gap + drawer_w - drawer_side_thick",
-         "drawer_front_thick", zbg),
-        {"x": "bg_depth", "y": "drawer_d - drawer_front_thick"}, "DrBGR_Sk")
-    ext_op(drawers_c, pr, "drawer_bottom_thick", CUT, dr_right, "DrBGR")
-
-    # -- Pull groove --
-    _, pr = sketch_rect_model(drawers_c, d_pl,
-        ("board_thick + drawer_gap", "-pull_depth",
-         "kick_h + bot_thick + drawer_gap"),
-        {"x": "drawer_w", "y": "pull_depth"}, "Pull_Sk")
-    ext_op(drawers_c, pr, "pull_h", CUT, dr_front, "PullGroove")
-
-    # -- Drawer dovetails --
-    _dft = ev("drawer_front_thick")
-    _dst = ev("drawer_side_thick")
-    _hp  = ev("dd_pin_w") / 2
-    _tw  = ev("dd_tail_w")
-    _zd  = ev("dd_zbase")
-    _ang = ev("dt_angle")
-    _df  = _dft * math.tan(_ang)
-    _db  = _dst * math.tan(_ang)
-    _dd  = ev("drawer_d")
-
-    dd_lpl = off_plane(drawers_c, drawers_c.yZConstructionPlane,
-                       "board_thick + drawer_gap", "DD_L_Pl")
-    dd_rpl = off_plane(drawers_c, drawers_c.yZConstructionPlane,
-                       "board_thick + drawer_gap + drawer_w - drawer_side_thick",
-                       "DD_R_Pl")
-
-    def dd_corner(plane, yw, yn, delta, narrow_e, thick_e, yw_e,
-                  pin_body, tail_body, dist_e, name):
-        """One dovetail corner: sketch + CUT + JOIN + feat_pattern."""
-        sk = drawers_c.sketches.add(plane)
-        sk.name = f"{name}_Sk"
-        ha, va = probe_sketch_axes(sk)
-        m = sk.modelToSketchSpace
-        px = plane.geometry.origin.x
-
-        s1 = m(P(px, yw, _zd + _hp))
-        s2 = m(P(px, yw, _zd + _hp + _tw))
-        s3 = m(P(px, yn, _zd + _hp + _tw - delta))
-        s4 = m(P(px, yn, _zd + _hp + delta))
-
-        ln = sk.sketchCurves.sketchLines
-        l1 = ln.addByTwoPoints(P(s1.x, s1.y, 0), P(s2.x, s2.y, 0))
-        l2 = ln.addByTwoPoints(l1.endSketchPoint, P(s3.x, s3.y, 0))
-        l3 = ln.addByTwoPoints(l2.endSketchPoint, P(s4.x, s4.y, 0))
-        l4 = ln.addByTwoPoints(l3.endSketchPoint, l1.startSketchPoint)
-
-        if va == "z":
-            sk.geometricConstraints.addVertical(l1)
-            sk.geometricConstraints.addVertical(l3)
-        else:
-            sk.geometricConstraints.addHorizontal(l1)
-            sk.geometricConstraints.addHorizontal(l3)
-
-        of = lambda a: H if a == ha else V
-        d = sk.sketchDimensions
-        zb = "dd_zbase + dd_pin_w / 2"
-
-        d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
-            of("z"), P(s1.x - 1, (s1.y + s2.y) / 2, 0)
-        ).parameter.expression = "dd_tail_w"
-        d.addDistanceDimension(l3.startSketchPoint, l3.endSketchPoint,
-            of("z"), P(s3.x + 1, (s3.y + s4.y) / 2, 0)
-        ).parameter.expression = narrow_e
-        d.addDistanceDimension(l1.startSketchPoint, l3.endSketchPoint,
-            of("y"), P((s1.x + s4.x) / 2, s1.y - 1, 0)
-        ).parameter.expression = thick_e
-        d.addDistanceDimension(sk.originPoint, l1.startSketchPoint,
-            of("z"), P(s1.x - 2, s1.y / 2, 0)
-        ).parameter.expression = zb
-        d.addDistanceDimension(sk.originPoint, l1.startSketchPoint,
-            of("y"), P(s1.x / 2, s1.y - 2, 0)
-        ).parameter.expression = yw_e
-        d.addDistanceDimension(sk.originPoint, l3.endSketchPoint,
-            of("z"), P(s4.x + 2, s4.y / 2, 0)
-        ).parameter.expression = zb + " + " + thick_e + " * tan(dt_angle)"
-
-        pr = sk.profiles.item(0)
-
-        ec = ext_op(drawers_c, pr, dist_e, CUT, pin_body, f"{name}_Cut")
-        ej = ext_op(drawers_c, pr, dist_e, JOIN, tail_body, f"{name}_Join")
-
-        feat_pattern(drawers_c, ec, drawers_c.zConstructionAxis,
-                     "dd_tail_count", "dd_pitch", f"{name}_PatCut")
-        feat_pattern(drawers_c, ej, drawers_c.zConstructionAxis,
-                     "dd_tail_count", "dd_pitch", f"{name}_PatJoin")
-
-    print(">>>   Drawer dovetails")
-    dd_corner(dd_lpl, 0, _dft, _df,
-        "dd_narrow_f", "drawer_front_thick", "0 in",
-        dr_front, dr_left, "drawer_side_thick", "DD_FL")
-    dd_corner(dd_lpl, _dd, _dd - _dst, _db,
-        "dd_narrow_b", "drawer_side_thick", "drawer_d",
-        dr_back, dr_left, "drawer_side_thick", "DD_BL")
-    dd_corner(dd_rpl, 0, _dft, _df,
-        "dd_narrow_f", "drawer_front_thick", "0 in",
-        dr_front, dr_right, "drawer_side_thick", "DD_FR")
-    dd_corner(dd_rpl, _dd, _dd - _dst, _db,
-        "dd_narrow_b", "drawer_side_thick", "drawer_d",
-        dr_back, dr_right, "drawer_side_thick", "DD_BR")
-
-    # -- Pattern drawers 2..n --
-    n_dr = int(ev("n_drawers"))
-    if n_dr > 1:
-        dr_coll = adsk.core.ObjectCollection.create()
-        for b in [dr_front, dr_back, dr_left, dr_right, dr_bot]:
-            dr_coll.add(b)
-        dr_inp = drawers_c.features.rectangularPatternFeatures.createInput(
-            dr_coll, drawers_c.zConstructionAxis,
-            adsk.core.ValueInput.createByString("n_drawers"),
-            adsk.core.ValueInput.createByString("drawer_pitch"),
-            adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
-        dr_pat = drawers_c.features.rectangularPatternFeatures.add(dr_inp)
-        dr_pat.name = "Dr_Pat"
+    # Pattern drawers 2..n
+    dovetailed_drawer.pattern(drawers_c, dd_result["all_bodies"],
+                              "n_drawers", "drawer_pitch", ev)
     print(">>> All drawers done")
 
     # ==============================================================
