@@ -78,26 +78,79 @@ Each example should have at minimum an **overview** shot. Full documentation use
 
 ## Transparent / Detail Views
 
-For joinery documentation, use body opacity to reveal internal structure:
+For joinery documentation, **isolate the relevant bodies** — hide everything unrelated so the joint is clearly visible against an empty background.
+
+### Technique: Isolated Body Detail Shots (Preferred)
+
+For each joinery detail, show only the 2-3 bodies directly involved in the joint:
 
 ```python
-# Make case boards semi-transparent
-for body in case_bodies:
-    body.opacity = 0.2
+# 1. Hide everything
+for i in range(root.occurrences.count):
+    root.occurrences.item(i).isLightBulbOn = False
+for i in range(root.bRepBodies.count):
+    root.bRepBodies.item(i).isVisible = False
 
-# Hide entire component
-some_occ.isLightBulbOn = False
+# 2. Show only the relevant component and bodies
+for i in range(root.occurrences.count):
+    occ = root.occurrences.item(i)
+    if occ.component.name == "Case":
+        occ.isLightBulbOn = True
+        comp = occ.component
+        for j in range(comp.bRepBodies.count):
+            b = comp.bRepBodies.item(j)
+            if b.name in ("Divider1", "Top", "Bottom"):
+                b.opacity = 0.15
+                b.isVisible = True
+            else:
+                b.isVisible = False
 ```
 
-### Common Detail Shots
+This produces much cleaner images than making everything transparent — no visual noise from unrelated bodies.
 
-| Shot | Technique | Shows |
-|------|-----------|-------|
-| Frame detail | Case transparent (0.2), frame opaque | M&T joints, rail connections |
-| Case detail | Frame hidden, drawers opaque | Dovetails, dados, grooves |
-| Joint close-up | Zoom to specific corner | Tenon fit, hinge mortise, brace triangle |
+### Example Detail Shots (TV Console)
 
-After taking transparent shots, **restore opacity** to 1.0 before taking opaque shots.
+| Shot | Bodies Shown | What's Visible |
+|------|-------------|----------------|
+| Dovetail corner | Left + Top + Bottom | Dovetail tails interlocking at case corner |
+| Divider dominos | Divider1 + Top + Bottom + domino voids | Domino mortise pockets straddling the interface |
+| Door hinge | Left case side + LeftDoor + hinge hardware | Hinge with rebate mortise between boards |
+| Cleat dominos | Cleat1 + Bottom + domino voids | Domino voids in cleat-to-case connection |
+| Drawer dovetails | dd_Front + dd_Back + dd_Left + dd_Right + dd_Bottom | Half-blind dovetails at front, through at back |
+| Frame M&T | Leg_FL + FrontRail + SideRailL | Interlocking tenons weaving inside the leg |
+
+### Technique: Full Transparent Overview
+
+For overview shots showing all internal structure at once, set all bodies to low opacity:
+
+```python
+# Set ALL bodies to 0.15 opacity
+for i in range(root.bRepBodies.count):
+    root.bRepBodies.item(i).opacity = 0.15
+for i in range(root.allOccurrences.count):
+    occ = root.allOccurrences.item(i)
+    occ.isLightBulbOn = True
+    for j in range(occ.component.bRepBodies.count):
+        occ.component.bRepBodies.item(j).opacity = 0.15
+```
+
+Make **all** components transparent — including hardware, domino voids, and any other auxiliary bodies.
+
+### Restoring After Detail Shots
+
+After taking transparent/isolated shots, restore everything:
+
+```python
+for i in range(root.bRepBodies.count):
+    b = root.bRepBodies.item(i)
+    b.isVisible = True; b.opacity = 1.0
+for i in range(root.allOccurrences.count):
+    occ = root.allOccurrences.item(i)
+    occ.isLightBulbOn = True
+    for j in range(occ.component.bRepBodies.count):
+        b = occ.component.bRepBodies.item(j)
+        b.isVisible = True; b.opacity = 1.0
+```
 
 ## Cleanup Before Screenshots
 
