@@ -770,7 +770,7 @@ def run(context):
     # ==============================================================
     #  7. EPILOGUE
     # ==============================================================
-    all_comps = [leg_c, lr_c, sr_c, slats_c, bt_c]
+    all_comps = [leg_c, lr_c, sr_c, sl_c, bt_c]
     for comp in all_comps:
         for sk in comp.sketches:
             sk.isVisible = False
@@ -783,8 +783,8 @@ def run(context):
     for cp in root.constructionPlanes:
         cp.isLightBulbOn = False
 
-    for comp_name, c in [("Root", root), ("Legs", legs_c), ("LongRails", lr_c),
-                          ("ShortRails", sr_c), ("Slats", slats_c), ("Bottom", bt_c)]:
+    for comp_name, c in [("Root", root), ("Legs", leg_c), ("LongRails", lr_c),
+                          ("ShortRails", sr_c), ("Slats", sl_c), ("Bottom", bt_c)]:
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{comp_name}: {len(names)} bodies -> {names}")
 
