@@ -25,14 +25,6 @@ import tempfile
 def run(context):
     app = adsk.core.Application.get()
 
-    # Close unsaved docs
-    while True:
-        doc = app.activeDocument
-        if doc and not doc.isSaved:
-            doc.close(False)
-        else:
-            break
-
     # ================================================================
     # Phase 1: Create a dummy hinge body and export as STEP
     # ================================================================
@@ -40,7 +32,6 @@ def run(context):
     print("Phase 1: Create dummy hinge + export STEP")
     print("=" * 50)
 
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root = design.rootComponent
@@ -146,7 +137,6 @@ def run(context):
     print(f"  Search 'test hinge': found {len(found)} result(s)")
 
     # Create fresh design with a test board
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design2 = adsk.fusion.Design.cast(app.activeProduct)
     design2.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root2 = design2.rootComponent

@@ -459,6 +459,35 @@ def _make_body_proxy(body, top_occ, body_occ_map=None):
     return body.createForAssemblyContext(top_occ)
 
 
+def _hinge_combined_bbox(occ, bodies, body_occ_map=None):
+    """Combined bounding box of all hinge bodies (leaves + pin + screws).
+
+    Returns a BoundingBox3D-like object with min/max points covering all bodies.
+    Used for rebate pocket sizing so the pocket clears the full barrel.
+    """
+    min_x = min_y = min_z = 1e10
+    max_x = max_y = max_z = -1e10
+    for b in bodies:
+        bb = _leaf_proxy_bbox(occ, b, body_occ_map)
+        min_x = min(min_x, bb.minPoint.x)
+        min_y = min(min_y, bb.minPoint.y)
+        min_z = min(min_z, bb.minPoint.z)
+        max_x = max(max_x, bb.maxPoint.x)
+        max_y = max(max_y, bb.maxPoint.y)
+        max_z = max(max_z, bb.maxPoint.z)
+
+    # Return as a simple namespace with minPoint/maxPoint
+    class _BB:
+        pass
+    class _Pt:
+        def __init__(self, x, y, z):
+            self.x, self.y, self.z = x, y, z
+    result = _BB()
+    result.minPoint = _Pt(min_x, min_y, min_z)
+    result.maxPoint = _Pt(max_x, max_y, max_z)
+    return result
+
+
 def _leaf_proxy_bbox(occ, leaf_body, body_occ_map=None):
     if occ is not None:
         proxy = _make_body_proxy(leaf_body, occ, body_occ_map)
@@ -509,16 +538,85 @@ def _fold_leaf_closed(comp, occ, leaf_bodies, pin_axis_world, pin_center,
     return feat
 
 
+def _door_flush_rebate_depths(gap_cm, barrel_d_cm, plate_t_cm):
+    """Compute rebate depths for door_flush based on gap-to-hinge ratio.
+
+    Returns (rebate_a, rebate_b) where:
+      rebate_a = depth into door (board_a)
+      rebate_b = depth into case side (board_b)
+
+    Cases:
+      gap > barrel_d  → ValueError
+      gap ≈ barrel_d  → (0, 0) — surface mount, no rebate
+      barrel_d - plate_t ≤ gap < barrel_d → (0, barrel_d - gap) — one-side (case only)
+      gap < barrel_d - plate_t → symmetric split into both boards
+    """
+    tol = 0.001  # 10µm
+
+    if gap_cm > barrel_d_cm + tol:
+        raise ValueError(
+            f"Gap ({gap_cm:.4f} cm) exceeds barrel diameter "
+            f"({barrel_d_cm:.4f} cm). Use a smaller gap or larger hinge.")
+
+    if gap_cm >= barrel_d_cm - tol:
+        return 0.0, 0.0  # No rebate
+
+    if gap_cm >= barrel_d_cm - plate_t_cm - tol:
+        return 0.0, barrel_d_cm - gap_cm  # One-side (case only)
+
+    # Two-side: symmetric split
+    excess = barrel_d_cm - gap_cm
+    half = excess / 2
+    return half, half
+
+
+def _sketch_rebate_pocket(comp, plane, origin_yz, size_yz, depth_cm,
+                          board, name, ev, flip, margin=0.02):
+    """Cut an oversized rectangular rebate pocket into a board.
+
+    Uses sketch+extrude (fast) with a small margin to clear barrel
+    knuckle geometry that extends beyond the leaf plate bounding box.
+
+    Args:
+        plane: Construction plane for the sketch (at the board face)
+        origin_yz: (y, z) model-space origin of the pocket
+        size_yz: (y_size, z_size) pocket dimensions
+        depth_cm: Pocket depth in cm (+ margin is added automatically)
+        board: Target board body
+        flip: True for CUT into -X, False for +X
+        margin: Extra depth/size added for barrel clearance (cm)
+    """
+    from helpers import af
+    cuts = []
+    y0, z0 = origin_yz
+    yw, zh = size_yz
+    # Oversized pocket: margin on all sides + depth
+    sk, pr = af.sketch_rect_model(comp, plane,
+        (0, y0 - margin, z0 - margin),  # X is ignored (on-plane)
+        {"y": yw + 2 * margin, "z": zh + 2 * margin},
+        f"{name}_Sk", ev)
+    feat = af.ext_op(comp, pr, f"{depth_cm + margin} cm", CUT, board,
+                     f"{name}", flip=flip)
+    sk.isVisible = False
+    if feat:
+        cuts.append(feat)
+    return cuts
+
+
 def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
                  board_a, board_b, pos, raw_pos,
-                 plate_t_cm, leaf_t_cm, leaf_t_str, name, ev, gap_cm=0,
+                 plate_t_cm, barrel_d_cm, barrel_d_str, name, ev, gap_cm=0,
                  body_occ_map=None):
-    """Cut rebate pockets into boards for each hinge leaf.
+    """Cut rebate pockets into boards for hinge installation.
 
-    lid_surface  — rebate depth = plate_t (flat plate only, not barrel)
-    lid_flush    — rebate depth = barrel_r (from bounding box)
-    door_surface — body-CUT mortise
-    door_flush   — rebate depth = barrel_r (from bounding box)
+    Uses oversized sketch-based rectangular pockets for performance.
+    A small margin (0.02 cm = 0.2 mm) is added beyond the combined
+    hinge bounding box to clear barrel knuckle geometry.
+
+    lid_surface  — sketch rebate both boards, then recess hinge
+    lid_flush    — sketch rebate both boards
+    door_surface — body-CUT mortise (hinge visible, exact fit desired)
+    door_flush   — sketch rebate based on gap logic
     """
     from helpers import af
     cuts = []
@@ -533,19 +631,17 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
                               _offset_expr(1), f"{name}_CutPl")
         cut_pl.isLightBulbOn = False
 
-        # Rebate depth = plate thickness (0.025 in for 1603A2)
-        depth_str = f"{plate_t_cm} cm"
+        hinge_bb = _hinge_combined_bbox(occ, bodies, body_occ_map)
 
-        for lf, board, sfx in [(leaf_a, board_a, "A"),
-                                (leaf_b, board_b, "B")]:
-            bb = _leaf_proxy_bbox(occ, lf, body_occ_map)
+        for board, sfx, flip in [(board_a, "A", True), (board_b, "B", True)]:
             sk, pr = af.sketch_rect_model(comp, cut_pl,
-                (bb.minPoint.x, pos[1], bb.minPoint.z),
-                {"x": bb.maxPoint.x - bb.minPoint.x,
-                 "z": bb.maxPoint.z - bb.minPoint.z},
+                (hinge_bb.minPoint.x - 0.02, pos[1],
+                 hinge_bb.minPoint.z - 0.02),
+                {"x": (hinge_bb.maxPoint.x - hinge_bb.minPoint.x) + 0.04,
+                 "z": (hinge_bb.maxPoint.z - hinge_bb.minPoint.z) + 0.04},
                 f"{name}_Reb{sfx}_Sk", ev)
-            feat = af.ext_op(comp, pr, depth_str, CUT, board,
-                             f"{name}_Reb{sfx}", flip=True)
+            feat = af.ext_op(comp, pr, f"{plate_t_cm + 0.02} cm", CUT,
+                             board, f"{name}_Reb{sfx}", flip=flip)
             sk.isVisible = False
             if feat:
                 cuts.append(feat)
@@ -564,107 +660,94 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
                               _offset_expr(2), f"{name}_CutPl")
         cut_pl.isLightBulbOn = False
 
-        # barrel_r from leaf extent beyond seam (previous working approach)
-        bb_a = _leaf_proxy_bbox(occ, leaf_a, body_occ_map)
-        barrel_r = max(abs(bb_a.maxPoint.z - pos[2]),
-                       abs(bb_a.minPoint.z - pos[2]))
-        depth_str = f"{barrel_r} cm"
+        hinge_bb = _hinge_combined_bbox(occ, bodies, body_occ_map)
+        barrel_r = max(abs(hinge_bb.maxPoint.z - pos[2]),
+                       abs(hinge_bb.minPoint.z - pos[2]))
 
-        # leaf_a -> board_a (lid), CUT upward from seam
-        sk, pr = af.sketch_rect_model(comp, cut_pl,
-            (bb_a.minPoint.x, bb_a.minPoint.y, pos[2]),
-            {"x": bb_a.maxPoint.x - bb_a.minPoint.x,
-             "y": bb_a.maxPoint.y - bb_a.minPoint.y},
-            f"{name}_RebA_Sk", ev)
-        feat = af.ext_op(comp, pr, depth_str, CUT, board_a,
-                         f"{name}_RebA", flip=False)
-        sk.isVisible = False
-        if feat:
-            cuts.append(feat)
-
-        # leaf_b -> board_b (back), CUT downward from seam
-        bb_b = _leaf_proxy_bbox(occ, leaf_b, body_occ_map)
-        sk, pr = af.sketch_rect_model(comp, cut_pl,
-            (bb_b.minPoint.x, bb_b.minPoint.y, pos[2]),
-            {"x": bb_b.maxPoint.x - bb_b.minPoint.x,
-             "y": bb_b.maxPoint.y - bb_b.minPoint.y},
-            f"{name}_RebB_Sk", ev)
-        feat = af.ext_op(comp, pr, depth_str, CUT, board_b,
-                         f"{name}_RebB", flip=True)
-        sk.isVisible = False
-        if feat:
-            cuts.append(feat)
+        for board, sfx, flip in [(board_a, "A", False), (board_b, "B", True)]:
+            sk, pr = af.sketch_rect_model(comp, cut_pl,
+                (hinge_bb.minPoint.x - 0.02,
+                 hinge_bb.minPoint.y - 0.02, pos[2]),
+                {"x": (hinge_bb.maxPoint.x - hinge_bb.minPoint.x) + 0.04,
+                 "y": (hinge_bb.maxPoint.y - hinge_bb.minPoint.y) + 0.04},
+                f"{name}_Reb{sfx}_Sk", ev)
+            feat = af.ext_op(comp, pr, f"{barrel_r + 0.02} cm", CUT,
+                             board, f"{name}_Reb{sfx}", flip=flip)
+            sk.isVisible = False
+            if feat:
+                cuts.append(feat)
 
     elif style == "door_surface":
-        # Body-CUT mortise into both boards
+        # Body-CUT mortise into both boards (hinge visible, exact fit)
         for b in bodies:
             proxy = _make_body_proxy(b, occ, body_occ_map) if occ else b
-            try:
-                c = af.combine(comp, board_b, [proxy], CUT, True,
-                               f"{name}_Cut_{board_b.name}_{b.name}")
-                if c:
-                    cuts.append(c)
-            except Exception:
-                pass
-            try:
-                c = af.combine(comp, board_a, [proxy], CUT, True,
-                               f"{name}_Cut_{board_a.name}_{b.name}")
-                if c:
-                    cuts.append(c)
-            except Exception:
-                pass
+            for board in [board_b, board_a]:
+                try:
+                    c = af.combine(comp, board, [proxy], CUT, True,
+                                   f"{name}_Cut_{board.name}_{b.name}")
+                    if c:
+                        cuts.append(c)
+                except Exception:
+                    pass
 
     elif style == "door_flush":
-        # Seam plane at X = pin_pos[0]
-        cut_pl = af.off_plane(comp, comp.yZConstructionPlane,
-                              _offset_expr(0), f"{name}_CutPl")
-        cut_pl.isLightBulbOn = False
-
-        # barrel_r from leaf extent beyond seam (previous working approach)
+        # Per-leaf bboxes from the already-positioned, folded hinge
         bb_a = _leaf_proxy_bbox(occ, leaf_a, body_occ_map)
-        barrel_r = max(abs(bb_a.maxPoint.x - pos[0]),
-                       abs(bb_a.minPoint.x - pos[0]))
-        depth_str = f"{barrel_r} cm"
-
         bb_b = _leaf_proxy_bbox(occ, leaf_b, body_occ_map)
 
-        # leaf_b -> board_b (case/side), CUT -X from seam
-        sk, pr = af.sketch_rect_model(comp, cut_pl,
-            (pos[0], bb_b.minPoint.y, bb_b.minPoint.z),
-            {"y": bb_b.maxPoint.y - bb_b.minPoint.y,
-             "z": bb_b.maxPoint.z - bb_b.minPoint.z},
-            f"{name}_RebB_Sk", ev)
-        feat = af.ext_op(comp, pr, depth_str, CUT, board_b,
-                         f"{name}_RebB", flip=True)
-        sk.isVisible = False
-        if feat:
-            cuts.append(feat)
+        # Detect door side: is door (board_a) at +X or -X of pin?
+        door_bb = board_a.boundingBox
+        door_cx = (door_bb.minPoint.x + door_bb.maxPoint.x) / 2
+        door_at_plus_x = door_cx > pos[0]
 
-        # leaf_a -> board_a (door), CUT +X into door
-        if gap_cm > 0:
-            door_pl = af.off_plane(comp, comp.yZConstructionPlane,
-                                   f"{pos[0] + gap_cm} cm",
-                                   f"{name}_DoorPl")
-            door_pl.isLightBulbOn = False
-            door_depth = f"{max(barrel_r - gap_cm, 0.001)} cm"
-            sk, pr = af.sketch_rect_model(comp, door_pl,
-                (pos[0] + gap_cm, bb_a.minPoint.y, bb_a.minPoint.z),
-                {"y": bb_a.maxPoint.y - bb_a.minPoint.y,
-                 "z": bb_a.maxPoint.z - bb_a.minPoint.z},
-                f"{name}_RebA_Sk", ev)
-            feat = af.ext_op(comp, pr, door_depth, CUT, board_a,
-                             f"{name}_RebA", flip=False)
+        # Compute rebate depth from actual leaf overlap with each board.
+        # How far each leaf extends past the board face into the board.
+        if door_at_plus_x:
+            depth_b = max(pos[0] - bb_b.minPoint.x, 0)   # leaf into -X
+            depth_a = max(bb_a.maxPoint.x - (pos[0] + gap_cm), 0)  # leaf into +X
         else:
-            sk, pr = af.sketch_rect_model(comp, cut_pl,
-                (pos[0], bb_a.minPoint.y, bb_a.minPoint.z),
-                {"y": bb_a.maxPoint.y - bb_a.minPoint.y,
-                 "z": bb_a.maxPoint.z - bb_a.minPoint.z},
-                f"{name}_RebA_Sk", ev)
-            feat = af.ext_op(comp, pr, depth_str, CUT, board_a,
-                             f"{name}_RebA", flip=False)
-        sk.isVisible = False
-        if feat:
-            cuts.append(feat)
+            depth_b = max(bb_b.maxPoint.x - pos[0], 0)    # leaf into +X
+            depth_a = max((pos[0] - gap_cm) - bb_a.minPoint.x, 0)  # leaf into -X
+
+        def _open_mortise_yz(leaf_bb, board):
+            """Pocket sized to leaf, extended to nearest board edge."""
+            brd_bb = board.boundingBox
+            leaf_cy = (leaf_bb.minPoint.y + leaf_bb.maxPoint.y) / 2
+            if abs(leaf_cy - brd_bb.minPoint.y) < abs(leaf_cy - brd_bb.maxPoint.y):
+                y_min = brd_bb.minPoint.y      # open at near edge
+                y_max = leaf_bb.maxPoint.y
+            else:
+                y_min = leaf_bb.minPoint.y
+                y_max = brd_bb.maxPoint.y       # open at near edge
+            return (y_min, leaf_bb.minPoint.z,
+                    y_max - y_min, leaf_bb.maxPoint.z - leaf_bb.minPoint.z)
+
+        # Case side rebate (leaf_b → board_b)
+        if depth_b > 0.001:
+            cut_pl = af.off_plane(comp, comp.yZConstructionPlane,
+                                  _offset_expr(0), f"{name}_CutPl")
+            cut_pl.isLightBulbOn = False
+            py, pz, pyw, pzh = _open_mortise_yz(bb_b, board_b)
+            cuts.extend(_sketch_rebate_pocket(
+                comp, cut_pl, (py, pz), (pyw, pzh), depth_b,
+                board_b, f"{name}_RebB", ev,
+                flip=door_at_plus_x, margin=0))
+
+        # Door rebate (leaf_a → board_a)
+        if depth_a > 0.001:
+            gap_sign = 1 if door_at_plus_x else -1
+            if gap_cm > 0.001:
+                door_pl = af.off_plane(comp, comp.yZConstructionPlane,
+                                       f"{pos[0] + gap_sign * gap_cm} cm",
+                                       f"{name}_DoorPl")
+                door_pl.isLightBulbOn = False
+            else:
+                door_pl = cut_pl  # reuse case side plane
+            py, pz, pyw, pzh = _open_mortise_yz(bb_a, board_a)
+            cuts.extend(_sketch_rebate_pocket(
+                comp, door_pl, (py, pz), (pyw, pzh), depth_a,
+                board_a, f"{name}_RebA", ev,
+                flip=not door_at_plus_x, margin=0))
 
     return cuts
 
@@ -932,7 +1015,8 @@ def _collect_all_body_proxies(comp, top_occ, coll):
 def _import_assembly(part_id, part, comp):
     """Import a hinge assembly STEP (Pin + LeafA + LeafB sub-components).
 
-    Returns (top_occ, pin_bodies, leaf_a_bodies, leaf_b_bodies, all_bodies).
+    Returns (top_occ, child_occs, pin_bodies, leaf_a_bodies,
+             leaf_b_bodies, all_bodies, body_occ_map).
     Falls back to bare hinge STEP if no assembly_step in catalog.
     """
     assembly_path = part.get("assembly_step")
@@ -1110,8 +1194,16 @@ def install_butt_hinge(part_id, comp, back_body=None, lid_body=None,
         else:
             pos.append(p)
 
-    leaf_t_str = dims.get("leaf_thickness", "0.050 in")
-    leaf_t_cm = ev(leaf_t_str) if ev else 0.127
+    barrel_d_str = dims.get("leaf_thickness", "0.050 in")
+    barrel_d_cm = ev(barrel_d_str) if ev else 0.127
+
+    # ── Early gap validation (before STEP import) ──
+    if style == "door_flush" and gap:
+        gap_cm_val = ev(gap) if isinstance(gap, str) and ev else float(gap)
+        if gap_cm_val > barrel_d_cm + 0.001:
+            raise ValueError(
+                f"Gap ({gap_cm_val:.4f} cm) exceeds barrel diameter "
+                f"({barrel_d_cm:.4f} cm). Use a smaller gap or larger hinge.")
 
     # ── Import assembly STEP ──
     (top_occ, child_occs, pin_bodies, leaf_a_bodies, leaf_b_bodies,
@@ -1140,6 +1232,20 @@ def install_butt_hinge(part_id, comp, back_body=None, lid_body=None,
         surface_offset_cm = -leaf_min_y
     else:
         surface_offset_cm = 0
+
+    # For door_flush with gap: shift hinge toward the door so barrel
+    # splits correctly between door and case side.
+    if style == "door_flush" and gap:
+        gap_cm_val = ev(gap) if isinstance(gap, str) and ev else float(gap)
+        _, rebate_b_cm = _door_flush_rebate_depths(
+            gap_cm_val, barrel_d_cm, plate_t_cm)
+        surface_offset_cm = barrel_d_cm / 2 - rebate_b_cm
+        # Flip offset direction if door is at -X of pin (right-side hinge)
+        if door_body is not None:
+            door_bb = door_body.boundingBox
+            door_cx = (door_bb.minPoint.x + door_bb.maxPoint.x) / 2
+            if door_cx < pos[0]:
+                surface_offset_cm = -surface_offset_cm
 
     anchor_origin = anchor.get("origin", [0, 0, 0])
 
@@ -1180,31 +1286,15 @@ def install_butt_hinge(part_id, comp, back_body=None, lid_body=None,
 
     cuts = []
     if board_a is not None and board_b is not None:
-        cuts = _cut_rebates(comp, style, top_occ, leaf_a, leaf_b, all_bodies,
+        # Only CUT structural hinge bodies (leaves + pin) — NOT screws.
+        # Screw holes are CUT separately below to avoid splitting boards
+        # when screw heads extend past the board face.
+        structural_bodies = [leaf_a, leaf_b, pin_bodies[0]] if pin_bodies else [leaf_a, leaf_b]
+        cuts = _cut_rebates(comp, style, top_occ, leaf_a, leaf_b,
+                            structural_bodies,
                             board_a, board_b, pos, raw_pos,
-                            plate_t_cm, leaf_t_cm, leaf_t_str, name, ev,
+                            plate_t_cm, barrel_d_cm, barrel_d_str, name, ev,
                             gap_cm=gap_cm, body_occ_map=body_occ_map)
-
-    # ── Cut screw holes into boards ──
-    from helpers import af
-    screw_bodies_a = [b for b in leaf_a_bodies if b is not leaf_a]
-    screw_bodies_b = [b for b in leaf_b_bodies if b is not leaf_b]
-
-    screw_cuts = []
-    for screw_list, board in [(screw_bodies_a, board_a), (screw_bodies_b, board_b)]:
-        if not board:
-            continue
-        for i, sb in enumerate(screw_list):
-            proxy = _make_body_proxy(sb, top_occ, body_occ_map)
-            try:
-                c = af.combine(comp, board, [proxy], CUT, True,
-                               f"{name}_ScrewCut_{i}")
-                if c:
-                    screw_cuts.append(c)
-            except Exception:
-                pass
-
-    screw_count = len(screw_bodies_a) + len(screw_bodies_b)
 
     result = {
         "occurrence": top_occ,
@@ -1212,10 +1302,10 @@ def install_butt_hinge(part_id, comp, back_body=None, lid_body=None,
         "pin": pin_bodies[0] if pin_bodies else None,
         "leaves": leaf_bodies,
         "part": part,
-        "leaf_t_cm": leaf_t_cm,
+        "barrel_d_cm": barrel_d_cm,
         "plate_t_cm": plate_t_cm,
-        "cuts": cuts + screw_cuts,
-        "screws": [{}] * screw_count,  # placeholder list for count
+        "cuts": cuts,
+        "screws": [],
     }
 
     return result
@@ -1366,16 +1456,16 @@ def install_butt_hinge_pair(part_id, comp, pin_y, pin_z,
         r_leaf_b = mirrored_leaves[1] if len(mirrored_leaves) > 1 else None
 
         plate_t = left.get("plate_t_cm", 0.0635)
-        leaf_t = left.get("leaf_t_cm", 0.127)
+        barrel_d = left.get("barrel_d_cm", 0.127)
         dims = left["part"].get("dimensions", {})
-        leaf_t_str = dims.get("leaf_thickness", "0.050 in")
+        barrel_d_str = dims.get("leaf_thickness", "0.050 in")
 
         # Use the hinge mirror occurrence context for leaf bboxes.
         # Mirror creates bodies in comp directly, so no proxy needed.
         right_cuts = _cut_rebates(
             comp, style, None, r_leaf_a, r_leaf_b, mirrored_hinge,
             board_a, board_b, right_pos, right_raw_pos,
-            plate_t, leaf_t, leaf_t_str, f"{name}_R", ev,
+            plate_t, barrel_d, barrel_d_str, f"{name}_R", ev,
             gap_cm=gap_cm)
 
     right = {

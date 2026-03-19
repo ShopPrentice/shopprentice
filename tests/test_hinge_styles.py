@@ -17,17 +17,6 @@ import adsk.fusion
 def run(context):
     app = adsk.core.Application.get()
 
-    try:
-        while True:
-            doc = app.activeDocument
-            if doc and not doc.isSaved:
-                doc.close(False)
-            else:
-                break
-    except Exception:
-        pass
-
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
 

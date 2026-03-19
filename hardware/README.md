@@ -15,7 +15,7 @@ hardware.recommend_hinge(lid_length_cm=25.4)
 
 ## Butt Hinge Installation
 
-`install_butt_hinge()` handles the complete installation in one call: STEP import, rotation, positioning, folding, rebate CUTs, and screw hole CUTs into both boards.
+`install_butt_hinge()` handles the complete installation in one call: STEP import, rotation, positioning, folding, and rebate CUTs. Screws from the assembly STEP are visual only (not boolean-CUT — thread geometry causes extreme memory usage in Fusion).
 
 ### Style Selection Guide
 
@@ -137,6 +137,15 @@ hardware.install_butt_hinge(
     ..., style="door_flush", gap=ctx.ev("door_gap"), ...)
 ```
 
+Rebate depth is computed from the actual positioned leaf geometry — how far each leaf extends past the board face after rotation, positioning, and folding. Pockets are open mortises (extended to the nearest board edge). Works for both left-side and right-side hinges — the offset and flip directions are auto-detected from the door body position relative to the pin.
+
+**Gap scenarios (validated in `test_hinge_gap_logic.py`):**
+- `gap = 0` → two-side rebate, symmetric, both boards cut
+- `gap < barrel_d - plate_t` → two-side rebate
+- `barrel_d - plate_t ≤ gap < barrel_d` → one-side rebate (case only)
+- `gap ≈ barrel_d` → no rebate (surface mount)
+- `gap > barrel_d` → ValueError
+
 ## Assembly STEP Files
 
 Assembly STEPs in `assemblies/` contain hinge + screws in standard frame:
@@ -155,7 +164,7 @@ Returns recommended part_id based on lid/door edge length. Uses `selection_guide
 
 ### `install_butt_hinge(part_id, comp, ...)`
 
-Install a single butt hinge with full rebate CUTs and screw hole CUTs. One call does everything.
+Install a single butt hinge with rebate CUTs. Screws are visual only (included in assembly STEP but not CUT).
 
 | Parameter | Description |
 |-----------|-------------|
@@ -166,11 +175,11 @@ Install a single butt hinge with full rebate CUTs and screw hole CUTs. One call 
 | `pin_position` | `(x, y, z)` — barrel center (cm floats or expression strings) |
 | `style` | `"lid_surface"`, `"lid_flush"`, `"door_surface"`, `"door_flush"` |
 | `gap` | Door gap in cm (door_flush only) |
-| `install_screws` | Accepted for compat; screws always included via assembly STEP |
+| `install_screws` | Accepted for compat; screws are visual only via assembly STEP |
 | `ev` | Expression evaluator |
 | `name` | Feature name prefix |
 
-Returns dict with `occurrence`, `bodies`, `pin`, `leaves`, `part`, `leaf_t_cm`, `plate_t_cm`, `cuts`, `screws`.
+Returns dict with `occurrence`, `bodies`, `pin`, `leaves`, `part`, `barrel_d_cm`, `plate_t_cm`, `cuts`, `screws`.
 
 ### `install_butt_hinge_pair(part_id, comp, pin_y, pin_z, ...)`
 

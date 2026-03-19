@@ -43,16 +43,14 @@ def run(context):
     s1_lid = af.ext_new(comp1, pr, "s1_bt", "S1_Lid").bodies.item(0); s1_lid.name = "S1_Lid"
 
     bv, lv = s1_back.volume, s1_lid.volume
-    s1_screws = 0
     for i, (frac, sfx) in enumerate([("s1_l / 4", "L"), ("s1_l * 3 / 4", "R")]):
         r = hardware.install_butt_hinge(part_id="1603a2", comp=comp1,
             back_body=s1_back, lid_body=s1_lid,
             pin_position=(ctx.ev(frac), ctx.ev("s1_w"), ctx.ev("s1_h")),
-            style="lid_surface", install_screws=True,
+            style="lid_surface",
             ev=ctx.ev, name=f"S1_H_{sfx}")
-        s1_screws += len(r.get("screws", []))
     ok = s1_back.volume < bv and s1_lid.volume < lv
-    print(f"  Back cut: {s1_back.volume < bv}, Lid cut: {s1_lid.volume < lv}, Screws: {s1_screws} -> {'PASS' if ok else 'FAIL'}")
+    print(f"  Back cut: {s1_back.volume < bv}, Lid cut: {s1_lid.volume < lv} -> {'PASS' if ok else 'FAIL'}")
     results["S1"] = ok
 
     # ── S2: lid_flush — 1603A3 (medium) ──────────────────────────────
@@ -72,16 +70,14 @@ def run(context):
     s2_lid = af.ext_new(comp2, pr, "s2_bt", "S2_Lid").bodies.item(0); s2_lid.name = "S2_Lid"
 
     bv, lv = s2_back.volume, s2_lid.volume
-    s2_screws = 0
     for i, (frac, sfx) in enumerate([("s2_off_x + s2_l / 4", "L"), ("s2_off_x + s2_l * 3 / 4", "R")]):
         r = hardware.install_butt_hinge(part_id="1603a3", comp=comp2,
             back_body=s2_back, lid_body=s2_lid,
             pin_position=(ctx.ev(frac), ctx.ev("s2_w"), ctx.ev("s2_h")),
-            style="lid_flush", install_screws=True,
+            style="lid_flush",
             ev=ctx.ev, name=f"S2_H_{sfx}")
-        s2_screws += len(r.get("screws", []))
     ok = s2_back.volume < bv and s2_lid.volume < lv
-    print(f"  Back cut: {s2_back.volume < bv}, Lid cut: {s2_lid.volume < lv}, Screws: {s2_screws} -> {'PASS' if ok else 'FAIL'}")
+    print(f"  Back cut: {s2_back.volume < bv}, Lid cut: {s2_lid.volume < lv} -> {'PASS' if ok else 'FAIL'}")
     results["S2"] = ok
 
     # ── S3: door_surface — 1603A7 (large) ────────────────────────────
@@ -99,16 +95,14 @@ def run(context):
     s3_door = af.ext_new(comp3, pr, "s3_h", "S3_Door").bodies.item(0); s3_door.name = "S3_Door"
 
     sv, dv = s3_side.volume, s3_door.volume
-    s3_screws = 0
     for frac, sfx in [("s3_h / 4", "Lo"), ("s3_h * 3 / 4", "Hi")]:
         r = hardware.install_butt_hinge(part_id="1603a7", comp=comp3,
             door_body=s3_door, case_body=s3_side,
             pin_position=("0 in", "s3_off_y", frac),
-            style="door_surface", install_screws=True,
+            style="door_surface",
             ev=ctx.ev, name=f"S3_H_{sfx}")
-        s3_screws += len(r.get("screws", []))
     ok = s3_side.volume < sv and s3_door.volume < dv
-    print(f"  Side cut: {s3_side.volume < sv}, Door cut: {s3_door.volume < dv}, Screws: {s3_screws} -> {'PASS' if ok else 'FAIL'}")
+    print(f"  Side cut: {s3_side.volume < sv}, Door cut: {s3_door.volume < dv} -> {'PASS' if ok else 'FAIL'}")
     results["S3"] = ok
 
     # ── S4: door_flush — 1603A3, no gap ──────────────────────────────
@@ -126,16 +120,14 @@ def run(context):
     s4_door = af.ext_new(comp4, pr, "s4_h", "S4_Door").bodies.item(0); s4_door.name = "S4_Door"
 
     sv, dv = s4_side.volume, s4_door.volume
-    s4_screws = 0
     for frac, sfx in [("s4_h / 4", "Lo"), ("s4_h * 3 / 4", "Hi")]:
         r = hardware.install_butt_hinge(part_id="1603a3", comp=comp4,
             door_body=s4_door, case_body=s4_side,
             pin_position=("s4_off_x + s4_bt", "s3_off_y", frac),
-            style="door_flush", install_screws=True,
+            style="door_flush",
             ev=ctx.ev, name=f"S4_H_{sfx}")
-        s4_screws += len(r.get("screws", []))
     ok = s4_side.volume < sv and s4_door.volume < dv
-    print(f"  Side cut: {s4_side.volume < sv}, Door cut: {s4_door.volume < dv}, Screws: {s4_screws} -> {'PASS' if ok else 'FAIL'}")
+    print(f"  Side cut: {s4_side.volume < sv}, Door cut: {s4_door.volume < dv} -> {'PASS' if ok else 'FAIL'}")
     results["S4"] = ok
 
     # ── S5: door_flush — 1603A3, 1/16" gap ───────────────────────────
@@ -155,16 +147,14 @@ def run(context):
 
     sv, dv = s5_side.volume, s5_door.volume
     gap_cm = ctx.ev("s5_gap")
-    s5_screws = 0
     for frac, sfx in [("s5_h / 4", "Lo"), ("s5_h * 3 / 4", "Hi")]:
         r = hardware.install_butt_hinge(part_id="1603a3", comp=comp5,
             door_body=s5_door, case_body=s5_side,
             pin_position=("s5_off_x + s5_bt", "s3_off_y", frac),
-            style="door_flush", gap=gap_cm, install_screws=True,
+            style="door_flush", gap=gap_cm,
             ev=ctx.ev, name=f"S5_H_{sfx}")
-        s5_screws += len(r.get("screws", []))
     ok = s5_side.volume < sv and s5_door.volume < dv
-    print(f"  Gap={gap_cm/2.54:.4f}in  Side cut: {s5_side.volume < sv}, Door cut: {s5_door.volume < dv}, Screws: {s5_screws} -> {'PASS' if ok else 'FAIL'}")
+    print(f"  Gap={gap_cm/2.54:.4f}in  Side cut: {s5_side.volume < sv}, Door cut: {s5_door.volume < dv} -> {'PASS' if ok else 'FAIL'}")
     results["S5"] = ok
 
     # ── Summary ───────────────────────────────────────────────────────
@@ -172,8 +162,6 @@ def run(context):
     for occ_item in root.occurrences:
         c = occ_item.component
         print(f"  {c.name}: {c.bRepBodies.count} bodies")
-    total_sc = s1_screws + s2_screws + s3_screws + s4_screws + s5_screws
-    print(f"  Total screws: {total_sc}")
     status = "PASS" if all(results.values()) else "FAIL"
     detail = " ".join(f"{k}={'PASS' if v else 'FAIL'}" for k, v in results.items())
     print(f"\n{status}: {detail}")

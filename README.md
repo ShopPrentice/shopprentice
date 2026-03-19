@@ -77,7 +77,7 @@ Each folder under `examples/` contains a complete Fusion 360 project with screen
 <tr>
 <td align="center"><a href="examples/stool-rebuild/"><img src="examples/stool-rebuild/screenshots/overview.png" width="200" /><br /><b>Step Stool</b></a><br />Splayed legs, through tenons (rebuilt)</td>
 <td align="center"><a href="examples/pergola-rebuild/"><img src="examples/pergola-rebuild/screenshots/overview.png" width="200" /><br /><b>Pergola + Deck</b></a><br />43 bodies, scarf joints (rebuilt)</td>
-<td align="center"><a href="examples/counter-stool/"><br /><b>Counter Stool</b></a><br />Splayed legs, dominos, stretchers</td>
+<td align="center"><a href="examples/counter-stool/"><img src="examples/counter-stool/screenshots/overview.png" width="200" /><br /><b>Counter Stool</b></a><br />Splayed legs, dominos, stretchers</td>
 </tr>
 <tr>
 <td align="center"><a href="examples/tv-console/"><img src="examples/tv-console/screenshots/iso-top-left.png" width="200" /><br /><b>TV Console</b></a><br />Interlocking M&T, dovetails, dominos</td>

@@ -6,15 +6,6 @@ from helpers import af
 
 def run(context):
     app = adsk.core.Application.get()
-
-    # Close unsaved docs
-    while True:
-        doc = app.activeDocument
-        if doc and not doc.isSaved:
-            doc.close(False)
-        else:
-            break
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
 

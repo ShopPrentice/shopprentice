@@ -35,17 +35,6 @@ def run(context):
 
 def _run(app):
     print(">>> Script starting")
-
-    # Close all unsaved documents first
-    for _close_i in range(20):
-        doc = app.activeDocument
-        if doc and not doc.isSaved:
-            print(f">>>   Closing unsaved doc: {doc.name}")
-            doc.close(False)
-        else:
-            break
-    print(">>> Creating new document")
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root = design.rootComponent

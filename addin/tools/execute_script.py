@@ -157,6 +157,23 @@ def handler(script: str, sandbox: bool = False, clean: bool = False) -> dict:
             "message": "Script does not have a run function that takes a single argument",
         }
 
+    # Guard: scripts must not manage documents themselves — execute_script
+    # handles doc lifecycle via clean=True.  doc.close() + documents.add()
+    # inside a script conflicts with the transaction wrapper and can cause
+    # Fusion to allocate unbounded memory during STEP imports.
+    if re.search(r'\.close\s*\(\s*False\s*\)', script) and re.search(r'documents\.add\s*\(', script):
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": ("Script contains doc.close()/documents.add() which conflicts "
+                             "with execute_script's document management. Remove the document "
+                             "cleanup loop and use clean=True instead.")
+                }
+            ],
+            "isError": True,
+        }
+
     if sandbox:
         return _execute_sandbox(script)
 

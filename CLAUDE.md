@@ -38,6 +38,10 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 - **Combine-based joinery**: Build tenon as body, CUT into receiver, JOIN to owner
 - **Validate every phase**: `capture_design` after each execution, not just screenshots
 
+### Script Safety Rules
+
+**Scripts must NEVER manage documents.** Do not include `doc.close(False)` or `app.documents.add()` in scripts. The `execute_script` tool manages scratch documents via `clean=true`. Scripts that create/close documents conflict with the transaction wrapper and cause Fusion to allocate unbounded memory (200+ GB), freezing the application. A guard in `execute_script.py` rejects such scripts.
+
 ### Document Safety Rules (for search_build / script generator development)
 
 **NEVER modify user-saved documents.** All testing and building must happen on scratch (unsaved) documents.

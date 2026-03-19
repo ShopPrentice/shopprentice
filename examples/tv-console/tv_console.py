@@ -11,13 +11,6 @@ NEW  = adsk.fusion.FeatureOperations.NewBodyFeatureOperation
 
 def run(context):
     app = adsk.core.Application.get()
-    while True:
-        doc = app.activeDocument
-        if doc and not doc.isSaved:
-            doc.close(False)
-        else:
-            break
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root = design.rootComponent
@@ -789,6 +782,50 @@ def run(context):
             edge_coll, VI("leg_ch"), True)
         ch_feat = frame_c.features.chamferFeatures.add(ch_inp)
         ch_feat.name = f"{leg_name}_Ch"
+
+    # ── Door Hinges (door_flush, inset) ─────────────────────────────
+    from helpers import hardware
+    hardware.clear_step_cache()
+
+    # Proxied bodies for cross-component hinge install
+    ldoor_px = ldoor_body.createForAssemblyContext(doors_occ)
+    rdoor_px = rdoor_body.createForAssemblyContext(doors_occ)
+
+    left_ref = right_ref = None
+    for i in range(case_c.bRepBodies.count):
+        b = case_c.bRepBodies.item(i)
+        if b.name == "Left":
+            left_ref = b
+        elif b.name == "Right":
+            right_ref = b
+    left_px = left_ref.createForAssemblyContext(case_occ)
+    right_px = right_ref.createForAssemblyContext(case_occ)
+
+    rec = hardware.recommend_hinge(lid_length_cm=ev("door_h"))
+    hinge_id = rec["part_id"]
+    print(f"Door hinges: {hinge_id} (door_h={ev('door_h'):.1f}cm)")
+
+    # Left door — hinges at 1/4 and 3/4 of case height
+    for z_expr, sfx in [("case_z + board_thick + case_h / 4", "Lo"),
+                         ("case_z + board_thick + 3 * case_h / 4", "Hi")]:
+        hardware.install_butt_hinge(
+            part_id=hinge_id, comp=root,
+            door_body=ldoor_px, case_body=left_px,
+            pin_position=("board_thick", "0 in", z_expr),
+            style="door_flush", gap=ev("door_gap"),
+            ev=ev, name=f"LDoor_H_{sfx}")
+
+    # Right door — hinges at same heights, X at right case side
+    for z_expr, sfx in [("case_z + board_thick + case_h / 4", "Lo"),
+                         ("case_z + board_thick + 3 * case_h / 4", "Hi")]:
+        hardware.install_butt_hinge(
+            part_id=hinge_id, comp=root,
+            door_body=rdoor_px, case_body=right_px,
+            pin_position=("console_w - board_thick", "0 in", z_expr),
+            style="door_flush", gap=ev("door_gap"),
+            ev=ev, name=f"RDoor_H_{sfx}")
+
+    hardware.cleanup_step_templates()
 
     # ── Epilogue ───────────────────────────────────────────────────
     all_comps = [case_c, frame_c, drawers_c, doors_c, cleats_c]

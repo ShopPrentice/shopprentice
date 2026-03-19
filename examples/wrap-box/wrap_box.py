@@ -57,13 +57,6 @@ import adsk.core, adsk.fusion, math
 
 def run(context):
     app = adsk.core.Application.get()
-
-    # Close existing WrapBox document (if any), then create fresh.
-    for i in range(app.documents.count - 1, -1, -1):
-        doc = app.documents.item(i)
-        if doc.name.startswith("WrapBox"):
-            doc.close(False)
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root = design.rootComponent

@@ -25,13 +25,6 @@ def make_comp_at(root, name, x_cm=0.0):
 def run(context):
     app = adsk.core.Application.get()
 
-    while True:
-        doc = app.activeDocument
-        if doc and not doc.isSaved:
-            doc.close(False)
-        else:
-            break
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
 
