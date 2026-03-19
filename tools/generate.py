@@ -1665,13 +1665,6 @@ class Generator:
 
             def run(context):
                 app = adsk.core.Application.get()
-
-                try:
-                    if app.activeDocument and not app.activeDocument.isSaved:
-                        app.activeDocument.close(False)
-                except:
-                    pass
-                app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
                 design = adsk.fusion.Design.cast(app.activeProduct)
                 design.designType = adsk.fusion.DesignTypes.ParametricDesignType
                 root = design.rootComponent

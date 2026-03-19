@@ -607,26 +607,15 @@ Complex furniture (10+ bodies, 3+ joint systems) should be built in phases. Each
 5. **Show final result.** Take a screenshot only after the last phase and present it to the user.
 6. **Design-first planning applies at every phase.** Before writing code for a new phase, write out the step list (see Design-First Planning).
 
-### Document Reuse Pattern
+### Document Management — DO NOT manage documents in scripts
 
-Scripts close existing unsaved documents and create a fresh Fusion Design document. This is fast (no slow timeline clearing) and guarantees component support (Part Design can't have components).
+Scripts MUST NOT close or create documents. The `execute_script` MCP tool manages the scratch document via `clean=True`. A script that calls `doc.close(False)` or `app.documents.add()` conflicts with the transaction wrapper and causes Fusion to allocate unbounded memory (200+ GB observed), freezing the application.
 
-The AutoFusion add-in handles document switches gracefully — it detects the document change and skips committing the old transaction.
-
-**IMPORTANT**: Do NOT try to clear the timeline feature-by-feature. Each deletion triggers a full model recompute, causing Fusion 360 to hang on complex models.
+A guard in `execute_script.py` rejects scripts containing this pattern.
 
 ```python
 def run(context):
     app = adsk.core.Application.get()
-
-    # Close ALL unsaved documents (handles stacked failed runs)
-    while True:
-        doc = app.activeDocument
-        if doc and not doc.isSaved:
-            doc.close(False)
-        else:
-            break
-    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
 
@@ -635,6 +624,8 @@ def run(context):
     Point3D = adsk.core.Point3D
     # ... build from scratch ...
 ```
+
+Use `execute_script` with `clean=True` for a fresh slate — it deletes all timeline features and user parameters before running, wrapped in a single transaction (Ctrl+Z reverts everything).
 
 ### Script Epilogue
 
@@ -760,6 +751,16 @@ Phase 3: Add details
 - Always generate complete, standalone parametric scripts. MCP is the delivery mechanism — the script must also work when pasted into Fusion 360's script editor.
 - Never generate partial snippets that only work via MCP.
 - Scripts must NOT catch exceptions — let them propagate so Fusion 360 aborts the transaction and returns the full error to the agent.
+
+### Screenshots
+
+After the final phase, take screenshots for documentation. See [woodworking/screenshots.md](woodworking/screenshots.md) for the full guide:
+
+- **Resolution**: 2048x2048 via `get_screenshot(width=2048, height=2048)`
+- **Visual style**: `ShadedWithVisibleEdgesOnlyVisualStyle` (enum value 2) — edge lines required
+- **Framing**: entire model inside frame, centered, filling ~70-80% of the image
+- **Cleanup**: clear selections, hide sketches/construction planes before capture
+- **Transparent views**: use `body.opacity = 0.2` to reveal internal joinery (M&T, dovetails, dominos)
 
 ### MCP Timeout
 
