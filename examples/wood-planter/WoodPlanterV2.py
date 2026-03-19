@@ -768,8 +768,26 @@ def run(context):
     combine(root, blo_proxy, dm_b_proxies, CUT, True, "BtDm_CutBackRail")
 
     # ==============================================================
-    #  7. FIT VIEW
+    #  7. EPILOGUE
     # ==============================================================
+    all_comps = [legs_c, lr_c, sr_c, slats_c, bt_c]
+    for comp in all_comps:
+        for sk in comp.sketches:
+            sk.isVisible = False
+        for cp in comp.constructionPlanes:
+            cp.isLightBulbOn = False
+        for ca in comp.constructionAxes:
+            ca.isLightBulbOn = False
+    for sk in root.sketches:
+        sk.isVisible = False
+    for cp in root.constructionPlanes:
+        cp.isLightBulbOn = False
+
+    for comp_name, c in [("Root", root), ("Legs", legs_c), ("LongRails", lr_c),
+                          ("ShortRails", sr_c), ("Slats", slats_c), ("Bottom", bt_c)]:
+        names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
+        print(f"{comp_name}: {len(names)} bodies -> {names}")
+
     cam = app.activeViewport.camera
     cam.isFitView = True
     app.activeViewport.camera = cam
