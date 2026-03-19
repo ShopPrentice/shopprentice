@@ -2,6 +2,100 @@
 
 How to take consistent, high-quality screenshots for example READMEs and documentation.
 
+## `af.screenshot_cam()` — Dynamic Camera Positioning
+
+The `screenshot_cam` helper computes camera distance automatically using the actual Fusion FOV and projected bounding box geometry. No manual multiplier tuning needed.
+
+```python
+from helpers import af
+
+# Overview: frame all visible bodies
+af.screenshot_cam(eye_dir=(1, -1, 0.7))
+
+# Detail: frame only the dovetail tails at one corner
+tails = [b for b in all_bodies if b.name.startswith("DT_FL")]
+af.screenshot_cam(eye_dir=(1, -1, 0.7), bodies=tails, fill=0.85)
+```
+
+### How It Works
+
+1. Reads the actual Fusion perspective FOV (`camera.perspectiveAngle` — typically ~22°)
+2. Computes the bounding box of the target bodies
+3. Projects all 8 bbox corners onto the camera's view plane (right/up axes derived from eye direction)
+4. Sets camera distance so the largest projected extent fills `fill` fraction of the frame
+5. For elevation views where projected extent is small (flat face), enforces a minimum distance based on the 3D diagonal
+
+### Parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `eye_dir` | `(x, y, z)` | required | Camera direction from target |
+| `bodies` | `[BRepBody]` | `None` | Bodies to frame. `None` = all visible bodies |
+| `fill` | `float` | `0.80` | Fraction of frame the subject fills (0.0–1.0) |
+
+### Standard Eye Directions
+
+| Shot | `eye_dir` | Purpose |
+|------|-----------|---------|
+| iso-top-left | `(-1, -1, 0.7)` | Primary overview — front + left side |
+| iso-top-right | `(1, -1, 0.7)` | Alternate overview — front + right side |
+| front | `(0, -1, 0)` | Front elevation |
+| right | `(1, 0, 0)` | Side elevation |
+
+### Fill Guidelines
+
+| Shot Type | Fill | Why |
+|-----------|------|-----|
+| Overview (iso) | `0.75–0.80` | Breathing room, grid visible |
+| Front/side elevation | `0.80` | Min-distance clamp prevents flat-wall zoom |
+| Joinery detail | `0.85–0.90` | Tight framing on the joint |
+| Transparent overview | `0.70` | More context for internal structure |
+
+## Choosing the Bounding Box
+
+The `bodies` parameter controls what the camera frames. Choosing the right set of bodies is the key decision for each shot.
+
+### Overview Shots
+
+Pass `bodies=None` (default) — frames all visible bodies. Works for iso views, front, and side elevations.
+
+### Joinery Detail Shots
+
+Pass only the bodies directly involved in the joint. The camera zooms to their combined bounding box, ignoring everything else in the model.
+
+**Think about what tells the story of the joint**, not just what's geometrically nearby:
+
+| Joint | Bodies to Frame | Why |
+|-------|----------------|-----|
+| Dovetail corner | Tail bodies (e.g., `DT_FL*`) + adjacent pin board faces | Shows the interlocking geometry |
+| M&T at one leg | The leg + the 2-3 rails that meet it | Shows how tenons weave inside |
+| Domino joint | The domino void bodies + the 2 boards they connect | Shows mortise pockets straddling the interface |
+| Hinge | Door + case side + hinge bodies | Shows rebate mortise and leaf placement |
+| Drawer dovetails | All 5 drawer bodies (front, back, sides, bottom) | Shows half-blind vs through at each end |
+
+**Rule of thumb:** if two long boards are joined by dovetails at one end, don't frame both full boards — frame the tails and the area around the joint. The agent should collect the tail bodies and maybe a short section of each board near the joint.
+
+### Finding Bodies for Detail Shots
+
+```python
+ctx = af.DesignContext()
+
+# By exact name
+leg = ctx.find_body("Leg_FL")
+
+# By glob pattern — all dovetail tails at front-left corner
+dt_tails = ctx.find_bodies("DT_FL*")
+
+# By component — all bodies in the Frame component
+frame_occ = None
+for i in range(root.occurrences.count):
+    if root.occurrences.item(i).component.name == "Frame":
+        frame_occ = root.occurrences.item(i)
+        break
+frame_bodies = [frame_occ.component.bRepBodies.item(i)
+                for i in range(frame_occ.component.bRepBodies.count)]
+```
+
 ## Standard Settings
 
 ```python
@@ -21,60 +115,34 @@ app.userInterface.activeSelections.clear()  # remove any blue highlights
 | `ShadedWithVisibleEdgesOnlyVisualStyle` | 2 | **Default for screenshots** |
 | `WireframeVisualStyle` | 3 | Wireframe only |
 
-## Framing Rules
-
-1. **Entire model inside the frame** — no body should be cut off at any edge. Pull the camera back enough.
-2. **Model fills ~70-80% of the frame** — avoid excessive whitespace around the model.
-3. **Center the subject** — the model (or detail area) should be centered in the frame, not off to one side.
-4. **Grid is fine** — no need to hide the ground grid. It provides scale context.
-
-### Camera Positioning
-
-Use the bounding box to compute camera distance:
-
-```python
-# Get model bounding box
-min_x = min_y = min_z = 1e10
-max_x = max_y = max_z = -1e10
-for i in range(root.allOccurrences.count):
-    occ = root.allOccurrences.item(i)
-    for j in range(occ.component.bRepBodies.count):
-        proxy = occ.component.bRepBodies.item(j).createForAssemblyContext(occ)
-        bb = proxy.boundingBox
-        min_x, min_y, min_z = min(min_x, bb.minPoint.x), min(min_y, bb.minPoint.y), min(min_z, bb.minPoint.z)
-        max_x, max_y, max_z = max(max_x, bb.maxPoint.x), max(max_y, bb.maxPoint.y), max(max_z, bb.maxPoint.z)
-
-cx = (min_x + max_x) / 2
-cy = (min_y + max_y) / 2
-cz = (min_z + max_z) / 2
-span = max(max_x - min_x, max_y - min_y, max_z - min_z)
-```
-
-Then position the camera with distance proportional to span:
-
-```python
-cam = vp.camera
-cam.isFitView = False
-cam.target = Point3D.create(cx, cy, cz)
-# For iso-top-left: eye at (-X, -Y, +Z) from target
-cam.eye = Point3D.create(cx - span*1.2, cy - span*1.2, cz + span*0.8)
-cam.upVector = Vector3D.create(0, 0, 1)
-vp.camera = cam
-```
-
-Adjust the multipliers (1.2, 0.8, etc.) to frame the model correctly. Start with `fit_view = True`, then fine-tune manually.
-
 ## Standard Shot Set for Examples
 
 Each example should have at minimum an **overview** shot. Full documentation uses:
 
-| Shot | Camera Position | Purpose |
-|------|----------------|---------|
-| `iso-top-left.png` | Eye at (-X, -Y, +Z) | Primary overview — shows front + left side |
-| `iso-top-right.png` | Eye at (+X, -Y, +Z) | Alternate overview — shows front + right side |
-| `front.png` | Eye at (cx, -far, cz) | Front elevation |
-| `right.png` | Eye at (+far, cy, cz) | Side elevation |
-| `overview.png` | Best angle for the piece | Alternative to iso pair for simpler models |
+| Shot | File | Purpose |
+|------|------|---------|
+| `iso-top-left.png` | Primary overview — shows front + left side |
+| `iso-top-right.png` | Alternate overview — shows front + right side |
+| `front.png` | Front elevation |
+| `right.png` | Side elevation |
+
+### Taking All Standard Shots
+
+```python
+from helpers import af
+
+shots = [
+    ("iso-top-left",  (-1, -1, 0.7)),
+    ("iso-top-right", ( 1, -1, 0.7)),
+    ("front",         ( 0, -1, 0)),
+    ("right",         ( 1,  0, 0)),
+]
+
+for name, eye_dir in shots:
+    af.screenshot_cam(eye_dir=eye_dir, fill=0.80)
+    # → call get_screenshot(width=2048, height=2048)
+    # → save as screenshots/{name}.png
+```
 
 ## Transparent / Detail Views
 
@@ -82,42 +150,32 @@ For joinery documentation, **isolate the relevant bodies** — hide everything u
 
 ### Technique: Isolated Body Detail Shots (Preferred)
 
-For each joinery detail, show only the 2-3 bodies directly involved in the joint:
+For each joinery detail, show only the 2-3 bodies directly involved in the joint, then use `screenshot_cam(bodies=...)` to frame them:
 
 ```python
+from helpers import af
+
 # 1. Hide everything
 for i in range(root.occurrences.count):
     root.occurrences.item(i).isLightBulbOn = False
 for i in range(root.bRepBodies.count):
     root.bRepBodies.item(i).isVisible = False
 
-# 2. Show only the relevant component and bodies
-for i in range(root.occurrences.count):
-    occ = root.occurrences.item(i)
-    if occ.component.name == "Case":
-        occ.isLightBulbOn = True
-        comp = occ.component
-        for j in range(comp.bRepBodies.count):
-            b = comp.bRepBodies.item(j)
-            if b.name in ("Divider1", "Top", "Bottom"):
-                b.opacity = 0.15
-                b.isVisible = True
-            else:
-                b.isVisible = False
+# 2. Show only the relevant bodies
+ctx = af.DesignContext()
+detail_bodies = []
+for name in ["Leg_FL", "FrontRail", "SideRailL"]:
+    b = ctx.find_body(name)
+    b.isVisible = True
+    b.opacity = 0.15  # semi-transparent to show internal joinery
+    detail_bodies.append(b)
+
+# 3. Frame the detail bodies (not the whole model)
+af.screenshot_cam(eye_dir=(1, -1, 0.7), bodies=detail_bodies, fill=0.85)
+# → get_screenshot(width=2048, height=2048)
 ```
 
-This produces much cleaner images than making everything transparent — no visual noise from unrelated bodies.
-
-### Example Detail Shots (TV Console)
-
-| Shot | Bodies Shown | What's Visible |
-|------|-------------|----------------|
-| Dovetail corner | Left + Top + Bottom | Dovetail tails interlocking at case corner |
-| Divider dominos | Divider1 + Top + Bottom + domino voids | Domino mortise pockets straddling the interface |
-| Door hinge | Left case side + LeftDoor + hinge hardware | Hinge with rebate mortise between boards |
-| Cleat dominos | Cleat1 + Bottom + domino voids | Domino voids in cleat-to-case connection |
-| Drawer dovetails | dd_Front + dd_Back + dd_Left + dd_Right + dd_Bottom | Half-blind dovetails at front, through at back |
-| Frame M&T | Leg_FL + FrontRail + SideRailL | Interlocking tenons weaving inside the leg |
+This produces much cleaner images than making everything transparent — no visual noise from unrelated bodies, and the camera automatically zooms to the joint area.
 
 ### Technique: Full Transparent Overview
 
@@ -132,9 +190,9 @@ for i in range(root.allOccurrences.count):
     occ.isLightBulbOn = True
     for j in range(occ.component.bRepBodies.count):
         occ.component.bRepBodies.item(j).opacity = 0.15
-```
 
-Make **all** components transparent — including hardware, domino voids, and any other auxiliary bodies.
+af.screenshot_cam(eye_dir=(-1, -1, 0.7), fill=0.70)
+```
 
 ### Restoring After Detail Shots
 
@@ -169,12 +227,3 @@ for comp in [root] + [root.allOccurrences.item(i).component
     for ca in comp.constructionAxes:
         ca.isLightBulbOn = False
 ```
-
-## Iterating on Framing
-
-Getting the camera right often takes 2-3 attempts. Common adjustments:
-
-- **Model cut off** → increase distance multipliers (move eye further from target)
-- **Model too small** → decrease distance multipliers
-- **Off-center** → shift target coordinates toward the model center
-- **Wrong angle** → flip sign of eye offset components (e.g., -X → +X for opposite side)
