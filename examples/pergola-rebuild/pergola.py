@@ -3135,7 +3135,7 @@ def run(context):
         _d = abs(_bb.minPoint.x - _t_mnx) + abs(_bb.minPoint.y - _t_mny) + abs(_bb.maxPoint.x - _t_mxx) + abs(_bb.maxPoint.y - _t_mxy)
         if _d < _best_d: _best_pi, _best_d = _pi, _d
     inp = comp.features.extrudeFeatures.createInput(Sketch2_rafts_1.profiles.item(_best_pi), CUT)
-    inp.setDistanceExtent(False, adsk.core.ValueInput.createByString("-rafter_offset / 2"))
+    inp.setDistanceExtent(False, adsk.core.ValueInput.createByString("-rafter_offset"))
     inp.participantBodies = [Body1_rafts_1]
     Extrude2 = comp.features.extrudeFeatures.add(inp)
     Extrude2.name = "Extrude2"
