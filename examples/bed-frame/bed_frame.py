@@ -48,7 +48,7 @@ def run(context):
         ("outer_l",    "bed_l + 2 * post_size",                     "in"),
         ("side_rail_l","bed_l",                                      "in"),
         ("end_rail_l", "bed_w",                                      "in"),
-        ("slat_l",     "bed_w",                                      "in"),
+        ("slat_l",     "outer_w - 2 * rail_thick",                    "in"),
         ("slat_sp",    "(bed_l - slat_w) / (n_slats - 1)",          "in"),
         ("mid_x",      "outer_w / 2",                                "in"),
         ("mid_y",      "outer_l / 2",                                "in"),
@@ -74,8 +74,8 @@ def run(context):
     # ==============================================================
     #  1. POSTS — 4 corner posts
     # ==============================================================
-    # Front-left post (footboard height — 12")
-    params.add("footboard_h", VI("12 in"), "in", "")
+    # Front-left post (same height as rail — flush with side rails)
+    params.add("footboard_h", VI("rail_h"), "in", "")
 
     _, pr = af.sketch_rect_model(post_c, post_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
@@ -146,7 +146,7 @@ def run(context):
     slat_z_pl = af.off_plane(slat_c, slat_c.xYConstructionPlane,
                               "rail_h - slat_thick", "SlatZ_Pl")
     _, pr = af.sketch_rect_model(slat_c, slat_z_pl,
-        ("post_size", "post_size", "rail_h - slat_thick"),
+        ("rail_thick", "post_size", "rail_h - slat_thick"),
         {"x": "slat_l", "y": "slat_w"}, "Slat_Sk", ev)
     slat_ext = af.ext_new(slat_c, pr, "slat_thick", "Slat_1")
     slat_body = slat_ext.bodies.item(0)

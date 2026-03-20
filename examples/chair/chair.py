@@ -128,8 +128,10 @@ def run(context):
     print(">>> Seat: 1")
 
     # ==== BACK SLATS (ladder-back) ====
-    # Template slat between back legs — sketch on XZ plane, extrude in Y
-    _, pr = af.sketch_rect_model(back_c, back_c.xZConstructionPlane,
+    # Template slat between back legs — offset XZ plane to back leg Y position
+    slat_y_pl = af.off_plane(back_c, back_c.xZConstructionPlane,
+                              "seat_d - leg_size", "SlatY_Pl")
+    _, pr = af.sketch_rect_model(back_c, slat_y_pl,
         ("leg_size", "seat_d - leg_size", "slat_start_z"),
         {"x": "short_apron_l", "z": "slat_h"}, "Slat_Sk", ev)
     slat_ext = af.ext_new(back_c, pr, "slat_thick", "BackSlat_1")
