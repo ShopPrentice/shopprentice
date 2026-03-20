@@ -15,6 +15,7 @@ Components:
 import adsk.core, adsk.fusion
 
 from helpers import af
+from helpers.templates import domino
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -148,6 +149,95 @@ def run(context):
     print(">>> Seat: 1 body done")
 
     # ==============================================================
+    #  4. DOMINO JOINERY — apron/stretcher to leg connections
+    # ==============================================================
+    # Domino params
+    params.add("dm_t", VI("8 mm"), "in", "")
+    params.add("dm_w", VI("22 mm"), "in", "")
+    params.add("dm_d", VI("20 mm"), "in", "")
+    params.add("dm_count", VI("2"), "", "")
+    params.add("dm_apron_sp", VI("apron_h / (dm_count + 1)"), "in", "")
+    params.add("dm_apron_z", VI("apron_z + apron_h / (dm_count + 1)"), "in", "")
+    params.add("dm_str_z", VI("stretcher_z + stretcher_h / 2"), "in", "")
+
+    # Assembly proxies
+    fl_p = leg_fl.createForAssemblyContext(leg_occ)
+    fr_p = leg_fr.createForAssemblyContext(leg_occ)
+    bl_p = leg_bl.createForAssemblyContext(leg_occ)
+    br_p = leg_br.createForAssemblyContext(leg_occ)
+
+    fa_body = None; ba_body = None
+    la_body = None; ra_body = None
+    sf_body = None; sb_body = None
+    for i in range(apron_c.bRepBodies.count):
+        b = apron_c.bRepBodies.item(i)
+        if b.name == "Apron_Front": fa_body = b
+        elif b.name == "Apron_Back": ba_body = b
+        elif b.name == "Apron_Left": la_body = b
+        elif b.name == "Apron_Right": ra_body = b
+        elif b.name == "Str_Front": sf_body = b
+        elif b.name == "Str_Back": sb_body = b
+
+    fa_p = fa_body.createForAssemblyContext(apron_occ)
+    ba_p = ba_body.createForAssemblyContext(apron_occ)
+    la_p = la_body.createForAssemblyContext(apron_occ)
+    ra_p = ra_body.createForAssemblyContext(apron_occ)
+    sf_p = sf_body.createForAssemblyContext(apron_occ)
+    sb_p = sb_body.createForAssemblyContext(apron_occ)
+
+    # Apron dominos (same pattern as coffee table)
+    dm_fl = af.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
+    dm_fr = af.off_plane(root, root.yZConstructionPlane, "bench_l - leg_size", "DM_FR")
+    dm_lf = af.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
+    dm_lb = af.off_plane(root, root.xZConstructionPlane, "bench_w - leg_size", "DM_LB")
+
+    # Front apron → FL, FR legs
+    domino.grid(root, dm_fl, ("leg_size", "apron_thick/2", "dm_apron_z"),
+        "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        fa_p, fl_p, "DM_FA_L", ev)
+    domino.grid(root, dm_fr, ("bench_l - leg_size", "apron_thick/2", "dm_apron_z"),
+        "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        fa_p, fr_p, "DM_FA_R", ev)
+
+    # Back apron → BL, BR legs
+    domino.grid(root, dm_fl, ("leg_size", "bench_w - apron_thick/2", "dm_apron_z"),
+        "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        ba_p, bl_p, "DM_BA_L", ev)
+    domino.grid(root, dm_fr, ("bench_l - leg_size", "bench_w - apron_thick/2", "dm_apron_z"),
+        "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        ba_p, br_p, "DM_BA_R", ev)
+
+    # Left apron → FL, BL legs
+    domino.grid(root, dm_lf, ("apron_thick/2", "leg_size", "dm_apron_z"),
+        "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        la_p, fl_p, "DM_LA_F", ev)
+    domino.grid(root, dm_lb, ("apron_thick/2", "bench_w - leg_size", "dm_apron_z"),
+        "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        la_p, bl_p, "DM_LA_B", ev)
+
+    # Right apron → FR, BR legs
+    domino.grid(root, dm_lf, ("bench_l - apron_thick/2", "leg_size", "dm_apron_z"),
+        "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        ra_p, fr_p, "DM_RA_F", ev)
+    domino.grid(root, dm_lb, ("bench_l - apron_thick/2", "bench_w - leg_size", "dm_apron_z"),
+        "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        ra_p, br_p, "DM_RA_B", ev)
+
+    # Front stretcher → FL, FR legs (single domino each, centered in stretcher height)
+    domino.single(root, dm_fl, ("leg_size", "stretcher_thick/2", "dm_str_z"),
+        "z", "dm_w", "dm_t", "dm_d", sf_p, fl_p, "DM_SF_L", ev)
+    domino.single(root, dm_fr, ("bench_l - leg_size", "stretcher_thick/2", "dm_str_z"),
+        "z", "dm_w", "dm_t", "dm_d", sf_p, fr_p, "DM_SF_R", ev)
+
+    # Back stretcher → BL, BR legs
+    domino.single(root, dm_fl, ("leg_size", "bench_w - stretcher_thick/2", "dm_str_z"),
+        "z", "dm_w", "dm_t", "dm_d", sb_p, bl_p, "DM_SB_L", ev)
+    domino.single(root, dm_fr, ("bench_l - leg_size", "bench_w - stretcher_thick/2", "dm_str_z"),
+        "z", "dm_w", "dm_t", "dm_d", sb_p, br_p, "DM_SB_R", ev)
+
+    print(">>> Dominos: 12 joints (aprons: 8×2=16, stretchers: 4×1=4 voids)")
+
+    # ==============================================================
     #  EPILOGUE
     # ==============================================================
     for comp in [leg_c, apron_c, seat_c]:
@@ -155,10 +245,15 @@ def run(context):
             sk.isVisible = False
         for cp in comp.constructionPlanes:
             cp.isLightBulbOn = False
+    for sk in root.sketches:
+        sk.isVisible = False
+    for cp in root.constructionPlanes:
+        cp.isLightBulbOn = False
 
     for comp_name, c in [("Legs", leg_c), ("Aprons", apron_c), ("Seat", seat_c)]:
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{comp_name}: {len(names)} bodies -> {names}")
+    print(f"Root: {root.bRepBodies.count} domino voids")
 
     cam = app.activeViewport.camera
     cam.isFitView = True
