@@ -1,0 +1,75 @@
+# Modern Style
+
+Clean, minimal furniture with square profiles, hidden joinery where possible, and restrained proportions. The default style when no specific style is identified.
+
+## Overview
+
+Modern furniture emphasizes function, clean geometry, and visual lightness. Joints are hidden unless their visibility is intentional (e.g., through dovetails on a premium box). Edges are crisp or lightly broken. Hardware is minimal and functional — concealed hinges, simple pulls. Stock thickness tends toward standard dimensioned lumber (3/4", 1/2") without heavy proportions.
+
+## Joinery Preferences
+
+| Joint location | Preferred | Alternative | Avoid |
+|---------------|-----------|-------------|-------|
+| Visible case corners | Through dovetails | Finger/box joints | Exposed screws, nails |
+| Hidden structural (rails, stretchers) | Dominos | Blind M&T | Pocket screws on visible faces |
+| Drawer front | Half-blind dovetails | Dominos | Butt joint |
+| Drawer back | Through dovetails | Box joints | Butt joint |
+| Panel in frame | Floating in groove | Tongue & groove | Glued-in panel |
+| Shelf to case | Dados or shelf pins | Dominos | Cleats only |
+| Top attachment | Dominos or buttons | Figure-8 fasteners | Glue (restricts movement) |
+| Leg to rail/apron | Blind M&T | Dominos | Dowels alone |
+
+## Edge Treatments
+
+| Element | Treatment | Parameter |
+|---------|-----------|-----------|
+| Tabletops, lids | Light ease (1/16" roundover or chamfer) | `ch_d = 0.0625 in` |
+| Case edges | Square or very light chamfer | `ch_d = 0.0625 in` |
+| Leg bottoms | Small chamfer to prevent splintering | `ch_d = 0.0625 in` |
+| Drawer fronts | Square edges, tight reveal gap | — |
+
+## Transitions
+
+| Transition | Treatment |
+|-----------|-----------|
+| Case to base/feet | Flush kick (kick boards flush with case sides) or recessed kick (inset 1") |
+| Lid/top to case | Flush or minimal overhang (0–0.25") |
+| Drawer to case | Flush front with 1/16" reveal gap |
+| Back panel | Rabbeted into sides, flush with back edge |
+| Shelf to side | Dado (hidden) or shelf pin holes |
+
+## Proportions
+
+| Ratio | Value | Note |
+|-------|-------|------|
+| Kick/foot height | 3–4" or 1:8 of total height | Recessed, not decorative |
+| Top/lid overhang | 0–0.25" | Minimal or flush |
+| Board thickness | 0.75" (4/4 stock) | Standard |
+| Drawer gap/reveal | 1/16" (0.0625") | Tight, consistent |
+| Back panel thickness | 0.25" (1/4" plywood) | Functional, not structural |
+
+## Hardware
+
+| Hardware | Specification | Aesthetic |
+|---------|--------------|-----------|
+| Hinges (doors) | Euro concealed (35mm cup) | Completely hidden |
+| Hinges (lids) | Brass or stainless butt hinge | Minimal profile |
+| Pulls | Simple cylindrical bar or rectangular | Brushed metal or wood |
+| Catches | Magnetic or push-to-open | No visible catch hardware |
+| Shelf supports | 5mm shelf pins | Standard pattern, hidden holes |
+
+## Materials
+
+| Element | Species | Finish |
+|---------|---------|--------|
+| Primary | Walnut, white oak, maple, ash | Oil, lacquer, or water-based poly |
+| Secondary | Baltic birch plywood, poplar | Match or complement primary |
+| Panels | Plywood | Veneer-matched to primary |
+
+## What NOT to Do
+
+- Don't add decorative moldings, corbels, or ornamental details
+- Don't use turned legs or spindles (use square or tapered)
+- Don't leave end grain exposed at visible joints without purpose
+- Don't use contrasting wood for structural joints (unless intentionally decorative)
+- Don't over-dimension — keep proportions light and functional
