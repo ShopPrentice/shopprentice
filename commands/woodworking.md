@@ -77,6 +77,51 @@ Read the specific joint file **before writing joinery code**. Each file has para
 
 **Read the topic/joinery file BEFORE writing code** that uses those techniques. The core skill provides the routing — the reference files provide the implementation details. For Draft files, treat instructions as a starting point and validate aggressively.
 
+### Style & Type Guides
+
+Before planning, identify the **furniture type** and **design style** from the user's request. Load the matching files — they provide component checklists, connection requirements, hardware needs, proportions, and detail patterns specific to that combination.
+
+**Identify type** from what the user is building:
+
+| Type | Keywords | File |
+|------|----------|------|
+| Chair | chair, dining chair, side chair | `woodworking/types/chair.md` |
+| Stool | stool, counter stool, bar stool, step stool | `woodworking/types/stool.md` |
+| Bench | bench, entryway bench, garden bench | `woodworking/types/bench.md` |
+| Sofa | sofa, couch, settee, loveseat | `woodworking/types/sofa.md` |
+| Dining table | dining table, farm table, harvest table | `woodworking/types/dining-table.md` |
+| Coffee table | coffee table, cocktail table | `woodworking/types/coffee-table.md` |
+| Side table | side table, end table, nightstand, accent table | `woodworking/types/side-table.md` |
+| Desk | desk, writing desk, secretary | `woodworking/types/desk.md` |
+| Console table | console, TV console, media console, credenza | `woodworking/types/console-table.md` |
+| Chest | chest, trunk, blanket chest, toy box, hope chest | `woodworking/types/chest.md` |
+| Box | box, pencil box, jewelry box, keepsake box | `woodworking/types/box.md` |
+| Cabinet | cabinet, cupboard, pantry, hutch | `woodworking/types/cabinet.md` |
+| Dresser | dresser, bureau, chest of drawers | `woodworking/types/dresser.md` |
+| Bookshelf | bookshelf, bookcase, shelving unit | `woodworking/types/bookshelf.md` |
+| Wardrobe | wardrobe, armoire, closet | `woodworking/types/wardrobe.md` |
+| Sideboard | sideboard, buffet, server | `woodworking/types/sideboard.md` |
+| Bed frame | bed, bed frame, platform bed, four-poster | `woodworking/types/bed-frame.md` |
+| Crib | crib, baby crib, toddler bed | `woodworking/types/crib.md` |
+| Planter | planter, window box, plant stand | `woodworking/types/planter.md` |
+| Pergola | pergola, arbor, trellis, gazebo | `woodworking/types/pergola.md` |
+| Mirror frame | mirror, mirror frame, looking glass | `woodworking/types/mirror-frame.md` |
+| Shelf | shelf, floating shelf, wall shelf, ledge | `woodworking/types/shelf.md` |
+
+**Identify style** from visual cues, user description, or reference photos:
+
+| Style | Keywords / Visual Cues | File |
+|-------|----------------------|------|
+| Modern | clean lines, minimal, contemporary, square edges, hidden hardware | `woodworking/styles/modern.md` |
+| Shaker | through dovetails, tapered details, applied base, brass hardware, simple lines | `woodworking/styles/shaker.md` |
+| Craftsman | exposed tenons, corbels, quartersawn oak, thick stock, Arts & Crafts | `woodworking/styles/craftsman.md` |
+| Mid-century | tapered legs, floating tops, thin profiles, hidden joinery, Danish, Scandinavian | `woodworking/styles/mid-century.md` |
+| Rustic | thick boards, farmhouse, reclaimed, visible fasteners, breadboard ends | `woodworking/styles/rustic.md` |
+
+**If no style is specified or identifiable, default to Modern.**
+
+**Read both files BEFORE the high-level plan.** The type file tells you what components and connections to plan. The style file tells you which joinery, edge treatments, and hardware to use. If a file doesn't exist yet, proceed with the core skill rules and note the gap.
+
 ## Parameter Planning
 
 Choosing which values are user parameters vs. derived is critical. The goal: adjusting any single parameter always produces a clean, valid model — no broken geometry, no asymmetric gaps, no overlapping bodies.
