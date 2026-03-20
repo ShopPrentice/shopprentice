@@ -74,11 +74,13 @@ def run(context):
     # ==============================================================
     #  1. POSTS — 4 corner posts
     # ==============================================================
-    # Front-left post (shorter — just rail height)
+    # Front-left post (footboard height — 12")
+    params.add("footboard_h", VI("12 in"), "in", "")
+
     _, pr = af.sketch_rect_model(post_c, post_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "post_size", "y": "post_size"}, "PostFL_Sk", ev)
-    fl_ext = af.ext_new(post_c, pr, "rail_h", "PostFL")
+    fl_ext = af.ext_new(post_c, pr, "footboard_h", "PostFL")
     fl_ext.bodies.item(0).name = "Post_FL"
 
     p_xmid = af.off_plane(post_c, post_c.yZConstructionPlane, "mid_x", "PXMid")
@@ -86,7 +88,7 @@ def run(context):
 
     af.mirror_body(post_c, fl_ext.bodies.item(0), p_xmid, "PostFR").bodies.item(0).name = "Post_FR"
 
-    # Back posts are taller (headboard height)
+    # Back posts are taller (headboard height — 36")
     _, pr = af.sketch_rect_model(post_c, post_c.xYConstructionPlane,
         ("0 in", "bed_l + post_size", "0 in"),
         {"x": "post_size", "y": "post_size"}, "PostBL_Sk", ev)
@@ -95,7 +97,7 @@ def run(context):
 
     af.mirror_body(post_c, bl_ext.bodies.item(0), p_xmid, "PostBR").bodies.item(0).name = "Post_BR"
 
-    print(">>> Posts: 4 (front short, back tall for headboard)")
+    print(">>> Posts: 4 (front 12\", back 36\")")
 
     # ==============================================================
     #  2. RAILS — side rails + foot rail
@@ -160,16 +162,34 @@ def run(context):
     print(">>> Slats: %d bodies" % int(ev("n_slats")))
 
     # ==============================================================
+    #  5. CENTER SUPPORT BEAM (required for Queen+)
+    #     Runs lengthwise under the slats at the midpoint
+    # ==============================================================
+    support_occ = af.make_comp(root, "Support")
+    support_c = support_occ.component
+
+    # Center beam: runs along Y (bed length) at mid_x, from floor to ledger top
+    cb_pl = af.off_plane(support_c, support_c.yZConstructionPlane,
+                          "mid_x - rail_thick / 2", "CB_Pl")
+    _, pr = af.sketch_rect_model(support_c, cb_pl,
+        ("mid_x - rail_thick / 2", "post_size", "0 in"),
+        {"y": "bed_l", "z": "ledger_z + ledger_h"}, "CenterBeam_Sk", ev)
+    af.ext_new(support_c, pr, "rail_thick", "CenterBeam").bodies.item(0).name = "CenterBeam"
+
+    print(">>> Center support beam: 1 body")
+
+    # ==============================================================
     #  EPILOGUE
     # ==============================================================
-    for comp in [post_c, rail_c, hb_c, slat_c]:
+    for comp in [post_c, rail_c, hb_c, slat_c, support_c]:
         for sk in comp.sketches:
             sk.isVisible = False
         for cp in comp.constructionPlanes:
             cp.isLightBulbOn = False
 
     for cn, c in [("Posts", post_c), ("Rails", rail_c),
-                   ("Headboard", hb_c), ("Slats", slat_c)]:
+                   ("Headboard", hb_c), ("Slats", slat_c),
+                   ("Support", support_c)]:
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cn}: {len(names)} bodies -> {names}")
 

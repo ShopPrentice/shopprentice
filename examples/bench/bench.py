@@ -35,7 +35,7 @@ def run(context):
     # ==============================================================
     for pname, expr, unit in [
         ("bench_l",     "48 in",   "in"),
-        ("bench_w",     "14 in",   "in"),
+        ("bench_w",     "12 in",   "in"),
         ("seat_h",      "18 in",   "in"),
         ("seat_thick",  "1.5 in",  "in"),
         ("leg_size",    "2 in",    "in"),
