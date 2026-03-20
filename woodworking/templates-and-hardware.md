@@ -47,5 +47,6 @@ Reference for available reusable templates and hardware. Check this before writi
 | Drawer pull / knob | dresser, desk, cabinet, chest | Phase 2 | McMaster or generic cylinder |
 | Catch / latch | cabinet, wardrobe, chest | Phase 2 | McMaster |
 | Shelf pin holes | cabinet, bookshelf | Phase 2 | Standard 5mm pattern |
-| Bed bolt / rail bracket | bed-frame | Phase 3 | Generic or catalog |
+| Bed rail fastener | bed-frame | Phase 2 | Hook plate + strike plate pair — detachable rail-to-post connection |
+| Bed bolt (IKEA-style) | bed-frame | Phase 2 | Barrel nut + bolt — alternative detachable connection |
 | Soft-close drawer slide | desk, dresser, cabinet | Phase 3 | Generic side-mount |

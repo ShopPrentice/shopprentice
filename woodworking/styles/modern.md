@@ -1,10 +1,20 @@
 # Modern Style
 
-Clean, minimal furniture with square profiles, hidden joinery where possible, and restrained proportions. The default style when no specific style is identified.
+Clean, minimal furniture with tapered profiles, hidden joinery, and light proportions. The default style when no specific style is identified.
 
 ## Overview
 
-Modern furniture emphasizes function, clean geometry, and visual lightness. Joints are hidden unless their visibility is intentional (e.g., through dovetails on a premium box). Edges are crisp or lightly broken. Hardware is minimal and functional — concealed hinges, simple pulls. Stock thickness tends toward standard dimensioned lumber (3/4", 1/2") without heavy proportions.
+Modern furniture emphasizes function, clean geometry, and visual lightness. Joints are hidden unless their visibility is intentional (e.g., through dovetails on a premium box). Edges are crisp or lightly eased. Hardware is minimal and functional — concealed hinges, simple pulls. **Proportions should be lighter and thinner than you think** — err on the side of slim stock and tapered legs.
+
+## Design Principles
+
+1. **Less structure is better.** Don't add aprons, stretchers, or rails unless the piece needs them. Modern pieces derive stability from geometry (tapered legs, angled connections) rather than additional members. A coffee table might be just a top + 4 tapered legs + dominos.
+
+2. **Proportions follow ergonomics.** A desk is 18" deep because that's laptop depth. A bench seat is 12" deep because you sit upright. A chair seat is 16" deep because you lean back. Derive dimensions from how the body uses the furniture, not from aesthetics.
+
+3. **Comfort features are functional requirements.** Rounded seat edges on a bench, contoured seat on a chair, tapered legs for visual lightness — these aren't decorative choices, they're what separates a finished piece from a construction project.
+
+4. **Tapered legs, not square.** The defining visual of modern wood furniture. Legs taper from top (full size at the joint) to bottom (narrower at the floor). Even a subtle 5° taper transforms the look.
 
 ## Joinery Preferences
 
@@ -16,8 +26,10 @@ Modern furniture emphasizes function, clean geometry, and visual lightness. Join
 | Drawer back | Through dovetails | Box joints | Butt joint |
 | Panel in frame | Floating in groove | Tongue & groove | Glued-in panel |
 | Shelf to case | Dados or shelf pins | Dominos | Cleats only |
-| Top attachment | Dominos or buttons | Figure-8 fasteners | Glue (restricts movement) |
+| Top to legs (no apron) | Dominos directly into underside | Buttons + apron | — |
+| Top attachment (with apron) | Buttons or dominos | Figure-8 fasteners | Glue (restricts movement) |
 | Leg to rail/apron | Domino grid (2 per joint) | Blind M&T | Dowels alone |
+| Bed rail to post | Bed rail fastener or bed bolt | — | Permanent M&T (can't disassemble) |
 
 ### Leg-Frame Joinery Pattern (Tables, Benches, Chairs, Desks)
 
@@ -26,6 +38,7 @@ For any piece with legs + aprons/rails, use `domino.grid()` at each apron-to-leg
 - **Interface plane** at the leg-apron boundary (YZ for long aprons, XZ for short)
 - **Stretchers** get a single domino per end (lower in the leg than aprons)
 - **Cross-component**: aprons and legs are in separate components; domino CUTs happen in root via assembly proxies
+- **Minimal designs** (no aprons): dominos go directly from leg top into the underside of the top board
 
 This pattern applies to: coffee table, bench, chair, desk, side table, sofa frame, dining table.
 
@@ -34,6 +47,7 @@ This pattern applies to: coffee table, bench, chair, desk, side table, sofa fram
 | Element | Treatment | Parameter |
 |---------|-----------|-----------|
 | Tabletops, lids | Light ease (1/16" roundover or chamfer) | `ch_d = 0.0625 in` |
+| Bench/chair seats | Rounded edges for comfort | `fl_r = 0.125 in` |
 | Case edges | Square or very light chamfer | `ch_d = 0.0625 in` |
 | Leg bottoms | Small chamfer to prevent splintering | `ch_d = 0.0625 in` |
 | Drawer fronts | Square edges, tight reveal gap | — |
@@ -54,9 +68,11 @@ This pattern applies to: coffee table, bench, chair, desk, side table, sofa fram
 |-------|-------|------|
 | Kick/foot height | 3–4" or 1:8 of total height | Recessed, not decorative |
 | Top/lid overhang | 0–0.25" | Minimal or flush |
-| Board thickness | 0.75" (4/4 stock) | Standard |
+| Board thickness | 0.75" (4/4 stock) | Standard for case boards |
+| Leg size | 1.25–1.75" | Lighter than traditional (2"+) |
 | Drawer gap/reveal | 1/16" (0.0625") | Tight, consistent |
-| Back panel thickness | 0.25" (1/4" plywood) | Functional, not structural |
+| Coffee table L:W ratio | 2:1 to 3.5:1 | Elongated, not square |
+| Headboard:footboard height | ~3:1 | Tall headboard, low footboard |
 
 ## Hardware
 
@@ -67,6 +83,7 @@ This pattern applies to: coffee table, bench, chair, desk, side table, sofa fram
 | Pulls | Simple cylindrical bar or rectangular | Brushed metal or wood |
 | Catches | Magnetic or push-to-open | No visible catch hardware |
 | Shelf supports | 5mm shelf pins | Standard pattern, hidden holes |
+| Bed rail | Bed rail fastener or bed bolt | Hidden, detachable |
 
 ## Materials
 
@@ -78,8 +95,11 @@ This pattern applies to: coffee table, bench, chair, desk, side table, sofa fram
 
 ## What NOT to Do
 
+- **Don't over-build.** If a piece works without aprons, don't add them. If legs can be 1.5", don't make them 2.5".
 - Don't add decorative moldings, corbels, or ornamental details
-- Don't use turned legs or spindles (use square or tapered)
+- Don't use turned legs or spindles (use tapered or square)
 - Don't leave end grain exposed at visible joints without purpose
 - Don't use contrasting wood for structural joints (unless intentionally decorative)
-- Don't over-dimension — keep proportions light and functional
+- Don't leave seat edges sharp/square on seating furniture — always round or ease
+- Don't assume every table needs 4 aprons — many modern designs skip them
+- Don't make flat seats on chairs — contour or deepen for comfort
