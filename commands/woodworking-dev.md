@@ -18,15 +18,15 @@ After completing a build (or a build session with notable discoveries), when the
 | File | Purpose |
 |------|---------|
 | `commands/woodworking.md` | Core skill — design philosophy, API rules, parameter planning, routing tables, build order |
-| `commands/woodworking/angled-construction.md` | Topic: splayed legs, compound angles, Move, Sweep, SplitBody, stretcher splay |
-| `commands/woodworking/details-and-finishing.md` | Topic: fillets, chamfers, edge treatments (planned) |
-| `commands/woodworking/mcp-advanced.md` | Topic: modify existing designs, sync, selection workflow (planned) |
+| `woodworking/angled-construction.md` | Topic: splayed legs, compound angles, Move, Sweep, SplitBody, stretcher splay |
+| `woodworking/details-and-finishing.md` | Topic: fillets, chamfers, edge treatments (planned) |
+| `woodworking/mcp-advanced.md` | Topic: modify existing designs, sync, selection workflow (planned) |
 
 ### Joinery reference files (in the repo, not in commands/)
 
 | File | Status |
 |------|--------|
-| `joinery/mortise-tenon.md` | Tested |
+| Mortise & Tenon | Tested (inline in skill + `mortise_tenon` template) |
 | `joinery/domino-joint.md` | Tested |
 | `joinery/dovetail.md` | Tested |
 | `joinery/dado-rabbet.md` | Tested |
@@ -87,7 +87,7 @@ Summarize findings to the user before making changes.
 |-------------|---------------|
 | New technique for an existing topic | New section in the topic file |
 | New pitfall for an existing topic | Add to that topic's Common Pitfalls table |
-| New topic area (doesn't fit existing files) | New file in `commands/woodworking/` + routing entry in `woodworking.md` |
+| New topic area (doesn't fit existing files) | New file in `woodworking/` + routing entry in `woodworking.md` |
 | Joint-specific finding | The specific `joinery/*.md` file |
 | Routing gap (agent wouldn't have found the right file) | Update trigger phrases in the routing tables in `woodworking.md` |
 | General API rule | Core skill `woodworking.md` |

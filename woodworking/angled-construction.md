@@ -1,517 +1,509 @@
 # Angled Construction
 
-Techniques for furniture with non-rectilinear members: splayed legs (stools, chairs, Windsor chairs, workbenches), angled braces, and through-tenon joinery.
+Techniques for splayed legs, compound angles, and connecting parts at non-orthogonal positions. Read this topic when the design involves any angle that isn't 90 degrees.
 
-## When to Read This File
+## When to Read
 
-Read this file when the project involves:
-- Legs or members at an angle to the seat/top (splay)
-- Through-tenons (tenon extends through and proud of the receiving board)
-- Compound angles (splay in two directions simultaneously)
-- Sweep-based mortises (mortise follows an angled body's path)
+- Splayed legs (chairs, stools, benches, sawhorses)
+- Tapered legs (Shaker tables, mid-century furniture)
+- Compound angles (splay in two planes simultaneously)
+- Stretchers or rails connecting splayed legs
+- Through-tenons at an angle
 
-## Splay Parameters
+## Splayed Legs
 
-Splayed legs require careful parameter design. The leg leans outward — the foot is offset from the top.
+### Splay Parameters
 
-### Single Splay (one direction)
+Splay is the outward lean of a leg from vertical. Compound splay means the leg leans in two planes — along the piece's length (X) and along its width (Y).
+
 ```python
-params.add("splay", VI("10 deg"), "deg", "Leg splay angle")
-params.add("leg_h", VI("7 in"), "in", "Leg height to seat bottom")
-params.add("seat_t", VI("0.9 in"), "in", "Seat thickness")
-params.add("tenon_proud", VI("0.125 in"), "in", "Tenon above seat")
+# Splay angles
+params.add("splay",   VI("6 deg"), "deg", "Leg splay along length (X)")
+params.add("splay_w", VI("4 deg"), "deg", "Leg splay along width (Y)")
 
-# Derived
-params.add("leg_top_z", VI("leg_h + seat_t + tenon_proud"), "in", "Total leg Z")
-params.add("splay_shift", VI("leg_top_z * tan(splay)"), "in", "Foot offset from top")
+# Derived: how far the foot shifts from the top at floor level
+params.add("splay_shift",   VI("leg_h * tan(splay)"),   "in", "Foot X offset from top")
+params.add("splay_shift_w", VI("leg_h * tan(splay_w)"), "in", "Foot Y offset from top")
 ```
 
-### Compound Splay (two directions)
-For legs that lean both forward/backward AND outward:
-```python
-params.add("splay", VI("10 deg"), "deg", "Leg splay along length")
-params.add("splay_w", VI("5 deg"), "deg", "Leg splay along width")
-params.add("splay_shift", VI("leg_top_z * tan(splay)"), "in", "Foot offset along length")
-params.add("splay_shift_w", VI("leg_top_z * tan(splay_w)"), "in", "Foot offset along width")
+### Strategy: Trapezoid Sketch + Move
+
+Build compound splay in two steps:
+
+1. **Primary splay (along length)** — Sketch the leg as a trapezoid in the XZ plane. The top edge is at `leg_inset_x ± leg_w/2`; the bottom edge shifts by `splay_shift`. This is a single sketch feature with fully parametric dimensions.
+
+2. **Secondary splay (along width)** — Apply a Move feature that rotates the leg body around the X axis by `splay_w`. This avoids compound-angle sketch math and keeps each splay axis independent.
+
+**Why not a single compound-angle sketch?** The sketch would need trigonometric expressions for foreshortened dimensions, and the extrude direction wouldn't align with any principal axis. Two-step splay is simpler, more readable, and each angle is independently adjustable.
+
+### Trapezoid Sketch (Primary Splay)
+
+Sketch on an XZ-offset construction plane at the leg's Y position. The four corners form a trapezoid — parallel top and bottom edges, with the bottom shifted by `splay_shift`:
+
+```
+ Top-left ─────── Top-right        ← at leg_top_z
+    \                 /
+     \               /              ← leg tapers inward toward floor
+      \             /
+  Bot-left ─── Bot-right            ← at Z = 0, shifted by splay_shift
 ```
 
-### Sketch the Leg Profile
-
-The leg is sketched as a **trapezoid** (not a rectangle) — the foot is offset from the top by `splay_shift`. Sketch on a construction plane parallel to the splay direction:
-
 ```python
-# Construction plane at the leg's front face position
-LegFront_Pl = af.off_plane(comp, root.xZConstructionPlane,
+# Construction plane at front face of leg
+LegFront_Pl = af.off_plane(root, root.xZConstructionPlane,
     "leg_inset_y - leg_d / 2", "LegFront_Pl")
 
-# Sketch trapezoid: top is at (inset_x, leg_top_z), foot is offset by splay_shift
-sk = comp.sketches.add(LegFront_Pl)
-sk.name = "Leg_Sk"
-lns = sk.sketchCurves.sketchLines
+sk = root.sketches.add(LegFront_Pl)
+m2s = sk.modelToSketchSpace  # ALWAYS use for XZ planes (Y may flip)
 
-# Top edge (at seat level + tenon proud)
-top_left_x = ev("leg_inset_x - leg_w / 2")
-top_right_x = ev("leg_inset_x + leg_w / 2")
+# Model-space corners → sketch-space points
+inset_x = ev("leg_inset_x")
+half_w = ev("leg_w") / 2
 top_z = ev("leg_top_z")
+shift = ev("splay_shift")
+plane_y = ev("leg_inset_y") - ev("leg_d") / 2
 
-# Bottom edge (shifted by splay at ground)
-bot_left_x = top_left_x - ev("splay_shift")
-bot_right_x = top_right_x - ev("splay_shift")
+s_tl = m2s(P(inset_x - half_w,          plane_y, top_z))
+s_tr = m2s(P(inset_x + half_w,          plane_y, top_z))
+s_br = m2s(P(inset_x + half_w - shift,  plane_y, 0))
+s_bl = m2s(P(inset_x - half_w - shift,  plane_y, 0))
 
-top = lns.addByTwoPoints(P(top_left_x, top_z, 0), P(top_right_x, top_z, 0))
-right = lns.addByTwoPoints(top.endSketchPoint, P(bot_right_x, 0, 0))
-bot = lns.addByTwoPoints(right.endSketchPoint, P(bot_left_x, 0, 0))
-left = lns.addByTwoPoints(bot.endSketchPoint, top.startSketchPoint)
-
-# Constrain: top and bottom are horizontal, sides are angled (no H/V constraint)
-gc = sk.geometricConstraints
-gc.addHorizontal(top)
-gc.addHorizontal(bot)
-
-# Dimension everything parametrically
-d = sk.sketchDimensions
-d.addDistanceDimension(top.startSketchPoint, top.endSketchPoint,
-    H, P(0, 0, 0)).parameter.expression = "leg_w"
-d.addDistanceDimension(bot.startSketchPoint, bot.endSketchPoint,
-    H, P(0, 0, 0)).parameter.expression = "leg_w"
-d.addDistanceDimension(sk.originPoint, top.startSketchPoint,
-    V, P(0, 0, 0)).parameter.expression = "leg_top_z"
-d.addDistanceDimension(top.startSketchPoint, bot.endSketchPoint,
-    H, P(0, 0, 0)).parameter.expression = "splay_shift"
-d.addDistanceDimension(top.startSketchPoint, bot.endSketchPoint,
-    V, P(0, 0, 0)).parameter.expression = "leg_top_z"
+# Draw 4 connected lines (shared sketch points at each corner)
+lns = sk.sketchCurves.sketchLines
+ln_top   = lns.addByTwoPoints(P(s_tl.x, s_tl.y, 0), P(s_tr.x, s_tr.y, 0))
+ln_right = lns.addByTwoPoints(ln_top.endSketchPoint,  P(s_br.x, s_br.y, 0))
+ln_bot   = lns.addByTwoPoints(ln_right.endSketchPoint, P(s_bl.x, s_bl.y, 0))
+ln_left  = lns.addByTwoPoints(ln_bot.endSketchPoint, ln_top.startSketchPoint)
 ```
 
-Extrude with `leg_d` (depth) as NewBody. The result is a straight-profiled leg with splay built into the sketch geometry.
+**Geometric constraints:** Only the top and bottom lines get `addHorizontal`. The side lines are intentionally angled (the splay) — no H/V constraint.
 
-## Move Feature (Splay Application)
+**Parametric dimensions (6 total):**
 
-The leg from above has splay in one direction (from the trapezoid sketch). For the perpendicular splay direction, use a **Move** feature with a rotation matrix.
+| Dimension | Points | Expression | Purpose |
+|-----------|--------|------------|---------|
+| Top width | top start → top end | `leg_w` | Leg width at top |
+| Bottom width | bot start → bot end | `leg_w` | Leg width at foot (same width, shifted position) |
+| Height | origin → top start (V) | `leg_top_z` | Leg top Z |
+| X position | origin → top start (H) | `leg_inset_x - leg_w / 2` | Left edge position |
+| Splay H | top start → bot end (H) | `splay_shift` | Horizontal shift between top and bottom |
+| Splay V | top start → bot end (V) | `leg_top_z` | Vertical span of splay (redundant with height, but constrains the diagonal) |
 
-### Single-Axis Rotation
+Extrude by `leg_d` to create the leg body.
+
+### Move Feature (Secondary Splay)
+
+Rotate the leg body around the X axis by `splay_w`, pivoting at a specific point so the leg top stays embedded in the seat.
 
 ```python
-import math
-
-# Rotate around X axis by splay_w angle (Y-direction splay)
-angle = ev("splay_w")  # radians (ev returns cm for lengths, rad for angles)
+angle = ev("splay_w")
 c, s = math.cos(angle), math.sin(angle)
 
-# Rotation matrix around X axis (row-major 4x4)
-xform = adsk.core.Matrix3D.create()
-xform.setWithArray([
-    1.0, 0.0, 0.0, 0.0,     # X unchanged
-    0.0,   c,   s, ty,       # Y rotated
-    0.0,  -s,   c, tz,       # Z rotated
-    0.0, 0.0, 0.0, 1.0
-])
-
-# ty, tz compensate so the rotation pivots around the leg top (not origin)
-# Pivot point: (leg_inset_x, leg_inset_y, leg_top_z)
-# ty = pivot_y - (pivot_y * c + pivot_z * s)
-# tz = pivot_z - (-pivot_y * s + pivot_z * c)
-pivot_y = ev("leg_inset_y")
+# Pivot point — see "Pivot Point Selection" below
+pivot_y = ev("leg_inset_y") + ev("leg_d") / 2  # inner edge of leg top
 pivot_z = ev("leg_top_z")
+
+# Translation to keep pivot fixed: T = pivot - R × pivot
 ty = pivot_y - (pivot_y * c + pivot_z * s)
 tz = pivot_z - (-pivot_y * s + pivot_z * c)
 
+xform = adsk.core.Matrix3D.create()
+xform.setWithArray([
+    1.0,  0.0,  0.0,  0.0,   # X unchanged
+    0.0,    c,    s,   ty,    # Y rotation + translation
+    0.0,   -s,    c,   tz,    # Z rotation + translation
+    0.0,  0.0,  0.0,  1.0
+])
+
 move_coll = adsk.core.ObjectCollection.create()
 move_coll.add(leg_body)
-move_inp = comp.features.moveFeatures.createInput2(move_coll)
+move_inp = root.features.moveFeatures.createInput2(move_coll)
 move_inp.defineAsFreeMove(xform)
-move_feat = comp.features.moveFeatures.add(move_inp)
+move_feat = root.features.moveFeatures.add(move_inp)
 move_feat.name = "YSplay_NL"
 ```
 
-### Compound Angle (Two Rotations)
+**Matrix construction:** The 4×4 matrix combines rotation and translation. For rotation around the X axis (splay in the YZ plane):
+```
+[1    0       0      0  ]
+[0  cos(θ)  sin(θ)  ty ]
+[0 -sin(θ)  cos(θ)  tz ]
+[0    0       0      1  ]
+```
 
-For compound splay, apply **two sequential Move features** — one for each splay direction. The order matters: apply the smaller splay first, then the larger. Each Move uses `defineAsFreeMove` with a rotation matrix pivoting around the leg top.
+For rotation around the Y axis (splay in the XZ plane), swap the affected columns/rows accordingly.
+
+The translation components `ty` and `tz` compensate for the pivot point — without them, the rotation pivots around the origin and the leg flies off to the wrong position.
+
+### Pivot Point Selection (CRITICAL)
+
+The pivot point determines which part of the leg stays fixed during the rotation. **Choose the pivot at the edge of the leg top that should remain fully embedded in the seat body.**
+
+| Pivot location | Result |
+|---------------|--------|
+| Outer edge of leg top | Leg top partially exits the seat — CUT leaves a split surface |
+| Center of leg top | Half the leg top exits the seat |
+| **Inner edge of leg top** | **Entire leg top submerges into seat — clean CUT surface** |
+
+For a leg at `leg_inset_y` with depth `leg_d`, the inner edge (toward seat center) is at `leg_inset_y + leg_d / 2`. Using this as the pivot ensures the entire leg cross-section stays inside the seat after the Y-splay rotation.
+
+**Why this matters:** After splay, the leg top is trimmed by CUTting the seat body from the leg. If the leg top partially exits the seat, the CUT leaves a visible split line on the leg face — an unacceptable artifact. Pivoting at the inner edge guarantees full submersion.
+
+### Trimming the Leg Top
+
+After both splay operations, the leg top protrudes into the seat body at an angle. CUT the seat from the leg to create a clean angled surface:
 
 ```python
-# Move 1: Y-splay (rotate around X axis)
-# ... same pattern as above with splay_w angle ...
-move_feat1 = comp.features.moveFeatures.add(move_inp1)
-move_feat1.name = "YSplay"
-
-# Move 2: X-splay is already in the trapezoid sketch — no second move needed
-# OR if both splays are done via Move (starting from a straight rectangular leg):
-# Rotate around Y axis by splay angle
+af.combine(root, leg_body, [seat_body], CUT, True, "LegTrim_NL")
 ```
 
-**Design choice:** You can build splay into the sketch profile (trapezoid) for one direction and use Move for the other, or use Move for both directions starting from a straight rectangular leg. The stool uses the hybrid approach — trapezoid sketch for the primary splay, Move for the secondary.
+**Do this BEFORE mirroring** — one CUT instead of four. Mirror propagates the trim.
 
-### Matrix Reference
+### Mirror for All Four Legs
 
-Common rotation matrices (row-major 4x4, for `setWithArray`):
+Build one leg (near-left), then mirror:
 
-| Rotation | Matrix (3x3 part) |
-|----------|-------------------|
-| Around X by θ | `[1,0,0], [0,cos,-sin], [0,sin,cos]` |
-| Around Y by θ | `[cos,0,sin], [0,1,0], [-sin,0,cos]` |
-| Around Z by θ | `[cos,-sin,0], [sin,cos,0], [0,0,1]` |
+1. Mirror NL across YMid → NR (2 legs)
+2. Mirror NL + NR across XMid → FL + FR (4 legs)
 
-Note: Fusion uses `setWithArray` with **row-major** order: `[r0c0, r0c1, r0c2, r0c3, r1c0, ...]`. The 4th column (indices 3, 7, 11) is translation.
+All features — trapezoid sketch, splay Move, trim CUT — propagate through the mirrors.
 
-**Pivot compensation:** To rotate around a point P (not the origin), set translation column to:
+## Splay-Adjusted Positions
+
+### The Formula
+
+Any horizontal member connecting splayed legs (stretcher, footrest, cross-brace) needs its position adjusted for splay. At a given height `h` from the floor, the legs have shifted inward by a fraction of the total splay:
+
 ```
-tx = Px - (Px*m00 + Py*m01 + Pz*m02)
-ty = Py - (Px*m10 + Py*m11 + Pz*m12)
-tz = Pz - (Px*m20 + Py*m21 + Pz*m22)
+splay_offset_at_h = splay_shift × (leg_top_z - h) / leg_top_z
 ```
 
-## Sweep Feature
+This is linear interpolation: at `h = 0` (floor), offset = full `splay_shift`. At `h = leg_top_z` (top), offset = 0. At any height in between, offset is proportional.
 
-Sweep extrudes a profile along a path (edge or curve). Essential for mortises that follow an angled body's path — a planar extrude can't match a compound-angle entry.
-
-### Basic Sweep
+**As a Fusion parameter expression:**
 
 ```python
-# Find the leg edge that runs from foot to top
-sweep_edge = None
-foot_pt = (ev("foot_x"), ev("foot_y"), 0)
-top_pt = (ev("top_x"), ev("top_y"), ev("leg_top_z"))
-for i in range(leg_body.edges.count):
-    e = leg_body.edges.item(i)
-    sp, ep = e.startVertex.geometry, e.endVertex.geometry
-    d_start = abs(sp.x - foot_pt[0]) + abs(sp.y - foot_pt[1]) + abs(sp.z - foot_pt[2])
-    d_end = abs(ep.x - top_pt[0]) + abs(ep.y - top_pt[1]) + abs(ep.z - top_pt[2])
-    if d_start < 0.1 and d_end < 0.1:
-        sweep_edge = e
-        break
-
-sweep_path = comp.features.createPath(sweep_edge)
+params.add("str_sx", VI("splay_shift * (leg_top_z - str_h) / leg_top_z"),
+           "in", "Stretcher X splay offset")
+params.add("str_sy", VI("splay_shift_w * (leg_top_z - str_h) / leg_top_z"),
+           "in", "Stretcher Y splay offset")
 ```
 
-### Sweep as CUT (Through-Mortise)
+**As a script-time helper (for positioning sketches):**
 
 ```python
-# Profile: the tenon shoulder cross-section on the seat face (see Body Projection below)
-sweep_inp = comp.features.sweepFeatures.createInput(profiles, sweep_path, CUT)
-sweep_inp.orientation = adsk.fusion.SweepOrientationTypes.PerpendicularOrientationType
-sweep_inp.participantBodies = [seat_body]
-
-# Distance control: what fraction of the path to sweep
-# distanceOne = 1.0 means full path from start, distanceTwo = 0 means no extension
-sweep_inp.distanceOne = adsk.core.ValueInput.createByString("1.00")
-sweep_inp.distanceTwo = adsk.core.ValueInput.createByString("0")
-
-sweep_feat = comp.features.sweepFeatures.add(sweep_inp)
-sweep_feat.name = "ThroughMortise"
+def splay_center(h):
+    """Return (sx, sy) splay offsets at height h (all values in cm)."""
+    frac = (ev("leg_top_z") - h) / ev("leg_top_z")
+    return ev("splay_shift") * frac, ev("splay_shift_w") * frac
 ```
 
-### Path Direction
+### Stretcher Length with Splay
 
-The sweep path has a direction based on the edge orientation. `distanceOne` sweeps in the path direction; `distanceTwo` sweeps opposite. To determine which end of the edge matches your intended start point:
+A stretcher running along the X axis between two legs at height `str_h`:
 
 ```python
-# Check if path start matches our expected start vertex
-path_start_vertex = sweep_edge.startVertex.geometry
-expected_start = (foot_x, foot_y, foot_z)
-vtx_match = (abs(path_start_vertex.x - expected_start[0]) +
-             abs(path_start_vertex.y - expected_start[1]) +
-             abs(path_start_vertex.z - expected_start[2]) < 0.1)
+# Splay offsets at this height
+params.add("str_sx", VI("splay_shift * (leg_top_z - str_h) / leg_top_z"), "in", "")
 
-# isOpposedToEntity indicates if the path item is reversed relative to the edge
-opposed = sweep_path.item(0).isOpposedToEntity
-path_fwd = not (vtx_match != opposed)
-
-if path_fwd:
-    sweep_inp.distanceOne = VI("1.00")
-    sweep_inp.distanceTwo = VI("0")
-else:
-    sweep_inp.distanceOne = VI("0")
-    sweep_inp.distanceTwo = VI("1.00")
+# Stretcher runs from leg inner face to leg inner face, plus tenon protrusion
+params.add("str_len",
+    VI("seat_l - 2 * leg_inset_x + 2 * str_sx - leg_w + 2 * mt_l"),
+    "in", "Stretcher total length")
 ```
 
-### Sweep Orientation Types
+Breaking this down:
+- `seat_l - 2 * leg_inset_x` — distance between leg centers at top
+- `+ 2 * str_sx` — legs are wider apart at this lower height due to splay
+- `- leg_w` — subtract leg width (stretcher starts at inner face, not center)
+- `+ 2 * mt_l` — add tenon protrusion at each end
 
-| Type | Behavior |
-|------|----------|
-| `PerpendicularOrientationType` | Profile stays perpendicular to path (most common for mortises) |
-| `ParallelOrientationType` | Profile maintains original orientation along path |
+For a stretcher along Y:
+```python
+params.add("str_len_y",
+    VI("seat_w - 2 * leg_inset_y + 2 * str_sy - leg_d + 2 * mt_l"),
+    "in", "Side stretcher total length")
+```
 
-## Body Projection (`intersectWithSketchPlane`)
+### Stretcher Center Position
 
-Projects a body's cross-section onto a sketch plane. Returns reference curves showing where the body passes through the plane. Essential for laying out through-tenon shoulders.
+The stretcher center must also be splay-adjusted:
+
+```python
+sx, sy = splay_center(ev("str_h"))
+# X-axis stretcher: centered at large Y (back legs)
+str_x0 = ev("leg_inset_x") - sx + ev("leg_w") / 2 - ev("mt_l")
+str_y_c = ev("seat_w") - ev("leg_inset_y") + sy  # back leg row
+str_z_c = ev("str_h")
+```
+
+### Stretcher Sketch vs. Extrude Dimension Mapping
+
+Stretchers are sketched on a **horizontal construction plane** (XY offset at `str_h`). On this plane, the sketch spans X and Y while `ext_new_sym` extrudes in Z. For a tall, thin stretcher (shelf-style), the **height** (tall dimension) must go on the extrude, not the sketch cross-axis:
+
+| Stretcher runs in | Sketch long axis | Sketch cross-axis | `ext_new_sym` (Z) |
+|---|---|---|---|
+| X (back/front) | X = `str_len` | Y = `str_t` (thickness) | `str_w / 2` (half-height) |
+| Y (side) | Y = `str_len` | X = `str_t` (thickness) | `str_w / 2` (half-height) |
+
+**Common mistake:** putting `str_w` (the larger "width/height" dimension) on the sketch cross-axis and `str_t` on the extrude. This produces a stretcher that is deep (into the table) instead of tall, and causes stretcher-to-stretcher interference at leg corners where two 3.5"-deep stretchers overlap inside a 1.5" leg.
+
+**Rule of thumb:** On a horizontal construction plane, the extrude direction is Z (vertical). A stretcher's visible height is vertical → it goes on the extrude. The thin dimension faces the table interior → it goes on the sketch cross-axis.
+
+## Non-Perpendicular Joinery
+
+### The Gap Problem
+
+When a stretcher meets a splayed leg, the standard flat shoulder CUT leaves a gap. The shoulder face is perpendicular to the stretcher axis, but the leg surface is tilted by the splay angle. At 6 deg splay, this gap is ~0.09"--0.18" -- visible and structurally weak.
+
+### Solution: Leg CUT + Sweep Tenon
+
+Instead of cutting shoulders from the stretcher ends, CUT the leg FROM the stretcher to create an angled mating face. Then sweep a tenon from that angled face along the stretcher axis. The shoulder naturally sits flush against the splayed leg.
+
+See `joinery/mortise-tenon.md` section "Angled M&T Variant" for the complete 6-step technique.
+
+### Key Points
+
+- Use `angled_tenon_end()` instead of `shoulder_cut_end()` when any rail meets a post at a non-perpendicular angle
+- The leg is the CUT tool with `keepTool=True` -- it is not modified
+- Sweep uses `PerpendicularOrientationType` -- the tenon follows the stretcher axis
+- Apply before mirror -- mirrored stretchers inherit the angled geometry
+- Existing mortise CUTs work unchanged -- the tenon creates an angled mortise pocket
+
+## Stretcher Splay Matching
 
 ### When to Use
 
-| Technique | Use When |
-|-----------|----------|
-| `sk.project(edge)` | Project specific edges (slot boundaries, dado lines) |
-| `sk.intersectWithSketchPlane([body])` | Project full body cross-section (angled body through a face) |
+When stretchers connect splayed legs and the stretcher sides should be **parallel to the adjacent leg faces** — not horizontal. This is a refined look where the stretcher follows the leg geometry. Without this, the stretcher-to-leg junction shows a visible wedge gap between the flat stretcher side and the angled leg face.
 
-### Usage
+### Technique: Move Before Joinery
+
+Add a **Move (free rotation)** to the stretcher body **after extrude but before `angled_tenon_end`**:
+
+1. Stretcher tilts to match the leg splay angle
+2. `angled_tenon_end`'s leg CUT creates a shoulder face accounting for both the stretcher tilt and leg splay
+3. Mirror features propagate the tilt automatically
+
+**Key insight — rotation axis = stretcher's long axis.** A back stretcher runs in X and rotates around X (for Y-splay `splay_w`). A side stretcher runs in Y and rotates around Y (for X-splay `splay`). Since rotation is around the stretcher's own long axis, sweep paths along that axis are unaffected — only the cross-section tilts.
+
+### Pivot at Stretcher Center
+
+Unlike legs (where the pivot is at the inner edge to stay embedded in the seat), stretchers pivot at their **own center** — the point that should stay fixed is the stretcher's centroid at its splay-adjusted position:
 
 ```python
-# Sketch on the seat's top face
-top_face = af.find_face(seat_body, "z", +1)
-sk = comp.sketches.add(top_face)
-sk.name = "Mortise_Sk"
-
-# Project the angled leg body onto this sketch plane
-projected = sk.intersectWithSketchPlane([leg_body])
-
-# Collect projected reference curves and their sketch points
-proj_pts = []    # [(x, y, sketchPoint), ...]
-proj_curves = [] # [(sx, sy, ex, ey, curve), ...]
-for i in range(sk.sketchCurves.count):
-    c = sk.sketchCurves.item(i)
-    if c.isReference:
-        sp, ep = c.startSketchPoint, c.endSketchPoint
-        sg, eg = sp.geometry, ep.geometry
-        proj_pts.append((sg.x, sg.y, sp))
-        proj_curves.append((sg.x, sg.y, eg.x, eg.y, c))
+# Back stretcher: rotate -splay_w around X, pivot at (bstr_y_c, bstr_z_c)
+angle_bs = -ev("splay_w")
+c_bs, s_bs = math.cos(angle_bs), math.sin(angle_bs)
+ty_bs = bstr_y_c - (bstr_y_c * c_bs + bstr_z_c * s_bs)
+tz_bs = bstr_z_c - (-bstr_y_c * s_bs + bstr_z_c * c_bs)
+xf_bs = adsk.core.Matrix3D.create()
+xf_bs.setWithArray([
+    1.0,  0.0,   0.0,   0.0,
+    0.0,  c_bs,  s_bs,  ty_bs,
+    0.0, -s_bs,  c_bs,  tz_bs,
+    0.0,  0.0,   0.0,   1.0
+])
 ```
 
-### Finding Projected Points
+For a side stretcher (runs in Y), use the Y-axis rotation matrix with `+splay` and pivot at `(sstr_x_c, sstr_z_c)`.
+
+### Angle Sign Convention
+
+| Stretcher | Runs in | Rotates around | Angle | Effect |
+|-----------|---------|----------------|-------|--------|
+| Back (large Y) | X | X | `-splay_w` | Bottom tilts toward +Y → matches back legs' outward lean |
+| Side (small X) | Y | Y | `+splay` | Bottom tilts toward -X → matches left legs' outward lean |
+
+The front stretcher (mirror of back across YMid) and right stretcher (mirror of left across XMid) inherit the correct tilt direction from their mirror source.
+
+### Interference After Tilting
+
+Tilting a stretcher can push its surface into adjacent bodies. **Always run `check_interference` after adding splay moves.** Common case: a footrest sitting directly above the front stretcher — the tilted stretcher's top edge rises by `str_w/2 × sin(splay_angle)` and may intersect the footrest. Fix with a trim CUT:
 
 ```python
-def nearest_proj(proj_pts, x, y):
-    """Find the nearest projected sketch point to (x, y)."""
-    best, best_d = None, 1e10
-    for px, py, sp in proj_pts:
-        d = abs(px - x) + abs(py - y)
-        if d < best_d:
-            best, best_d = sp, d
-    return best
-
-def nearest_proj_curve(proj_curves, sx, sy, ex, ey):
-    """Find the projected curve closest to a line from (sx,sy) to (ex,ey)."""
-    best, best_d = None, 1e10
-    for _sx, _sy, _ex, _ey, c in proj_curves:
-        d = min(abs(_sx-sx)+abs(_sy-sy)+abs(_ex-ex)+abs(_ey-ey),
-                abs(_sx-ex)+abs(_sy-ey)+abs(_ex-sx)+abs(_ey-sy))
-        if d < best_d:
-            best, best_d = c, d
-    return best
+af.combine(root, footrest_body, [front_stretcher], CUT, True, "FR_FStrTrim")
 ```
 
-### Shoulder Lines from Projected Corners
+### Build Order
 
-Draw lines inward from each projected corner to create the tenon shoulder. The distance is parametric (`tenon_shoulder_w`):
-
-```python
-# For each projected corner, draw a line along the projected edge
-# to a point tenon_shoulder_w inward
-corner_pt = nearest_proj(proj_pts, corner_x, corner_y)
-corner_geom = corner_pt.geometry
-
-# Find the projected curve starting from this corner
-proj_edge = nearest_proj_curve(proj_curves, corner_x, corner_y, far_x, far_y)
-
-# Calculate point at tenon_shoulder_w along the projected edge
-es = proj_edge.startSketchPoint.geometry
-ee = proj_edge.endSketchPoint.geometry
-edge_len = ((ee.x-es.x)**2 + (ee.y-es.y)**2)**0.5
-frac = ev("tenon_shoulder_w") / edge_len if edge_len > 0.001 else 0
-
-# Direction: from corner toward far end
-ds = abs(corner_geom.x - es.x) + abs(corner_geom.y - es.y)
-de = abs(corner_geom.x - ee.x) + abs(corner_geom.y - ee.y)
-if ds < de:
-    end_x = es.x + (ee.x - es.x) * frac
-    end_y = es.y + (ee.y - es.y) * frac
-else:
-    end_x = ee.x + (es.x - ee.x) * frac
-    end_y = ee.y + (es.y - ee.y) * frac
-
-# Draw the shoulder line
-shoulder = lns.addByTwoPoints(P(corner_geom.x, corner_geom.y, 0),
-                               P(end_x, end_y, 0))
-# Coincident constraint ties shoulder start to projected corner
-sk.geometricConstraints.addCoincident(shoulder.startSketchPoint, corner_pt)
-
-# Add parametric dimension
-sk.sketchDimensions.addDistanceDimension(
-    corner_pt, shoulder.endSketchPoint,
-    adsk.fusion.DimensionOrientations.AlignedDimensionOrientation,
-    P(0, 0, 0)).parameter.expression = "tenon_shoulder_w"
+```
+Extrude stretcher → Splay Move → angled_tenon_end (both ends) → Mirror → Mortise CUTs
 ```
 
-After drawing all four shoulder lines, connect their endpoints to close the shoulder rectangle. The smallest profile in the sketch is the tenon cross-section:
+The Move must come after extrude (body must exist) and before `angled_tenon_end` (so the leg CUT + sweep tenon account for the tilted orientation).
+
+## SplitBody
+
+### When to Use
+
+SplitBody separates one body into two pieces using a cutting tool (plane or body face). Used for:
+- Through-tenons: split the protruding portion from the main body
+- Angled cuts: split a body at a construction plane
+
+### API
 
 ```python
-# Connect shoulder line endpoints to form the inner rectangle
-lns.addByTwoPoints(shoulder_top_left.endSketchPoint, shoulder_top_right.endSketchPoint)
-lns.addByTwoPoints(shoulder_bot_left.endSketchPoint, shoulder_bot_right.endSketchPoint)
-
-# Select the smallest profile (the tenon shoulder area)
-prof = af.smallest_profile(sk)
-```
-
-## SplitBody Feature
-
-Splits a body into multiple pieces using a plane or face as the cutting tool.
-
-### Basic Split
-
-```python
-# Split leg at the seat bottom plane
-split_inp = comp.features.splitBodyFeatures.createInput(
-    leg_body,           # body to split
-    seat_bottom_plane,  # splitting tool (construction plane or BRepFace)
-    True                # keep both pieces
+split_inp = root.features.splitBodyFeatures.createInput(
+    body_to_split,
+    splitting_tool,  # construction plane or BRepFace
+    True             # splitToolExtent: extend tool to fully cut body
 )
-split_feat = comp.features.splitBodyFeatures.add(split_inp)
-split_feat.name = "LegSplit"
+split_feat = root.features.splitBodyFeatures.add(split_inp)
 ```
 
-After splitting, Fusion renames the pieces: original keeps its name, copies get `(1)`, `(2)`, etc. Use `find_body()` to locate each piece.
+### API Limitation: Single Tool Only
 
-### Multi-Tool Split (API Limitation)
+The Fusion UI allows selecting multiple splitting tools, but the Python API accepts only a single entity. `ObjectCollection` is rejected.
 
-Fusion's API only accepts ONE splitting tool per `SplitBodyFeature`. For multiple split planes, use sequential splits:
+**Workaround:** Chain sequential single-tool splits. Each split produces two bodies; feed the appropriate piece into the next split.
+
+### Re-Finding Bodies After Split
+
+After `splitBodyFeatures.add()`, the original body reference may be stale. Re-find bodies by name:
 
 ```python
-# Split 1: separate tenon from leg
-split1 = comp.features.splitBodyFeatures.createInput(leg_body, seat_pl, True)
-feat1 = comp.features.splitBodyFeatures.add(split1)
-feat1.name = "Split_Seat"
-
-# Split 2: separate waste from tenon (find the largest remaining piece)
-biggest = None
-for i in range(comp.bRepBodies.count):
-    b = comp.bRepBodies.item(i)
-    if "Leg" in b.name and (biggest is None or b.volume > biggest.volume):
-        biggest = b
-
-split2 = comp.features.splitBodyFeatures.createInput(biggest, waste_plane, True)
-feat2 = comp.features.splitBodyFeatures.add(split2)
-feat2.name = "Split_Waste"
+split_feat = root.features.splitBodyFeatures.add(split_inp)
+# Re-find bodies — split may change which body has which name
+upper = None
+lower = None
+for i in range(root.bRepBodies.count):
+    b = root.bRepBodies.item(i)
+    if b.name == "MyBody":
+        # Determine which piece is which by bounding box
+        bb = b.boundingBox
+        if bb.maxPoint.z > threshold:
+            upper = b
+        else:
+            lower = b
 ```
 
-## RemoveBody Feature
+## Move Feature
 
-Removes unwanted bodies (waste pieces after split, construction helper bodies).
+### When to Use
+
+- Secondary splay (rotation in a second plane after the sketch-based primary splay)
+- Repositioning a body to a non-axis-aligned location
+- Any rotation that can't be expressed as a sketch angle
+
+### API
 
 ```python
-waste = find_body("Leg_NL (2)")  # waste piece from split
-if waste:
-    comp.features.removeFeatures.add(waste)
+xform = adsk.core.Matrix3D.create()
+xform.setWithArray([...])  # 4×4 row-major matrix
+
+move_coll = adsk.core.ObjectCollection.create()
+move_coll.add(body)
+move_inp = root.features.moveFeatures.createInput2(move_coll)
+move_inp.defineAsFreeMove(xform)
+feat = root.features.moveFeatures.add(move_inp)
 ```
 
-**Naming after split:** When a body "Leg" is split into 3 pieces, they become "Leg", "Leg (1)", "Leg (2)". Identify which piece is which by checking bounding boxes or volumes — don't rely on the numbering order being predictable.
+### Pivot-Compensated Rotation Matrix
 
-## Through-Tenon Joinery — Complete Pattern
-
-A through-tenon passes completely through the receiving board, with a small proud section visible on the far side. Common in stool seats, workbench tops, and trestle tables.
-
-### Workflow Summary
+To rotate by angle θ around axis A, pivoting at point P (not the origin):
 
 ```
-1. Sketch leg profile (trapezoid for splay) → Extrude through seat
-2. Move to apply perpendicular splay (compound angle)
-3. Sketch tenon shoulders on seat top face (body projection + shoulder lines)
-4. Sweep along leg edge → CUT angled through-mortise in seat
-5. SplitBody at seat bottom → separate proud tenon from leg
-6. RemoveBody waste pieces
-7. Mirror to replicate all legs
-8. Combine CUT all legs into seat (through-mortise)
+T = P - R × P
 ```
 
-### Step-by-Step
+Where R is the rotation matrix and T is the translation vector. This ensures point P stays fixed after the rotation.
 
-**1. Leg extends through seat:**
+**Rotation around X axis** (splay in YZ plane):
 ```python
-# leg_top_z = leg_h + seat_t + tenon_proud
-# The leg profile goes from z=0 (foot) to z=leg_top_z (above seat)
-# Extrude depth = leg_d
+c, s = math.cos(theta), math.sin(theta)
+ty = py - (py * c + pz * s)
+tz = pz - (-py * s + pz * c)
+matrix = [
+    1, 0,  0, 0,
+    0, c,  s, ty,
+    0, -s, c, tz,
+    0, 0,  0, 1
+]
 ```
 
-**2. Apply compound splay (if needed):**
+**Rotation around Y axis** (splay in XZ plane):
 ```python
-# First Move: Y-direction splay (rotate around X, pivot at leg top)
-# Second Move: Already in trapezoid sketch (X-direction splay)
+c, s = math.cos(theta), math.sin(theta)
+tx = px - (px * c - pz * s)
+tz = pz - (px * s + pz * c)
+matrix = [
+    c, 0, -s, tx,
+    0, 1,  0, 0,
+    s, 0,  c, tz,
+    0, 0,  0, 1
+]
 ```
 
-**3. Project and draw shoulders:**
+**Rotation around Z axis** (rotation in XY plane):
 ```python
-# Sketch on seat top face
-# intersectWithSketchPlane([leg_body]) → projected outline
-# Draw 4 shoulder lines inward from projected corners
-# Connect endpoints → tenon shoulder rectangle
-# Select smallest profile
+c, s = math.cos(theta), math.sin(theta)
+tx = px - (px * c + py * s)
+ty = py - (-px * s + py * c)
+matrix = [
+    c,  s, 0, tx,
+    -s, c, 0, ty,
+    0,  0, 1, 0,
+    0,  0, 0, 1
+]
 ```
 
-**4. Sweep CUT:**
-```python
-# Find the leg edge from foot to top
-# Create path from edge
-# Sweep the shoulder profile along path → CUT into seat
-# PerpendicularOrientationType keeps profile square to leg angle
-```
+### Move is NOT Parametric
 
-**5–6. Split and remove waste:**
-```python
-# Split leg at seat bottom plane (construction plane at seat_z)
-# Result: 3 pieces — leg below seat, tenon through seat, waste above
-# Remove waste piece(s)
-# Remaining: leg body + proud tenon extending above seat
-```
+The Move feature's matrix is baked at script time — it doesn't update when parameters change. If `splay_w` changes in Change Parameters, the Move angle stays the same.
 
-**7. Mirror:**
-```python
-# Mirror the leg across midplanes to create all 4 legs
-# Use mirror_bodies for the final leg body (after split/remove)
-# Each mirrored leg inherits the compound splay angle
-```
+**Mitigation:** For furniture models, splay angles are rarely adjusted after the initial design. If parametric splay is required, use a component-level rotation (via occurrence transform) instead of a Move feature, but this adds complexity to cross-component CUT operations.
 
-**8. Through-mortise CUT:**
-```python
-# The sweep already cut the angled mortise in step 4
-# Mirror creates matching mortises for all legs
-# Alternative: CUT all legs into seat via Combine after mirror
-```
+### Re-Find Bodies After Move
 
-### Parameter Summary for Through-Tenon with Compound Splay
+After a Move feature, the body's geometry has changed but the Python variable still references the same object. However, if subsequent operations rely on coordinates (e.g., `find_face`), re-find the body by name to ensure the reference is fresh:
 
 ```python
-# Primary dimensions
-("leg_w", "1.4 in", "in", "Leg width (cross-section)")
-("leg_d", "1.1 in", "in", "Leg depth (cross-section)")
-("leg_h", "7 in", "in", "Leg height to seat bottom")
-("seat_t", "0.9 in", "in", "Seat thickness")
-
-# Splay angles
-("splay", "10 deg", "deg", "Leg splay along length")
-("splay_w", "5 deg", "deg", "Leg splay along width")
-
-# Through-tenon
-("tenon_proud", "0.125 in", "in", "Tenon extension above seat")
-("tenon_shoulder_w", "0.3 in", "in", "Shoulder width (material around mortise)")
-
-# Derived
-("leg_top_z", "leg_h + seat_t + tenon_proud", "in", "Total leg Z extent")
-("splay_shift", "leg_top_z * tan(splay)", "in", "Foot offset from top, along length")
-("splay_shift_w", "leg_top_z * tan(splay_w)", "in", "Foot offset from top, along width")
-("leg_inset_x", "2 in", "in", "Leg center from seat end")
-("leg_inset_y", "1.5 in", "in", "Leg center from seat edge")
-("seat_z", "leg_h", "in", "Seat bottom Z position")
+body = None
+for i in range(root.bRepBodies.count):
+    b = root.bRepBodies.item(i)
+    if b.name == "Leg_NL":
+        body = b
+        break
 ```
 
-## Coordinate Transform for Body-Face Sketches
+## Common Pitfalls
 
-When sketching on a body face (e.g., seat top), the sketch coordinate system may differ from the captured/expected axes. Use a coordinate transform to map between captured and actual sketch directions:
+| Error | Cause | Fix |
+|-------|-------|-----|
+| Leg upside-down on XZ plane | Sketch Y maps to model -Z on XZ-offset planes | Use `modelToSketchSpace` for all corner points — never assume sketch Y = model Z |
+| Leg top partially outside seat after Y-splay | Move pivot at outer/center edge of leg | Pivot at the **inner edge** of the leg top (`leg_inset + leg_d / 2`) |
+| Stretcher doesn't reach legs | Stretcher length doesn't account for splay at its height | Use `splay_shift * (leg_top_z - h) / leg_top_z` for splay-adjusted positions |
+| 4 trim CUTs needed | Trim CUT applied after mirroring all legs | Apply trim CUT to template leg BEFORE mirror — mirrors propagate the CUT |
+| Move matrix wrong — body flies off | Forgot pivot compensation (T = P - R×P) | Include translation components in the matrix that compensate for pivot point |
+| Splay angle changes don't update | Move feature matrix baked at script time | Expected limitation — splay angles are design-time constants |
+| H/V constraint on trapezoid side line | Taper lines are intentionally angled | Only add `addHorizontal` on top/bottom edges, never on the angled sides |
+| Dimension uses `addDistanceDimension` for splay but value is negative | Distance dimensions are always positive | Use the `splay_shift` parameter directly — it's always positive (derived from `tan(splay)`) |
+| Tilted stretcher intersects footrest/rail | Splay Move raises stretcher edge into adjacent body | Run `check_interference` after splay moves; add trim CUT if non-zero |
+| Splay Move after `angled_tenon_end` — wrong shoulder | Move tilts the already-cut shoulder face | Move must come BEFORE `angled_tenon_end` — the tenon technique needs to see the tilted body |
+| Stretcher 3.5" deep × 0.75" tall (swapped) | Put `str_w` (height) on sketch cross-axis, `str_t` on extrude | Sketch cross-axis = `str_t` (thickness), extrude = `str_w / 2` (half-height). See "Sketch vs. Extrude Dimension Mapping" |
+| Stretcher-to-stretcher interference at corners | Two thick stretchers overlap inside a leg | Swap to correct dims (above); run `check_interference` after stretcher extrudes |
 
-```python
-# Captured sketch axes (from design intent or capture data)
-cap_xd = (1.0, 0.0, 0.0)
-cap_yd = (0.0, -1.0, 0.0)
+## Complete Build Sequence for Splayed-Leg Piece
 
-# Actual sketch axes (from the runtime sketch)
-act_xd = sk.xDirection
-act_yd = sk.yDirection
-
-# Build 2x2 rotation matrix
-m00 = cap_xd[0]*act_xd.x + cap_xd[1]*act_xd.y + cap_xd[2]*act_xd.z
-m01 = cap_yd[0]*act_xd.x + cap_yd[1]*act_xd.y + cap_yd[2]*act_xd.z
-m10 = cap_xd[0]*act_yd.x + cap_xd[1]*act_yd.y + cap_xd[2]*act_yd.z
-m11 = cap_yd[0]*act_yd.x + cap_yd[1]*act_yd.y + cap_yd[2]*act_yd.z
-
-def xf(sx, sy):
-    """Transform from captured sketch space to actual sketch space."""
-    return (sx * m00 + sy * m01, sx * m10 + sy * m11)
 ```
-
-This is needed because body faces can have different sketch orientations depending on which face is selected and how Fusion sets up the sketch axes. Always compare the expected vs actual `xDirection`/`yDirection` and apply the transform to all sketch coordinates.
+1. Parameters: splay, splay_w, splay_shift, splay_shift_w, leg dimensions
+2. Seat: simple rectangular extrude on XY plane at seat_z
+3. Near-left leg:
+   a. Construction plane at leg front face (XZ offset)
+   b. Trapezoid sketch (primary splay in X)
+   c. Extrude by leg_d
+   d. Move feature (secondary splay in Y, pivot at inner edge)
+   e. Trim CUT (seat CUTs leg top — clean angled surface)
+4. Mirror NL → NR across YMid
+5. Mirror NL+NR → FL+FR across XMid
+6. Joinery: dominos, through-tenons, or shouldered M&T (see joinery/*.md)
+7. Stretchers:
+   a. Splay-adjusted derived params for each stretcher
+   b. Extrude stretcher at full length (includes tenon protrusion)
+   c. (Optional) Splay Move — tilt stretcher to match leg angle (see "Stretcher Splay Matching")
+   d. Angled tenon (for splayed legs) or shoulder CUT both ends (see joinery/mortise-tenon.md)
+   e. Mirror if symmetric (splay + shoulders propagate)
+   f. Trim CUT adjacent bodies if splay creates interference (footrest, rails)
+   g. CUT stretcher into legs (creates mortise pockets)
+8. Details: chamfers on seat edges and leg bottoms
+```

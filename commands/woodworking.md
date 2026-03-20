@@ -63,7 +63,7 @@ Read the specific joint file **before writing joinery code**. Each file has para
 
 | Joint | When to Read | Status | File |
 |-------|-------------|--------|------|
-| **Mortise & Tenon** | Leg-to-rail, stretcher-to-leg, frame-and-panel, table aprons, any rail-into-post connection | Tested (counter stool — blind, through & angled variants) | `joinery/mortise-tenon.md` |
+| **Mortise & Tenon** | Leg-to-rail, stretcher-to-leg, frame-and-panel, table aprons, any rail-into-post connection | Tested (counter stool — blind, through & angled variants) | Inline in skill + `mortise_tenon` template |
 | **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `joinery/domino-joint.md` |
 | **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `joinery/dovetail.md` |
 | **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `joinery/box-joint.md` |

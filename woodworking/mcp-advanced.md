@@ -1,77 +1,150 @@
-# MCP Advanced Workflow
+# MCP Advanced — Modifying Existing Designs
 
-Read this file when modifying an existing design, syncing UI changes, or using selection-driven interaction. The basic MCP execution loop is in the core skill.
+Techniques for modifying models that already have a timeline, without rebuilding from scratch.
 
-## Modifying an Existing Design
+## When to Read
 
-When the user asks to change an existing design (e.g., "make the shelves wider"):
+- User asks to change, fix, or add features to an existing model
+- User selects bodies in Fusion and asks for modifications
+- You need to fix a bug in a previously-built model (e.g., swapped dimensions)
+- Adding joinery or details to a model built by another agent or session
 
-**Step 1: Check provenance** — call `get_document_status` first:
+## Tools for Incremental Work
 
-- `tracked=false` → The agent can't safely modify this design incrementally. Ask the user: "I can't safely modify this design incrementally. Would you like me to create a new script for it?"
-- `tracked=true`, `needsSync=true` → Provenance was restored from disk. Call `sync_script` to reconcile before proceeding.
-- `tracked=true`, `pendingChanges > 0` → The user made UI changes. Call `sync_script` to reconcile, then proceed.
-- `tracked=true`, `pendingChanges == 0` → Proceed directly.
+| Tool | Use Case |
+|------|----------|
+| `get_selection` | Read what the user selected — body names, volumes, bounding boxes |
+| `capture_design` | Get current parameters, body names, timeline (read-only, safe on any doc) |
+| `modify_parameters` | Change parameter values without touching the timeline — fastest fix for dimension issues |
+| `execute_script` (no `clean`) | Append new features to the end of the timeline |
+| `execute_script` (with feature deletion in script) | Delete specific features and rebuild them |
+| `suppress_features` | Toggle features on/off for diagnostics |
+| `check_interference` | Validate after modifications |
 
-**Step 2: Apply the change:**
+## Approach 1: Parameter Modification Only
 
-**For dimension changes** (most common) — use `modify_parameters` for fast incremental tuning:
+**When to use:** The timeline structure is correct but dimensions are wrong (e.g., swapped width/thickness, wrong height).
 
-1. Call `capture_design` to understand the current model state.
-2. Call `modify_parameters` to change the relevant parameter expression(s).
-3. Fusion does **incremental recomputation** — only affected features recompute.
-4. Validate with `capture_design`.
-5. **Good** → update the `.py` source file to match the new expression.
-6. **Bad** → revert via `modify_parameters` with the old expression.
+```python
+# Via modify_parameters tool:
+{"parameters": [
+    {"name": "str_w", "expression": "0.875 in"},
+    {"name": "str_t", "expression": "1.25 in"}
+]}
+```
 
-**For structural changes** (add a component, change joinery type) — read the tracked script, make targeted changes, and re-run with `execute_script(clean=true)`. This deletes the existing model and rebuilds from the modified script. The entire operation is one transaction — **the user can Ctrl+Z to revert to the previous state**.
+All downstream features that reference these parameters recompute automatically. No timeline changes needed.
 
-## Selection-Driven Interaction
+**Limitation:** Can only change values of existing parameters. Cannot add new parameters, change which parameter an expression references, or fix structural issues (wrong sketch axis, wrong extrude direction).
 
-When the user points at something in Fusion 360 and asks about it:
+## Approach 2: Additive Features
 
-1. Call `get_selection` to read what they've selected.
-2. Use the structured entity info (type, name, dimensions) to understand their intent.
-3. If they want a change, use `modify_parameters` for dimension tweaks or `execute_script` for structural changes.
-4. Use `set_selection` to highlight the result or related entities.
+**When to use:** Adding new features to an existing model (e.g., adding dominos to a table that has legs and a top but no joinery).
 
-## Change Detection
+1. `get_selection` — identify the bodies the user wants to modify
+2. `capture_design` — get current parameter names and body geometry
+3. Write a script that:
+   - Uses `find_body(name)` to reference existing bodies
+   - Adds new parameters (check for name conflicts with existing ones)
+   - Creates new sketches, extrudes, CUTs, etc.
+4. `execute_script` (without `clean=true`) — appends to the timeline
+5. Ctrl+Z reverts the entire addition
 
-When iterating on a design with the user making manual changes in Fusion 360:
+**Key rules:**
+- New parameter names must not collide with existing ones
+- Reference existing bodies by name via `find_body()`
+- Reference existing construction planes via `root.constructionPlanes.itemByName()`
+- The script runs AFTER the existing timeline — all existing features are computed
 
-1. Call `get_changes` once at the start (or after a script run) to capture a baseline.
-2. When the user says "I changed something" or between iterations, call `get_changes` again.
-3. The diff tells you exactly what moved — parameter expression changes, sketch dimension edits, body additions/removals, and timeline feature count delta.
-4. Use the diff to decide next steps: `modify_parameters` to adjust related dimensions, or `execute_script` if structural changes are needed.
+## Approach 3: Delete and Rebuild Features
 
-This avoids re-reading the full design with `capture_design` when you only need to know what changed.
+**When to use:** Existing features have structural problems that can't be fixed by parameter changes alone (e.g., wrong sketch-to-extrude dimension mapping, wrong feature order, missing splay moves).
 
-## Script Sync (after UI tweaks)
+### Deletion Order Matters
 
-When the user tweaks a design in the Fusion UI and you need to update the `.py` script to match:
+Features must be deleted in **reverse dependency order** — delete consumers before producers. If feature B references a body created by feature A, deleting A first causes B to lose its reference and the deletion fails.
 
-1. Call `sync_script` — no arguments needed. It reads the tracked script from the DocumentTracker and diffs automatically.
-2. The tool auto-patches user parameter expression changes (e.g., `tt_shoulder` from `"0.375 in"` to `"0.3 in"`) and returns the patched script.
-3. For changes that need agent help (`needsAgent`), apply each one:
-   - `featureParameterChanged` — update hardcoded expressions near the feature's `.name = "..."` line.
-   - `featureRemoved` — delete the code block that created the feature.
-   - `featureAdded` — generate new code from the capture data and insert it at the appropriate timeline position.
-4. Write the updated script to the file.
-5. Re-execute via `execute_script(clean=true)` to verify the model matches.
+**Correct order for stretcher rebuild:**
+```
+1. Mortise CUTs      (reference mirrored bodies → delete first)
+2. Mirrors           (create mirrored bodies)
+3. Angled tenons     (JOIN/sweep/sketch on stretcher body)
+4. Splay Moves       (transform stretcher body)
+5. Base extrude      (creates stretcher body)
+6. Sketch + ConstrPlane  (referenced by extrude)
+```
 
-## Sandbox Mode
+### Delete by Name, Not Index
 
-Use `execute_script` with `sandbox=true` to run a script in a throwaway document. The script executes in a fresh temporary document; on completion, a design snapshot is returned and the temp document is discarded.
+Timeline indices shift as features are deleted. Always find features by name:
 
-**When to use sandbox:**
-- Validating a script before committing to the real design (especially complex joinery phases)
-- Testing helper imports or sketch logic without risk
-- Exploring "what if" variations without polluting the undo history
+```python
+def delete_feature_by_name(timeline, name):
+    for i in range(timeline.count):
+        item = timeline.item(i)
+        if item.entity and hasattr(item.entity, 'name') and item.entity.name == name:
+            item.entity.deleteMe()
+            return True
+    return False
 
-**Behavior:**
-- ActionLog events are suppressed during the sandbox run
-- The sandbox document has no user parameters from the real design — scripts must create their own
-- Returns `{sandbox: true, snapshot: {...}}` on success
-- On error, the temp document is closed and the original document is restored
+# Delete in dependency order
+for feat_name in [
+    # Consumers first
+    "BStr_Mort_NR", "BStr_Mort_FR",
+    # Then mirrors
+    "FStr_Mir",
+    # Then angled tenons (reverse timeline order)
+    "BStr_TnR_Join", "BStr_TnR_Sweep", "BStr_TnR_PathSk", "BStr_TnR_Sk", "BStr_TnR_LegCut",
+    "BStr_TnL_Join", "BStr_TnL_Sweep", "BStr_TnL_PathSk", "BStr_TnL_Sk", "BStr_TnL_LegCut",
+    # Then base features
+    "BStr_Splay", "BStr", "BStr_Sk", "BStr_Pl",
+]:
+    delete_feature_by_name(timeline, feat_name)
+```
 
-**Not a substitute for the real execution loop.** Sandbox validates error-free execution but the real design's parameter expressions and timeline context may differ.
+### Adding New Parameters After Deletion
+
+After deleting features, their parameter references are gone, but user parameters may still exist. Check before adding:
+
+```python
+if not params.itemByName("front_str_h"):
+    params.add("front_str_h", VI("7 in"), "in", "Front stretcher height")
+```
+
+Old parameters that are no longer referenced can be deleted:
+```python
+p = params.itemByName("str_h")
+if p:
+    p.deleteMe()
+```
+
+### Surviving Features
+
+Features that don't depend on the deleted features survive unchanged. In the bar table rebuild:
+- Top, legs, dominos (before stretchers) — unaffected
+- Chamfers on leg bottoms (after stretchers) — survived because they reference leg bodies, not stretcher bodies
+
+**Caution:** If a surviving feature references a body modified by a deleted feature (e.g., a chamfer on a leg that had mortise CUTs from a stretcher), the feature recomputes with the unmodified body geometry. This may change edge counts or positions, potentially breaking the chamfer. Always verify with `capture_design` after deletion.
+
+## Workflow Summary
+
+```
+1. get_selection → identify what the user wants to change
+2. capture_design → understand current state (params, bodies, timeline)
+3. Decide approach:
+   a. Parameter values wrong → modify_parameters (simplest)
+   b. Need to add features → additive execute_script
+   c. Need to fix/replace features → delete + rebuild in execute_script
+4. Execute → validate with capture_design + check_interference
+5. User can Ctrl+Z to revert
+```
+
+## Common Pitfalls
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `deleteMe()` fails with "Tool Body Error / Reference Failures" | Deleting a feature that is referenced by a downstream feature still in the timeline | Delete consumers before producers — mortise CUTs before mirrors, mirrors before base extrudes |
+| "param name is not valid" after deletion | Deleted a feature but its user parameter still exists with a broken expression | Delete the orphaned parameter explicitly, or reuse it |
+| Chamfer fails after stretcher rebuild | Mortise CUT deletion changed leg geometry, altering edge count | Re-add chamfers after the rebuild, or verify edges still exist |
+| New parameter name collides | Script tries to add a parameter that already exists | Check `params.itemByName()` before adding |
+| Timeline index wrong after deletions | Used index-based deletion — indices shift as features are removed | Always find features by name, never by index |
