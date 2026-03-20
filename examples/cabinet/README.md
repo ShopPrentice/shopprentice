@@ -9,6 +9,13 @@ A parametric modern wall cabinet — 24"W x 12"D x 30"H with 2 inset doors, adju
   <img src="screenshots/right.png" width="49%" />
 </p>
 
+### Transparent Views
+
+<p float="left">
+  <img src="screenshots/transparent-iso-top-left.png" width="49%" />
+  <img src="screenshots/transparent-iso-top-right.png" width="49%" />
+</p>
+
 ## Example Prompt
 
 ```

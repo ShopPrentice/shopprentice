@@ -9,4 +9,13 @@ A parametric modern platform bed — Queen 60"W x 80"L, headboard to 36", slat s
   <img src="screenshots/right.png" width="49%" />
 </p>
 
+### Transparent Views
+
+<p float="left">
+  <img src="screenshots/transparent-iso-top-left.png" width="49%" />
+  <img src="screenshots/transparent-iso-top-right.png" width="49%" />
+</p>
+
+---
+
 **Script:** [`bed_frame.py`](bed_frame.py) — 23 bodies (4 posts, 3 rails, 2 ledgers, headboard, 13 slats). Change `bed_w`/`bed_l` for Twin/King.

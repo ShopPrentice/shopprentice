@@ -9,6 +9,13 @@ A parametric modern floating shelf — 36"L x 8"D x 1.5" thick. Hollow shell con
   <img src="screenshots/right.png" width="49%" />
 </p>
 
+### Transparent Views
+
+<p float="left">
+  <img src="screenshots/transparent-iso-top-left.png" width="49%" />
+  <img src="screenshots/transparent-iso-top-right.png" width="49%" />
+</p>
+
 ## Example Prompt
 
 ```

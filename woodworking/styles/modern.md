@@ -17,7 +17,17 @@ Modern furniture emphasizes function, clean geometry, and visual lightness. Join
 | Panel in frame | Floating in groove | Tongue & groove | Glued-in panel |
 | Shelf to case | Dados or shelf pins | Dominos | Cleats only |
 | Top attachment | Dominos or buttons | Figure-8 fasteners | Glue (restricts movement) |
-| Leg to rail/apron | Blind M&T | Dominos | Dowels alone |
+| Leg to rail/apron | Domino grid (2 per joint) | Blind M&T | Dowels alone |
+
+### Leg-Frame Joinery Pattern (Tables, Benches, Chairs, Desks)
+
+For any piece with legs + aprons/rails, use `domino.grid()` at each apron-to-leg interface:
+- **2 dominos per joint** evenly spaced along the apron height
+- **Interface plane** at the leg-apron boundary (YZ for long aprons, XZ for short)
+- **Stretchers** get a single domino per end (lower in the leg than aprons)
+- **Cross-component**: aprons and legs are in separate components; domino CUTs happen in root via assembly proxies
+
+This pattern applies to: coffee table, bench, chair, desk, side table, sofa frame, dining table.
 
 ## Edge Treatments
 

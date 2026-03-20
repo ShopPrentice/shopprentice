@@ -32,13 +32,15 @@ Back rest (if present) extends from back legs above seat
 
 ## Connections
 
-| Connection | Joint type | Template |
-|-----------|-----------|----------|
-| Leg to seat | Through-tenon, blind M&T, or dominos | `mortise_tenon` or `domino` |
-| Stretcher to leg | M&T or domino | `mortise_tenon` or `domino` |
-| Apron to leg | Blind M&T | `mortise_tenon` |
-| Back rest to legs | M&T or domino | `mortise_tenon` |
-| Shelf to stretchers | Dado, domino, or resting | inline or `domino` |
+| Connection | Joint type | Template | Notes |
+|-----------|-----------|----------|-------|
+| Apron to leg | Domino grid (2 per joint) | `domino.grid()` | 8 joints total |
+| Stretcher to leg | Single domino per end | `domino.single()` | Lower in leg than aprons |
+| Leg to seat | Seat rests on apron frame | — | Top attached via dominos or buttons |
+| Back rest to legs | M&T or domino | `mortise_tenon` | Only if back rest present |
+| Shelf to stretchers | Resting or dado | inline | Only if shelf present |
+
+**Stretcher vs apron domino height:** Apron dominos are centered in the apron height. Stretcher dominos use a single centered domino. Both must be offset in Z so they don't collide inside the same leg — aprons are higher (near seat), stretchers are lower (near floor).
 
 ## Hardware Checklist
 

@@ -15,25 +15,52 @@ Low table for living room — coffee tables, cocktail tables. Height 16–20" (l
 ### Component relationships
 
 ```
-Same as dining table but lower height and different proportions.
-Top sits on leg/apron frame
-Shelf (if present) spans between legs/stretchers near floor
+Legs at 4 corners
+Aprons connect adjacent legs at top (front, back, left, right)
+Top sits on aprons, attached with buttons or dominos
+Shelf (if present) spans between legs near floor
 ```
+
+## Openings & Cavities
+
+No openings needed — coffee tables are open on all sides.
 
 ## Connections
 
 | Connection | Joint type | Template |
 |-----------|-----------|----------|
-| Apron to leg | Blind M&T | `mortise_tenon` |
+| Apron to leg | Domino grid (2 per joint) | `domino.grid()` |
 | Top to apron | Buttons or dominos | inline or `domino` |
-| Shelf to legs | Dados or dominos | inline or `domino` |
-| Stretcher to leg | M&T | `mortise_tenon` |
+| Shelf to legs | Resting on stretchers or in dados | inline |
+| Stretcher to leg | Single domino or M&T | `domino.single()` or `mortise_tenon` |
 
-## Hardware Checklist
+## Build Order
 
-| Hardware | When needed | Template/catalog |
-|----------|------------|-----------------|
-| Floor glides | Always | — |
+```
+1. Legs (build FL, mirror to all 4 corners)
+2. Aprons (build front + left, mirror for back + right)
+3. Top (solid panel)
+4. Shelf (if present)
+5. Domino joinery — apron-to-leg at all 8 joints (cross-component CUTs)
+6. Details (edge treatments)
+```
+
+## Validation Rules
+
+| Phase | Expected bodies | Check |
+|-------|----------------|-------|
+| After legs | 4 | Symmetrically placed |
+| After aprons | 8 | Aprons between correct leg pairs |
+| After top + shelf | 10 | Top spans full length/width |
+| After dominos | +16 void bodies | Mortise pockets visible in legs and apron ends |
+
+## Common Mistakes
+
+- Apron-to-leg joints missing entirely (bodies just positioned with no connection)
+- Domino voids placed at wrong height (should be centered vertically in apron)
+- Aprons extending into leg volume (should butt against leg face, not overlap)
+- Shelf floating without support (needs to rest on stretchers or sit in dado)
+- Top glued to aprons across grain direction (restrict movement — use buttons)
 
 ## Parameter Suggestions
 
@@ -44,5 +71,5 @@ Shelf (if present) spans between legs/stretchers near floor
 | table_h | 16–20 in | 18 in |
 | top_thick | 0.75–1.5 in | 1 in |
 | leg_size | 1.5–2.5 in | 2 in |
-
-Refer to `types/dining-table.md` for detailed build order, validation, and common mistakes — the construction is structurally identical, just shorter.
+| dm_count | 2 | Dominos per apron end |
+| dm_t | 8 mm | Domino cutter diameter |
