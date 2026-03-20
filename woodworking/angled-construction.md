@@ -9,6 +9,8 @@ Techniques for splayed legs, compound angles, and connecting parts at non-orthog
 - Compound angles (splay in two planes simultaneously)
 - Stretchers or rails connecting splayed legs
 - Through-tenons at an angle
+- **Angled chair backrests** (vertical-to-raked back legs, smooth bend transitions)
+- **Tilted dominos** (connecting angled rails/slats to vertical posts)
 
 ## Splayed Legs
 
@@ -466,6 +468,178 @@ for i in range(root.bRepBodies.count):
         break
 ```
 
+## Angled Chair Backrests
+
+### When to Use
+
+Chair back legs that are vertical from floor to seat, then angle backward for the backrest. The bend point is typically 1-3" above the seat. A fillet at the bend creates a smooth transition.
+
+### Strategy: Profile Sketch + Extrude (Tested — dining chair)
+
+**Do NOT use two-piece JOIN for back legs with a bend.** The overlap approach (vertical box + rotated backrest box + JOIN) creates a notch on the inner face: the rotated overlap protrudes past the vertical portion's inner face due to the rotation geometry. This leaves a clean bend on the outer face but a step/notch on the inner face that cannot be filleted.
+
+**Instead, sketch the side profile as a single closed shape and extrude by `leg_size`:**
+
+```
+Inner face:                    Outer face:
+   /  ← angled                    /  ← angled
+  /                               /
+ |   ← bend point                |   ← bend point
+ |                                |
+ |   ← vertical                  |   ← vertical
+ |                                |
+```
+
+The profile on a YZ plane (6 lines):
+1. Inner vertical: `(Y_inner, 0)` → `(Y_inner, bend_z)`
+2. Inner angled: → `(Y_inner + h*sin(rake), bend_z + h*cos(rake))`
+3. Top cap: → `(Y_outer + h*sin(rake), bend_z + h*cos(rake))`
+4. Outer angled: → `(Y_outer, bend_z)`
+5. Outer vertical: → `(Y_outer, 0)`
+6. Bottom cap: → close to point 1
+
+Where `h = back_h - bend_z` and `Y_inner/Y_outer = seat_d - leg_size / seat_d`.
+
+```python
+sk = leg_c.sketches.add(leg_c.yZConstructionPlane)
+m2s = sk.modelToSketchSpace
+P3 = adsk.core.Point3D
+
+yi = ev("seat_d - leg_size")  # inner Y
+yo = ev("seat_d")              # outer Y
+bz = ev("bend_z")
+h = ev("back_h") - bz
+dy = h * math.sin(rake_rad)
+dz = h * math.cos(rake_rad)
+
+mp = [
+    P3.create(0, yi, 0),               # inner bottom
+    P3.create(0, yi, bz),              # inner bend
+    P3.create(0, yi + dy, bz + dz),   # inner top
+    P3.create(0, yo + dy, bz + dz),   # outer top
+    P3.create(0, yo, bz),              # outer bend
+    P3.create(0, yo, 0),               # outer bottom
+]
+sp = [m2s(p) for p in mp]
+
+# Draw closed profile with shared sketch points
+lines = sk.sketchCurves.sketchLines
+l0 = lines.addByTwoPoints(sp[0], sp[1])
+l1 = lines.addByTwoPoints(l0.endSketchPoint, sp[2])
+l2 = lines.addByTwoPoints(l1.endSketchPoint, sp[3])
+l3 = lines.addByTwoPoints(l2.endSketchPoint, sp[4])
+l4 = lines.addByTwoPoints(l3.endSketchPoint, sp[5])
+l5 = lines.addByTwoPoints(l4.endSketchPoint, l0.startSketchPoint)
+
+# H/V constraints on vertical and horizontal lines only
+h_ax, v_ax = af.probe_sketch_axes(sk)
+gc = sk.geometricConstraints
+if v_ax == "z":
+    gc.addVertical(l0);  gc.addVertical(l4)   # vertical lines
+    gc.addHorizontal(l2); gc.addHorizontal(l5) # caps
+else:
+    gc.addHorizontal(l0); gc.addHorizontal(l4)
+    gc.addVertical(l2);   gc.addVertical(l5)
+# DO NOT constrain angled lines (l1, l3)
+
+# Extrude by leg_size in +X
+prof = sk.profiles.item(0)
+ext_inp = leg_c.features.extrudeFeatures.createInput(
+    prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+ext_inp.setDistanceExtent(False, VI("leg_size"))
+```
+
+Result: single body with clean bends on ALL 4 faces. Mirror across X midplane for the opposite leg.
+
+### Filleting the Bend Edges
+
+After extrude, the bend creates 2 edges (inner + outer face) where the normals of adjacent planar faces are nearly parallel. Find them by checking `acos(dot)` of face normals:
+
+```python
+bend_edges = adsk.core.ObjectCollection.create()
+for i in range(body.edges.count):
+    edge = body.edges.item(i)
+    if edge.faces.count != 2:
+        continue
+    g1 = edge.faces.item(0).geometry
+    g2 = edge.faces.item(1).geometry
+    if not (isinstance(g1, adsk.core.Plane) and isinstance(g2, adsk.core.Plane)):
+        continue
+    n1, n2 = g1.normal, g2.normal
+    dot = max(-1.0, min(1.0, n1.x*n2.x + n1.y*n2.y + n1.z*n2.z))
+    angle = math.degrees(math.acos(dot))
+    if angle < 20:  # normals nearly parallel = obtuse bend
+        bend_edges.add(edge)
+```
+
+**Pitfall — angle interpretation:** When two faces meet at 172° (nearly flat, 8° bend), the outward normals are 8° apart, NOT 172°. `acos(dot)` returns the small angle (8°). Filter with `angle < 20` to catch bend edges while excluding 90° corners.
+
+Apply fillet with `propagate=True` — the 2 edges propagate to the side faces:
+```python
+fil_inp = comp.features.filletFeatures.createInput()
+fil_inp.addConstantRadiusEdgeSet(bend_edges, VI("bend_r"), True)
+```
+
+A 6" radius at 8° bend creates a subtle but clean smooth transition.
+
+### Backrest Components (Vertical Slats — NORDVIKEN Style)
+
+For a ladder-back with vertical slats:
+- **Top rail** + **bottom rail** between back posts (not through — dominos connect to posts)
+- **N vertical slats** between the rails with stub tenons
+- Top rail offset 0.5" below the post top (creates a small "ear" detail)
+- All pieces built at non-raked positions, then rotated together with the same pivot-compensated transform as the backrest
+
+**Centering on the leg cross-section:** Rails and slats should be centered on the back post, not flush with the inner face. Use `back_face_y = seat_d - leg_size/2 - rail_thick/2`. This gives equal material on both sides of the mortise/domino.
+
+### Tilted Dominos for Angled Joints
+
+Standard `domino.grid` creates vertical dominos (long_axis="z"). When connecting an angled rail to a vertical post, the domino should align with the rail's cross-section — tilted by `back_rake`.
+
+Build tilted dominos manually: sketch a rotated rectangle on the interface plane, extrude symmetrically:
+
+```python
+def tilted_rail_domino(plane, center_x, rail_z_center, rail_body, leg_body, name):
+    """Domino tilted by back_rake at a rail-to-post interface."""
+    # Compute rotated center position
+    dz = rail_z_center - bend_z_cm
+    y_rot = bl_cy + sin_r * dz
+    z_rot = bend_z_cm + cos_r * dz
+
+    # Tilted rectangle corners in model space
+    half_l = ev("dm_w") / 2
+    half_s = ev("dm_t") / 2
+    dy_l = half_l * sin_r;  dz_l = half_l * cos_r  # long direction
+    dy_s = half_s * cos_r;  dz_s = -half_s * sin_r  # short direction
+
+    corners = [
+        P3.create(center_x, y_rot + dy_l + dy_s, z_rot + dz_l + dz_s),
+        P3.create(center_x, y_rot + dy_l - dy_s, z_rot + dz_l - dz_s),
+        P3.create(center_x, y_rot - dy_l - dy_s, z_rot - dz_l - dz_s),
+        P3.create(center_x, y_rot - dy_l + dy_s, z_rot - dz_l + dz_s),
+    ]
+    # Sketch on interface plane, extrude symmetrically by dm_d
+    sk = root.sketches.add(plane)
+    sp = [sk.modelToSketchSpace(p) for p in corners]
+    lines = sk.sketchCurves.sketchLines
+    l0 = lines.addByTwoPoints(sp[0], sp[1])
+    l1 = lines.addByTwoPoints(l0.endSketchPoint, sp[2])
+    l2 = lines.addByTwoPoints(l1.endSketchPoint, sp[3])
+    lines.addByTwoPoints(l2.endSketchPoint, l0.startSketchPoint)
+
+    prof = sk.profiles.item(0)
+    ext_inp = root.features.extrudeFeatures.createInput(
+        prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+    ext_inp.setSymmetricExtent(VI("dm_d"), False)
+    ext = root.features.extrudeFeatures.add(ext_inp)
+    dm_body = ext.bodies.item(0)
+    # CUT into both bodies
+    af.combine(root, rail_body, [dm_body], CUT, True, f"{name}_CutRail")
+    af.combine(root, leg_body, [dm_body], CUT, True, f"{name}_CutLeg")
+```
+
+This creates a domino whose long axis follows the tilted backrest direction, properly aligning with the rail cross-section at the post interface.
+
 ## Common Pitfalls
 
 | Error | Cause | Fix |
@@ -482,6 +656,35 @@ for i in range(root.bRepBodies.count):
 | Splay Move after `angled_tenon_end` — wrong shoulder | Move tilts the already-cut shoulder face | Move must come BEFORE `angled_tenon_end` — the tenon technique needs to see the tilted body |
 | Stretcher 3.5" deep × 0.75" tall (swapped) | Put `str_w` (height) on sketch cross-axis, `str_t` on extrude | Sketch cross-axis = `str_t` (thickness), extrude = `str_w / 2` (half-height). See "Sketch vs. Extrude Dimension Mapping" |
 | Stretcher-to-stretcher interference at corners | Two thick stretchers overlap inside a leg | Swap to correct dims (above); run `check_interference` after stretcher extrudes |
+| Two-piece back leg has notch on inner face | Overlap from rotated backrest protrudes past vertical portion's inner face | Use single profile sketch + extrude instead of two-piece JOIN (see "Angled Chair Backrests") |
+| Fillet misses bend edges (finds 0 or 1) | Filtering by `180 - acos(dot)` ≈ rake angle is wrong — `acos(dot)` already IS the small angle | Filter `acos(dot) < 20` for nearly-parallel normals at obtuse bends |
+| Back apron dominos don't CUT into back legs | Apron at Y = seat_d - leg_size (inner face) has zero Y overlap with leg | Position apron flush with outer face: Y = seat_d - apron_thick (within leg's Y range) |
+| Domino vertical on angled rail joint | Standard domino.grid uses long_axis="z" (vertical) | Build tilted dominos manually — sketch rotated rectangle on interface plane (see "Tilted Dominos") |
+
+## Complete Build Sequence for Chair with Angled Backrest
+
+```
+1. Parameters: back_rake, bend_above, bend_r, slat/rail dimensions
+2. Front legs: simple rectangular extrude
+3. Back legs:
+   a. Sketch side profile on YZ plane (6-line closed shape)
+   b. Extrude by leg_size in X
+   c. Fillet bend edges (find by acos(dot) < 20)
+   d. Mirror across X midplane
+4. Aprons + Stretchers: position within leg cross-section range for joinery
+   a. Back apron flush with outer face of back legs (not inner face)
+   b. Stretchers centered on legs (leg_size/2 - str_thick/2)
+5. Seat: extrude, CUT notch for back legs
+6. Backrest (NORDVIKEN style):
+   a. Top rail + bottom rail between posts (not through)
+   b. N vertical slats with stub tenons into rails
+   c. Rotate ALL back pieces with same pivot-compensated transform
+   d. CUT slats into rails (stub mortise)
+   e. Tilted dominos connecting rails to posts
+7. Dominos: aprons + stretchers to all legs
+8. Details: leg bottom chamfers, seat edge fillet
+9. Verify: check_interference, no floating pieces audit
+```
 
 ## Complete Build Sequence for Splayed-Leg Piece
 

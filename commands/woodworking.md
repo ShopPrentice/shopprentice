@@ -43,6 +43,8 @@ Before writing any code, plan the modeling steps the way an experienced designer
    - **End grain to side grain** (fiber ends meeting a surface) — mechanical joint required (rail into leg = M&T, board corner = dovetail).
    - **End grain to end grain** — weakest possible bond. Always reinforce with a cross-grain element (spline, domino, biscuit).
 
+10. **Position parts for joinery overlap.** Dominos and mortise-tenons only work when the joint body physically overlaps both mating parts. During planning, verify that each connecting piece sits **within the receiving leg/post's cross-section range** — not just touching at an edge. Common mistake: back apron flush with the inner face of back legs (Y overlap = zero, dominos miss the leg). Fix: position the apron flush with the **outer face** (same strategy as front apron to front legs), or center it on the leg. Similarly, stretchers should be centered on legs (`leg_size/2 - str_thick/2`), not flush with the outer face, for balanced mortise material on both sides.
+
 ## Topic Reference
 
 This skill is modular. The core (this file) covers fundamentals needed for every project. Read additional topic files based on your project's needs:
@@ -51,7 +53,7 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 
 | Topic | When to Read | Status | File |
 |-------|-------------|--------|------|
-| **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | Tested (counter stool) | `woodworking/angled-construction.md` |
+| **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody, **angled chair backrests**, bent-back legs, tilted dominos | Tested (counter stool, dining chair) | `woodworking/angled-construction.md` |
 | **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | Planned — inline quick reference below | `woodworking/details-and-finishing.md` |
 | **MCP Advanced** | Modifying existing designs, fixing dimensions, adding features to built models, delete-and-rebuild timeline sections | Tested (bar side table) | `woodworking/mcp-advanced.md` |
 
@@ -739,6 +741,7 @@ Name every feature and body for a readable timeline and easy debugging:
 5. Section Analysis > verify joinery alignment
 6. Verify no overlapping joints at corners
 7. Body count matches expected (diagnostic print confirms no accidental merges or orphans)
+8. **No floating pieces** — every body-to-body connection has mechanical joinery (domino, M&T, through-mortise, CUT). Contact or proximity alone is NOT attachment. After cross-component CUTs, audit every touching pair: if a piece could be pulled away without breaking wood fibers, it needs a joint.
 
 ## Common Errors and Fixes
 | Error | Cause | Fix |
