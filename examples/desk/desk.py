@@ -12,6 +12,7 @@ import adsk.core, adsk.fusion
 
 from helpers import af
 from helpers.templates import dovetailed_drawer
+from helpers.templates import domino
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -134,6 +135,64 @@ def run(context):
     print(">>> Drawer: %d bodies" % len(dd_result["all_bodies"]))
 
     # ==============================================================
+    #  5. DOMINO JOINERY — apron-to-leg connections (6 joints)
+    # ==============================================================
+    params.add("dm_t", VI("8 mm"), "in", "")
+    params.add("dm_w", VI("22 mm"), "in", "")
+    params.add("dm_d", VI("20 mm"), "in", "")
+    params.add("dm_count", VI("2"), "", "")
+    params.add("dm_sp", VI("apron_h / (dm_count + 1)"), "in", "")
+    params.add("dm_z_start", VI("apron_z + apron_h / (dm_count + 1)"), "in", "")
+
+    # Get leg bodies for proxies
+    leg_fr = leg_bl = leg_br = None
+    for i in range(leg_c.bRepBodies.count):
+        b = leg_c.bRepBodies.item(i)
+        if b.name == "Leg_FR": leg_fr = b
+        elif b.name == "Leg_BL": leg_bl = b
+        elif b.name == "Leg_BR": leg_br = b
+
+    fl_p = leg_fl.createForAssemblyContext(leg_occ)
+    fr_p = leg_fr.createForAssemblyContext(leg_occ)
+    bl_p = leg_bl.createForAssemblyContext(leg_occ)
+    br_p = leg_br.createForAssemblyContext(leg_occ)
+
+    ba_body = la_body = ra_body = None
+    for i in range(apron_c.bRepBodies.count):
+        b = apron_c.bRepBodies.item(i)
+        if b.name == "Apron_Back": ba_body = b
+        elif b.name == "Apron_Left": la_body = b
+        elif b.name == "Apron_Right": ra_body = b
+    ba_p = ba_body.createForAssemblyContext(apron_occ)
+    la_p = la_body.createForAssemblyContext(apron_occ)
+    ra_p = ra_body.createForAssemblyContext(apron_occ)
+
+    dm_fl = af.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
+    dm_fr = af.off_plane(root, root.yZConstructionPlane, "desk_l - leg_size", "DM_FR")
+    dm_lf = af.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
+    dm_lb = af.off_plane(root, root.xZConstructionPlane, "desk_w - leg_size", "DM_LB")
+
+    # Back apron → BL, BR legs
+    domino.grid(root, dm_fl, ("leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_p, bl_p, "DM_BA_L", ev)
+    domino.grid(root, dm_fr, ("desk_l - leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_p, br_p, "DM_BA_R", ev)
+
+    # Left apron → FL, BL
+    domino.grid(root, dm_lf, ("apron_thick/2", "leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_p, fl_p, "DM_LA_F", ev)
+    domino.grid(root, dm_lb, ("apron_thick/2", "desk_w - leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_p, bl_p, "DM_LA_B", ev)
+
+    # Right apron → FR, BR
+    domino.grid(root, dm_lf, ("desk_l - apron_thick/2", "leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_p, fr_p, "DM_RA_F", ev)
+    domino.grid(root, dm_lb, ("desk_l - apron_thick/2", "desk_w - leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_p, br_p, "DM_RA_B", ev)
+
+    print(">>> Dominos: 6 joints (12 voids)")
+
+    # ==============================================================
     #  EPILOGUE
     # ==============================================================
     for comp in [leg_c, apron_c, top_c, drawer_c]:
@@ -141,11 +200,16 @@ def run(context):
             sk.isVisible = False
         for cp in comp.constructionPlanes:
             cp.isLightBulbOn = False
+    for sk in root.sketches:
+        sk.isVisible = False
+    for cp in root.constructionPlanes:
+        cp.isLightBulbOn = False
 
     for cn, c in [("Legs", leg_c), ("Aprons", apron_c),
                    ("Top", top_c), ("Drawer", drawer_c)]:
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cn}: {len(names)} bodies -> {names}")
+    print(f"Root: {root.bRepBodies.count} domino voids")
 
     cam = app.activeViewport.camera
     cam.isFitView = True
