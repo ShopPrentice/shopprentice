@@ -72,14 +72,13 @@ def install(comp, post_body, rail_body,
         print(f">>> Run tools/bed_rail_fastener.py first to generate hardware")
         return
 
-    # Import using hardware manager (tracks for cleanup)
+    # Import using hardware manager (import_step already tracks for cleanup)
     imported = hw_mgr.import_step(step_file, root)
     if not imported:
         print(f">>> ERROR: STEP import returned no geometry")
         return
     hw_occ, hw_bodies = imported[0]
     hw_comp = hw_occ.component
-    hw_mgr._hardware_occurrences.append((hw_occ, root))
     print(f">>> Imported {size} hardware: {hw_comp.bRepBodies.count} bodies")
 
     # Identify hook plate and strike plate by volume (2 largest bodies)
