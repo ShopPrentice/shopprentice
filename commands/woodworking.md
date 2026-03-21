@@ -43,8 +43,6 @@ Before writing any code, plan the modeling steps the way an experienced designer
    - **End grain to side grain** (fiber ends meeting a surface) — mechanical joint required (rail into leg = M&T, board corner = dovetail).
    - **End grain to end grain** — weakest possible bond. Always reinforce with a cross-grain element (spline, domino, biscuit).
 
-10. **Position parts for joinery overlap.** Dominos and mortise-tenons only work when the joint body physically overlaps both mating parts. During planning, verify that each connecting piece sits **within the receiving leg/post's cross-section range** — not just touching at an edge. Common mistake: back apron flush with the inner face of back legs (Y overlap = zero, dominos miss the leg). Fix: position the apron flush with the **outer face** (same strategy as front apron to front legs), or center it on the leg. Similarly, stretchers should be centered on legs (`leg_size/2 - str_thick/2`), not flush with the outer face, for balanced mortise material on both sides.
-
 ## Topic Reference
 
 This skill is modular. The core (this file) covers fundamentals needed for every project. Read additional topic files based on your project's needs:
@@ -53,7 +51,7 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 
 | Topic | When to Read | Status | File |
 |-------|-------------|--------|------|
-| **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody, **angled chair backrests**, bent-back legs, tilted dominos | Tested (counter stool, dining chair) | `woodworking/angled-construction.md` |
+| **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | Tested (counter stool) | `woodworking/angled-construction.md` |
 | **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | Planned — inline quick reference below | `woodworking/details-and-finishing.md` |
 | **MCP Advanced** | Modifying existing designs, fixing dimensions, adding features to built models, delete-and-rebuild timeline sections | Tested (bar side table) | `woodworking/mcp-advanced.md` |
 
@@ -120,7 +118,6 @@ Before planning, identify the **furniture type** and **design style** from the u
 | Craftsman | exposed tenons, corbels, quartersawn oak, thick stock, Arts & Crafts | `woodworking/styles/craftsman.md` |
 | Mid-century | tapered legs, floating tops, thin profiles, hidden joinery, Danish, Scandinavian | `woodworking/styles/mid-century.md` |
 | Rustic | thick boards, farmhouse, reclaimed, visible fasteners, breadboard ends | `woodworking/styles/rustic.md` |
-| Nakashima | live edge, natural edge, slab, organic, bowties, butterfly keys, walnut slab, free-form | `woodworking/styles/nakashima.md` |
 
 **If no style is specified or identifiable, default to Modern.**
 
@@ -413,7 +410,6 @@ Quick reference:
 - **Chamfer:** `chamferFeatures.createInput2()` → `inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(edges, distance, propagate)`
 - Note: chamfer uses `createInput2()` (not `createInput()`) and has a nested `.chamferEdgeSets` collection.
 - The API requires `BRepEdge` objects, never `BRepFace`. Iterate face edges and deduplicate via `tempId`.
-- **Chamfer alignment rule:** When posts have top chamfers, adjacent rails should align with the **bottom edge of the chamfer**, not the raw post top. Use `rail_top_z = post_h - post_chamfer` so the rail visually meets the flat portion of the post. This applies to any edge treatment — the connecting piece should stop where the treatment starts.
 
 ## Standard Helpers
 
@@ -621,7 +617,7 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Cross-component:** Use `body.createForAssemblyContext(occ)` for CUT in root. Bulk CUT all tools in one Combine.
 
-**Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `helpers/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. **Orientation: the domino must lie flat** — `long_axis` is the model axis perpendicular to both boards' grain AND in the interface plane (see `joinery/domino-joint.md` "Choosing long_axis by Grain Direction"). Full reference: `joinery/domino-joint.md`.
+**Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `helpers/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `joinery/domino-joint.md`.
 
 **Bed rail fasteners (detachable):** Use `bed_rail_fastener.install()` from `helpers/templates/bed_rail_fastener.py` for joints that must be disassemblable (bed rails to posts). Imports STEP hardware, positions with rotation matrix, CUTs recess pockets into both boards. Three sizes: 80mm, 100mm (standard), 120mm. Always call hardware cleanup in epilogue to consolidate imports into hidden `_HW` container. STEP files at `~/.autofusion/hardware/bed_rail_fastener/` — generate with `tools/bed_rail_fastener.py` if missing.
 
@@ -746,7 +742,6 @@ Name every feature and body for a readable timeline and easy debugging:
 5. Section Analysis > verify joinery alignment
 6. Verify no overlapping joints at corners
 7. Body count matches expected (diagnostic print confirms no accidental merges or orphans)
-8. **No floating pieces** — every body-to-body connection has mechanical joinery (domino, M&T, through-mortise, CUT). Contact or proximity alone is NOT attachment. After cross-component CUTs, audit every touching pair: if a piece could be pulled away without breaking wood fibers, it needs a joint.
 
 ## Common Errors and Fixes
 | Error | Cause | Fix |
@@ -798,7 +793,7 @@ Models are built **one component at a time**. Each component gets its own plan �
    b. Validate body count and interference
 4. Details (final cycle):
    a. Fillets, chamfers, decorative cutouts
-   b. Validate → screenshot → present to user
+   b. Validate → apply_appearance → screenshot → present to user
 ```
 
 ### Why Component-by-Component
@@ -831,7 +826,7 @@ Details: fillets → bounded context → done
 6. **Plan before code, always in separate responses.** Before each component, output its step list as text. Then write the code and execute in the next response.
 7. **Cross-component operations are a separate cycle.** After all components are built, one final cycle adds root-level CUTs via assembly proxies.
 8. **Details are the last cycle.** Fillets and chamfers require all geometry to exist first.
-9. **Show final result.** Screenshot only after the last cycle (details or cross-component, whichever is last).
+9. **Show final result.** After the last cycle, apply wood appearance (`apply_appearance` — default white oak), then screenshot and present to the user.
 
 ### What Goes Where
 
@@ -915,6 +910,7 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 | `get_changes` | Snapshot & diff. First call captures a baseline; subsequent calls return what changed — parameter expression changes, sketch dimension changes, body additions/removals, feature count delta. Use between iterations or when the user says "I changed something". |
 | `sync_script` | Auto-sync UI changes back to a script. Pass the original script source (or omit to use the tracked script from the last execute_script run) — auto-patches user parameter expression changes, reports feature-level param edits, feature additions, and feature removals with script context for the agent to apply. |
 | `get_document_status` | Check if the active document was built by a known script. Returns `tracked` (true/false), `pendingChanges` count, and `canUpdate` flag. Call before attempting incremental updates. |
+| `apply_appearance` | Apply wood appearance with grain-aligned texture. Auto-detects fiber direction from bounding box longest axis, with dovetail-aware constraints (dovetailed edges = end grain → grain excluded from that axis). Call once after final validation, before screenshots. |
 
 ### Execution + Validation Loop
 
@@ -929,7 +925,9 @@ After generating each component's code, run this loop:
    - Report a brief summary: `"Shelves OK: 5 bodies [shelf_0..shelf_4], positions correct. Total: 12 bodies."`
 4. **If validation fails** — use `get_timeline_state` to bisect the timeline and pinpoint the problem feature (see Diagnosing with Timeline Rollback below). Fix and re-execute.
 5. **Auto-proceed** to the next component if validation passes.
-6. **Screenshot only at the end** — after the final cycle (details or cross-component) succeeds and validates, take one screenshot with `get_screenshot` and present it to the user.
+6. **Appearance + screenshot at the end** — after the final cycle succeeds and validates:
+   - Call `apply_appearance` with the wood species (use the user's choice, or **white oak** as default).
+   - Then take a screenshot with `get_screenshot` and present it to the user.
 
 ### Diagnosing with Timeline Rollback
 
@@ -985,7 +983,9 @@ Response 9 (build): append root-level CUTs to box.py
 
 Response 10 (plan): Details — lid chamfer, edge fillets
 Response 11 (build): append details to box.py
-  → execute → capture_design → validate → screenshot → present to user
+  → execute → capture_design → validate
+  → apply_appearance (species from user, or "white oak" default)
+  → screenshot → present to user
 ```
 
 ### Sandbox Mode
@@ -1011,6 +1011,30 @@ Use `execute_script` with `sandbox=true` to run a script in a throwaway document
 - Scripts using `from helpers import af` need the addin's `helpers/` directory on the Python path (automatic when run via `execute_script`). For standalone use outside MCP, copy `addin/helpers/` alongside the script.
 - Never generate partial snippets that only work via MCP.
 - Scripts must NOT catch exceptions — let them propagate so Fusion 360 aborts the transaction and returns the full error to the agent.
+
+### Wood Appearance
+
+After final validation (zero interferences, correct body count), apply a realistic wood appearance before taking screenshots.
+
+**Default species: white oak.** Use the species the user requests. If none specified, use white oak.
+
+**How to call:**
+```
+apply_appearance(species="white oak")                     # all bodies, auto grain
+apply_appearance(species="cherry", bodies=["Front"])      # specific bodies
+apply_appearance(species="walnut",                        # override grain
+                 grain_overrides={"Leg_FL": "z"})
+```
+
+**Grain direction is automatic.** The tool determines fiber direction using two rules:
+1. **Longest axis** — fibers run parallel to the longest bounding box dimension (legs=Z, rails=X/Y, panels=longest).
+2. **Dovetail constraint** — scans the timeline for dovetail features. Dovetailed edges are end grain, so the joint axis (pattern direction) is excluded. If the longest axis conflicts, the next-longest non-excluded axis is chosen.
+
+**When grain auto-detection is wrong**, pass `grain_overrides` for specific bodies. This is rare — the two-rule system handles most furniture correctly.
+
+**Supported species:** cherry, walnut, oak, white oak, red oak, maple, ash, birch, pine, cedar, mahogany, teak, beech, poplar, hickory, ebony, rosewood, sapele, bamboo, douglas fir.
+
+**Multi-species designs:** Call `apply_appearance` multiple times with different `bodies` lists. Example: cherry case with walnut drawer front.
 
 ### Screenshots
 
