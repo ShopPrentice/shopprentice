@@ -58,7 +58,7 @@ python tools/search_build.py \
 ### Appearance
 
 ```
-apply_appearance(species="cedar")
+apply_appearance(species="white oak")
 ```
 
 ---

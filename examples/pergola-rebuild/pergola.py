@@ -3918,7 +3918,7 @@ def run(context):
     Combine2 = combine(comp, Body1_beam, [Body1_rafts_1, Body2_rafts_1, Body3_rafts_1, Body4_rafts_1, Body5_rafts_1, Body6_rafts_1, Body7_rafts_1, Body8_rafts_1], CUT, True, "Combine2")
 
     # ── FIT VIEW ──────────────────────────────────────────────────
-    af.apply_appearance("cedar")
+    af.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True
