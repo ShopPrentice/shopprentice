@@ -1,26 +1,29 @@
 """Bed rail fastener (mortise bedlock) installation template.
 
 Imports hook plate and strike plate from SEPARATE STEP files, positions
-each independently with a simple Ry(90°) rotation, and CUTs recess
-pockets into both boards.
+each independently, and CUTs recess pockets into both boards.
 
-Hook plate → rail end face (hooks protrude toward post)
-Strike plate → post side face (slots face the rail)
+INSTALLATION RULE:
+  - Hook plate → RAIL end face (hooks face toward the post/leg)
+  - Strike plate → POST/LEG side face (slots face toward the rail)
+  - The post supports the rail: hooks on rail drop into slots on post
+  - Hook hardware lives inside the Rail component
+  - Strike hardware lives inside the Post component
 
 STEP files at: ~/.autofusion/hardware/bed_rail_fastener/
-  hook_plate_100mm.step, strike_plate_100mm.step, etc.
 Generate with: tools/bed_rail_fastener.py
 
 Usage:
     from helpers.templates import bed_rail_fastener as brf
-    from helpers import hardware as hw_mgr
 
+    # post_proxy is the POST body, rail_proxy is the RAIL body
     brf.install(root, post_proxy, rail_proxy,
                 interface_axis="y", interface_coord=post_size_cm,
                 center_z=rail_center_z_cm,
                 size="100mm", name="BRF_RL_F", ev=ev)
 
-    # In epilogue: consolidate templates into hidden _HW
+    # Hardware auto-moves into parent components (Rails/Posts)
+    # Templates go to hidden _HW in epilogue cleanup
 """
 
 import adsk.core
@@ -191,8 +194,28 @@ def install(comp, post_body, rail_body,
     hp_proxy = hook_plate.createForAssemblyContext(hook_occ)
     af.combine(root, rail_body, [hp_proxy], CUT, True, f"{name}_HookRecess")
 
-    # Name the components
+    # Name and move into parent components
     hook_comp.name = f"{name}_Hook"
     strike_comp.name = f"{name}_Strike"
 
-    print(f">>> {name}: {size} bedlock installed (hook + strike plates positioned + recesses cut)")
+    # Move hardware into the component of the board they're attached to
+    # Hook plate → rail's parent component, Strike plate → post's parent component
+    try:
+        # Find parent occurrences by matching the body's parentComponent
+        rail_parent_occ = None
+        post_parent_occ = None
+        for i in range(root.occurrences.count):
+            occ = root.occurrences.item(i)
+            if occ.component == rail_body.parentComponent:
+                rail_parent_occ = occ
+            if occ.component == post_body.parentComponent:
+                post_parent_occ = occ
+
+        if rail_parent_occ and hook_occ.isValid:
+            hook_occ.moveToComponent(rail_parent_occ)
+        if post_parent_occ and strike_occ.isValid:
+            strike_occ.moveToComponent(post_parent_occ)
+    except Exception:
+        pass  # keep at root if move fails
+
+    print(f">>> {name}: {size} bedlock — hook in rail, strike in post")

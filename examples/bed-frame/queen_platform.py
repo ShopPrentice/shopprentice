@@ -457,31 +457,25 @@ def run(context):
 
         print(">>> Post top chamfers applied")
 
-    # Hardware cleanup: hide templates, keep installed copies visible
+    # Hardware cleanup: hide STEP templates (installed hardware already in parent components)
     furniture_names = {"Posts", "Rails", "Headboard", "Slats", "Support"}
-    templates_to_hide = []
+    templates = []
     for i in range(root.occurrences.count):
         occ = root.occurrences.item(i)
-        nm = occ.component.name
-        if nm in furniture_names:
-            continue
-        # Installed hardware — keep visible (named BRF_*_Hook or BRF_*_Strike)
-        if nm.startswith("BRF_"):
-            continue
-        # Everything else → hide (templates, _Hardware, Bedlock_*)
-        templates_to_hide.append(occ)
+        if occ.component.name not in furniture_names:
+            templates.append(occ)
 
-    if templates_to_hide:
+    if templates:
         hw_container = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
         hw_container.component.name = "_HW"
         hw_container.isLightBulbOn = False
-        for occ in templates_to_hide:
+        for occ in templates:
             if occ.isValid:
                 try:
                     occ.moveToComponent(hw_container)
                 except Exception:
                     pass
-    print(f">>> Cleanup: {len(templates_to_hide)} templates hidden, installed hardware visible")
+    print(f">>> Cleanup: {len(templates)} templates hidden")
 
     # ================================================================
     #  EPILOGUE
