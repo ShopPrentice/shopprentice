@@ -544,7 +544,7 @@ def run(context):
     fillet_feat.name = "Fillet1"
 
     # ── FIT VIEW ──────────────────────────────────────────────────
-    af.apply_appearance("maple")
+    af.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

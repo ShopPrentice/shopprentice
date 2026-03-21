@@ -1031,17 +1031,21 @@ def _grain_transform(grain_dir):
     return m
 
 
-def apply_appearance(species="white oak"):
-    """Apply wood appearance to all bodies with grain-aligned texture.
+def apply_appearance(species="white oak", bodies=None):
+    """Apply wood appearance to bodies with grain-aligned texture.
 
     Call at the end of a script, after all geometry is built.
 
     Args:
         species: Wood species name (e.g. "cherry", "walnut", "white oak").
                  Falls back to a similar species if exact match unavailable.
+        bodies: Optional list of body name strings. If None, applies to ALL
+                bodies. Use for multi-species designs.
 
     Usage:
-        af.apply_appearance("walnut")
+        af.apply_appearance("walnut")                          # all bodies
+        af.apply_appearance("white oak", bodies=["Seat"])      # specific bodies
+        af.apply_appearance("teak", bodies=["Leg_FL","Leg_FR"]) # accent species
     """
     app = adsk.core.Application.get()
     design = adsk.fusion.Design.cast(app.activeProduct)
@@ -1086,18 +1090,23 @@ def apply_appearance(species="white oak"):
     if not local:
         local = design.appearances.addByCopy(appearance, appearance.name)
 
-    # Collect all bodies
-    def all_bodies(comp):
-        bodies = []
+    # Collect target bodies
+    def all_bodies_recursive(comp):
+        result = []
         for i in range(comp.bRepBodies.count):
-            bodies.append(comp.bRepBodies.item(i))
+            result.append(comp.bRepBodies.item(i))
         for i in range(comp.occurrences.count):
-            bodies.extend(all_bodies(comp.occurrences.item(i).component))
-        return bodies
+            result.extend(all_bodies_recursive(comp.occurrences.item(i).component))
+        return result
+
+    target_bodies = all_bodies_recursive(root)
+    if bodies is not None:
+        name_set = set(bodies)
+        target_bodies = [b for b in target_bodies if b.name in name_set]
 
     # Apply to each body with grain orientation
     count = 0
-    for body in all_bodies(root):
+    for body in target_bodies:
         try:
             body.appearance = local
             grain = _grain_axis(body)

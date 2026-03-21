@@ -25,7 +25,7 @@ The capture-and-rebuild pipeline reads the design's parameters, component tree, 
 ### Appearance
 
 ```
-apply_appearance(species="maple")
+apply_appearance(species="white oak")
 ```
 
 ---
