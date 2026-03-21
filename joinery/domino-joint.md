@@ -71,6 +71,36 @@ In practice, this means the `long_axis` should be chosen so the domino's wide di
 
 **Never orient the domino so its wide face is perpendicular to the board surface** — that would create a weak joint with minimal glue contact on the face.
 
+### Choosing `long_axis` by Grain Direction (Tested — bed frame, dining chair)
+
+The domino's wide face must lie flat — parallel to both mating board surfaces. At any joint, identify the grain direction of each piece and the interface plane. The `long_axis` is the model axis that is:
+1. **In the interface plane** (not the normal direction)
+2. **Perpendicular to both boards' grain** (so the domino lies across the grain, not along it)
+
+| Joint | Board A grain | Board B grain | Interface plane | `long_axis` |
+|-------|--------------|--------------|----------------|-------------|
+| Side rail (Y) → post (Z) | Y | Z | YZ (at X=const) | **x** — flat, perpendicular to both grains |
+| Front rail (X) → post (Z) | X | Z | XZ (at Y=const) | **y** — flat, perpendicular to both grains |
+| HB rail (X) → post (Z) | X | Z | XZ (at Y=const) | **y** — same as front rail |
+| Side apron (Y) → leg (Z) | Y | Z | YZ (at X=const) | **x** — same as side rail |
+| Ledger (Y) → side rail (Y) | Y | Y | YZ (at X=const) | **z** — cross-grain for both |
+
+**Rule of thumb:** the `long_axis` is the model axis that does NOT appear in either board's grain direction and is NOT the interface normal. If the interface is a YZ plane and the grains are Y and Z, the only remaining axis is X → `long_axis="x"`.
+
+**When both boards share the same grain direction** (e.g., ledger strip Y-grain glued to side rail Y-grain), the `long_axis` is Z — perpendicular to the shared grain, in the interface plane.
+
+### Sizing for Thin Boards (Tested — bed frame ledger)
+
+The domino narrow dimension (`dm_t`) must fit within the thinnest board at the joint. Use separate domino parameters per joint when board thicknesses differ:
+
+| Board thickness | Max cutter | Typical params |
+|----------------|-----------|----------------|
+| 0.75" (19mm) | 5mm | `ldm_t=5mm, ldm_w=30mm, ldm_d=15mm` |
+| 1" (25mm) | 6mm | `dm_t=6mm, dm_w=20mm, dm_d=15mm` |
+| 1.5"+ (38mm+) | 8mm | `dm_t=8mm, dm_w=40mm, dm_d=20mm` |
+
+**Rule:** cutter diameter ≤ 1/3 of the thinnest board. A 0.75" ledger with an 8mm domino (42% of thickness) is too aggressive — the mortise walls are paper-thin.
+
 ## Geometry Workflow
 
 The domino mortise is modeled as a **stadium-shaped void body** sketched on the mating surface and symmetric-extruded so it penetrates equally into both pieces. The stadium shape is two semicircles (radius = `dm_w / 2`) connected by two straight lines — use `sketch_slot` to draw this. After creation, the void is CUT from both pieces (with `keepTool=True` on the first CUT so it survives for the second).

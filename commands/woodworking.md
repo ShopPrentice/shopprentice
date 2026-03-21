@@ -411,6 +411,7 @@ Quick reference:
 - **Chamfer:** `chamferFeatures.createInput2()` → `inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(edges, distance, propagate)`
 - Note: chamfer uses `createInput2()` (not `createInput()`) and has a nested `.chamferEdgeSets` collection.
 - The API requires `BRepEdge` objects, never `BRepFace`. Iterate face edges and deduplicate via `tempId`.
+- **Chamfer alignment rule:** When posts have top chamfers, adjacent rails should align with the **bottom edge of the chamfer**, not the raw post top. Use `rail_top_z = post_h - post_chamfer` so the rail visually meets the flat portion of the post. This applies to any edge treatment — the connecting piece should stop where the treatment starts.
 
 ## Standard Helpers
 
@@ -618,7 +619,7 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Cross-component:** Use `body.createForAssemblyContext(occ)` for CUT in root. Bulk CUT all tools in one Combine.
 
-**Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `helpers/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `joinery/domino-joint.md`.
+**Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `helpers/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. **Orientation: the domino must lie flat** — `long_axis` is the model axis perpendicular to both boards' grain AND in the interface plane (see `joinery/domino-joint.md` "Choosing long_axis by Grain Direction"). Full reference: `joinery/domino-joint.md`.
 
 **Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `helpers/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`af.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `joinery/mortise-tenon.md`.
 
