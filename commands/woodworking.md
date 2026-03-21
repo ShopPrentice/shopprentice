@@ -119,6 +119,7 @@ Before planning, identify the **furniture type** and **design style** from the u
 | Craftsman | exposed tenons, corbels, quartersawn oak, thick stock, Arts & Crafts | `woodworking/styles/craftsman.md` |
 | Mid-century | tapered legs, floating tops, thin profiles, hidden joinery, Danish, Scandinavian | `woodworking/styles/mid-century.md` |
 | Rustic | thick boards, farmhouse, reclaimed, visible fasteners, breadboard ends | `woodworking/styles/rustic.md` |
+| Nakashima | live edge, natural edge, slab, organic, bowties, butterfly keys, walnut slab, free-form | `woodworking/styles/nakashima.md` |
 
 **If no style is specified or identifiable, default to Modern.**
 
