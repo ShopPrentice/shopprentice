@@ -201,14 +201,7 @@ def run(context):
 
             hp_screw_bodies.append(screw_body)
 
-        # JOIN all screw bodies into hook plate
-        if hp_screw_bodies:
-            coll = adsk.core.ObjectCollection.create()
-            for sb in hp_screw_bodies:
-                coll.add(sb)
-            ci = comp.features.combineFeatures.createInput(hook_plate, coll)
-            ci.operation = JOIN; ci.isKeepToolBodies = False
-            comp.features.combineFeatures.add(ci).name = "JoinScrews_HP"
+        # Screws stay as separate bodies (visible circle boundary on plate surface)
 
         # ==== STRIKE PLATE ====
         sk_s = comp.sketches.add(comp.xYConstructionPlane)
@@ -291,14 +284,7 @@ def run(context):
 
             sp_screw_bodies.append(screw_body_sp)
 
-        # JOIN screws into strike plate
-        if sp_screw_bodies:
-            coll = adsk.core.ObjectCollection.create()
-            for sb in sp_screw_bodies:
-                coll.add(sb)
-            ci = comp.features.combineFeatures.createInput(strike_plate, coll)
-            ci.operation = JOIN; ci.isKeepToolBodies = False
-            comp.features.combineFeatures.add(ci).name = "JoinScrews_SP"
+        # Screws stay as separate bodies (visible circle boundary on plate surface)
 
         sk_h.isVisible = False
         sk_s.isVisible = False

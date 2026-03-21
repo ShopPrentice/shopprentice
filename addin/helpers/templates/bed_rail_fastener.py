@@ -201,4 +201,63 @@ def install(comp, post_body, rail_body,
     comp.features.extrudeFeatures.add(pocket_ext_r).name = f"{name}_HookPocket"
     sk_rail.isVisible = False
 
-    print(f">>> {name}: mortise pockets cut for {size} bedlock (post + rail)")
+    # === INSERT PLATE BODIES into the pockets ===
+    # Strike plate in post pocket (stadium body, flush with post face)
+    sk_sp_body = comp.sketches.add(post_face)
+    sk_sp_body.name = f"{name}_StrikePlateBody_Sk"
+    m2s_spb = sk_sp_body.modelToSketchSpace
+    lines_spb = sk_sp_body.sketchCurves.sketchLines
+    arcs_spb = sk_sp_body.sketchCurves.sketchArcs
+
+    sp_tl_b = m2s_spb(mp(cross_center - r, z_top - r))
+    sp_tr_b = m2s_spb(mp(cross_center + r, z_top - r))
+    sp_br_b = m2s_spb(mp(cross_center + r, z_bot + r))
+    sp_bl_b = m2s_spb(mp(cross_center - r, z_bot + r))
+    sp_top_b = m2s_spb(mp(cross_center, z_top))
+    sp_bot_b = m2s_spb(mp(cross_center, z_bot))
+
+    l_left_b = lines_spb.addByTwoPoints(sp_tl_b, sp_bl_b)
+    l_right_b = lines_spb.addByTwoPoints(sp_br_b, sp_tr_b)
+    arcs_spb.addByThreePoints(l_right_b.endSketchPoint, sp_top_b, l_left_b.startSketchPoint)
+    arcs_spb.addByThreePoints(l_left_b.endSketchPoint, sp_bot_b, l_right_b.startSketchPoint)
+
+    sp_body_prof = sk_sp_body.profiles.item(0)
+    sp_body_ext = comp.features.extrudeFeatures.createInput(sp_body_prof, NEW)
+    sp_body_ext.setOneSideExtent(
+        adsk.fusion.DistanceExtentDefinition.create(VI(f"{plate_t} cm")),
+        adsk.fusion.ExtentDirections.NegativeExtentDirection)
+    sp_body_feat = comp.features.extrudeFeatures.add(sp_body_ext)
+    sp_body_feat.name = f"{name}_StrikePlate"
+    sp_body_feat.bodies.item(0).name = f"{name}_StrikePlate"
+    sk_sp_body.isVisible = False
+
+    # Hook plate in rail pocket
+    sk_hp_body = comp.sketches.add(rail_face)
+    sk_hp_body.name = f"{name}_HookPlateBody_Sk"
+    m2s_hpb = sk_hp_body.modelToSketchSpace
+    lines_hpb = sk_hp_body.sketchCurves.sketchLines
+    arcs_hpb = sk_hp_body.sketchCurves.sketchArcs
+
+    hp_tl_b = m2s_hpb(mp_r(cross_center_r - r, z_top - r))
+    hp_tr_b = m2s_hpb(mp_r(cross_center_r + r, z_top - r))
+    hp_br_b = m2s_hpb(mp_r(cross_center_r + r, z_bot + r))
+    hp_bl_b = m2s_hpb(mp_r(cross_center_r - r, z_bot + r))
+    hp_top_b = m2s_hpb(mp_r(cross_center_r, z_top))
+    hp_bot_b = m2s_hpb(mp_r(cross_center_r, z_bot))
+
+    l_left_hb = lines_hpb.addByTwoPoints(hp_tl_b, hp_bl_b)
+    l_right_hb = lines_hpb.addByTwoPoints(hp_br_b, hp_tr_b)
+    arcs_hpb.addByThreePoints(l_right_hb.endSketchPoint, hp_top_b, l_left_hb.startSketchPoint)
+    arcs_hpb.addByThreePoints(l_left_hb.endSketchPoint, hp_bot_b, l_right_hb.startSketchPoint)
+
+    hp_body_prof = sk_hp_body.profiles.item(0)
+    hp_body_ext = comp.features.extrudeFeatures.createInput(hp_body_prof, NEW)
+    hp_body_ext.setOneSideExtent(
+        adsk.fusion.DistanceExtentDefinition.create(VI(f"{plate_t} cm")),
+        adsk.fusion.ExtentDirections.NegativeExtentDirection)
+    hp_body_feat = comp.features.extrudeFeatures.add(hp_body_ext)
+    hp_body_feat.name = f"{name}_HookPlate"
+    hp_body_feat.bodies.item(0).name = f"{name}_HookPlate"
+    sk_hp_body.isVisible = False
+
+    print(f">>> {name}: {size} bedlock installed (pockets + plates in post + rail)")
