@@ -950,15 +950,19 @@ def screenshot_cam(eye_dir, bodies=None, fill=0.80):
                 max_r = max(max_r, abs(x * rx + y * ry + z * rz))
                 max_u = max(max_u, abs(x * ux + y * uy + z * uz))
 
-    # Distance from projected extent
-    half_angle = (actual_fov / 2) * fill
-    dist = max(max_r, max_u) / math.tan(half_angle)
+    # Distance from projected extent.
+    # fill=0.80 means the subject fills 80% of the frame width/height.
+    # tan(half_fov) * dist = full frame half-extent at target distance.
+    # We want max_extent = fill * full_half_extent, so:
+    #   dist = max_extent / (tan(half_fov) * fill)
+    half_fov = actual_fov / 2
+    dist = max(max_r, max_u) / (math.tan(half_fov) * fill)
 
     # For elevation views, enforce minimum distance based on 3D diagonal
     # so we don't zoom absurdly close to a flat face
     diag = math.sqrt((max_x - min_x) ** 2 + (max_y - min_y) ** 2
                      + (max_z - min_z) ** 2)
-    min_dist = (diag / 2) / math.tan(half_angle) * 0.75
+    min_dist = (diag / 2) / (math.tan(half_fov) * fill) * 0.75
     dist = max(dist, min_dist)
 
     # Set camera
