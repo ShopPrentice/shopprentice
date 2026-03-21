@@ -1,29 +1,13 @@
 """Bed rail fastener (mortise bedlock) installation template.
 
-Imports hook plate and strike plate from SEPARATE STEP files, positions
-each independently, and CUTs recess pockets into both boards.
-
 INSTALLATION RULE:
-  - Hook plate → RAIL end face (hooks face toward the post/leg)
+  - Hook plate → RAIL end face (hooks face OUTWARD from rail, toward the post)
   - Strike plate → POST/LEG side face (slots face toward the rail)
-  - The post supports the rail: hooks on rail drop into slots on post
-  - Hook hardware lives inside the Rail component
-  - Strike hardware lives inside the Post component
+  - Hardware auto-moves into a "Hardwares" sub-folder in the parent component
+  - Templates hidden in _HW
 
 STEP files at: ~/.autofusion/hardware/bed_rail_fastener/
 Generate with: tools/bed_rail_fastener.py
-
-Usage:
-    from helpers.templates import bed_rail_fastener as brf
-
-    # post_proxy is the POST body, rail_proxy is the RAIL body
-    brf.install(root, post_proxy, rail_proxy,
-                interface_axis="y", interface_coord=post_size_cm,
-                center_z=rail_center_z_cm,
-                size="100mm", name="BRF_RL_F", ev=ev)
-
-    # Hardware auto-moves into parent components (Rails/Posts)
-    # Templates go to hidden _HW in epilogue cleanup
 """
 
 import adsk.core
@@ -38,18 +22,13 @@ HARDWARE_DIR = os.path.expanduser("~/.autofusion/hardware/bed_rail_fastener")
 PLATE_T = 0.25  # cm
 
 # Module-level cache: import each plate STEP once, copy for each use
-_plate_cache = {}  # key: (part_id,) → value: template occurrence
+_plate_cache = {}  # key: part_id → value: template occurrence
 
 
 def install(comp, post_body, rail_body,
             interface_axis, interface_coord,
             center_z, size="100mm", name="BedRail", ev=None):
-    """Install a bedlock pair from separate STEP files.
-
-    Each plate is imported independently (or copied from cache),
-    positioned with a simple Ry(90°) rotation, and used as a CUT
-    tool to create the recess pocket.
-    """
+    """Install a bedlock pair. Hook in rail, strike in post."""
     app = adsk.core.Application.get()
     design = adsk.fusion.Design.cast(app.activeProduct)
     root = design.rootComponent
@@ -59,7 +38,7 @@ def install(comp, post_body, rail_body,
     cz = float(center_z)
     other_axis = "y" if interface_axis == "x" else "x"
 
-    # Centers on the other axis (perpendicular to interface + Z)
+    # Body centers on the other axis
     post_bb = post_body.boundingBox
     post_center = (getattr(post_bb.minPoint, other_axis) +
                    getattr(post_bb.maxPoint, other_axis)) / 2
@@ -67,8 +46,17 @@ def install(comp, post_body, rail_body,
     rail_center = (getattr(rail_bb.minPoint, other_axis) +
                    getattr(rail_bb.maxPoint, other_axis)) / 2
 
+    # Determine which side of interface each body is on
+    rail_iface_center = (getattr(rail_bb.minPoint, interface_axis) +
+                         getattr(rail_bb.maxPoint, interface_axis)) / 2
+    rail_on_positive_side = rail_iface_center > iface
+    # Hooks face OUTWARD from rail = AWAY from rail center = TOWARD post
+    # If rail is on +side of iface: hooks face -direction
+    # If rail is on -side of iface: hooks face +direction
+    hook_dir = -1 if rail_on_positive_side else +1
+
     # ================================================================
-    # Import/copy each plate type independently
+    # Import/copy plates
     # ================================================================
     hook_step = os.path.join(HARDWARE_DIR, f"hook_plate_{size}.step")
     strike_step = os.path.join(HARDWARE_DIR, f"strike_plate_{size}.step")
@@ -77,14 +65,12 @@ def install(comp, post_body, rail_body,
         print(f">>> ERROR: STEP files not found. Run tools/bed_rail_fastener.py first.")
         return
 
-    # Import each plate STEP once, copy for subsequent uses
     def _get_or_import(part_id, step_file):
         global _plate_cache
         if part_id in _plate_cache:
             tmpl = _plate_cache[part_id]
             if tmpl.isValid:
                 return hw_mgr._copy_from_template(tmpl, root)
-        # First import — hidden template
         imported = hw_mgr.import_step(step_file, root)
         if not imported:
             return None
@@ -107,115 +93,157 @@ def install(comp, post_body, rail_body,
     strike_occ, strike_bodies = strike_result[0]
     hook_comp = hook_occ.component
     strike_comp = strike_occ.component
-
-    # Register installed copies for cleanup
     hw_mgr._hardware_occurrences.append((hook_occ, root))
     hw_mgr._hardware_occurrences.append((strike_occ, root))
 
-    # Find the main plate body (largest volume) in each
+    # Main plate bodies
     hook_plate = max(hook_bodies, key=lambda b: b.volume)
     strike_plate = max(strike_bodies, key=lambda b: b.volume)
 
-    # Get STEP-space centers
+    # STEP-space centers
     hp_bb = hook_plate.boundingBox
-    hp_cx = (hp_bb.minPoint.x + hp_bb.maxPoint.x) / 2  # plate length center
-    hp_cy = (hp_bb.minPoint.y + hp_bb.maxPoint.y) / 2  # plate width center
+    hp_cx = (hp_bb.minPoint.x + hp_bb.maxPoint.x) / 2
+    hp_cy = (hp_bb.minPoint.y + hp_bb.maxPoint.y) / 2
 
     sp_bb = strike_plate.boundingBox
     sp_cx = (sp_bb.minPoint.x + sp_bb.maxPoint.x) / 2
     sp_cy = (sp_bb.minPoint.y + sp_bb.maxPoint.y) / 2
 
     # ================================================================
-    # Position each plate with simple Ry(90°)
-    # Ry(90°): STEP_X→-Z, STEP_Y→Y, STEP_Z→+X  (det=+1)
-    # This maps plate length to vertical, thickness to interface axis
+    # Position plates with direction-aware rotation
     # ================================================================
+    VI = adsk.core.ValueInput.createByString
 
-    def move_plate(plate_comp, bodies_list, tx, ty, tz, plate_name):
-        """Position a plate with Ry(90°) + translation."""
-        xf = adsk.core.Matrix3D.create()
-        if interface_axis == "x":
-            # Ry(90°): model_X=STEP_Z, model_Y=STEP_Y, model_Z=-STEP_X
-            xf.setCell(0, 0, 0);  xf.setCell(0, 1, 0); xf.setCell(0, 2, 1);  xf.setCell(0, 3, tx)
-            xf.setCell(1, 0, 0);  xf.setCell(1, 1, 1); xf.setCell(1, 2, 0);  xf.setCell(1, 3, ty)
-            xf.setCell(2, 0, -1); xf.setCell(2, 1, 0); xf.setCell(2, 2, 0);  xf.setCell(2, 3, tz)
-        else:
-            # Y-interface: STEP_Z→+Y, STEP_Y→-X, STEP_X→-Z  (det=+1)
-            xf.setCell(0, 0, 0);  xf.setCell(0, 1, -1); xf.setCell(0, 2, 0);  xf.setCell(0, 3, tx)
-            xf.setCell(1, 0, 0);  xf.setCell(1, 1, 0);  xf.setCell(1, 2, 1);  xf.setCell(1, 3, ty)
-            xf.setCell(2, 0, -1); xf.setCell(2, 1, 0);  xf.setCell(2, 2, 0);  xf.setCell(2, 3, tz)
-
+    def move_bodies(plate_comp, bodies, matrix, plate_name):
         coll = adsk.core.ObjectCollection.create()
-        for b in bodies_list:
+        for b in bodies:
             coll.add(b)
         move_inp = plate_comp.features.moveFeatures.createInput2(coll)
-        move_inp.defineAsFreeMove(xf)
+        move_inp.defineAsFreeMove(matrix)
         plate_comp.features.moveFeatures.add(move_inp).name = plate_name
 
-    # STRIKE PLATE → in post face
-    # STEP_Z=0 (base) goes to interface_axis = iface - PLATE_T (bottom of pocket)
-    # STEP_Z=PLATE_T (outside face) goes to interface_axis = iface (flush with post face)
+    # HOOK PLATE — direction-aware rotation
+    # hook_dir=+1: hooks face +interface_axis (STEP_Z → +iface_axis)
+    # hook_dir=-1: hooks face -interface_axis (STEP_Z → -iface_axis)
+    xf_hook = adsk.core.Matrix3D.create()
     if interface_axis == "x":
-        move_plate(strike_comp, strike_bodies,
-                   tx=iface - PLATE_T - sp_bb.minPoint.z,  # base at iface-t
-                   ty=post_center - sp_cy,
-                   tz=cz + sp_cx,
-                   plate_name=f"{name}_StrikePos")
-    else:
-        move_plate(strike_comp, strike_bodies,
-                   tx=post_center + sp_cy,   # -STEP_Y maps to +X
-                   ty=iface - PLATE_T - sp_bb.minPoint.z,
-                   tz=cz + sp_cx,
-                   plate_name=f"{name}_StrikePos")
+        if hook_dir > 0:
+            # Ry(90°): STEP_Z→+X, hooks face +X
+            tx = iface - PLATE_T - hp_bb.minPoint.z
+            ty = rail_center - hp_cy
+            tz = cz + hp_cx
+            xf_hook.setCell(0,0,0); xf_hook.setCell(0,1,0); xf_hook.setCell(0,2,1);  xf_hook.setCell(0,3,tx)
+            xf_hook.setCell(1,0,0); xf_hook.setCell(1,1,1); xf_hook.setCell(1,2,0);  xf_hook.setCell(1,3,ty)
+            xf_hook.setCell(2,0,-1);xf_hook.setCell(2,1,0); xf_hook.setCell(2,2,0);  xf_hook.setCell(2,3,tz)
+        else:
+            # Ry(-90°): STEP_Z→-X, hooks face -X
+            tx = iface + PLATE_T + hp_bb.minPoint.z
+            ty = rail_center - hp_cy
+            tz = cz - hp_cx
+            xf_hook.setCell(0,0,0); xf_hook.setCell(0,1,0); xf_hook.setCell(0,2,-1); xf_hook.setCell(0,3,tx)
+            xf_hook.setCell(1,0,0); xf_hook.setCell(1,1,1); xf_hook.setCell(1,2,0);  xf_hook.setCell(1,3,ty)
+            xf_hook.setCell(2,0,1); xf_hook.setCell(2,1,0); xf_hook.setCell(2,2,0);  xf_hook.setCell(2,3,tz)
+    else:  # Y-interface
+        if hook_dir > 0:
+            # STEP_Z→+Y, hooks face +Y
+            tx = rail_center + hp_cy
+            ty = iface - PLATE_T - hp_bb.minPoint.z
+            tz = cz + hp_cx
+            xf_hook.setCell(0,0,0); xf_hook.setCell(0,1,-1);xf_hook.setCell(0,2,0);  xf_hook.setCell(0,3,tx)
+            xf_hook.setCell(1,0,0); xf_hook.setCell(1,1,0); xf_hook.setCell(1,2,1);  xf_hook.setCell(1,3,ty)
+            xf_hook.setCell(2,0,-1);xf_hook.setCell(2,1,0); xf_hook.setCell(2,2,0);  xf_hook.setCell(2,3,tz)
+        else:
+            # STEP_Z→-Y, STEP_Y→-X, STEP_X→+Z (det=+1)
+            tx = rail_center + hp_cy  # -STEP_Y→X, center at rail_center
+            ty = iface + PLATE_T + hp_bb.minPoint.z
+            tz = cz - hp_cx           # +STEP_X→Z
+            xf_hook.setCell(0,0,0); xf_hook.setCell(0,1,-1); xf_hook.setCell(0,2,0);  xf_hook.setCell(0,3,tx)
+            xf_hook.setCell(1,0,0); xf_hook.setCell(1,1,0);  xf_hook.setCell(1,2,-1); xf_hook.setCell(1,3,ty)
+            xf_hook.setCell(2,0,1); xf_hook.setCell(2,1,0);  xf_hook.setCell(2,2,0);  xf_hook.setCell(2,3,tz)
 
-    # HOOK PLATE → in rail end face (use RAIL center, not post center)
-    # STEP_Z=0 (base) at iface (rail end surface)
+    move_bodies(hook_comp, hook_bodies, xf_hook, f"{name}_HookPos")
+
+    # STRIKE PLATE — faces toward rail (opposite direction from hooks)
+    strike_dir = -hook_dir  # strike faces the opposite way from hooks
+    xf_strike = adsk.core.Matrix3D.create()
     if interface_axis == "x":
-        move_plate(hook_comp, hook_bodies,
-                   tx=iface - hp_bb.minPoint.z,
-                   ty=rail_center - hp_cy,        # rail center, not post center
-                   tz=cz + hp_cx,
-                   plate_name=f"{name}_HookPos")
-    else:
-        move_plate(hook_comp, hook_bodies,
-                   tx=rail_center + hp_cy,         # rail center, not post center
-                   ty=iface - hp_bb.minPoint.z,
-                   tz=cz + hp_cx,
-                   plate_name=f"{name}_HookPos")
+        if strike_dir > 0:
+            tx = iface - sp_bb.minPoint.z
+            ty = post_center - sp_cy
+            tz = cz + sp_cx
+            xf_strike.setCell(0,0,0); xf_strike.setCell(0,1,0); xf_strike.setCell(0,2,1);  xf_strike.setCell(0,3,tx)
+            xf_strike.setCell(1,0,0); xf_strike.setCell(1,1,1); xf_strike.setCell(1,2,0);  xf_strike.setCell(1,3,ty)
+            xf_strike.setCell(2,0,-1);xf_strike.setCell(2,1,0); xf_strike.setCell(2,2,0);  xf_strike.setCell(2,3,tz)
+        else:
+            tx = iface + sp_bb.minPoint.z
+            ty = post_center - sp_cy
+            tz = cz - sp_cx
+            xf_strike.setCell(0,0,0); xf_strike.setCell(0,1,0); xf_strike.setCell(0,2,-1); xf_strike.setCell(0,3,tx)
+            xf_strike.setCell(1,0,0); xf_strike.setCell(1,1,1); xf_strike.setCell(1,2,0);  xf_strike.setCell(1,3,ty)
+            xf_strike.setCell(2,0,1); xf_strike.setCell(2,1,0); xf_strike.setCell(2,2,0);  xf_strike.setCell(2,3,tz)
+    else:  # Y-interface
+        if strike_dir > 0:
+            tx = post_center + sp_cy
+            ty = iface - sp_bb.minPoint.z
+            tz = cz + sp_cx
+            xf_strike.setCell(0,0,0); xf_strike.setCell(0,1,-1);xf_strike.setCell(0,2,0);  xf_strike.setCell(0,3,tx)
+            xf_strike.setCell(1,0,0); xf_strike.setCell(1,1,0); xf_strike.setCell(1,2,1);  xf_strike.setCell(1,3,ty)
+            xf_strike.setCell(2,0,-1);xf_strike.setCell(2,1,0); xf_strike.setCell(2,2,0);  xf_strike.setCell(2,3,tz)
+        else:
+            # STEP_Z→-Y, STEP_Y→-X, STEP_X→+Z (det=+1)
+            tx = post_center + sp_cy
+            ty = iface + sp_bb.minPoint.z
+            tz = cz - sp_cx
+            xf_strike.setCell(0,0,0); xf_strike.setCell(0,1,-1); xf_strike.setCell(0,2,0);  xf_strike.setCell(0,3,tx)
+            xf_strike.setCell(1,0,0); xf_strike.setCell(1,1,0);  xf_strike.setCell(1,2,-1); xf_strike.setCell(1,3,ty)
+            xf_strike.setCell(2,0,1); xf_strike.setCell(2,1,0);  xf_strike.setCell(2,2,0);  xf_strike.setCell(2,3,tz)
+
+    move_bodies(strike_comp, strike_bodies, xf_strike, f"{name}_StrikePos")
 
     # ================================================================
-    # CUT recess pockets using the positioned plates
+    # CUT recess pockets
     # ================================================================
-    # Strike plate CUTs into the post
     sp_proxy = strike_plate.createForAssemblyContext(strike_occ)
     af.combine(root, post_body, [sp_proxy], CUT, True, f"{name}_StrikeRecess")
 
-    # Hook plate CUTs into the rail
     hp_proxy = hook_plate.createForAssemblyContext(hook_occ)
     af.combine(root, rail_body, [hp_proxy], CUT, True, f"{name}_HookRecess")
 
-    # Name and move into parent components
+    # ================================================================
+    # Move into parent components' "Hardwares" sub-folder
+    # ================================================================
     hook_comp.name = f"{name}_Hook"
     strike_comp.name = f"{name}_Strike"
 
-    # Move hardware into the component of the board they're attached to
-    # Hook plate → rail's parent component, Strike plate → post's parent component
     try:
-        # Find parent occurrences by matching the body's parentComponent
-        rail_parent_occ = None
-        post_parent_occ = None
+        rail_parent = None
+        post_parent = None
         for i in range(root.occurrences.count):
             occ = root.occurrences.item(i)
             if occ.component == rail_body.parentComponent:
-                rail_parent_occ = occ
+                rail_parent = occ
             if occ.component == post_body.parentComponent:
-                post_parent_occ = occ
+                post_parent = occ
 
-        if rail_parent_occ and hook_occ.isValid:
-            hook_occ.moveToComponent(rail_parent_occ)
-        if post_parent_occ and strike_occ.isValid:
-            strike_occ.moveToComponent(post_parent_occ)
+        # Create or find "Hardwares" folder in each parent
+        def _get_hw_folder(parent_occ):
+            # Search by name in child occurrences
+            for j in range(parent_occ.childOccurrences.count):
+                ch = parent_occ.childOccurrences.item(j)
+                if "Hardwares" in ch.component.name:
+                    return ch
+            hw = parent_occ.component.occurrences.addNewComponent(
+                adsk.core.Matrix3D.create())
+            hw.component.name = "Hardwares"
+            return hw
+
+        if rail_parent and hook_occ.isValid:
+            rail_hw = _get_hw_folder(rail_parent)
+            hook_occ.moveToComponent(rail_hw)
+        if post_parent and strike_occ.isValid:
+            post_hw = _get_hw_folder(post_parent)
+            strike_occ.moveToComponent(post_hw)
     except Exception:
-        pass  # keep at root if move fails
+        pass
 
-    print(f">>> {name}: {size} bedlock — hook in rail, strike in post")
+    print(f">>> {name}: {size} bedlock — hook in rail, strike in post (hooks face {'+'if hook_dir>0 else '-'}{interface_axis})")
