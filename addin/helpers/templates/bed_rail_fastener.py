@@ -133,49 +133,52 @@ def install(comp, post_body, rail_body,
         else:
             strike_bodies.add(b)
 
-    # HOOK PLATE: goes in the rail end, hooks protrude toward the post
-    # Ry(-90°): STEP_X→Z, STEP_Z→-X. Outside face (STEP Z=plate_t) at interface.
-    # Hook plate outside face at X = iface (flush with rail end surface)
-    # tx = iface + plate_t so that STEP_Z=plate_t maps to X=iface
+    sp_cx = (sp_bb.minPoint.x + sp_bb.maxPoint.x) / 2
+
+    # Step 1: Ry(-90°) for ALL bodies — makes plate vertical (STEP_X→+Z, STEP_Z→-X)
+    # Then Step 2: Rx(180°) for ALL bodies — flips so hooks point DOWN (Z→-Z, Y→-Y)
+    # Combined: Rx(180°)·Ry(-90°)
+    # = [-1,0,0]   [0,0,-1]   [0, 0, 1]
+    #   [0,-1,0] × [0,1, 0] = [0,-1, 0]
+    #   [0,0, 1]   [1,0, 0]   [1, 0, 0]
+    # model_X = STEP_Z, model_Y = -STEP_Y, model_Z = STEP_X  (det=+1 ✓)
+    # Hooks at +STEP_X → +model_Z → UP. Not down! Need the other combo.
+    #
+    # Try: Rx(180°)·Ry(90°)
+    # = [-1,0,0]   [0, 0,1]   [0,  0,-1]
+    #   [0,-1,0] × [0, 1,0] = [0, -1, 0]
+    #   [0, 0,1]   [-1,0,0]   [-1, 0, 0]
+    # model_X = -STEP_Z, model_Y = -STEP_Y, model_Z = -STEP_X  (det=+1 ✓)
+    # Hooks at +STEP_X → -model_Z → DOWN ✓
+    # Outside face +STEP_Z → -model_X → hooks toward post ✓ (for hook plate)
+
+    # HOOK PLATE: Rx(180°)·Ry(90°) + translation
     xf_hook = adsk.core.Matrix3D.create()
     if interface_axis == "x":
-        tx_h = iface + PLATE_T
-        ty_h = other_center - hp_cy
-        tz_h = cz - hp_cx
-        xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, 0); xf_hook.setCell(0, 2, -1); xf_hook.setCell(0, 3, tx_h)
-        xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, 1); xf_hook.setCell(1, 2, 0);  xf_hook.setCell(1, 3, ty_h)
-        xf_hook.setCell(2, 0, 1);  xf_hook.setCell(2, 1, 0); xf_hook.setCell(2, 2, 0);  xf_hook.setCell(2, 3, tz_h)
-    else:
-        tx_h = other_center - hp_cy
-        ty_h = iface + PLATE_T
-        tz_h = cz - hp_cx
-        xf_hook.setCell(0, 0, 0); xf_hook.setCell(0, 1, 1);  xf_hook.setCell(0, 2, 0);  xf_hook.setCell(0, 3, tx_h)
-        xf_hook.setCell(1, 0, 0); xf_hook.setCell(1, 1, 0);  xf_hook.setCell(1, 2, -1); xf_hook.setCell(1, 3, ty_h)
-        xf_hook.setCell(2, 0, 1); xf_hook.setCell(2, 1, 0);  xf_hook.setCell(2, 2, 0);  xf_hook.setCell(2, 3, tz_h)
+        tx_h = iface + PLATE_T         # -STEP_Z=0 + tx = iface+t → base inside rail
+        ty_h = other_center + hp_cy    # -STEP_Y + ty = other_center → ty = oc + hp_cy
+        tz_h = cz + hp_cx             # -STEP_X + tz = cz → tz = cz + hp_cx
+        xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, 0);  xf_hook.setCell(0, 2, -1); xf_hook.setCell(0, 3, tx_h)
+        xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, -1); xf_hook.setCell(1, 2, 0);  xf_hook.setCell(1, 3, ty_h)
+        xf_hook.setCell(2, 0, -1); xf_hook.setCell(2, 1, 0);  xf_hook.setCell(2, 2, 0);  xf_hook.setCell(2, 3, tz_h)
 
     move_hook = hw_comp.features.moveFeatures.createInput2(hook_bodies)
     move_hook.defineAsFreeMove(xf_hook)
     hw_comp.features.moveFeatures.add(move_hook).name = f"{name}_HookPos"
 
-    # STRIKE PLATE: goes in the post face, outside (slots) faces toward the rail
-    # Ry(+90°): STEP_X→Z, STEP_Z→+X (flipped from hook plate)
-    # Strike plate outside face (STEP Z=plate_t) at X = iface (flush with post face, facing rail)
-    # tx = iface - plate_t so that STEP_Z=plate_t maps to X=iface
+    # STRIKE PLATE: Ry(90°) only (no X flip — slots face +X toward rail)
+    # model_X = STEP_Z, model_Y = STEP_Y, model_Z = -STEP_X  (det=+1 ✓)
+    # Hooks/slots at same -STEP_X → same model_Z ✓ (aligned!)
+    # But wait — strike Y is NOT flipped, hook Y IS flipped. Different Y centers.
+    # Hook: model_Y = -STEP_Y + ty = -0 + ty = other_center → OK (hp_cy≈0)
+    # Strike: model_Y = STEP_Y + ty = sp_cy + ty = other_center → ty = oc - sp_cy
     xf_strike = adsk.core.Matrix3D.create()
-    sp_cx = (sp_bb.minPoint.x + sp_bb.maxPoint.x) / 2
     if interface_axis == "x":
-        tx_s = iface - PLATE_T
-        ty_s = other_center - sp_cy
-        tz_s = cz - sp_cx
+        tx_s = iface - PLATE_T          # STEP_Z=0 + tx = iface-t → base inside post
+        ty_s = other_center - sp_cy    # STEP_Y=sp_cy + ty = other_center
+        tz_s = cz + sp_cx             # -STEP_X + tz = cz → tz = cz + sp_cx
         xf_strike.setCell(0, 0, 0);  xf_strike.setCell(0, 1, 0); xf_strike.setCell(0, 2, 1);  xf_strike.setCell(0, 3, tx_s)
         xf_strike.setCell(1, 0, 0);  xf_strike.setCell(1, 1, 1); xf_strike.setCell(1, 2, 0);  xf_strike.setCell(1, 3, ty_s)
-        xf_strike.setCell(2, 0, -1); xf_strike.setCell(2, 1, 0); xf_strike.setCell(2, 2, 0);  xf_strike.setCell(2, 3, tz_s)
-    else:
-        tx_s = other_center - sp_cy
-        ty_s = iface - PLATE_T
-        tz_s = cz - sp_cx
-        xf_strike.setCell(0, 0, 0);  xf_strike.setCell(0, 1, 1); xf_strike.setCell(0, 2, 0);  xf_strike.setCell(0, 3, tx_s)
-        xf_strike.setCell(1, 0, 0);  xf_strike.setCell(1, 1, 0); xf_strike.setCell(1, 2, 1);  xf_strike.setCell(1, 3, ty_s)
         xf_strike.setCell(2, 0, -1); xf_strike.setCell(2, 1, 0); xf_strike.setCell(2, 2, 0);  xf_strike.setCell(2, 3, tz_s)
 
     move_strike = hw_comp.features.moveFeatures.createInput2(strike_bodies)
