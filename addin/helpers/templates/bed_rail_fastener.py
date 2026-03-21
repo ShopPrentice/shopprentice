@@ -53,10 +53,13 @@ def install(comp, post_body, rail_body,
     cz = float(center_z)
     other_axis = "y" if interface_axis == "x" else "x"
 
-    # Post center on the other axis
+    # Centers on the other axis (perpendicular to interface + Z)
     post_bb = post_body.boundingBox
     post_center = (getattr(post_bb.minPoint, other_axis) +
                    getattr(post_bb.maxPoint, other_axis)) / 2
+    rail_bb = rail_body.boundingBox
+    rail_center = (getattr(rail_bb.minPoint, other_axis) +
+                   getattr(rail_bb.maxPoint, other_axis)) / 2
 
     # ================================================================
     # Import/copy each plate type independently
@@ -141,18 +144,17 @@ def install(comp, post_body, rail_body,
                    tz=cz + sp_cx,
                    plate_name=f"{name}_StrikePos")
 
-    # HOOK PLATE → in rail end face (opposite side of interface from strike)
+    # HOOK PLATE → in rail end face (use RAIL center, not post center)
     # STEP_Z=0 (base) at iface (rail end surface)
-    # STEP_Z=PLATE_T goes deeper into the rail
     if interface_axis == "x":
         move_plate(hook_comp, hook_bodies,
-                   tx=iface - hp_bb.minPoint.z,  # base at iface
-                   ty=post_center - hp_cy,
+                   tx=iface - hp_bb.minPoint.z,
+                   ty=rail_center - hp_cy,        # rail center, not post center
                    tz=cz + hp_cx,
                    plate_name=f"{name}_HookPos")
     else:
         move_plate(hook_comp, hook_bodies,
-                   tx=post_center + hp_cy,
+                   tx=rail_center + hp_cy,         # rail center, not post center
                    ty=iface - hp_bb.minPoint.z,
                    tz=cz + hp_cx,
                    plate_name=f"{name}_HookPos")
