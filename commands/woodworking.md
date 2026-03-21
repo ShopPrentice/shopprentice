@@ -76,6 +76,7 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | **Spline Joint** | Reinforced miters, decorative accents across a joint line | Draft | `joinery/spline-joint.md` |
 | **Dowel Joint** | Edge joining, panel glue-ups, face frames — round-peg alignment | Draft | `joinery/dowel-joint.md` |
 | **Pocket Hole** | Face frames, quick assemblies, tabletop attachment — screw-based | Draft | `joinery/pocket-hole.md` |
+| **Bed Rail Fastener** | Bed rail to post — detachable hardware (mortise bedlock). Hooks + slots, STEP import. | Tested (queen bed, twin bed) | `helpers/templates/bed_rail_fastener.py` |
 
 **Read the topic/joinery file BEFORE writing code** that uses those techniques. The core skill provides the routing — the reference files provide the implementation details. For Draft files, treat instructions as a starting point and validate aggressively.
 
@@ -621,6 +622,8 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 **Cross-component:** Use `body.createForAssemblyContext(occ)` for CUT in root. Bulk CUT all tools in one Combine.
 
 **Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `helpers/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. **Orientation: the domino must lie flat** — `long_axis` is the model axis perpendicular to both boards' grain AND in the interface plane (see `joinery/domino-joint.md` "Choosing long_axis by Grain Direction"). Full reference: `joinery/domino-joint.md`.
+
+**Bed rail fasteners (detachable):** Use `bed_rail_fastener.install()` from `helpers/templates/bed_rail_fastener.py` for joints that must be disassemblable (bed rails to posts). Imports STEP hardware, positions with rotation matrix, CUTs recess pockets into both boards. Three sizes: 80mm, 100mm (standard), 120mm. Always call hardware cleanup in epilogue to consolidate imports into hidden `_HW` container. STEP files at `~/.autofusion/hardware/bed_rail_fastener/` — generate with `tools/bed_rail_fastener.py` if missing.
 
 **Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `helpers/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`af.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `joinery/mortise-tenon.md`.
 

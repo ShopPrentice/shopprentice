@@ -66,18 +66,37 @@ Headboard frame (top rail + bottom rail + vertical slats) between back posts abo
 
 | Connection | Joint type | Notes |
 |-----------|-----------|-------|
-| Side rail → post | Domino (2 per end) | Rail centered on post cross-section |
-| Foot rail → front posts | Domino (2 per end) | Same positioning as side rails |
+| Side rail → post | **Bed rail fastener** (100mm) | Detachable — `bed_rail_fastener.install()`. STEP hardware imported, recesses CUT. Call `cleanup` in epilogue. |
+| Foot rail → front posts | **Bed rail fastener** (100mm) | Same as side rails — detachable for moving |
 | HB rails → back posts | Domino (1–2 per end) | Centered on post |
 | HB slats → HB rails | Stub tenon (CUT) | Slat extends dm_d into each rail |
 | Ledger → side rail | Domino (4 along length) | **Smaller dominos** (5mm cutter for 0.75" ledger — cutter ≤ 1/3 board thickness) |
 | Slats → ledgers | Rest on ledgers (loose) | Not fastened — gravity holds them |
 | Center beam legs → beam | Butted (glue or domino) | Removable for transport |
 
-### Domino orientation (grain direction)
-The domino wide face must lie flat — parallel to the board surfaces at the joint:
-- **Side rail (grain Y) → post (grain Z)**: `long_axis="z"` — domino runs vertically
-- **Foot rail (grain X) → post (grain Z)**: `long_axis="z"`
+### Bed rail fastener installation
+Rails connect to posts with detachable bed rail fasteners (mortise bedlocks), not permanent dominos. This allows the bed to be disassembled for moving.
+
+```python
+from helpers.templates import bed_rail_fastener as brf
+from helpers import hardware as hw_mgr
+
+# Install at each rail-to-post connection
+brf.install(root, post_proxy, rail_proxy,
+            interface_axis="y",           # axis where boards meet
+            interface_coord=ev("post_size"),  # coordinate of the interface
+            center_z=rail_center_z,       # Z center of the fastener
+            size="100mm", name="BRF_RL_F", ev=ev)
+
+# IMPORTANT: call cleanup in epilogue to hide STEP imports
+# Consolidate all _Hardware/_Imports/BRF_* into one hidden _HW component
+```
+
+Three sizes: 80mm (light rails), **100mm (standard)**, 120mm (heavy/tall rails). STEP files at `~/.autofusion/hardware/bed_rail_fastener/`. Generate with `tools/bed_rail_fastener.py` if missing.
+
+### Domino orientation (permanent joints only)
+Headboard rails and ledger strips use permanent dominos:
+- **HB rail (grain X) → post (grain Z)**: `long_axis="z"`
 - **Ledger (grain Y) → side rail (grain Y)**: `long_axis="z"` — perpendicular to shared grain
 
 ## Size Guide
@@ -102,13 +121,17 @@ Outer = mattress + 2 × post_size. **Center support beam**: required for Queen a
 6. Slats (spanning full width rail-to-rail, Z = rail_top - mattress_recess - slat_thick)
 7. Center support beam + 2 legs (Queen+ only, at 1/3 and 2/3 of bed length)
 8. Cross-component: HB slat stub-mortises into HB rails
-9. Dominos: side rails → posts, foot rail → posts, HB rails → posts, ledgers → rails
-10. Details: post top chamfers
-11. Verify: check_interference = 0, no floating pieces
+9. Bed rail fasteners: side rails → posts, foot rail → posts (STEP import, 100mm)
+10. Dominos (permanent): HB rails → posts, ledgers → rails
+11. Details: post top chamfers
+12. Hardware cleanup: consolidate _HW container, hide imports
+13. Verify: check_interference = 0, no floating pieces
 ```
 
 ## Common Mistakes
 
+- **Using permanent dominos for rail-to-post joints** — beds must be disassemblable for moving. Use bed rail fasteners (detachable), not dominos (permanent). Only headboard rails and ledger strips get dominos.
+- **STEP import clutter on root** — always consolidate hardware imports into a hidden `_HW` component in the epilogue. Use `hw_mgr.import_step()` for tracked imports.
 - **Rails and posts bottoms level** — most beds have space under the rails (leg_clearance). Without it, no airflow and no under-bed storage. Make leg_clearance an independent parameter.
 - **Slats flush with rail top** — mattress slides off. Add mattress_recess (1–2") so slats sit below rail top, creating a pocket that holds the mattress.
 - **Center beam as solid wall** — should be a beam with 2 discrete legs at 1/3 and 2/3 points, not a slab from floor to slat height.
