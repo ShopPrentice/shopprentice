@@ -14,6 +14,7 @@ import adsk.core, adsk.fusion
 from helpers import af
 from helpers.templates import domino
 from helpers.templates import bed_rail_fastener as brf
+from helpers import hardware as hw_mgr
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
@@ -431,6 +432,10 @@ def run(context):
                 post_c.features.chamferFeatures.add(ch_inp).name = f"{body_name}_TopCh"
 
         print(">>> Post top chamfers applied")
+
+    # Clean up STEP import artifacts — move into _Hardware/_Imports containers
+    hw_mgr.cleanup_step_templates()
+    print(">>> Hardware cleanup done")
 
     # ================================================================
     #  EPILOGUE

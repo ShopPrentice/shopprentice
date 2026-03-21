@@ -23,6 +23,7 @@ import math
 import os
 
 from helpers import af
+from helpers import hardware as hw_mgr
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 HARDWARE_DIR = os.path.expanduser("~/.autofusion/hardware/bed_rail_fastener")
@@ -71,14 +72,14 @@ def install(comp, post_body, rail_body,
         print(f">>> Run tools/bed_rail_fastener.py first to generate hardware")
         return
 
-    import_mgr = app.importManager
-    step_opts = import_mgr.createSTEPImportOptions(step_file)
-    # Import into the root component
-    import_mgr.importToTarget2(step_opts, root)
-
-    # Find the imported occurrence (most recent one added)
-    hw_occ = root.occurrences.item(root.occurrences.count - 1)
+    # Import using hardware manager (tracks for cleanup)
+    imported = hw_mgr.import_step(step_file, root)
+    if not imported:
+        print(f">>> ERROR: STEP import returned no geometry")
+        return
+    hw_occ, hw_bodies = imported[0]
     hw_comp = hw_occ.component
+    hw_mgr._hardware_occurrences.append((hw_occ, root))
     print(f">>> Imported {size} hardware: {hw_comp.bRepBodies.count} bodies")
 
     # Identify hook plate and strike plate by volume (2 largest bodies)
