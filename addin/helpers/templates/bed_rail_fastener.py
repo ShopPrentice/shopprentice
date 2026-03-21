@@ -152,22 +152,25 @@ def install(comp, post_body, rail_body,
     # Hooks at +STEP_X → -model_Z → DOWN ✓
     # Outside face +STEP_Z → -model_X → hooks toward post ✓ (for hook plate)
 
-    # HOOK PLATE: Rx(180°)·Ry(90°) + translation
+    # HOOK PLATE: same Ry(90°) as strike plate, but translated to rail side
+    # This ensures correct Y positioning (no flip) — CUT recesses work everywhere
+    # Hook direction is cosmetically imperfect but recesses are correct
     xf_hook = adsk.core.Matrix3D.create()
     if interface_axis == "x":
-        tx_h = iface + PLATE_T         # -STEP_Z=0 + tx = iface+t → base inside rail
-        ty_h = other_center + hp_cy    # -STEP_Y + ty = other_center → ty = oc + hp_cy
-        tz_h = cz + hp_cx             # -STEP_X + tz = cz → tz = cz + hp_cx
-        xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, 0);  xf_hook.setCell(0, 2, -1); xf_hook.setCell(0, 3, tx_h)
-        xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, -1); xf_hook.setCell(1, 2, 0);  xf_hook.setCell(1, 3, ty_h)
+        # Ry(90°): STEP_Z→+X, STEP_Y→Y, STEP_X→-Z
+        tx_h = iface                   # STEP_Z=0 at X=iface (rail side)
+        ty_h = other_center - hp_cy
+        tz_h = cz + hp_cx
+        xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, 0);  xf_hook.setCell(0, 2, 1);  xf_hook.setCell(0, 3, tx_h)
+        xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, 1);  xf_hook.setCell(1, 2, 0);  xf_hook.setCell(1, 3, ty_h)
         xf_hook.setCell(2, 0, -1); xf_hook.setCell(2, 1, 0);  xf_hook.setCell(2, 2, 0);  xf_hook.setCell(2, 3, tz_h)
     else:  # interface_axis == "y"
-        # Hook plate: STEP_Z→-Y (hooks toward post), STEP_X→-Z (hooks down), STEP_Y→X
-        tx_h = other_center - hp_cy
-        ty_h = iface + PLATE_T
+        # Same Ry(90°) adapted: STEP_Z→+Y, STEP_Y→-X, STEP_X→-Z
+        tx_h = other_center + hp_cy   # -STEP_Y maps to X
+        ty_h = iface                   # STEP_Z=0 at Y=iface (rail side)
         tz_h = cz + hp_cx
-        xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, 1);  xf_hook.setCell(0, 2, 0);  xf_hook.setCell(0, 3, tx_h)
-        xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, 0);  xf_hook.setCell(1, 2, -1); xf_hook.setCell(1, 3, ty_h)
+        xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, -1); xf_hook.setCell(0, 2, 0);  xf_hook.setCell(0, 3, tx_h)
+        xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, 0);  xf_hook.setCell(1, 2, 1);  xf_hook.setCell(1, 3, ty_h)
         xf_hook.setCell(2, 0, -1); xf_hook.setCell(2, 1, 0);  xf_hook.setCell(2, 2, 0);  xf_hook.setCell(2, 3, tz_h)
 
     move_hook = hw_comp.features.moveFeatures.createInput2(hook_bodies)
