@@ -326,12 +326,16 @@ def run(context):
     post_p = post_body.createForAssemblyContext(fix_occ)
     rail_p = rail_body.createForAssemblyContext(fix_occ)
 
+    # Interface at X = 3 in (7.62 cm) where post meets rail
+    fix_ev = lambda e: design.unitsManager.evaluateExpression(e, "cm")
+    post_w_cm = fix_ev("3 in")
+    rail_center_z = fix_ev("2.5 in") + fix_ev("10 in") / 2
     brf.install(root, post_p, rail_p,
-                post_face_axis="x", post_face_dir=+1,
-                rail_face_axis="x", rail_face_dir=-1,
-                center_z="7.5 in",  # center of rail
+                interface_axis="x",
+                interface_coord=post_w_cm,
+                center_z=rail_center_z,
                 size="100mm", name="TestBedRail",
-                ev=lambda e: design.unitsManager.evaluateExpression(e, "cm"))
+                ev=fix_ev)
 
     # Hide sketches
     for sk in fix_c.sketches:
