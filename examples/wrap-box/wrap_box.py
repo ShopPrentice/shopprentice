@@ -631,11 +631,3 @@ def run(context):
     cam.isFitView = True
     app.activeViewport.camera = cam
 
-    # ==============================================================
-    #  SAVE
-    # ==============================================================
-    doc = app.activeDocument
-    if not doc.isSaved:
-        project = app.data.activeProject
-        doc.saveAs("WrapBox", project.rootFolder, "Food wrap dispenser box", "")
-        print("Saved as: {}".format(doc.name))
