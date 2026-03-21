@@ -13,6 +13,8 @@ import adsk.core, adsk.fusion, math
 from helpers import af
 from helpers.templates import domino
 from helpers.templates import bowtie
+from helpers.templates import bed_rail_fastener as brf
+from helpers import hardware as hw_mgr
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
@@ -38,6 +40,7 @@ def run(context):
         ("rail_h",         "10 in",   "in"),
         ("rail_thick",     "1.5 in",  "in"),
         ("leg_clearance",  "4 in",    "in"),
+        ("back_rail_h",    "5 in",    "in"),
         ("mattress_recess","1.5 in",  "in"),
         ("headboard_h",   "36 in",    "in"),
         # Headboard slab
@@ -160,6 +163,15 @@ def run(context):
     fr_ext = af.ext_new(rail_c, pr, "rail_thick", "FootRail")
     rail_foot = fr_ext.bodies.item(0); rail_foot.name = "Rail_Foot"
 
+    # Back rail: between back posts, shorter, forward of headboard
+    br_pl = af.off_plane(rail_c, rail_c.xZConstructionPlane,
+                          "outer_l - post_size + post_size / 2 - rail_thick / 2", "BR_Pl")
+    _, pr = af.sketch_rect_model(rail_c, br_pl,
+        ("post_size", "outer_l - post_size + post_size / 2 - rail_thick / 2", "rail_z"),
+        {"x": "end_rail_l", "z": "back_rail_h"}, "BackRail_Sk", ev)
+    back_rail_ext = af.ext_new(rail_c, pr, "rail_thick", "BackRail")
+    rail_back = back_rail_ext.bodies.item(0); rail_back.name = "Rail_Back"
+
     # Ledger strips
     ldg_pl = af.off_plane(rail_c, rail_c.yZConstructionPlane,
                            "post_size / 2 + rail_thick / 2", "LDG_Pl")
@@ -171,7 +183,7 @@ def run(context):
 
     af.mirror_feats(rail_c, [ll_ext], r_xmid, "LedgerRMir").bodies.item(0).name = "Ledger_Right"
 
-    print(">>> Rails: 3 rails + 2 ledgers")
+    print(">>> Rails: 4 rails + 2 ledgers")
 
     # ================================================================
     #  3. HEADBOARD — live edge slab + 3 bowtie inlays
@@ -239,33 +251,35 @@ def run(context):
     dm_yf = af.off_plane(root, root.xZConstructionPlane, "post_size", "DM_YF")
     dm_yb = af.off_plane(root, root.xZConstructionPlane, "outer_l - post_size", "DM_YB")
 
-    # Side rails → posts (2 per end, 8 total)
-    domino.grid(root, dm_yf,
-        ("post_size / 2", "post_size", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rl_p, fl_p, "DM_RL_F", ev)
-    domino.grid(root, dm_yb,
-        ("post_size / 2", "outer_l - post_size", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rl_p, bl_p, "DM_RL_B", ev)
-    domino.grid(root, dm_yf,
-        ("outer_w - post_size / 2", "post_size", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rr_p, fr_p, "DM_RR_F", ev)
-    domino.grid(root, dm_yb,
-        ("outer_w - post_size / 2", "outer_l - post_size", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rr_p, br_p, "DM_RR_B", ev)
-
-    # Foot rail → front posts (2 per end, 4 total)
-    domino.grid(root, dm_xl,
-        ("post_size", "post_size / 2", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rf_p, fl_p, "DM_RF_L", ev)
-    domino.grid(root, dm_xr,
-        ("outer_w - post_size", "post_size / 2", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rf_p, fr_p, "DM_RF_R", ev)
+    # --- Rails → posts (bed rail fasteners — detachable) ---
+    rail_center_z = ev("rail_z") + (ev("rail_top_z") - ev("rail_z")) / 2
+    brf.install(root, fl_p, rl_p, interface_axis="y",
+                interface_coord=ev("post_size"), center_z=rail_center_z,
+                size="100mm", name="BRF_RL_F", ev=ev)
+    brf.install(root, bl_p, rl_p, interface_axis="y",
+                interface_coord=ev("outer_l") - ev("post_size"), center_z=rail_center_z,
+                size="100mm", name="BRF_RL_B", ev=ev)
+    brf.install(root, fr_p, rr_p, interface_axis="y",
+                interface_coord=ev("post_size"), center_z=rail_center_z,
+                size="100mm", name="BRF_RR_F", ev=ev)
+    brf.install(root, br_p, rr_p, interface_axis="y",
+                interface_coord=ev("outer_l") - ev("post_size"), center_z=rail_center_z,
+                size="100mm", name="BRF_RR_B", ev=ev)
+    brf.install(root, fl_p, rf_p, interface_axis="x",
+                interface_coord=ev("post_size"), center_z=rail_center_z,
+                size="100mm", name="BRF_RF_L", ev=ev)
+    brf.install(root, fr_p, rf_p, interface_axis="x",
+                interface_coord=ev("outer_w") - ev("post_size"), center_z=rail_center_z,
+                size="100mm", name="BRF_RF_R", ev=ev)
+    # Back rail (smaller 80mm)
+    rb_p = rail_back.createForAssemblyContext(rail_occ)
+    back_rail_cz = ev("rail_z") + ev("back_rail_h") / 2
+    brf.install(root, bl_p, rb_p, interface_axis="x",
+                interface_coord=ev("post_size"), center_z=back_rail_cz,
+                size="80mm", name="BRF_RB_L", ev=ev)
+    brf.install(root, br_p, rb_p, interface_axis="x",
+                interface_coord=ev("outer_w") - ev("post_size"), center_z=back_rail_cz,
+                size="80mm", name="BRF_RB_R", ev=ev)
 
     # Slab → back posts (2 per post, 4 total)
     slab_dm_z1 = ev("slab_z") + ev("slab_h") / 3
@@ -289,7 +303,7 @@ def run(context):
         "post_size / 2 + rail_thick / 2", "LedgerDM_PlL")
     domino.grid(root, ledger_dm_pl_l,
         ("post_size / 2 + rail_thick / 2", "ledger_dm_y0", "ledger_dm_z"),
-        "y", "ledger_dm_sp", "ledger_dm_count", "z", "ldm_w", "ldm_t", "ldm_d",
+        "y", "ledger_dm_sp", "ledger_dm_count", "y", "ldm_w", "ldm_t", "ldm_d",
         ll_p, rl_p, "DM_LL", ev)
 
     ledger_dm_pl_r = af.off_plane(root, root.yZConstructionPlane,
@@ -302,7 +316,7 @@ def run(context):
     if lr_p:
         domino.grid(root, ledger_dm_pl_r,
             ("outer_w - post_size / 2 - rail_thick / 2", "ledger_dm_y0", "ledger_dm_z"),
-            "y", "ledger_dm_sp", "ledger_dm_count", "z", "ldm_w", "ldm_t", "ldm_d",
+            "y", "ledger_dm_sp", "ledger_dm_count", "y", "ldm_w", "ldm_t", "ldm_d",
             lr_p, rr_p, "DM_LR", ev)
 
     print(">>> Dominos: all joints connected")
@@ -338,6 +352,28 @@ def run(context):
             post_c.features.chamferFeatures.add(ch_inp).name = f"{body_name}_TopCh"
 
     print(">>> Post top chamfers applied")
+
+    # Hardware cleanup
+    hw_container = None
+    occs_to_move = []
+    for i in range(root.occurrences.count):
+        occ = root.occurrences.item(i)
+        nm = occ.component.name
+        if nm.startswith("_Hardware") or nm.startswith("_Imports") or nm.startswith("BRF_") or nm.startswith("Bedlock"):
+            occs_to_move.append(occ)
+        elif occ.component.sketches.count == 0 and nm not in ["Posts", "Rails", "Headboard", "Slats"]:
+            occs_to_move.append(occ)
+    if occs_to_move:
+        hw_container = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+        hw_container.component.name = "_HW"
+        hw_container.isLightBulbOn = False
+        for occ in occs_to_move:
+            if occ.isValid:
+                try:
+                    occ.moveToComponent(hw_container)
+                except Exception:
+                    pass
+    print(f">>> Hardware cleanup: {len(occs_to_move)} items moved to _HW")
 
     # ================================================================
     #  EPILOGUE

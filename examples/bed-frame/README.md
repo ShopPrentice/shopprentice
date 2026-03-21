@@ -1,12 +1,27 @@
 # Queen Platform Bed Frame
 
-A parametric modern platform bed — Queen 60"W x 80"L, framed headboard with vertical slats, center support beam with legs, full domino joinery.
+A parametric modern platform bed — Queen 60"W x 80"L, framed headboard with vertical slats, center support beam with legs, full joinery.
 
 ![Queen Platform Bed](screenshots/queen-platform.png)
 
+### Transparent View — Joinery Detail
+
+![Queen Transparent](screenshots/queen-transparent.png)
+
 ---
 
-**Script:** [`queen_platform.py`](queen_platform.py) — 32 bodies (4 posts, 5 rails/ledgers, 7 headboard parts, 13 slats, 3 support). All domino-connected. Zero interferences.
+**Script:** [`queen_platform.py`](queen_platform.py) — 33 structural bodies + hardware. Zero interferences.
+
+### Joinery
+
+| Connection | Type | Details |
+|-----------|------|---------|
+| Side rails → posts | **Bed rail fastener** (100mm) | Detachable — STEP hardware imported, recesses CUT. Lift rail to disconnect. |
+| Foot rail → front posts | **Bed rail fastener** (100mm) | Same as side rails |
+| Back rail → back posts | **Bed rail fastener** (80mm) | Smaller size for shorter rail |
+| Headboard rails → back posts | Domino (8mm) | Permanent joint |
+| Headboard slats → rails | Stub tenon (CUT) | Slats insert into rails |
+| Ledger strips → side rails | Domino (5mm) | Smaller for 0.75" stock, `long_axis="y"` (flat along grain) |
 
 ### Key parameters
 
@@ -15,14 +30,9 @@ A parametric modern platform bed — Queen 60"W x 80"L, framed headboard with ve
 | `bed_w` / `bed_l` | 60 / 80 in | Change for Twin (39×75) or King (76×80) |
 | `leg_clearance` | 4 in | Space under rails (0 = platform on floor) |
 | `mattress_recess` | 1.5 in | Slat top below rail top (secures mattress) |
+| `back_rail_h` | 5 in | Shorter back rail (headboard adds rigidity) |
 | `post_chamfer` | 0.25 in | Rails align with chamfer bottom |
 | `n_hb_slats` | 5 | Headboard vertical slats |
-
-### Joinery
-- Rail/HB → posts: 8mm dominos (2 per end)
-- Ledger → rail: 5mm dominos (4 along length, sized for 0.75" stock)
-- HB slats → rails: stub tenon (CUT)
-- Center beam with 2 legs at 1/3 and 2/3 points
 
 ---
 
@@ -30,27 +40,42 @@ A parametric modern platform bed — Queen 60"W x 80"L, framed headboard with ve
 
 A Nakashima-inspired twin bed with a 2" thick slab headboard and 3 decorative bowtie (butterfly key) inlays spanning a horizontal crack.
 
-![Twin Bed — live edge slab headboard](screenshots/twin-live-edge-slab.png)
+![Twin Bed](screenshots/twin-live-edge-slab.png)
+
+### Transparent View — Joinery & Bowties
+
+![Twin Transparent](screenshots/twin-transparent.png)
 
 ---
 
-**Script:** [`twin_live_edge_slab.py`](twin_live_edge_slab.py) — 24 bodies (4 posts, 5 rails/ledgers, 4 headboard/bowties, 10 slats). Zero interferences.
+**Script:** [`twin_live_edge_slab.py`](twin_live_edge_slab.py) — 24 structural bodies + hardware. Zero interferences.
 
 **Style:** [Nakashima / Live Edge](../../woodworking/styles/nakashima.md)
 
+### Joinery
+
+| Connection | Type | Details |
+|-----------|------|---------|
+| Side rails → posts | **Bed rail fastener** (100mm) | Detachable |
+| Foot rail → front posts | **Bed rail fastener** (100mm) | Detachable |
+| Back rail → back posts | **Bed rail fastener** (80mm) | Smaller for shorter rail |
+| Slab → back posts | Domino (8mm) | Permanent — slab notched around posts |
+| Ledger strips → side rails | Domino (5mm) | Smaller for 0.75" stock |
+| Bowties → slab | CUT inlay pockets | Decorative — perpendicular to grain/crack |
+
 ### Key features
+
 - **Slab headboard** — 2" thick, spanning between posts (notched around them), stops below post chamfer
-- **3 bowtie inlays** — vertical orientation (perpendicular to horizontal crack/grain), evenly spaced at slab center height. Depth = 1/3 of slab thickness.
-- **Bowtie template** — `from helpers.templates import bowtie` → `bowtie.row()` for reusable inlay placement
-- **All joints connected** — dominos at every rail/slab-to-post connection, smaller 5mm dominos for thin ledger strips
-- No center support beam (not needed for Twin size)
+- **3 bowtie inlays** — vertical orientation (perpendicular to horizontal crack/grain), evenly spaced at slab center height
+- **Back rail** — 5" tall between back posts, forward of slab, 80mm fasteners
+- **Bowtie template** — `from helpers.templates import bowtie` → `bowtie.row()`
 
 ### Bowtie parameters
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
 | `bt_len` | 3 in | Bowtie length (perpendicular to crack) |
-| `bt_end_w` | 1.5 in | Width at the wide ends |
-| `bt_waist_w` | 0.5 in | Width at the narrow waist |
+| `bt_end_w` | 1.5 in | Width at wide ends |
+| `bt_waist_w` | 0.5 in | Width at narrow waist |
 | `bt_depth` | 0.67 in | Inlay depth (~1/3 of 2" slab) |
 | `n_bowties` | 3 | Number along crack line |
