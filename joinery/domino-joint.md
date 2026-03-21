@@ -83,11 +83,11 @@ The domino's wide face must lie flat — parallel to both mating board surfaces.
 | Front rail (X) → post (Z) | X | Z | XZ (at Y=const) | **y** — flat, perpendicular to both grains |
 | HB rail (X) → post (Z) | X | Z | XZ (at Y=const) | **y** — same as front rail |
 | Side apron (Y) → leg (Z) | Y | Z | YZ (at X=const) | **x** — same as side rail |
-| Ledger (Y) → side rail (Y) | Y | Y | YZ (at X=const) | **z** — cross-grain for both |
+| Ledger (Y) → side rail (Y) | Y | Y | YZ (at X=const) | **y** — along shared grain, domino lays flat |
 
 **Rule of thumb:** the `long_axis` is the model axis that does NOT appear in either board's grain direction and is NOT the interface normal. If the interface is a YZ plane and the grains are Y and Z, the only remaining axis is X → `long_axis="x"`.
 
-**When both boards share the same grain direction** (e.g., ledger strip Y-grain glued to side rail Y-grain), the `long_axis` is Z — perpendicular to the shared grain, in the interface plane.
+**When both boards share the same grain direction** (e.g., ledger strip Y-grain glued to side rail Y-grain), the `long_axis` runs along the shared grain direction — so the domino lays flat (wide face parallel to both board surfaces). Example: ledger Y + rail Y at a YZ interface → `long_axis="y"`.
 
 ### Sizing for Thin Boards (Tested — bed frame ledger)
 

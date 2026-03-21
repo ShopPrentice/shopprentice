@@ -97,7 +97,7 @@ Three sizes: 80mm (light rails), **100mm (standard)**, 120mm (heavy/tall rails).
 ### Domino orientation (permanent joints only)
 Headboard rails and ledger strips use permanent dominos:
 - **HB rail (grain X) → post (grain Z)**: `long_axis="z"`
-- **Ledger (grain Y) → side rail (grain Y)**: `long_axis="z"` — perpendicular to shared grain
+- **Ledger (grain Y) → side rail (grain Y)**: `long_axis="y"` — along shared grain, domino lays flat
 
 ## Size Guide
 

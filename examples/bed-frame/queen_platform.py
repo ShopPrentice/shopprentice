@@ -397,9 +397,11 @@ def run(context):
     # Left ledger → left rail (smaller dominos, flat — both grain in Y, cross at Z)
     ledger_dm_pl_l = af.off_plane(root, root.yZConstructionPlane,
         "post_size / 2 + rail_thick / 2", "LedgerDM_PlL")
+    # Ledger (grain Y) → rail (grain Y): domino lays flat, wide face in YZ plane
+    # long_axis="y" (parallel to grain, wide face in the board surface plane)
     domino.grid(root, ledger_dm_pl_l,
         ("post_size / 2 + rail_thick / 2", "ledger_dm_y0", "ledger_dm_z"),
-        "y", "ledger_dm_sp", "ledger_dm_count", "z", "ldm_w", "ldm_t", "ldm_d",
+        "y", "ledger_dm_sp", "ledger_dm_count", "y", "ldm_w", "ldm_t", "ldm_d",
         ll_p, rl_p, "DM_LL", ev)
 
     # Right ledger → right rail
@@ -414,7 +416,7 @@ def run(context):
     if lr_p:
         domino.grid(root, ledger_dm_pl_r,
             ("outer_w - post_size / 2 - rail_thick / 2", "ledger_dm_y0", "ledger_dm_z"),
-            "y", "ledger_dm_sp", "ledger_dm_count", "z", "ldm_w", "ldm_t", "ldm_d",
+            "y", "ledger_dm_sp", "ledger_dm_count", "y", "ldm_w", "ldm_t", "ldm_d",
             lr_p, rr_p, "DM_LR", ev)
 
     print(">>> Dominos: all rail + headboard + ledger joints")
