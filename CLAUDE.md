@@ -22,6 +22,7 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 | `get_changes` | Detect what changed since last call — snapshot & diff parameters, dimensions, bodies |
 | `sync_script` | After UI tweaks — auto-patch parameter changes in script, report feature adds/removes/edits for agent |
 | `get_document_status` | Check if the active document was built by a known script — gates incremental updates |
+| `apply_appearance` | Apply wood appearance with grain-aligned texture — call after final validation |
 
 ### Workflow
 
@@ -29,7 +30,7 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 2. Plan the build (components, features, joinery)
 3. Execute Phase 1 (structure) → validate with `capture_design`
 4. Execute Phase 2 (joinery) → validate with `capture_design`
-5. Execute Phase 3 (details) → validate → screenshot → present to user
+5. Execute Phase 3 (details) → validate → `apply_appearance` → screenshot → present to user
 
 ### Key Principles
 

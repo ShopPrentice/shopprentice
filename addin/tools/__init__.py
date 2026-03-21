@@ -20,3 +20,4 @@ from . import export_script
 from . import reload_addin
 from . import manage_documents
 from . import export_step
+from . import apply_appearance
