@@ -2,9 +2,21 @@
 
 A parametric step stool with splayed legs and through-tenon joinery. 12"L x 7"W seat, 7" leg height, with compound splay angles and beveled seat edges.
 
-![Stool overview](screenshots/overview.png)
+![Stool — iso top-right](screenshots/iso-top-right.png)
 
-![Stool front](screenshots/front.png)
+<p float="left">
+  <img src="screenshots/front.png" width="49%" />
+  <img src="screenshots/right.png" width="49%" />
+</p>
+
+### Transparent Views — Compound-Angle Through-Tenons
+
+All bodies at 0.15 opacity — reveals the angled mortise pockets in the seat and through-tenon geometry at compound splay angles (10° along length, 5° along width).
+
+<p float="left">
+  <img src="screenshots/transparent-iso-top-left.png" width="49%" />
+  <img src="screenshots/transparent-iso-top-right.png" width="49%" />
+</p>
 
 ## Regenerated Model
 
