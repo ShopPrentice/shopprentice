@@ -457,29 +457,31 @@ def run(context):
 
         print(">>> Post top chamfers applied")
 
-    # Clean up STEP import artifacts — consolidate into one hidden _HW container
-    hw_container = None
-    occs_to_move = []
+    # Hardware cleanup: hide templates, keep installed copies visible
+    furniture_names = {"Posts", "Rails", "Headboard", "Slats", "Support"}
+    templates_to_hide = []
     for i in range(root.occurrences.count):
         occ = root.occurrences.item(i)
         nm = occ.component.name
-        if nm.startswith("_Hardware") or nm.startswith("_Imports") or nm.startswith("BRF_") or nm.startswith("Bedlock"):
-            occs_to_move.append(occ)
-        # Also catch STEP imports (no sketches, not our furniture components)
-        elif occ.component.sketches.count == 0 and nm not in ["Posts", "Rails", "Headboard", "Slats", "Support"]:
-            occs_to_move.append(occ)
+        if nm in furniture_names:
+            continue
+        # Installed hardware — keep visible (named BRF_*_Hook or BRF_*_Strike)
+        if nm.startswith("BRF_"):
+            continue
+        # Everything else → hide (templates, _Hardware, Bedlock_*)
+        templates_to_hide.append(occ)
 
-    if occs_to_move:
+    if templates_to_hide:
         hw_container = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
         hw_container.component.name = "_HW"
         hw_container.isLightBulbOn = False
-        for occ in occs_to_move:
+        for occ in templates_to_hide:
             if occ.isValid:
                 try:
                     occ.moveToComponent(hw_container)
                 except Exception:
                     pass
-    print(f">>> Hardware cleanup: {len(occs_to_move)} items moved to _HW")
+    print(f">>> Cleanup: {len(templates_to_hide)} templates hidden, installed hardware visible")
 
     # ================================================================
     #  EPILOGUE

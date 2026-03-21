@@ -289,13 +289,41 @@ def run(context):
         sk_h.isVisible = False
         sk_s.isVisible = False
 
-        # Export as STEP
-        export_path = os.path.join(export_dir, f"bedlock_{size_name}.step")
+        # Export SEPARATE STEP files per plate (hook and strike independently)
         export_mgr = design.exportManager
-        step_opts = export_mgr.createSTEPExportOptions(export_path, comp)
+
+        # Move hook plate + its screws into a sub-component for export
+        hook_sub = comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+        hook_sub.component.name = f"HookPlate_{size_name}"
+        hook_coll = adsk.core.ObjectCollection.create()
+        hook_coll.add(hook_plate)
+        for sb in hp_screw_bodies:
+            hook_coll.add(sb)
+        hook_sub.component.features.copyPasteBodies.add(hook_coll)
+
+        hook_path = os.path.join(export_dir, f"hook_plate_{size_name}.step")
+        step_opts = export_mgr.createSTEPExportOptions(hook_path, hook_sub.component)
         export_mgr.execute(step_opts)
 
-        print(f">>> {size_name}: 2 bodies (hook+strike), exported to {export_path}")
+        # Move strike plate + its screws into a sub-component for export
+        strike_sub = comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+        strike_sub.component.name = f"StrikePlate_{size_name}"
+        strike_coll = adsk.core.ObjectCollection.create()
+        strike_coll.add(strike_plate)
+        for sb in sp_screw_bodies:
+            strike_coll.add(sb)
+        strike_sub.component.features.copyPasteBodies.add(strike_coll)
+
+        strike_path = os.path.join(export_dir, f"strike_plate_{size_name}.step")
+        step_opts = export_mgr.createSTEPExportOptions(strike_path, strike_sub.component)
+        export_mgr.execute(step_opts)
+
+        # Also export combined (backward compat)
+        combined_path = os.path.join(export_dir, f"bedlock_{size_name}.step")
+        step_opts = export_mgr.createSTEPExportOptions(combined_path, comp)
+        export_mgr.execute(step_opts)
+
+        print(f">>> {size_name}: exported hook_plate + strike_plate + combined STEP")
 
     # ================================================================
     # TEST FIXTURES — one for each size (80mm, 100mm, 120mm)

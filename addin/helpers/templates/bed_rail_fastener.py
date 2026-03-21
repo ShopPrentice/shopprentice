@@ -1,25 +1,30 @@
 """Bed rail fastener (mortise bedlock) installation template.
 
-Imports hook plate and strike plate from STEP files, positions them at the
-joint interface, and CUTs recess pockets into both boards.
+Imports hook plate and strike plate from SEPARATE STEP files, positions
+each independently with a simple Ry(90°) rotation, and CUTs recess
+pockets into both boards.
 
-The hook plate goes into the rail END face.
-The strike plate goes into the post SIDE face.
-Hardware STEP files must exist at: ~/.autofusion/hardware/bed_rail_fastener/
+Hook plate → rail end face (hooks protrude toward post)
+Strike plate → post side face (slots face the rail)
+
+STEP files at: ~/.autofusion/hardware/bed_rail_fastener/
+  hook_plate_100mm.step, strike_plate_100mm.step, etc.
+Generate with: tools/bed_rail_fastener.py
 
 Usage:
-    from helpers.templates import bed_rail_fastener
+    from helpers.templates import bed_rail_fastener as brf
+    from helpers import hardware as hw_mgr
 
-    bed_rail_fastener.install(
-        root, post_body=post_proxy, rail_body=rail_proxy,
-        interface_axis="x", interface_coord=7.62,
-        center_z=19.05, size="100mm", name="BedRail_RL_F", ev=ev,
-    )
+    brf.install(root, post_proxy, rail_proxy,
+                interface_axis="y", interface_coord=post_size_cm,
+                center_z=rail_center_z_cm,
+                size="100mm", name="BRF_RL_F", ev=ev)
+
+    # In epilogue: consolidate templates into hidden _HW
 """
 
 import adsk.core
 import adsk.fusion
-import math
 import os
 
 from helpers import af
@@ -27,195 +32,144 @@ from helpers import hardware as hw_mgr
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 HARDWARE_DIR = os.path.expanduser("~/.autofusion/hardware/bed_rail_fastener")
-
-# Plate thickness for pocket depth (must match hardware generator)
 PLATE_T = 0.25  # cm
 
 
 def install(comp, post_body, rail_body,
             interface_axis, interface_coord,
             center_z, size="100mm", name="BedRail", ev=None):
-    """Install a bedlock pair by importing STEP hardware and cutting recesses.
+    """Install a bedlock pair from separate STEP files.
 
-    Args:
-        comp: Root component.
-        post_body: Post body (assembly proxy). Strike plate recesses into its face.
-        rail_body: Rail body (assembly proxy). Hook plate recesses into its end.
-        interface_axis: "x" or "y" — axis where the two boards meet.
-        interface_coord: Float (cm) — coordinate on interface_axis where they meet.
-        center_z: Float (cm) — Z center of the fastener.
-        size: "80mm", "100mm", or "120mm".
-        name: Feature name prefix.
-        ev: Parameter evaluator (unused but kept for API consistency).
+    Each plate is imported independently (or copied from cache),
+    positioned with a simple Ry(90°) rotation, and used as a CUT
+    tool to create the recess pocket.
     """
     app = adsk.core.Application.get()
     design = adsk.fusion.Design.cast(app.activeProduct)
     root = design.rootComponent
-    VI = adsk.core.ValueInput.createByString
     P3 = adsk.core.Point3D
 
     iface = float(interface_coord)
     cz = float(center_z)
     other_axis = "y" if interface_axis == "x" else "x"
 
-    # Find center of the post on the other axis
+    # Post center on the other axis
     post_bb = post_body.boundingBox
-    other_center = (getattr(post_bb.minPoint, other_axis) +
-                    getattr(post_bb.maxPoint, other_axis)) / 2
+    post_center = (getattr(post_bb.minPoint, other_axis) +
+                   getattr(post_bb.maxPoint, other_axis)) / 2
 
     # ================================================================
-    # 1. Import STEP hardware into the design
+    # Import/copy each plate type independently
     # ================================================================
-    step_file = os.path.join(HARDWARE_DIR, f"bedlock_{size}.step")
-    if not os.path.exists(step_file):
-        print(f">>> ERROR: STEP file not found: {step_file}")
-        print(f">>> Run tools/bed_rail_fastener.py first to generate hardware")
+    hook_step = os.path.join(HARDWARE_DIR, f"hook_plate_{size}.step")
+    strike_step = os.path.join(HARDWARE_DIR, f"strike_plate_{size}.step")
+
+    if not os.path.exists(hook_step) or not os.path.exists(strike_step):
+        print(f">>> ERROR: STEP files not found. Run tools/bed_rail_fastener.py first.")
         return
 
-    # Import once, copy for each use (avoids repeated STEP imports)
-    imported = hw_mgr._import_or_copy(f"bedlock_{size}", step_file, root)
-    if not imported:
-        print(f">>> ERROR: STEP import/copy returned no geometry")
+    # Import once per plate type, copy for each use
+    hook_result = hw_mgr._import_or_copy(f"hook_{size}", hook_step, root)
+    strike_result = hw_mgr._import_or_copy(f"strike_{size}", strike_step, root)
+
+    if not hook_result or not strike_result:
+        print(f">>> ERROR: STEP import/copy failed for {name}")
         return
-    hw_occ, hw_bodies = imported[0]
-    hw_comp = hw_occ.component
-    hw_mgr._hardware_occurrences.append((hw_occ, root))
-    print(f">>> Imported {size} hardware: {len(hw_bodies)} bodies")
 
-    # Identify hook plate and strike plate by volume (2 largest bodies)
-    # and Y position (hook plate near Y=0, strike plate at Y>0 in STEP space)
-    all_bodies = [(hw_comp.bRepBodies.item(i), hw_comp.bRepBodies.item(i).volume)
-                  for i in range(hw_comp.bRepBodies.count)]
-    all_bodies.sort(key=lambda x: -x[1])  # largest first
-    plate_a, plate_b = all_bodies[0][0], all_bodies[1][0]
+    hook_occ, hook_bodies = hook_result[0]
+    strike_occ, strike_bodies = strike_result[0]
+    hook_comp = hook_occ.component
+    strike_comp = strike_occ.component
 
-    # Hook plate is at Y≈0, strike plate at Y>0 in STEP space
-    ya = (plate_a.boundingBox.minPoint.y + plate_a.boundingBox.maxPoint.y) / 2
-    yb = (plate_b.boundingBox.minPoint.y + plate_b.boundingBox.maxPoint.y) / 2
-    if ya < yb:
-        hook_plate, strike_plate = plate_a, plate_b
-    else:
-        hook_plate, strike_plate = plate_b, plate_a
+    # Register for cleanup (only installed copies, not templates)
+    hw_mgr._hardware_occurrences.append((hook_occ, root))
+    hw_mgr._hardware_occurrences.append((strike_occ, root))
 
-    print(f">>> Identified: hook plate vol={hook_plate.volume:.2f}, strike plate vol={strike_plate.volume:.2f}")
+    # Find the main plate body (largest volume) in each
+    hook_plate = max(hook_bodies, key=lambda b: b.volume)
+    strike_plate = max(strike_bodies, key=lambda b: b.volume)
 
-    # ================================================================
-    # 2. Position the hardware at the joint interface using MoveFeature
-    # ================================================================
-    # The STEP hardware was generated flat on XY plane:
-    #   STEP X = plate length direction
-    #   STEP Y = plate width direction (hook plate at Y≈0, strike at Y≈5)
-    #   STEP Z = plate thickness direction
-    # We need to rotate + translate so:
-    #   plate length → model Z (vertical)
-    #   plate width → model other_axis
-    #   plate thickness → model interface_axis
-
-    hw_occ.component.name = f"{name}_Hardware"
-
-    # Get hook plate center in STEP space for offset calculation
+    # Get STEP-space centers
     hp_bb = hook_plate.boundingBox
-    hp_cx = (hp_bb.minPoint.x + hp_bb.maxPoint.x) / 2
-    hp_cy = (hp_bb.minPoint.y + hp_bb.maxPoint.y) / 2
-    hp_cz_step = (hp_bb.minPoint.z + hp_bb.maxPoint.z) / 2
+    hp_cx = (hp_bb.minPoint.x + hp_bb.maxPoint.x) / 2  # plate length center
+    hp_cy = (hp_bb.minPoint.y + hp_bb.maxPoint.y) / 2  # plate width center
 
-    # Separate bodies into hook plate group (Y≈0) and strike plate group (Y>2)
     sp_bb = strike_plate.boundingBox
-    sp_cy = (sp_bb.minPoint.y + sp_bb.maxPoint.y) / 2
-    threshold_y = sp_cy / 2  # midpoint between the two plate groups
-
-    hook_bodies = adsk.core.ObjectCollection.create()
-    strike_bodies = adsk.core.ObjectCollection.create()
-    for i in range(hw_comp.bRepBodies.count):
-        b = hw_comp.bRepBodies.item(i)
-        by = (b.boundingBox.minPoint.y + b.boundingBox.maxPoint.y) / 2
-        if by < threshold_y:
-            hook_bodies.add(b)
-        else:
-            strike_bodies.add(b)
-
     sp_cx = (sp_bb.minPoint.x + sp_bb.maxPoint.x) / 2
-
-    # Step 1: Ry(-90°) for ALL bodies — makes plate vertical (STEP_X→+Z, STEP_Z→-X)
-    # Then Step 2: Rx(180°) for ALL bodies — flips so hooks point DOWN (Z→-Z, Y→-Y)
-    # Combined: Rx(180°)·Ry(-90°)
-    # = [-1,0,0]   [0,0,-1]   [0, 0, 1]
-    #   [0,-1,0] × [0,1, 0] = [0,-1, 0]
-    #   [0,0, 1]   [1,0, 0]   [1, 0, 0]
-    # model_X = STEP_Z, model_Y = -STEP_Y, model_Z = STEP_X  (det=+1 ✓)
-    # Hooks at +STEP_X → +model_Z → UP. Not down! Need the other combo.
-    #
-    # Try: Rx(180°)·Ry(90°)
-    # = [-1,0,0]   [0, 0,1]   [0,  0,-1]
-    #   [0,-1,0] × [0, 1,0] = [0, -1, 0]
-    #   [0, 0,1]   [-1,0,0]   [-1, 0, 0]
-    # model_X = -STEP_Z, model_Y = -STEP_Y, model_Z = -STEP_X  (det=+1 ✓)
-    # Hooks at +STEP_X → -model_Z → DOWN ✓
-    # Outside face +STEP_Z → -model_X → hooks toward post ✓ (for hook plate)
-
-    # HOOK PLATE: same Ry(90°) as strike plate, but translated to rail side
-    # This ensures correct Y positioning (no flip) — CUT recesses work everywhere
-    # Hook direction is cosmetically imperfect but recesses are correct
-    xf_hook = adsk.core.Matrix3D.create()
-    if interface_axis == "x":
-        # Ry(90°): STEP_Z→+X, STEP_Y→Y, STEP_X→-Z
-        tx_h = iface                   # STEP_Z=0 at X=iface (rail side)
-        ty_h = other_center - hp_cy
-        tz_h = cz + hp_cx
-        xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, 0);  xf_hook.setCell(0, 2, 1);  xf_hook.setCell(0, 3, tx_h)
-        xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, 1);  xf_hook.setCell(1, 2, 0);  xf_hook.setCell(1, 3, ty_h)
-        xf_hook.setCell(2, 0, -1); xf_hook.setCell(2, 1, 0);  xf_hook.setCell(2, 2, 0);  xf_hook.setCell(2, 3, tz_h)
-    else:  # interface_axis == "y"
-        # Same Ry(90°) adapted: STEP_Z→+Y, STEP_Y→-X, STEP_X→-Z
-        tx_h = other_center + hp_cy   # -STEP_Y maps to X
-        ty_h = iface                   # STEP_Z=0 at Y=iface (rail side)
-        tz_h = cz + hp_cx
-        xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, -1); xf_hook.setCell(0, 2, 0);  xf_hook.setCell(0, 3, tx_h)
-        xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, 0);  xf_hook.setCell(1, 2, 1);  xf_hook.setCell(1, 3, ty_h)
-        xf_hook.setCell(2, 0, -1); xf_hook.setCell(2, 1, 0);  xf_hook.setCell(2, 2, 0);  xf_hook.setCell(2, 3, tz_h)
-
-    move_hook = hw_comp.features.moveFeatures.createInput2(hook_bodies)
-    move_hook.defineAsFreeMove(xf_hook)
-    hw_comp.features.moveFeatures.add(move_hook).name = f"{name}_HookPos"
-
-    # STRIKE PLATE: Ry(90°) only (no X flip — slots face +X toward rail)
-    # model_X = STEP_Z, model_Y = STEP_Y, model_Z = -STEP_X  (det=+1 ✓)
-    # Hooks/slots at same -STEP_X → same model_Z ✓ (aligned!)
-    # But wait — strike Y is NOT flipped, hook Y IS flipped. Different Y centers.
-    # Hook: model_Y = -STEP_Y + ty = -0 + ty = other_center → OK (hp_cy≈0)
-    # Strike: model_Y = STEP_Y + ty = sp_cy + ty = other_center → ty = oc - sp_cy
-    xf_strike = adsk.core.Matrix3D.create()
-    if interface_axis == "x":
-        tx_s = iface - PLATE_T          # STEP_Z=0 + tx = iface-t → base inside post
-        ty_s = other_center - sp_cy    # STEP_Y=sp_cy + ty = other_center
-        tz_s = cz + sp_cx             # -STEP_X + tz = cz → tz = cz + sp_cx
-        xf_strike.setCell(0, 0, 0);  xf_strike.setCell(0, 1, 0); xf_strike.setCell(0, 2, 1);  xf_strike.setCell(0, 3, tx_s)
-        xf_strike.setCell(1, 0, 0);  xf_strike.setCell(1, 1, 1); xf_strike.setCell(1, 2, 0);  xf_strike.setCell(1, 3, ty_s)
-        xf_strike.setCell(2, 0, -1); xf_strike.setCell(2, 1, 0); xf_strike.setCell(2, 2, 0);  xf_strike.setCell(2, 3, tz_s)
-    else:  # interface_axis == "y"
-        # Strike plate: STEP_Z→+Y (slots face rail), STEP_X→-Z (aligned with hooks), STEP_Y→-X
-        tx_s = other_center + sp_cy   # Y flipped
-        ty_s = iface - PLATE_T
-        tz_s = cz + sp_cx
-        xf_strike.setCell(0, 0, 0);  xf_strike.setCell(0, 1, -1); xf_strike.setCell(0, 2, 0);  xf_strike.setCell(0, 3, tx_s)
-        xf_strike.setCell(1, 0, 0);  xf_strike.setCell(1, 1, 0);  xf_strike.setCell(1, 2, 1);  xf_strike.setCell(1, 3, ty_s)
-        xf_strike.setCell(2, 0, -1); xf_strike.setCell(2, 1, 0);  xf_strike.setCell(2, 2, 0);  xf_strike.setCell(2, 3, tz_s)
-
-    move_strike = hw_comp.features.moveFeatures.createInput2(strike_bodies)
-    move_strike.defineAsFreeMove(xf_strike)
-    hw_comp.features.moveFeatures.add(move_strike).name = f"{name}_StrikePos"
+    sp_cy = (sp_bb.minPoint.y + sp_bb.maxPoint.y) / 2
 
     # ================================================================
-    # 3. CUT recess pockets into the wood using the hardware bodies
+    # Position each plate with simple Ry(90°)
+    # Ry(90°): STEP_X→-Z, STEP_Y→Y, STEP_Z→+X  (det=+1)
+    # This maps plate length to vertical, thickness to interface axis
     # ================================================================
-    # Use the positioned hardware bodies as CUT tools
-    hp_proxy = hook_plate.createForAssemblyContext(hw_occ)
-    sp_proxy = strike_plate.createForAssemblyContext(hw_occ)
 
-    # CUT hook plate shape into rail (creates recess pocket)
-    af.combine(root, rail_body, [hp_proxy], CUT, True, f"{name}_HookRecess")
+    def move_plate(plate_comp, bodies_list, tx, ty, tz, plate_name):
+        """Position a plate with Ry(90°) + translation."""
+        xf = adsk.core.Matrix3D.create()
+        if interface_axis == "x":
+            # Ry(90°): model_X=STEP_Z, model_Y=STEP_Y, model_Z=-STEP_X
+            xf.setCell(0, 0, 0);  xf.setCell(0, 1, 0); xf.setCell(0, 2, 1);  xf.setCell(0, 3, tx)
+            xf.setCell(1, 0, 0);  xf.setCell(1, 1, 1); xf.setCell(1, 2, 0);  xf.setCell(1, 3, ty)
+            xf.setCell(2, 0, -1); xf.setCell(2, 1, 0); xf.setCell(2, 2, 0);  xf.setCell(2, 3, tz)
+        else:
+            # Y-interface: STEP_Z→+Y, STEP_Y→-X, STEP_X→-Z  (det=+1)
+            xf.setCell(0, 0, 0);  xf.setCell(0, 1, -1); xf.setCell(0, 2, 0);  xf.setCell(0, 3, tx)
+            xf.setCell(1, 0, 0);  xf.setCell(1, 1, 0);  xf.setCell(1, 2, 1);  xf.setCell(1, 3, ty)
+            xf.setCell(2, 0, -1); xf.setCell(2, 1, 0);  xf.setCell(2, 2, 0);  xf.setCell(2, 3, tz)
 
-    # CUT strike plate shape into post (creates recess pocket)
+        coll = adsk.core.ObjectCollection.create()
+        for b in bodies_list:
+            coll.add(b)
+        move_inp = plate_comp.features.moveFeatures.createInput2(coll)
+        move_inp.defineAsFreeMove(xf)
+        plate_comp.features.moveFeatures.add(move_inp).name = plate_name
+
+    # STRIKE PLATE → in post face
+    # STEP_Z=0 (base) goes to interface_axis = iface - PLATE_T (bottom of pocket)
+    # STEP_Z=PLATE_T (outside face) goes to interface_axis = iface (flush with post face)
+    if interface_axis == "x":
+        move_plate(strike_comp, strike_bodies,
+                   tx=iface - PLATE_T - sp_bb.minPoint.z,  # base at iface-t
+                   ty=post_center - sp_cy,
+                   tz=cz + sp_cx,
+                   plate_name=f"{name}_StrikePos")
+    else:
+        move_plate(strike_comp, strike_bodies,
+                   tx=post_center + sp_cy,   # -STEP_Y maps to +X
+                   ty=iface - PLATE_T - sp_bb.minPoint.z,
+                   tz=cz + sp_cx,
+                   plate_name=f"{name}_StrikePos")
+
+    # HOOK PLATE → in rail end face (opposite side of interface from strike)
+    # STEP_Z=0 (base) at iface (rail end surface)
+    # STEP_Z=PLATE_T goes deeper into the rail
+    if interface_axis == "x":
+        move_plate(hook_comp, hook_bodies,
+                   tx=iface - hp_bb.minPoint.z,  # base at iface
+                   ty=post_center - hp_cy,
+                   tz=cz + hp_cx,
+                   plate_name=f"{name}_HookPos")
+    else:
+        move_plate(hook_comp, hook_bodies,
+                   tx=post_center + hp_cy,
+                   ty=iface - hp_bb.minPoint.z,
+                   tz=cz + hp_cx,
+                   plate_name=f"{name}_HookPos")
+
+    # ================================================================
+    # CUT recess pockets using the positioned plates
+    # ================================================================
+    # Strike plate CUTs into the post
+    sp_proxy = strike_plate.createForAssemblyContext(strike_occ)
     af.combine(root, post_body, [sp_proxy], CUT, True, f"{name}_StrikeRecess")
 
-    print(f">>> {name}: {size} bedlock installed (STEP imported + recesses cut)")
+    # Hook plate CUTs into the rail
+    hp_proxy = hook_plate.createForAssemblyContext(hook_occ)
+    af.combine(root, rail_body, [hp_proxy], CUT, True, f"{name}_HookRecess")
+
+    # Name the components
+    hook_comp.name = f"{name}_Hook"
+    strike_comp.name = f"{name}_Strike"
+
+    print(f">>> {name}: {size} bedlock installed (hook + strike plates positioned + recesses cut)")
