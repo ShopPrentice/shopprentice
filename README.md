@@ -81,8 +81,18 @@ Each folder under `examples/` contains a complete Fusion 360 project with screen
 </tr>
 <tr>
 <td align="center"><a href="examples/tv-console/"><img src="examples/tv-console/screenshots/iso-top-left.png" width="200" /><br /><b>TV Console</b></a><br />Interlocking M&T, dovetails, dominos</td>
-<td></td>
-<td></td>
+<td align="center"><a href="examples/chair/"><img src="examples/chair/screenshots/nordviken-rebuild.png" width="200" /><br /><b>Dining Chair</b></a><br />Bent-back legs, vertical slats, tilted dominos</td>
+<td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/queen-platform.png" width="200" /><br /><b>Queen Bed</b></a><br />Bed rail fasteners, framed headboard, center beam</td>
+</tr>
+<tr>
+<td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/twin-live-edge-slab.png" width="200" /><br /><b>Twin Bed (Live Edge)</b></a><br />Slab headboard, bowtie inlays, Nakashima style</td>
+<td align="center"><a href="examples/coffee-table/"><img src="examples/coffee-table/screenshots/iso-top-right.png" width="200" /><br /><b>Coffee Table</b></a><br />Tapered legs, slatted top, dominos</td>
+<td align="center"><a href="examples/bench/"><img src="examples/bench/screenshots/iso-top-right.png" width="200" /><br /><b>Bench</b></a><br />Simple construction, domino joinery</td>
+</tr>
+<tr>
+<td align="center"><a href="examples/side-table/"><img src="examples/side-table/screenshots/iso-top-right.png" width="200" /><br /><b>Side Table</b></a><br />Compact, tapered legs</td>
+<td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a><br />Writing desk with aprons</td>
+<td align="center"><a href="examples/shelf/"><img src="examples/shelf/screenshots/iso-top-right.png" width="200" /><br /><b>Wall Shelf</b></a><br />Floating shelf, hidden hardware</td>
 </tr>
 </table>
 
