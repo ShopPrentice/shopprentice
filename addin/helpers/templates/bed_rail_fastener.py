@@ -34,6 +34,9 @@ CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 HARDWARE_DIR = os.path.expanduser("~/.autofusion/hardware/bed_rail_fastener")
 PLATE_T = 0.25  # cm
 
+# Module-level cache: import each plate STEP once, copy for each use
+_plate_cache = {}  # key: (part_id,) → value: template occurrence
+
 
 def install(comp, post_body, rail_body,
             interface_axis, interface_coord,
@@ -71,9 +74,27 @@ def install(comp, post_body, rail_body,
         print(f">>> ERROR: STEP files not found. Run tools/bed_rail_fastener.py first.")
         return
 
-    # Import once per plate type, copy for each use
-    hook_result = hw_mgr._import_or_copy(f"hook_{size}", hook_step, root)
-    strike_result = hw_mgr._import_or_copy(f"strike_{size}", strike_step, root)
+    # Import each plate STEP once, copy for subsequent uses
+    def _get_or_import(part_id, step_file):
+        global _plate_cache
+        if part_id in _plate_cache:
+            tmpl = _plate_cache[part_id]
+            if tmpl.isValid:
+                return hw_mgr._copy_from_template(tmpl, root)
+        # First import — hidden template
+        imported = hw_mgr.import_step(step_file, root)
+        if not imported:
+            return None
+        tmpl_occ = imported[0][0]
+        tmpl_occ.isLightBulbOn = False
+        for bi in range(tmpl_occ.component.bRepBodies.count):
+            tmpl_occ.component.bRepBodies.item(bi).isVisible = False
+        _plate_cache[part_id] = tmpl_occ
+        hw_mgr._hardware_occurrences.append((tmpl_occ, root))
+        return hw_mgr._copy_from_template(tmpl_occ, root)
+
+    hook_result = _get_or_import(f"hook_{size}", hook_step)
+    strike_result = _get_or_import(f"strike_{size}", strike_step)
 
     if not hook_result or not strike_result:
         print(f">>> ERROR: STEP import/copy failed for {name}")
@@ -84,7 +105,7 @@ def install(comp, post_body, rail_body,
     hook_comp = hook_occ.component
     strike_comp = strike_occ.component
 
-    # Register for cleanup (only installed copies, not templates)
+    # Register installed copies for cleanup
     hw_mgr._hardware_occurrences.append((hook_occ, root))
     hw_mgr._hardware_occurrences.append((strike_occ, root))
 
