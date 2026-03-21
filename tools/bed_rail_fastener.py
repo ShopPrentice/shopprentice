@@ -176,21 +176,24 @@ def run(context):
             screw_body.name = f"Screw_HP_{si}"
             sk_fh.isVisible = False
 
-            # Phillips cross on TOP face (outside) — sketch on top_plane, cut -Z
+            # Phillips cross on TOP face (outside) — sketch at Z=0, offset start
             for slot_dir in ["h", "v"]:
-                sk_ph = comp.sketches.add(top_plane)
+                sk_ph = comp.sketches.add(comp.xYConstructionPlane)
                 sk_ph.name = f"Ph_HP_{si}_{slot_dir}_Sk"
-                m2s_ph = sk_ph.modelToSketchSpace
                 cx_s = x0 + sx; cy_s = y_hook
                 if slot_dir == "h":
-                    p1 = m2s_ph(P3.create(cx_s - phillips_l/2, cy_s - phillips_w/2, plate_t))
-                    p2 = m2s_ph(P3.create(cx_s + phillips_l/2, cy_s + phillips_w/2, plate_t))
+                    sk_ph.sketchCurves.sketchLines.addTwoPointRectangle(
+                        P3.create(cx_s - phillips_l/2, cy_s - phillips_w/2, 0),
+                        P3.create(cx_s + phillips_l/2, cy_s + phillips_w/2, 0))
                 else:
-                    p1 = m2s_ph(P3.create(cx_s - phillips_w/2, cy_s - phillips_l/2, plate_t))
-                    p2 = m2s_ph(P3.create(cx_s + phillips_w/2, cy_s + phillips_l/2, plate_t))
-                sk_ph.sketchCurves.sketchLines.addTwoPointRectangle(p1, p2)
+                    sk_ph.sketchCurves.sketchLines.addTwoPointRectangle(
+                        P3.create(cx_s - phillips_w/2, cy_s - phillips_l/2, 0),
+                        P3.create(cx_s + phillips_w/2, cy_s + phillips_l/2, 0))
                 ph_prof = sk_ph.profiles.item(0)
                 ph_ext = comp.features.extrudeFeatures.createInput(ph_prof, CUT)
+                ph_start = adsk.fusion.OffsetStartDefinition.create(
+                    VI(f"{plate_t - phillips_d} cm"))
+                ph_ext.startExtent = ph_start
                 ph_ext.setDistanceExtent(False, VI(f"{phillips_d} cm"))
                 ph_ext.participantBodies = [screw_body]
                 comp.features.extrudeFeatures.add(ph_ext).name = f"Ph_HP_{si}_{slot_dir}"
@@ -264,20 +267,23 @@ def run(context):
             screw_body_sp.name = f"Screw_SP_{si}"
             sk_fs.isVisible = False
 
-            # Phillips on top face
+            # Phillips on top face — sketch at Z=0, offset start to cut top portion
             for slot_dir in ["h", "v"]:
-                sk_ps = comp.sketches.add(top_plane)
+                sk_ps = comp.sketches.add(comp.xYConstructionPlane)
                 sk_ps.name = f"Ph_SP_{si}_{slot_dir}_Sk"
-                m2s_ps = sk_ps.modelToSketchSpace
                 cx_s = x0 + sx; cy_s = y_strike
                 if slot_dir == "h":
-                    p1 = m2s_ps(P3.create(cx_s - phillips_l/2, cy_s - phillips_w/2, plate_t))
-                    p2 = m2s_ps(P3.create(cx_s + phillips_l/2, cy_s + phillips_w/2, plate_t))
+                    sk_ps.sketchCurves.sketchLines.addTwoPointRectangle(
+                        P3.create(cx_s - phillips_l/2, cy_s - phillips_w/2, 0),
+                        P3.create(cx_s + phillips_l/2, cy_s + phillips_w/2, 0))
                 else:
-                    p1 = m2s_ps(P3.create(cx_s - phillips_w/2, cy_s - phillips_l/2, plate_t))
-                    p2 = m2s_ps(P3.create(cx_s + phillips_w/2, cy_s + phillips_l/2, plate_t))
-                sk_ps.sketchCurves.sketchLines.addTwoPointRectangle(p1, p2)
+                    sk_ps.sketchCurves.sketchLines.addTwoPointRectangle(
+                        P3.create(cx_s - phillips_w/2, cy_s - phillips_l/2, 0),
+                        P3.create(cx_s + phillips_w/2, cy_s + phillips_l/2, 0))
                 ps_ext = comp.features.extrudeFeatures.createInput(sk_ps.profiles.item(0), CUT)
+                ps_start = adsk.fusion.OffsetStartDefinition.create(
+                    VI(f"{plate_t - phillips_d} cm"))
+                ps_ext.startExtent = ps_start
                 ps_ext.setDistanceExtent(False, VI(f"{phillips_d} cm"))
                 ps_ext.participantBodies = [screw_body_sp]
                 comp.features.extrudeFeatures.add(ps_ext).name = f"Ph_SP_{si}_{slot_dir}"
@@ -305,7 +311,49 @@ def run(context):
 
         print(f">>> {size_name}: 2 bodies (hook+strike), exported to {export_path}")
 
+    # ================================================================
+    # TEST FIXTURE — demo installation in a post + rail
+    # ================================================================
+    from helpers.templates import bed_rail_fastener as brf
+
+    fix_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    fix_occ.component.name = "TestFixture"
+    fix_c = fix_occ.component
+
+    # Post: 3" x 3" x 14" tall
+    post_w = 7.62  # 3 in
+    post_h = 35.56  # 14 in
+    _, pr = af.sketch_rect_model(fix_c, fix_c.xYConstructionPlane,
+        ("0 in", "0 in", "0 in"),
+        {"x": "3 in", "y": "3 in"}, "Post_Sk", lambda e: design.unitsManager.evaluateExpression(e, "cm"))
+    post_ext = af.ext_new(fix_c, pr, "14 in", "Post")
+    post_body = post_ext.bodies.item(0); post_body.name = "Post"
+
+    # Rail: 1.5" x 10" x 20" long, butted against post
+    _, pr = af.sketch_rect_model(fix_c, fix_c.xYConstructionPlane,
+        ("3 in", "0.75 in", "2.5 in"),
+        {"x": "20 in", "y": "1.5 in"}, "Rail_Sk", lambda e: design.unitsManager.evaluateExpression(e, "cm"))
+    rail_ext = af.ext_new(fix_c, pr, "10 in", "Rail")
+    rail_body = rail_ext.bodies.item(0); rail_body.name = "Rail"
+
+    # Install 100mm bedlock pair (post face at X=post_w, rail face at X=post_w)
+    post_p = post_body.createForAssemblyContext(fix_occ)
+    rail_p = rail_body.createForAssemblyContext(fix_occ)
+
+    brf.install(root, post_p, rail_p,
+                post_face_axis="x", post_face_dir=+1,
+                rail_face_axis="x", rail_face_dir=-1,
+                center_z="7.5 in",  # center of rail
+                size="100mm", name="TestBedRail",
+                ev=lambda e: design.unitsManager.evaluateExpression(e, "cm"))
+
+    # Hide sketches
+    for sk in fix_c.sketches:
+        sk.isVisible = False
+
+    print(">>> Test fixture: post + rail with 100mm bedlock installed")
+
     cam = app.activeViewport.camera
     cam.isFitView = True
     app.activeViewport.camera = cam
-    print(">>> All 3 sizes generated and exported")
+    print(">>> All 3 sizes generated, exported, and test fixture built")
