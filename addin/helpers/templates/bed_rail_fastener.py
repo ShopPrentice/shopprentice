@@ -161,6 +161,14 @@ def install(comp, post_body, rail_body,
         xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, 0);  xf_hook.setCell(0, 2, -1); xf_hook.setCell(0, 3, tx_h)
         xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, -1); xf_hook.setCell(1, 2, 0);  xf_hook.setCell(1, 3, ty_h)
         xf_hook.setCell(2, 0, -1); xf_hook.setCell(2, 1, 0);  xf_hook.setCell(2, 2, 0);  xf_hook.setCell(2, 3, tz_h)
+    else:  # interface_axis == "y"
+        # Hook plate: STEP_Z→-Y (hooks toward post), STEP_X→-Z (hooks down), STEP_Y→X
+        tx_h = other_center - hp_cy
+        ty_h = iface + PLATE_T
+        tz_h = cz + hp_cx
+        xf_hook.setCell(0, 0, 0);  xf_hook.setCell(0, 1, 1);  xf_hook.setCell(0, 2, 0);  xf_hook.setCell(0, 3, tx_h)
+        xf_hook.setCell(1, 0, 0);  xf_hook.setCell(1, 1, 0);  xf_hook.setCell(1, 2, -1); xf_hook.setCell(1, 3, ty_h)
+        xf_hook.setCell(2, 0, -1); xf_hook.setCell(2, 1, 0);  xf_hook.setCell(2, 2, 0);  xf_hook.setCell(2, 3, tz_h)
 
     move_hook = hw_comp.features.moveFeatures.createInput2(hook_bodies)
     move_hook.defineAsFreeMove(xf_hook)
@@ -180,6 +188,14 @@ def install(comp, post_body, rail_body,
         xf_strike.setCell(0, 0, 0);  xf_strike.setCell(0, 1, 0); xf_strike.setCell(0, 2, 1);  xf_strike.setCell(0, 3, tx_s)
         xf_strike.setCell(1, 0, 0);  xf_strike.setCell(1, 1, 1); xf_strike.setCell(1, 2, 0);  xf_strike.setCell(1, 3, ty_s)
         xf_strike.setCell(2, 0, -1); xf_strike.setCell(2, 1, 0); xf_strike.setCell(2, 2, 0);  xf_strike.setCell(2, 3, tz_s)
+    else:  # interface_axis == "y"
+        # Strike plate: STEP_Z→+Y (slots face rail), STEP_X→-Z (aligned with hooks), STEP_Y→-X
+        tx_s = other_center + sp_cy   # Y flipped
+        ty_s = iface - PLATE_T
+        tz_s = cz + sp_cx
+        xf_strike.setCell(0, 0, 0);  xf_strike.setCell(0, 1, -1); xf_strike.setCell(0, 2, 0);  xf_strike.setCell(0, 3, tx_s)
+        xf_strike.setCell(1, 0, 0);  xf_strike.setCell(1, 1, 0);  xf_strike.setCell(1, 2, 1);  xf_strike.setCell(1, 3, ty_s)
+        xf_strike.setCell(2, 0, -1); xf_strike.setCell(2, 1, 0);  xf_strike.setCell(2, 2, 0);  xf_strike.setCell(2, 3, tz_s)
 
     move_strike = hw_comp.features.moveFeatures.createInput2(strike_bodies)
     move_strike.defineAsFreeMove(xf_strike)

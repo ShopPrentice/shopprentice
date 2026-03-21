@@ -13,6 +13,7 @@ import adsk.core, adsk.fusion
 
 from helpers import af
 from helpers.templates import domino
+from helpers.templates import bed_rail_fastener as brf
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
@@ -305,33 +306,38 @@ def run(context):
     dm_yf = af.off_plane(root, root.xZConstructionPlane, "post_size", "DM_YF")
     dm_yb = af.off_plane(root, root.xZConstructionPlane, "outer_l - post_size", "DM_YB")
 
-    # --- Side rails → posts (2 dominos per end, 8 total) ---
-    domino.grid(root, dm_yf,
-        ("post_size / 2", "post_size", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rl_p, fl_p, "DM_RL_F", ev)
-    domino.grid(root, dm_yb,
-        ("post_size / 2", "outer_l - post_size", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rl_p, bl_p, "DM_RL_B", ev)
-    domino.grid(root, dm_yf,
-        ("outer_w - post_size / 2", "post_size", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rr_p, fr_p, "DM_RR_F", ev)
-    domino.grid(root, dm_yb,
-        ("outer_w - post_size / 2", "outer_l - post_size", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rr_p, br_p, "DM_RR_B", ev)
+    # --- Side rails → posts (bed rail fasteners — detachable) ---
+    rail_center_z = ev("rail_z") + (ev("rail_top_z") - ev("rail_z")) / 2
+    # Left rail → front post
+    brf.install(root, fl_p, rl_p,
+                interface_axis="y", interface_coord=ev("post_size"),
+                center_z=rail_center_z,
+                size="100mm", name="BRF_RL_F", ev=ev)
+    # Left rail → back post
+    brf.install(root, bl_p, rl_p,
+                interface_axis="y", interface_coord=ev("outer_l") - ev("post_size"),
+                center_z=rail_center_z,
+                size="100mm", name="BRF_RL_B", ev=ev)
+    # Right rail → front post
+    brf.install(root, fr_p, rr_p,
+                interface_axis="y", interface_coord=ev("post_size"),
+                center_z=rail_center_z,
+                size="100mm", name="BRF_RR_F", ev=ev)
+    # Right rail → back post
+    brf.install(root, br_p, rr_p,
+                interface_axis="y", interface_coord=ev("outer_l") - ev("post_size"),
+                center_z=rail_center_z,
+                size="100mm", name="BRF_RR_B", ev=ev)
 
-    # --- Foot rail → front posts (2 dominos per end, 4 total) ---
-    domino.grid(root, dm_xl,
-        ("post_size", "post_size / 2", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rf_p, fl_p, "DM_RF_L", ev)
-    domino.grid(root, dm_xr,
-        ("outer_w - post_size", "post_size / 2", "rail_dm_z1"),
-        "z", "rail_dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rf_p, fr_p, "DM_RF_R", ev)
+    # --- Foot rail → front posts (bed rail fasteners) ---
+    brf.install(root, fl_p, rf_p,
+                interface_axis="x", interface_coord=ev("post_size"),
+                center_z=rail_center_z,
+                size="100mm", name="BRF_RF_L", ev=ev)
+    brf.install(root, fr_p, rf_p,
+                interface_axis="x", interface_coord=ev("outer_w") - ev("post_size"),
+                center_z=rail_center_z,
+                size="100mm", name="BRF_RF_R", ev=ev)
 
     # --- Headboard rails → back posts (2 dominos per rail end, 8 total) ---
     # HB top rail center Z
