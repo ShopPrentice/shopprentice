@@ -298,44 +298,54 @@ def run(context):
         print(f">>> {size_name}: 2 bodies (hook+strike), exported to {export_path}")
 
     # ================================================================
-    # TEST FIXTURE — demo installation in a post + rail
+    # TEST FIXTURES — one for each size (80mm, 100mm, 120mm)
     # ================================================================
     from helpers.templates import bed_rail_fastener as brf
 
-    fix_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-    fix_occ.component.name = "TestFixture"
-    fix_c = fix_occ.component
-
-    # Post: 3" x 3" x 14" tall
-    post_w = 7.62  # 3 in
-    post_h = 35.56  # 14 in
-    _, pr = af.sketch_rect_model(fix_c, fix_c.xYConstructionPlane,
-        ("0 in", "0 in", "0 in"),
-        {"x": "3 in", "y": "3 in"}, "Post_Sk", lambda e: design.unitsManager.evaluateExpression(e, "cm"))
-    post_ext = af.ext_new(fix_c, pr, "14 in", "Post")
-    post_body = post_ext.bodies.item(0); post_body.name = "Post"
-
-    # Rail: 1.5" x 10" x 20" long, butted against post
-    _, pr = af.sketch_rect_model(fix_c, fix_c.xYConstructionPlane,
-        ("3 in", "0.75 in", "2.5 in"),
-        {"x": "20 in", "y": "1.5 in"}, "Rail_Sk", lambda e: design.unitsManager.evaluateExpression(e, "cm"))
-    rail_ext = af.ext_new(fix_c, pr, "10 in", "Rail")
-    rail_body = rail_ext.bodies.item(0); rail_body.name = "Rail"
-
-    # Install 100mm bedlock pair (post face at X=post_w, rail face at X=post_w)
-    post_p = post_body.createForAssemblyContext(fix_occ)
-    rail_p = rail_body.createForAssemblyContext(fix_occ)
-
-    # Interface at X = 3 in (7.62 cm) where post meets rail
     fix_ev = lambda e: design.unitsManager.evaluateExpression(e, "cm")
     post_w_cm = fix_ev("3 in")
-    rail_center_z = fix_ev("2.5 in") + fix_ev("10 in") / 2
-    brf.install(root, post_p, rail_p,
-                interface_axis="x",
-                interface_coord=post_w_cm,
-                center_z=rail_center_z,
-                size="100mm", name="TestBedRail",
-                ev=fix_ev)
+    fixture_spacing = fix_ev("30 in")  # space between fixtures
+
+    for fi, fix_size in enumerate(["80mm", "100mm", "120mm"]):
+        y_offset = fi * fixture_spacing
+
+        fix_occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+        fix_occ.component.name = f"Fixture_{fix_size}"
+        fix_c = fix_occ.component
+
+        # Post: 3" x 3" x 14" tall
+        _, pr = af.sketch_rect_model(fix_c, fix_c.xYConstructionPlane,
+            ("0 in", f"{y_offset} cm", "0 in"),
+            {"x": "3 in", "y": "3 in"}, "Post_Sk", fix_ev)
+        post_ext = af.ext_new(fix_c, pr, "14 in", "Post")
+        post_body = post_ext.bodies.item(0)
+        post_body.name = f"Post_{fix_size}"
+
+        # Rail: 1.5" x 10" x 20" long, butted against post
+        _, pr = af.sketch_rect_model(fix_c, fix_c.xYConstructionPlane,
+            ("3 in", f"{y_offset + fix_ev('0.75 in')} cm", "2.5 in"),
+            {"x": "20 in", "y": "1.5 in"}, "Rail_Sk", fix_ev)
+        rail_ext = af.ext_new(fix_c, pr, "10 in", "Rail")
+        rail_body = rail_ext.bodies.item(0)
+        rail_body.name = f"Rail_{fix_size}"
+
+        # Hide sketches
+        for sk in fix_c.sketches:
+            sk.isVisible = False
+
+        # Install bedlock
+        post_p = post_body.createForAssemblyContext(fix_occ)
+        rail_p = rail_body.createForAssemblyContext(fix_occ)
+        rail_center_z = fix_ev("2.5 in") + fix_ev("10 in") / 2
+
+        brf.install(root, post_p, rail_p,
+                    interface_axis="x",
+                    interface_coord=post_w_cm,
+                    center_z=rail_center_z,
+                    size=fix_size, name=f"Fix_{fix_size}",
+                    ev=fix_ev)
+
+        print(f">>> Fixture {fix_size}: post + rail with bedlock installed")
 
     # Hide sketches
     for sk in fix_c.sketches:
