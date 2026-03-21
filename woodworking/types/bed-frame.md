@@ -94,6 +94,10 @@ brf.install(root, post_proxy, rail_proxy,
 
 Three sizes: 80mm (light rails), **100mm (standard)**, 120mm (heavy/tall rails). STEP files at `~/.autofusion/hardware/bed_rail_fastener/`. Generate with `tools/bed_rail_fastener.py` if missing.
 
+**Hook direction rule:** Hooks always face OUTWARD from the rail they're attached to — toward the connecting post. The template auto-detects direction by comparing the rail body center vs interface coordinate. Each rail end gets the correct outward-facing hooks automatically.
+
+**Hardware organization:** Installed hook plates go into `Rails/Hardwares/`, strike plates into `Posts/Hardwares/`. Only STEP templates go to hidden `_HW`.
+
 ### Domino orientation (permanent joints only)
 Headboard rails and ledger strips use permanent dominos:
 - **HB rail (grain X) → post (grain Z)**: `long_axis="z"`

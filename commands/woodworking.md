@@ -619,7 +619,19 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `helpers/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `joinery/domino-joint.md`.
 
-**Hardware STEP import rule — import once, copy many.** When installing the same hardware multiple times (e.g., 8 bed rail fasteners, 4 hinges), NEVER call `import_step()` directly for each use. Use `hardware._import_or_copy(part_id, step_file, comp)` — it imports the STEP once as a hidden template, then uses `copyPasteBodies` for each subsequent use. This avoids dozens of duplicate imports. Always register occurrences with `_hardware_occurrences.append()` and consolidate into a hidden `_HW` container in the epilogue.
+**Hardware STEP installation rules (Tested — bed rail fastener, queen + twin beds):**
+
+1. **Split STEP per part.** If two hardware parts need different orientations (e.g., hook plate vs strike plate), generate SEPARATE STEP files. Never put opposite-facing parts in one STEP — you can't rotate them independently within one occurrence.
+
+2. **Import once, copy many.** Use a module-level `_cache` dict keyed by `part_id`. First call: `import_step()` + hide template + cache. Subsequent calls: `_copy_from_template(cached_tmpl, comp)`. Do NOT rely on `hardware._import_or_copy()` — its cache key uses `id(design)` which changes each call (Python creates new API wrapper objects).
+
+3. **Direction-aware positioning.** Hardware facing outward (hooks, hinges) must detect which side of the interface the parent board is on: `rail_on_positive_side = rail_center > iface`. Use paired rotations: Ry(90°) for +direction, Ry(-90°) for -direction.
+
+4. **Center on the CUT target.** The hook plate CUTs the rail → center it on `rail_center` (not `post_center`). The strike plate CUTs the post → center it on `post_center`. Rail center ≠ post center because the rail sits at the post edge, not centered on it.
+
+5. **Organize in parent component.** Move installed hardware into a "Hardwares" sub-folder inside its parent component (e.g., `Rails/Hardwares/` for hook plates). Only STEP templates go to hidden `_HW`. Installed copies stay visible.
+
+6. **Determinant = +1.** Every 3×3 rotation sub-matrix must have determinant +1. Fusion rejects -1 (reflections). When flipping one axis, flip another to compensate. Verify before every `defineAsFreeMove()`.
 
 **Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `helpers/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`af.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `joinery/mortise-tenon.md`.
 
