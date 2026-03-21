@@ -909,6 +909,8 @@ def _run(app):
     # ==============================================================
     #  FIT VIEW
     # ==============================================================
+    af.apply_appearance("cherry")
+
     cam = app.activeViewport.camera
     cam.isFitView = True
     app.activeViewport.camera = cam

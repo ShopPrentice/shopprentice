@@ -133,6 +133,8 @@ def run(context):
                   for i in range(root.bRepBodies.count)]
     print(f"Root: {len(root_names)} bodies -> {root_names}")
 
+    af.apply_appearance("walnut")
+
     cam = app.activeViewport.camera
     cam.isFitView = True
     app.activeViewport.camera = cam

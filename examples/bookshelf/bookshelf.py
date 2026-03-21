@@ -378,6 +378,8 @@ def run(context):
         total += n
     print(f"\nTotal: {total} bodies")
 
+    af.apply_appearance("white oak")
+
     cam = app.activeViewport.camera
     cam.isFitView = True
     app.activeViewport.camera = cam

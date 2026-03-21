@@ -132,6 +132,15 @@ def _clean_design():
         except Exception:
             pass
 
+    # Delete remaining component occurrences (e.g. STEP imports that
+    # survive timeline deletion because they are component insertions)
+    root = design.rootComponent
+    for i in range(root.occurrences.count - 1, -1, -1):
+        try:
+            root.occurrences.item(i).deleteMe()
+        except Exception:
+            pass
+
     # Delete user parameters
     params = design.userParameters
     for i in range(params.count - 1, -1, -1):

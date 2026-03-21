@@ -40,6 +40,7 @@ Why grooves before dovetails:
   they attach ungrooved — producing clean, stopped grooves at corners.
 """
 import adsk.core, adsk.fusion, math
+from helpers import af
 
 
 def run(context):
@@ -555,6 +556,8 @@ def run(context):
     # ==============================================================
     #  FIT VIEW
     # ==============================================================
+    af.apply_appearance("cherry")
+
     cam = app.activeViewport.camera
     cam.isFitView = True
     app.activeViewport.camera = cam

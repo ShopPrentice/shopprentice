@@ -1,23 +1,46 @@
 # Wood Appearance
 
-Apply realistic wood appearances to bodies with grain direction aligned to fiber direction. Uses the `apply_appearance` MCP tool.
+Apply realistic wood appearances to bodies with grain direction aligned to fiber direction.
 
 ## Default Species
 
 **White oak.** Use the species the user requests. If none specified, use white oak.
 
-## How to Call
+## How to Call (in scripts)
+
+Every model script must apply appearance before the fit-view epilogue. Use the `af.apply_appearance()` helper:
+
+```python
+from helpers import af
+
+# ... build geometry ...
+
+af.apply_appearance("white oak")    # all bodies, auto grain
+
+# Fit view epilogue
+cam = app.activeViewport.camera
+cam.isFitView = True
+app.activeViewport.camera = cam
+```
+
+This is a **required step** — scripts without appearance produce grey models.
+
+## When to Call
+
+After final validation (zero interferences, correct body count), before the fit-view epilogue. The appearance call is the last modeling step before presenting the model to the user.
+
+## MCP Tool (advanced)
+
+The `apply_appearance` MCP tool provides additional features not in the `af` helper:
+- `bodies` parameter to target specific bodies
+- `grain_overrides` to manually set grain direction per body
+- Dovetail constraint analysis (auto-excludes end-grain axes)
 
 ```
-apply_appearance(species="white oak")                     # all bodies, auto grain
 apply_appearance(species="cherry", bodies=["Front"])      # specific bodies
 apply_appearance(species="walnut",                        # override grain
                  grain_overrides={"Leg_FL": "z"})
 ```
-
-## When to Call
-
-After final validation (zero interferences, correct body count), before screenshots. This is the last step before presenting the model to the user.
 
 ## Grain Direction
 

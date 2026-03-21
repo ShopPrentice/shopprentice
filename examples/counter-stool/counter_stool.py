@@ -656,6 +656,8 @@ def run(context):
     names = [root.bRepBodies.item(i).name for i in range(root.bRepBodies.count)]
     print(f"Root: {len(names)} bodies -> {names}")
 
+    af.apply_appearance("white oak")
+
     cam = app.activeViewport.camera
     cam.isFitView = True
     app.activeViewport.camera = cam

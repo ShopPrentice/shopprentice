@@ -975,3 +975,139 @@ def screenshot_cam(eye_dir, bodies=None, fill=0.80):
         "center": (cx, cy, cz),
         "bbox": (min_x, min_y, min_z, max_x, max_y, max_z),
     }
+
+
+# ── Appearance ───────────────────────────────────────────────────────
+
+# Species name → Fusion Appearance Library search terms (with fallbacks)
+_SPECIES_MAP = {
+    "cherry":      ["Cherry"],
+    "walnut":      ["Walnut"],
+    "oak":         ["Oak"],
+    "white oak":   ["Oak"],
+    "red oak":     ["Oak"],
+    "maple":       ["Maple", "Oak"],
+    "ash":         ["Ash", "Oak"],
+    "birch":       ["Birch", "Oak"],
+    "pine":        ["Pine"],
+    "cedar":       ["Cedar", "Pine"],
+    "mahogany":    ["Mahogany"],
+    "teak":        ["Teak", "Mahogany"],
+    "beech":       ["Beech", "Oak"],
+    "poplar":      ["Poplar", "Oak"],
+    "hickory":     ["Hickory", "Oak"],
+    "ebony":       ["Ebony", "Walnut"],
+    "rosewood":    ["Rosewood", "Walnut"],
+    "sapele":      ["Sapele", "Mahogany"],
+    "bamboo":      ["Bamboo"],
+    "douglas fir": ["Douglas Fir", "Pine"],
+}
+
+
+def _grain_axis(body):
+    """Grain direction = longest bounding box axis."""
+    bb = body.boundingBox
+    dims = {
+        "x": abs(bb.maxPoint.x - bb.minPoint.x),
+        "y": abs(bb.maxPoint.y - bb.minPoint.y),
+        "z": abs(bb.maxPoint.z - bb.minPoint.z),
+    }
+    return max(dims, key=dims.get)
+
+
+def _grain_transform(grain_dir):
+    """Rotate texture so grain (texture Z) aligns with model axis."""
+    m = adsk.core.Matrix3D.create()
+    if grain_dir == "x":
+        m.setToRotation(math.pi / 2, adsk.core.Vector3D.create(0, 1, 0),
+                        Point3D.create(0, 0, 0))
+    elif grain_dir == "y":
+        m.setToRotation(-math.pi / 2, adsk.core.Vector3D.create(1, 0, 0),
+                        Point3D.create(0, 0, 0))
+    return m
+
+
+def apply_appearance(species="white oak"):
+    """Apply wood appearance to all bodies with grain-aligned texture.
+
+    Call at the end of a script, after all geometry is built.
+
+    Args:
+        species: Wood species name (e.g. "cherry", "walnut", "white oak").
+                 Falls back to a similar species if exact match unavailable.
+
+    Usage:
+        af.apply_appearance("walnut")
+    """
+    app = adsk.core.Application.get()
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    root = design.rootComponent
+    species_lower = species.lower().strip()
+    search_terms = _SPECIES_MAP.get(species_lower, [species])
+
+    # Find appearance in libraries
+    appearance = None
+    for term in search_terms:
+        # Check design local appearances first
+        for i in range(design.appearances.count):
+            a = design.appearances.item(i)
+            if term.lower() in a.name.lower():
+                appearance = a
+                break
+        if appearance:
+            break
+        # Search material libraries (prefer Appearance library)
+        libs = app.materialLibraries
+        for li in range(libs.count):
+            lib = libs.item(li)
+            for ai in range(lib.appearances.count):
+                a = lib.appearances.item(ai)
+                if term.lower() in a.name.lower():
+                    if "appearance" in lib.name.lower():
+                        appearance = a
+                        break
+                    if appearance is None:
+                        appearance = a
+            if appearance and "appearance" in lib.name.lower():
+                break
+        if appearance:
+            break
+
+    if appearance is None:
+        print(f"WARNING: No appearance found for '{species}'")
+        return
+
+    # Copy to design if from library
+    local = design.appearances.itemByName(appearance.name)
+    if not local:
+        local = design.appearances.addByCopy(appearance, appearance.name)
+
+    # Collect all bodies
+    def all_bodies(comp):
+        bodies = []
+        for i in range(comp.bRepBodies.count):
+            bodies.append(comp.bRepBodies.item(i))
+        for i in range(comp.occurrences.count):
+            bodies.extend(all_bodies(comp.occurrences.item(i).component))
+        return bodies
+
+    # Apply to each body with grain orientation
+    count = 0
+    for body in all_bodies(root):
+        try:
+            body.appearance = local
+            grain = _grain_axis(body)
+            adsk.doEvents()
+            tmc = body.textureMapControl
+            if tmc:
+                ptmc = adsk.core.ProjectedTextureMapControl.cast(tmc)
+                if ptmc:
+                    ptmc.projectedTextureMapType = (
+                        adsk.core.ProjectedTextureMapTypes
+                        .BoxTextureMapProjection)
+                    ptmc.transform = _grain_transform(grain)
+            count += 1
+        except Exception:
+            pass
+
+    print(f"Applied {local.name} to {count} bodies")

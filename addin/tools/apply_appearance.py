@@ -31,11 +31,11 @@ SPECIES_MAP = {
     "oak":        ["Oak"],
     "white oak":  ["Oak, White", "Oak"],
     "red oak":    ["Oak, Red", "Oak"],
-    "maple":      ["Maple"],
-    "ash":        ["Ash"],
-    "birch":      ["Birch"],
+    "maple":      ["Maple", "Oak"],
+    "ash":        ["Ash", "Oak"],
+    "birch":      ["Birch", "Oak"],
     "pine":       ["Pine"],
-    "cedar":      ["Cedar"],
+    "cedar":      ["Cedar", "Pine"],
     "mahogany":   ["Mahogany"],
     "teak":       ["Teak"],
     "beech":      ["Beech"],
@@ -291,10 +291,10 @@ def _find_appearance(species):
         a = design.appearances.item(i)
         a_name = a.name.lower()
         for term in search_terms:
-            if term.lower() in a_name and "wood" in a_name:
+            if term.lower() in a_name:
                 return a, f"design:{a.name}"
 
-    # 2. Search material libraries
+    # 2. Search material libraries — prefer Fusion Appearance Library
     libs = app.materialLibraries
     best = None
     best_source = ""
@@ -308,10 +308,10 @@ def _find_appearance(species):
             a_name = a.name.lower()
 
             for term in search_terms:
-                if term.lower() in a_name and "wood" in a_name:
+                if term.lower() in a_name:
                     source = f"{lib.name}:{a.name}"
-                    # Prefer the main Fusion library
-                    if "fusion" in lib.name.lower():
+                    # Prefer the Fusion Appearance Library
+                    if "appearance" in lib.name.lower():
                         return a, source
                     if best is None:
                         best = a
@@ -319,17 +319,6 @@ def _find_appearance(species):
 
     if best:
         return best, best_source
-
-    # 3. Fallback: try partial match without "wood" prefix
-    for li in range(libs.count):
-        lib = libs.item(li)
-        lib_appearances = lib.appearances
-        for ai in range(lib_appearances.count):
-            a = lib_appearances.item(ai)
-            a_name = a.name.lower()
-            for term in search_terms:
-                if term.lower() in a_name:
-                    return a, f"{lib.name}:{a.name}"
 
     return None, f"No appearance found for species '{species}'"
 

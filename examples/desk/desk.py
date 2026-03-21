@@ -211,6 +211,8 @@ def run(context):
         print(f"{cn}: {len(names)} bodies -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
 
+    af.apply_appearance("walnut")
+
     cam = app.activeViewport.camera
     cam.isFitView = True
     app.activeViewport.camera = cam

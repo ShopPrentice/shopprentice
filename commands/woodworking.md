@@ -868,7 +868,7 @@ Use `execute_script` with `clean=True` for a fresh slate — it deletes all time
 
 ### Script Epilogue
 
-Every script should end with three standard steps:
+Every script should end with four standard steps:
 
 ```python
 # 1. Hide construction elements (clean viewport)
@@ -884,11 +884,16 @@ names = [root.bRepBodies.item(i).name
          for i in range(root.bRepBodies.count)]
 print(f"Root: {len(names)} bodies -> {names}")
 
-# 3. Fit view (ensures screenshot captures complete model)
+# 3. Apply wood appearance (grain-aligned texture on all bodies)
+af.apply_appearance("white oak")  # use species from user request, default white oak
+
+# 4. Fit view (ensures screenshot captures complete model)
 cam = app.activeViewport.camera
 cam.isFitView = True
 app.activeViewport.camera = cam
 ```
+
+**Step 3 is required** — scripts without `af.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for supported species and grain details.
 
 ## MCP Live Execution
 
