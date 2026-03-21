@@ -42,6 +42,7 @@ def run(context):
         ("leg_clearance", "4 in",    "in"),   # space under rails to floor
         ("mattress_recess","1.5 in", "in"),   # slat top below rail top (secures mattress)
         ("headboard_h",   "36 in",   "in"),
+        ("back_rail_h",   "5 in",    "in"),   # shorter than side rails (headboard adds rigidity)
         # Headboard frame
         ("hb_top_rail_h", "3 in",    "in"),
         ("hb_bot_rail_h", "3 in",    "in"),
@@ -169,6 +170,15 @@ def run(context):
     fr_ext = af.ext_new(rail_c, pr, "rail_thick", "FootRail")
     rail_foot = fr_ext.bodies.item(0); rail_foot.name = "Rail_Foot"
 
+    # Back rail: between back posts, narrower, forward of headboard
+    br_pl = af.off_plane(rail_c, rail_c.xZConstructionPlane,
+                          "outer_l - post_size + post_size / 2 - rail_thick / 2", "BR_Pl")
+    _, pr = af.sketch_rect_model(rail_c, br_pl,
+        ("post_size", "outer_l - post_size + post_size / 2 - rail_thick / 2", "rail_z"),
+        {"x": "end_rail_l", "z": "back_rail_h"}, "BackRail_Sk", ev)
+    back_rail_ext = af.ext_new(rail_c, pr, "rail_thick", "BackRail")
+    rail_back = back_rail_ext.bodies.item(0); rail_back.name = "Rail_Back"
+
     # Ledger strips: on inside face of side rails, supporting slats
     ldg_pl = af.off_plane(rail_c, rail_c.yZConstructionPlane,
                            "post_size / 2 + rail_thick / 2", "LDG_Pl")
@@ -180,7 +190,7 @@ def run(context):
 
     af.mirror_feats(rail_c, [ll_ext], r_xmid, "LedgerRMir").bodies.item(0).name = "Ledger_Right"
 
-    print(">>> Rails: 3 rails + 2 ledgers")
+    print(">>> Rails: 4 rails + 2 ledgers")
 
     # ================================================================
     #  3. HEADBOARD — framed: top rail + bottom rail + vertical slats
@@ -339,6 +349,18 @@ def run(context):
                 interface_axis="x", interface_coord=ev("outer_w") - ev("post_size"),
                 center_z=rail_center_z,
                 size="100mm", name="BRF_RF_R", ev=ev)
+
+    # --- Back rail → back posts (bed rail fasteners, smaller size) ---
+    rb_p = rail_back.createForAssemblyContext(rail_occ)
+    back_rail_center_z = ev("rail_z") + ev("back_rail_h") / 2
+    brf.install(root, bl_p, rb_p,
+                interface_axis="x", interface_coord=ev("post_size"),
+                center_z=back_rail_center_z,
+                size="80mm", name="BRF_RB_L", ev=ev)
+    brf.install(root, br_p, rb_p,
+                interface_axis="x", interface_coord=ev("outer_w") - ev("post_size"),
+                center_z=back_rail_center_z,
+                size="80mm", name="BRF_RB_R", ev=ev)
 
     # --- Headboard rails → back posts (2 dominos per rail end, 8 total) ---
     # HB top rail center Z
