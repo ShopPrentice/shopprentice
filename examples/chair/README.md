@@ -8,6 +8,12 @@ A parametric modern dining chair — 18"W x 17"D seat, 18"H seat height, 34"H to
 
 **Script:** [`chair.py`](chair.py) — 18 structural bodies + 28 joinery voids. Zero interferences.
 
+### Appearance
+
+```
+apply_appearance(species="white oak")
+```
+
 **Style:** Modern
 **Type guide:** [`woodworking/types/chair.md`](../../woodworking/types/chair.md)
 

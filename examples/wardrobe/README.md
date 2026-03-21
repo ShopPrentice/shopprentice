@@ -19,3 +19,9 @@ A parametric modern wardrobe — 42"W x 24"D x 78"H with 2 full-height doors, ha
 ---
 
 **Script:** [`wardrobe.py`](wardrobe.py) — 13 bodies (4 case, 4 kick, 2 doors, shelf, hanging rod, back panel).
+
+### Appearance
+
+```
+apply_appearance(species="cherry")
+```

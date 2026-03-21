@@ -24,6 +24,12 @@ Build a modern floating shelf: 36" long x 8" deep x 1.5" thick.
 Wall-mounted via hidden cleat. Clean square edges, all parametric.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="walnut")
+```
+
 ---
 
 ## How to Run

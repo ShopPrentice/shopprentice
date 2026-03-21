@@ -21,6 +21,12 @@ arched lower edges on all rails, tapered legs, drawbore pins, and a floating top
 filleted edges and cleats. All joinery fully parametric.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="white oak")
+```
+
 ---
 
 ## How to Run

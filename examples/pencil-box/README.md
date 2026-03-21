@@ -21,6 +21,12 @@ side. Use 3 tails per corner. The bottom and lid should be 5/16" thick boards wi
 rabbeted tongues that fit into the grooves.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="cherry")
+```
+
 ---
 
 ## How to Run

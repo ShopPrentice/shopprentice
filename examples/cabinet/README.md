@@ -24,6 +24,12 @@ Build a modern wall cabinet: 24"W x 12"D x 30"H, 2 inset doors,
 adjustable shelf, plywood back, dado joints. All parametric.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="cherry")
+```
+
 ---
 
 **Script:** [`cabinet.py`](cabinet.py) — 8 bodies (4 case, 2 doors, shelf, back panel). Dado joints, back rabbet.

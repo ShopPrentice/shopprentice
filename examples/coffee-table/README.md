@@ -28,6 +28,12 @@ Build a modern coffee table: 48"L x 24"W x 18"H, 1" thick top,
 1.75" square legs, apron frame, lower shelf, domino joinery. All parametric.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="walnut")
+```
+
 ---
 
 ## How to Run

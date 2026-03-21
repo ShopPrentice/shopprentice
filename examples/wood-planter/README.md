@@ -21,6 +21,12 @@ on all four sides. Add a slatted bottom with drainage gaps and Festool Domino co
 to the lower rails.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="cedar")
+```
+
 ---
 
 ## How to Run

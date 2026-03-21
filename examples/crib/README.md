@@ -19,3 +19,9 @@ A parametric modern crib — 52"L x 28"W interior, 34"H rail height. Safety-comp
 ---
 
 **Script:** [`crib.py`](crib.py) — 83 bodies (4 posts, 8 rails, ~70 spindles, mattress support). Spindle count parametric via `spindle_sp`.
+
+### Appearance
+
+```
+apply_appearance(species="maple")
+```

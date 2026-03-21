@@ -20,6 +20,12 @@ Build a bar-height counter stool: 15.75" x 11" seat, 24" leg height, 4 splayed l
 stretchers on all 4 sides, footrest on front stretcher. All parametric.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="white oak")
+```
+
 ---
 
 ## How to Run

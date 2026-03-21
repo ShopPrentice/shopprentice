@@ -34,6 +34,11 @@ A parametric modern platform bed — Queen 60"W x 80"L, framed headboard with ve
 | `post_chamfer` | 0.25 in | Rails align with chamfer bottom |
 | `n_hb_slats` | 5 | Headboard vertical slats |
 
+### Appearance
+
+```
+apply_appearance(species="white oak")
+```
 ---
 
 # Twin Bed — Live Edge Slab Headboard with Bowties
@@ -79,3 +84,9 @@ A Nakashima-inspired twin bed with a 2" thick slab headboard and 3 decorative bo
 | `bt_waist_w` | 0.5 in | Width at narrow waist |
 | `bt_depth` | 0.67 in | Inlay depth (~1/3 of 2" slab) |
 | `n_bowties` | 3 | Number along crack line |
+
+### Appearance
+
+```
+apply_appearance(species="walnut")
+```

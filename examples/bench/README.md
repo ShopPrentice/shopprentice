@@ -24,6 +24,12 @@ Build a modern entryway bench: 48"L x 14"W x 18"H, thick seat,
 square legs, aprons, stretchers, domino joinery. All parametric.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="white oak")
+```
+
 ---
 
 **Script:** [`bench.py`](bench.py) — 11 structural bodies + 20 domino voids. Domino grid at 8 apron-to-leg joints (2 per joint) + single dominos at 4 stretcher-to-leg joints.

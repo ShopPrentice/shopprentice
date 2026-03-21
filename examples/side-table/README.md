@@ -19,3 +19,9 @@ A parametric modern side table — 22"L x 16"W x 24"H with single dovetailed dra
 ---
 
 **Script:** [`side_table.py`](side_table.py) — 13 bodies (4 legs, 3 aprons, top, 5 drawer). Uses `dovetailed_drawer` template.
+
+### Appearance
+
+```
+apply_appearance(species="cherry")
+```

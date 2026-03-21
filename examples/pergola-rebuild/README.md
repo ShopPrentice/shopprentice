@@ -55,6 +55,12 @@ python tools/search_build.py \
 
 **Script:** [`pergola.py`](pergola.py)
 
+### Appearance
+
+```
+apply_appearance(species="cedar")
+```
+
 ---
 
 ## Dimensions

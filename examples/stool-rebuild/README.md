@@ -22,6 +22,12 @@ The capture-and-rebuild pipeline reads the design's parameters, component tree, 
 
 **Script:** [`stool.py`](stool.py)
 
+### Appearance
+
+```
+apply_appearance(species="maple")
+```
+
 ---
 
 ## Dimensions

@@ -21,6 +21,12 @@ kick board, domino connections for a 1/2" plywood backboard, and through dovetai
 attach the top. All joinery should be fully parametric.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="white oak")
+```
+
 ---
 
 ## How to Run

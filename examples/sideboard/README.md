@@ -19,3 +19,9 @@ A parametric modern sideboard — 60"W x 20"D x 34"H with 3 sections: 2 door com
 ---
 
 **Script:** [`sideboard.py`](sideboard.py) — 18 bodies (5 case, top, 4 kick, 2 doors, 5 drawer, back). Uses `dovetailed_drawer` template.
+
+### Appearance
+
+```
+apply_appearance(species="white oak")
+```

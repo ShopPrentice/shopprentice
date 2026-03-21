@@ -117,7 +117,10 @@ def _analyze_dovetail_constraints(design):
 
     for ti in range(timeline.count):
         item = timeline.item(ti)
-        entity = item.entity
+        try:
+            entity = item.entity
+        except Exception:
+            continue
         if entity is None:
             continue
 

@@ -24,6 +24,12 @@ Build a modern mirror frame: 24"W x 36"H mirror opening, 3" wide frame,
 3/4" thick. Rabbeted inner edge for glass. Clean square profile.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="walnut")
+```
+
 ---
 
 ## How to Run

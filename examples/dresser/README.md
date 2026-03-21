@@ -46,6 +46,12 @@ plywood back. All joinery fully parametric — changing n_drawers should produce
 of equal-height drawers.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="cherry")
+```
+
 ---
 
 ## How to Run

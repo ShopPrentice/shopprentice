@@ -66,6 +66,12 @@ interlocking tenons at corners. Cleats connecting case to frame with blind tenon
 rails and Festool Domino joints into the case bottom. All joinery fully parametric.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="walnut")
+```
+
 ---
 
 ## How to Run

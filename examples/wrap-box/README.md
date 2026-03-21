@@ -21,6 +21,12 @@ slot in front wall for film exit, and a raised cutter lip with groove on the bac
 3 tails per corner, all joinery fully parametric.
 ```
 
+### Appearance
+
+```
+apply_appearance(species="cherry")
+```
+
 ---
 
 ## How to Run
