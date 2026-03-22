@@ -45,8 +45,7 @@ def run(context):
         ("support_thick", "0.75 in",  "in"),
         ("slat_w",        "2.5 in",   "in"),
         ("n_slats",       "8",        ""),
-        ("ledger_h",      "1.5 in",   "in"),
-        ("ledger_thick",  "0.75 in",  "in"),
+        # (ledger strips removed — support rails connect directly to posts)
         # Dominos (6mm for rails)
         ("dm_t",          "6 mm",     "in"),
         ("dm_w",          "20 mm",    "in"),
@@ -73,7 +72,6 @@ def run(context):
         # Slat support
         ("slat_l",        "interior_w",                                 "in"),
         ("slat_sp",       "(interior_l - slat_w) / (n_slats - 1)",    "in"),
-        ("ledger_z",      "mattress_h - ledger_h - support_thick",     "in"),
         # Rail domino Z positions (2 per rail end, evenly in rail height)
         ("dm_z1",         "rail_w / 3",                                "in"),
         ("dm_sp",         "rail_w / 3",                                "in"),
@@ -239,27 +237,33 @@ def run(context):
     print(f">>> Spindles: {spindle_c.bRepBodies.count}")
 
     # ================================================================
-    #  4. MATTRESS SUPPORT — slats on ledger strips
+    #  4. MATTRESS SUPPORT — 2 support rails + slats attached to them
     # ================================================================
-    # Ledger strips on left + right side rails (inside face)
-    ldg_pl = af.off_plane(support_c, support_c.yZConstructionPlane,
-                           "post_size / 2 + rail_thick / 2", "LDG_Pl")
-    _, pr = af.sketch_rect_model(support_c, ldg_pl,
-        ("post_size / 2 + rail_thick / 2", "post_size", "ledger_z"),
-        {"y": "interior_l", "z": "ledger_h"}, "LedgerL_Sk", ev)
-    ll_ext = af.ext_new(support_c, pr, "ledger_thick", "LedgerLeft")
-    ll_ext.bodies.item(0).name = "Ledger_Left"
+    # 2 support rails run lengthwise (Y), connected to front + back posts
+    # Slats span widthwise (X) between the support rails
+    params.add("sup_rail_w", VI("1.5 in"), "in", "")
+    params.add("sup_rail_h", VI("1.5 in"), "in", "")
+    params.add("sup_rail_inset", VI("post_size + 2 in"), "in", "")  # inset from posts
 
+    # Left support rail
+    sup_lpl = af.off_plane(support_c, support_c.yZConstructionPlane,
+                            "sup_rail_inset", "SupL_Pl")
+    _, pr = af.sketch_rect_model(support_c, sup_lpl,
+        ("sup_rail_inset", "post_size", "mattress_h - support_thick - sup_rail_h"),
+        {"y": "interior_l", "z": "sup_rail_h"}, "SupRailL_Sk", ev)
+    srl_ext = af.ext_new(support_c, pr, "sup_rail_w", "SupRailLeft")
+    sup_rail_l = srl_ext.bodies.item(0); sup_rail_l.name = "SupRail_Left"
+
+    # Right support rail (mirror)
     sup_xmid = af.off_plane(support_c, support_c.yZConstructionPlane, "mid_x", "SupXMid")
-    af.mirror_feats(support_c, [ll_ext], sup_xmid, "LedgerRMir").bodies.item(0).name = "Ledger_Right"
+    af.mirror_feats(support_c, [srl_ext], sup_xmid, "SupRailRMir").bodies.item(0).name = "SupRail_Right"
 
-    # Slats
+    # Slats span between support rails, resting on top
     slat_z_pl = af.off_plane(support_c, support_c.xYConstructionPlane,
                               "mattress_h - support_thick", "SlatZ_Pl")
     _, pr = af.sketch_rect_model(support_c, slat_z_pl,
-        ("post_size / 2 + rail_thick / 2 + ledger_thick", "post_size",
-         "mattress_h - support_thick"),
-        {"x": "slat_l - 2 * ledger_thick", "y": "slat_w"}, "Slat_Sk", ev)
+        ("sup_rail_inset", "post_size", "mattress_h - support_thick"),
+        {"x": "outer_w - 2 * sup_rail_inset", "y": "slat_w"}, "Slat_Sk", ev)
     slat_ext = af.ext_new(support_c, pr, "support_thick", "Slat_1")
     slat_body = slat_ext.bodies.item(0); slat_body.name = "Slat_1"
 
@@ -267,7 +271,29 @@ def run(context):
         af.body_pattern(support_c, slat_body, support_c.yConstructionAxis,
                          "n_slats", "slat_sp", "SlatPat")
 
-    print(f">>> Support: 2 ledgers + {int(ev('n_slats'))} slats")
+    # CUT slats into support rails (mortise connection)
+    srl_p = sup_rail_l.createForAssemblyContext(support_occ)
+    srr_body = None
+    for i in range(support_c.bRepBodies.count):
+        if support_c.bRepBodies.item(i).name == "SupRail_Right":
+            srr_body = support_c.bRepBodies.item(i)
+            break
+    srr_p = srr_body.createForAssemblyContext(support_occ) if srr_body else None
+
+    slat_bodies_proxies = []
+    for i in range(support_c.bRepBodies.count):
+        b = support_c.bRepBodies.item(i)
+        if b.name.startswith("Slat_"):
+            slat_bodies_proxies.append(b.createForAssemblyContext(support_occ))
+
+    if slat_bodies_proxies:
+        af.combine(root, srl_p, slat_bodies_proxies, CUT, True, "SlatCut_SupL")
+        if srr_p:
+            af.combine(root, srr_p, slat_bodies_proxies, CUT, True, "SlatCut_SupR")
+
+    # Support rail dominos are in the cross-component section below (needs dm_yf/dm_yb planes)
+
+    print(f">>> Support: 2 rails + {int(ev('n_slats'))} slats (attached)")
 
     # ================================================================
     #  5. CROSS-COMPONENT: Dominos (rails→posts) + Dowels (spindles→rails)
@@ -431,6 +457,27 @@ def run(context):
         af.combine(root, rtr_p, right_sp, CUT, True, "SpindleCut_RTop")
 
     print(">>> Spindle mortises: 8 bulk CUTs into rails")
+
+    # --- Support rails → posts (dominos, 1 per end, 4 total) ---
+    params.add("sup_dm_z", VI("mattress_h - support_thick - sup_rail_h / 2"), "in", "")
+    domino.grid(root, dm_yf,
+        ("sup_rail_inset + sup_rail_w / 2", "post_size", "sup_dm_z"),
+        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
+        srl_p, fl_p, "DM_SRL_F", ev)
+    domino.grid(root, dm_yb,
+        ("sup_rail_inset + sup_rail_w / 2", "outer_l - post_size", "sup_dm_z"),
+        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
+        srl_p, bl_p, "DM_SRL_B", ev)
+    if srr_p:
+        domino.grid(root, dm_yf,
+            ("outer_w - sup_rail_inset - sup_rail_w / 2", "post_size", "sup_dm_z"),
+            "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
+            srr_p, fr_p, "DM_SRR_F", ev)
+        domino.grid(root, dm_yb,
+            ("outer_w - sup_rail_inset - sup_rail_w / 2", "outer_l - post_size", "sup_dm_z"),
+            "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
+            srr_p, br_p, "DM_SRR_B", ev)
+    print(">>> Support rail dominos: 4 joints")
 
     # ================================================================
     #  6. DETAILS — post top chamfers (safety: flush, slight ease)
