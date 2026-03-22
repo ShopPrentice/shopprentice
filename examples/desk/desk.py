@@ -193,7 +193,15 @@ def run(context):
     _, pr = af.sketch_rect_model(apron_c, az_pl,
         ("mid_x - divider_thick / 2", "apron_thick", "apron_z"),
         {"x": "divider_thick", "y": "desk_w - leg_size - 2 * apron_thick"}, "Divider_Sk", ev)
-    af.ext_new(apron_c, pr, "apron_h", "Divider").bodies.item(0).name = "Divider"
+    div_ext = af.ext_new(apron_c, pr, "apron_h", "Divider")
+    div_body = div_ext.bodies.item(0); div_body.name = "Divider"
+
+    # Divider front extension — fills the gap between drawer fronts
+    # Only spans the drawer opening height (below front rail, not overlapping it)
+    _, pr = af.sketch_rect_model(apron_c, az_pl,
+        ("mid_x - divider_thick / 2", "0 in", "apron_z"),
+        {"x": "divider_thick", "y": "apron_thick"}, "DivFront_Sk", ev)
+    af.ext_new(apron_c, pr, "drawer_opening", "DivFront").bodies.item(0).name = "Divider_Front"
 
     # Drawer runners — 2 on side aprons only (divider sides have no runners
     # to avoid blocking drawer slide path)
