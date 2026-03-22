@@ -88,6 +88,16 @@ params.add("ch_d", VI("0.125 in"), "in", "Chamfer distance")
 
 Common woodworking values: fillet 1/16"–1/4" (comfort, softening), chamfer 1/8"–1/4" (visual detail, splinter prevention).
 
+## What to Chamfer / Fillet
+
+Chamfers and fillets are for **exposed structural edges only**. Skip:
+
+- **Joinery void bodies** (`DM_*`, domino loose tenons) — chamfering expands them beyond their mortise pockets, causing interference with mating bodies.
+- **Cylindrical bodies** (spindles, dowels) — already round, no sharp edges to break.
+- **Mortise pocket interiors** — chamfering pocket edges creates tiny interferences where the tenon/spindle meets the chamfered edge. If you chamfer an entire component's edges in one feature, the pocket edges get chamfered too. This is usually harmless (sub-mm overlap) but will show up in interference checks.
+
+**Best practice:** Collect all edges from structural bodies in a component (skipping void bodies), apply one chamfer feature per component. This keeps the timeline clean (4-5 features instead of one per body) and naturally excludes void bodies.
+
 ## Sizing Constraints
 
 - Fillet radius must be less than half the smallest adjacent face dimension — too large and the fillet fails.
