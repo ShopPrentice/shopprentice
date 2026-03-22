@@ -134,6 +134,9 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 | `dovetail` | Box corners, drawer fronts |
 | `half_blind_dovetail` | Drawer fronts (hides end grain) |
 | `splayed_legs` | Compound-splayed legs with floor trim |
+| `dowel` | Spindle-to-rail, panel alignment, edge joining |
+| `bowtie` | Live edge slab inlays (Nakashima style) |
+| `bed_rail_fastener` | STEP hardware for rail-to-post connections |
 | `dovetailed_drawer` | Complete drawer box |
 
 **Reference files** (`woodworking/joinery/`) provide orientation rules, sizing constraints, and variant selection for all joint types:
@@ -146,7 +149,7 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 | Lap Joint | [joinery/lap-joint.md](joinery/lap-joint.md) | — | Frames, cross braces |
 | Box Joint | [joinery/box-joint.md](joinery/box-joint.md) | `finger_joint` | Boxes, drawers |
 | Bridle Joint | [joinery/bridle-joint.md](joinery/bridle-joint.md) | — | Frame corners |
-| Dowel Joint | [joinery/dowel-joint.md](joinery/dowel-joint.md) | — | Panel glue-ups |
+| Dowel Joint | [joinery/dowel-joint.md](joinery/dowel-joint.md) | `dowel` | Spindle connections, panel glue-ups |
 | Spline Joint | [joinery/spline-joint.md](joinery/spline-joint.md) | — | Reinforced miters |
 | Miter Joint | [joinery/miter-joint.md](joinery/miter-joint.md) | — | Picture frames, trim |
 | Dovetail | [joinery/dovetail.md](joinery/dovetail.md) | `dovetail` | Drawer fronts, premium boxes |
