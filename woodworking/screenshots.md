@@ -2,7 +2,30 @@
 
 How to take consistent, high-quality screenshots for example READMEs and documentation.
 
-## `af.screenshot_cam()` — Dynamic Camera Positioning
+## MCP Tools (Primary Workflow)
+
+Two MCP tools handle screenshots — use these instead of manual scripting:
+
+| Tool | Use | Resolution | Cleanup |
+|------|-----|-----------|---------|
+| `get_screenshot` | Build validation | 1024×1024 | None (as-is) |
+| `get_product_shots` | Final presentation | 2048×2048 | Auto-hides artifacts, restores state |
+
+```
+# Quick validation during builds
+get_screenshot(view="iso-top-right")
+
+# Final product shots (default: 3 views, high-res, cleaned up)
+get_product_shots()
+
+# Transparent view
+get_product_shots(views=["iso-top-right"], style="transparent")
+
+# Detail shot framing specific bodies
+get_product_shots(views=["iso-top-right"], bodies=["Post_FL", "Rail_FrontBot"], fill=0.90)
+```
+
+## Internals: `af.screenshot_cam()` — Dynamic Camera Positioning
 
 The `screenshot_cam` helper computes camera distance automatically using the actual Fusion FOV and projected bounding box geometry. No manual multiplier tuning needed.
 
@@ -128,21 +151,12 @@ Each example should have at minimum an **overview** shot. Full documentation use
 
 ### Taking All Standard Shots
 
-```python
-from helpers import af
-
-shots = [
-    ("iso-top-left",  (-1, -1, 0.7)),
-    ("iso-top-right", ( 1, -1, 0.7)),
-    ("front",         ( 0, -1, 0)),
-    ("right",         ( 1,  0, 0)),
-]
-
-for name, eye_dir in shots:
-    af.screenshot_cam(eye_dir=eye_dir, fill=0.80)
-    # → call get_screenshot(width=2048, height=2048)
-    # → save as screenshots/{name}.png
+Use `get_product_shots` — one MCP call captures all views:
 ```
+get_product_shots(views=["iso-top-right", "front", "right"])
+```
+
+Internally this calls `af.screenshot_cam()` for each view, hides artifacts, and restores state.
 
 ## Transparent / Detail Views
 

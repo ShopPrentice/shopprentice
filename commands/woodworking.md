@@ -807,7 +807,7 @@ Models are built **one component at a time**. Each component gets its own plan �
    b. Validate body count and interference
 4. Details (final cycle):
    a. Fillets, chamfers, decorative cutouts
-   b. Validate → apply_appearance → screenshot → present to user
+   b. Validate → apply_appearance → get_product_shots → present to user
 ```
 
 ### Why Component-by-Component
@@ -840,7 +840,7 @@ Details: fillets → bounded context → done
 6. **Plan before code, always in separate responses.** Before each component, output its step list as text. Then write the code and execute in the next response.
 7. **Cross-component operations are a separate cycle.** After all components are built, one final cycle adds root-level CUTs via assembly proxies.
 8. **Details are the last cycle.** Fillets and chamfers require all geometry to exist first.
-9. **Show final result.** After the last cycle, apply wood appearance via `apply_appearance`, then screenshot and present to the user.
+9. **Show final result.** After the last cycle, call `apply_appearance` then `get_product_shots` to capture presentation-quality images and present to the user.
 10. **Replace, don't patch.** When an approach doesn't work and you rewrite it, **replace the old code block entirely** — don't add new code below while partially cleaning up the old (e.g., calling `deleteMe()` on an old sketch but leaving its extrude). Partial cleanup creates orphan bodies invisible in code review but visible in the model. The old code is always recoverable from git or undo, so replacing is safe.
 
 ### What Goes Where
@@ -903,14 +903,11 @@ print(f"Root: {len(names)} joinery voids")
 
 # 3. Apply wood appearance (grain-aligned texture on all bodies)
 af.apply_appearance("white oak")
-
-# 4. Fit view (ensures screenshot captures complete model)
-cam = app.activeViewport.camera
-cam.isFitView = True
-app.activeViewport.camera = cam
 ```
 
-**Step 4 is required** — scripts without `af.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for supported species and grain details.
+**Step 3 is required** — scripts without `af.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for species and grain details.
+
+After the script runs, call `get_product_shots` via MCP to capture presentation images. It handles camera positioning, artifact cleanup, and framing automatically — no fit-view or hide-sketch code needed in the script.
 
 ## MCP Live Execution
 
@@ -1009,7 +1006,7 @@ Response 9 (build): append root-level CUTs to box.py
 Response 10 (plan): Details — lid chamfer, edge fillets
 Response 11 (build): append details to box.py
   → execute → capture_design → validate
-  → apply_appearance → screenshot → present to user
+  → validate_design → apply_appearance → get_product_shots → present to user
 ```
 
 ### Sandbox Mode
@@ -1038,13 +1035,12 @@ Use `execute_script` with `sandbox=true` to run a script in a throwaway document
 
 ### Screenshots
 
-After the final phase, take screenshots for documentation. See [woodworking/screenshots.md](woodworking/screenshots.md) for the full guide:
+After the final phase, call `get_product_shots` for presentation images. It handles everything automatically — artifact cleanup, FOV-aware framing, multiple views, visual style. See [woodworking/screenshots.md](woodworking/screenshots.md) for camera direction details.
 
-- **Resolution**: 2048x2048 via `get_screenshot(width=2048, height=2048)`
-- **Visual style**: `ShadedWithVisibleEdgesOnlyVisualStyle` (enum value 2) — edge lines required
-- **Framing**: entire model inside frame, centered, filling ~70-80% of the image
-- **Cleanup**: clear selections, hide sketches/construction planes before capture
-- **Transparent views**: use `body.opacity = 0.2` to reveal internal joinery (M&T, dovetails, dominos)
+- **Validation during builds**: `get_screenshot` (quick, 1024x1024, as-is)
+- **Final presentation**: `get_product_shots` (2048x2048, cleaned up, multiple views)
+- **Transparent views**: `get_product_shots(style="transparent")`
+- **Detail shots**: `get_product_shots(bodies=["Post_FL", "Rail_FrontBot"], fill=0.90)`
 
 ### MCP Timeout
 
