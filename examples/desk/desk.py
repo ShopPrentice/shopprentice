@@ -386,7 +386,65 @@ def run(context):
     print(">>> Dominos: 8 apron-leg + 2 front-rail = 10 joints")
 
     # ==============================================================
-    #  6. DETAILS — edge chamfers
+    #  6. DRAWER SLIDE TEST — verify drawers can open fully
+    # ==============================================================
+    # Slide each drawer to 75% open position, check for interference
+    slide_dist = ev("drawer_d") * 0.75  # 75% of drawer depth
+
+    for dr_name, dr_occ in [("DrawerL", drawer_l_occ), ("DrawerR", drawer_r_occ)]:
+        # Save original transform
+        orig_t = dr_occ.transform.copy()
+
+        # Move drawer forward (-Y direction)
+        slide_t = adsk.core.Matrix3D.create()
+        slide_t.translation = adsk.core.Vector3D.create(0, -slide_dist, 0)
+        new_t = orig_t.copy()
+        new_t.transformBy(slide_t)
+        dr_occ.transform = new_t
+        design.snapshots.add()  # force recompute
+
+        # Collect all bodies for interference check
+        all_bodies = adsk.core.ObjectCollection.create()
+        for occ in root.allOccurrences:
+            for i in range(occ.component.bRepBodies.count):
+                all_bodies.add(occ.component.bRepBodies.item(i))
+        for i in range(root.bRepBodies.count):
+            all_bodies.add(root.bRepBodies.item(i))
+
+        if all_bodies.count >= 2:
+            interf_input = design.createInterferenceInput(all_bodies)
+            results = design.analyzeInterference(interf_input)
+
+            # Filter: only report interferences involving THIS drawer
+            drawer_hits = []
+            for j in range(results.count):
+                r = results.item(j)
+                try:
+                    b1 = r.entityOne.name
+                    b2 = r.entityTwo.name
+                except Exception:
+                    continue
+                if b1.startswith(dr_name[:3].lower()) or b2.startswith(dr_name[:3].lower()):
+                    vol = 0
+                    try:
+                        vol = r.interferenceBody.volume
+                    except Exception:
+                        pass
+                    if vol > 0.01:  # ignore tiny cosmetic overlaps
+                        drawer_hits.append(f"{b1} vs {b2} (vol={vol:.2f})")
+
+            if drawer_hits:
+                print(f"WARNING: {dr_name} BLOCKED when open:")
+                for h in drawer_hits:
+                    print(f"  {h}")
+            else:
+                print(f">>> {dr_name} slide test PASSED (75% open, no interference)")
+
+        # Restore original position
+        dr_occ.transform = orig_t
+
+    # ==============================================================
+    #  7. DETAILS — edge chamfers
     # ==============================================================
     for comp_name, comp in [("Legs", leg_c), ("Aprons", apron_c), ("Top", top_c)]:
         edges = adsk.core.ObjectCollection.create()
