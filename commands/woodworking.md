@@ -76,7 +76,7 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | **Lap Joint** | Flat frames, cross braces, grid assemblies, half-lap at crossings | Draft | `woodworking/joinery/lap-joint.md` |
 | **Miter Joint** | Picture frames, trim, hidden end grain at corners | Draft | `woodworking/joinery/miter-joint.md` |
 | **Spline Joint** | Reinforced miters, decorative accents across a joint line | Draft | `woodworking/joinery/spline-joint.md` |
-| **Dowel Joint** | Edge joining, panel glue-ups, face frames — round-peg alignment | Draft | `woodworking/joinery/dowel-joint.md` |
+| **Dowel Joint** | Edge joining, panel glue-ups, face frames, spindle-to-rail, round-peg alignment | Tested | `woodworking/joinery/dowel-joint.md` + `woodworking/templates/dowel.py` |
 | **Pocket Hole** | Face frames, quick assemblies, tabletop attachment — screw-based | Draft | `woodworking/joinery/pocket-hole.md` |
 | **Bed Rail Fastener** | Bed rail to post — detachable STEP hardware (mortise bedlock, hooks + slots) | Tested (queen + twin beds) | `woodworking/templates/bed_rail_fastener.py` + `woodworking/hardware-installation.md` |
 | **Bowtie / Butterfly Key** | Live edge slab crack stabilization, decorative inlay | Tested (twin bed) | `woodworking/templates/bowtie.py` |
