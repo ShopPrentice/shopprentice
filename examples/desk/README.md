@@ -1,6 +1,6 @@
 # Writing Desk
 
-A parametric modern writing desk — 48"L × 28"W × 30"H with tapered legs, single dovetailed drawer with runners and stops, front rail above drawer, cable grommet, domino joinery throughout. Walnut appearance.
+A parametric modern writing desk — 48"L × 24"W × 30"H with tapered legs, two dovetailed drawers with center divider, drawer runners and stops, front rail, cable grommet, L-bracket top attachment for wood movement. Walnut appearance.
 
 ![Desk — iso top-right](screenshots/iso-top-right.png)
 
@@ -17,26 +17,28 @@ A parametric modern writing desk — 48"L × 28"W × 30"H with tapered legs, sin
 
 ---
 
-**Script:** [`desk.py`](desk.py) — 28 structural bodies + 14 domino voids.
+**Script:** [`desk.py`](desk.py) — 32 structural bodies + 18 domino voids.
 
 ### Structure
 - **4 tapered legs** — 2" square at top, taper to 1.25" at floor on inner faces
-- **3 aprons** — back + 2 sides (no front apron — drawer front fills it)
-- **Front rail** — 1.5" strip above drawer opening, domino'd to front legs
-- **2 drawer runners** — wooden strips on side aprons for drawer slides
-- **2 drawer stops** — blocks at back of runners preventing push-through
+- **3 aprons** — back + 2 sides (no front apron — drawer fronts fill it)
+- **Front rail** — 1.5" strip above drawer openings
+- **Center divider** — separates the two drawer openings
+- **4 drawer runners** — on side aprons + both sides of divider
+- **4 drawer stops** — blocks at back of each runner
 - **Top** — 1" thick with 2" cable grommet at back-right corner
 
-### Drawer
-- Dovetailed drawer box (half-blind front, through back)
-- 5 bodies: front, back, 2 sides, bottom
-- Slides on wooden runners, stopped by blocks at back
+### Drawers
+- 2 dovetailed drawer boxes (half-blind front, through back)
+- Each slides on wooden runners, stopped by blocks at back
+- 5 bodies per drawer (10 total)
 
 ### Joinery
 - **Aprons → legs:** 2 dominos per joint (6 apron joints)
 - **Front rail → legs:** 1 domino each side (2 joints)
-- **Top → aprons:** 10 L-brackets with slotted holes (3 front + 3 back + 2 per side, allows cross-grain wood movement)
-- **Drawer:** dovetails at all 4 corners
+- **Divider → front rail + back apron:** 2 dominos each end (4 joints)
+- **Top → aprons:** 9 L-brackets with slotted holes (wood movement)
+- **Drawers:** dovetails at all 4 corners
 
 ### Appearance
 

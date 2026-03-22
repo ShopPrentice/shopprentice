@@ -36,7 +36,7 @@ def run(context):
     # ==============================================================
     for pname, expr, unit in [
         ("desk_l",      "48 in",    "in"),
-        ("desk_w",      "28 in",    "in"),
+        ("desk_w",      "24 in",    "in"),
         ("desk_h",      "30 in",    "in"),
         ("top_thick",   "1 in",     "in"),
         ("leg_size",    "2 in",     "in"),
@@ -44,6 +44,7 @@ def run(context):
         ("apron_h",     "5 in",     "in"),
         ("apron_thick", "0.75 in",  "in"),
         ("front_rail_h","1.5 in",   "in"),   # rail above drawer opening
+        ("divider_thick","0.75 in", "in"),  # center divider between drawers
         ("drawer_gap",  "0.0625 in","in"),
         ("runner_w",    "0.75 in",  "in"),   # drawer runner width
         ("runner_h",    "0.375 in", "in"),   # drawer runner height
@@ -64,7 +65,7 @@ def run(context):
         ("mid_y",         "desk_w / 2",                                  "in"),
         # Drawer opening = apron_h minus front_rail_h
         ("drawer_opening","apron_h - front_rail_h",                     "in"),
-        ("drawer_w",      "long_apron_l - 2 * drawer_gap",             "in"),
+        ("drawer_w",      "(long_apron_l - divider_thick - 4 * drawer_gap) / 2", "in"),
         ("drawer_d",      "short_apron_l",                              "in"),
         ("drawer_h_inner","drawer_opening - 2 * drawer_gap",           "in"),
         # Taper starts below the apron
@@ -72,15 +73,27 @@ def run(context):
     ]:
         params.add(pname, VI(expr), unit, "")
 
-    dovetailed_drawer.define_params(params, prefix="dd",
+    # Left drawer x_offset: just inside left leg
+    dovetailed_drawer.define_params(params, prefix="ddl",
         drawer_w="drawer_w", drawer_d="drawer_d",
         drawer_h="drawer_h_inner",
         front_thick="0.75 in", side_thick="0.5 in",
         bottom_thick="0.25 in",
         bg_depth="0.25 in", bg_up="0.25 in",
         dt_angle="8 deg", dt_tail_w="0.625 in",
-        front_tail_count="3", back_tail_count="3",
+        front_tail_count="2", back_tail_count="2",
         x_offset="leg_size + drawer_gap",
+        z_offset="apron_z + drawer_gap")
+    # Right drawer x_offset: after divider
+    dovetailed_drawer.define_params(params, prefix="ddr",
+        drawer_w="drawer_w", drawer_d="drawer_d",
+        drawer_h="drawer_h_inner",
+        front_thick="0.75 in", side_thick="0.5 in",
+        bottom_thick="0.25 in",
+        bg_depth="0.25 in", bg_up="0.25 in",
+        dt_angle="8 deg", dt_tail_w="0.625 in",
+        front_tail_count="2", back_tail_count="2",
+        x_offset="mid_x + divider_thick / 2 + drawer_gap",
         z_offset="apron_z + drawer_gap")
 
     print(">>> Parameters done")
@@ -91,12 +104,14 @@ def run(context):
     leg_occ    = af.make_comp(root, "Legs")
     apron_occ  = af.make_comp(root, "Aprons")
     top_occ    = af.make_comp(root, "Top")
-    drawer_occ = af.make_comp(root, "Drawer")
+    drawer_l_occ = af.make_comp(root, "DrawerLeft")
+    drawer_r_occ = af.make_comp(root, "DrawerRight")
 
     leg_c    = leg_occ.component
     apron_c  = apron_occ.component
     top_c    = top_occ.component
-    drawer_c = drawer_occ.component
+    drawer_l_c = drawer_l_occ.component
+    drawer_r_c = drawer_r_occ.component
 
     # ==============================================================
     #  1. LEGS — tapered on inner faces below the apron
@@ -174,27 +189,54 @@ def run(context):
         {"x": "long_apron_l", "y": "apron_thick"}, "FrontRail_Sk", ev)
     af.ext_new(apron_c, pr, "front_rail_h", "FrontRail").bodies.item(0).name = "Apron_FrontRail"
 
-    # Drawer runners — strips on inner face of side aprons, running front-to-back (Y)
+    # Center divider — runs front-to-back between the two drawer openings
+    _, pr = af.sketch_rect_model(apron_c, az_pl,
+        ("mid_x - divider_thick / 2", "0 in", "apron_z"),
+        {"x": "divider_thick", "y": "desk_w - leg_size - apron_thick"}, "Divider_Sk", ev)
+    af.ext_new(apron_c, pr, "apron_h", "Divider").bodies.item(0).name = "Divider"
+
+    # Drawer runners — 4 total: left apron, left side of divider,
+    # right side of divider, right apron. All run front-to-back (Y).
     runner_z = "apron_z + drawer_gap"
     runner_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, runner_z, "RunnerZ_Pl")
+
+    # Left apron runner (inner face at X=apron_thick)
     _, pr = af.sketch_rect_model(apron_c, runner_z_pl,
         ("apron_thick", "leg_size", runner_z),
-        {"x": "runner_w", "y": "short_apron_l"}, "LeftRunner_Sk", ev)
-    lr_ext = af.ext_new(apron_c, pr, "runner_h", "LeftRunner")
-    lr_ext.bodies.item(0).name = "Runner_Left"
-    af.mirror_feats(apron_c, [lr_ext], a_xmid, "RightRunnerMir").bodies.item(0).name = "Runner_Right"
+        {"x": "runner_w", "y": "short_apron_l"}, "RunnerLL_Sk", ev)
+    af.ext_new(apron_c, pr, "runner_h", "RunnerLL").bodies.item(0).name = "Runner_LL"
 
-    # Drawer stops — blocks at back of each runner, on top of runner
+    # Left side of divider (X = mid_x - divider_thick/2 - runner_w)
+    _, pr = af.sketch_rect_model(apron_c, runner_z_pl,
+        ("mid_x - divider_thick / 2 - runner_w", "leg_size", runner_z),
+        {"x": "runner_w", "y": "short_apron_l"}, "RunnerLR_Sk", ev)
+    af.ext_new(apron_c, pr, "runner_h", "RunnerLR").bodies.item(0).name = "Runner_LR"
+
+    # Right side of divider (X = mid_x + divider_thick/2)
+    _, pr = af.sketch_rect_model(apron_c, runner_z_pl,
+        ("mid_x + divider_thick / 2", "leg_size", runner_z),
+        {"x": "runner_w", "y": "short_apron_l"}, "RunnerRL_Sk", ev)
+    af.ext_new(apron_c, pr, "runner_h", "RunnerRL").bodies.item(0).name = "Runner_RL"
+
+    # Right apron runner (inner face at X=desk_l-apron_thick-runner_w)
+    _, pr = af.sketch_rect_model(apron_c, runner_z_pl,
+        ("desk_l - apron_thick - runner_w", "leg_size", runner_z),
+        {"x": "runner_w", "y": "short_apron_l"}, "RunnerRR_Sk", ev)
+    af.ext_new(apron_c, pr, "runner_h", "RunnerRR").bodies.item(0).name = "Runner_RR"
+
+    # Drawer stops — 4 blocks at back of each runner
     stop_z = "apron_z + drawer_gap + runner_h"
     stop_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, stop_z, "StopZ_Pl")
-    _, pr = af.sketch_rect_model(apron_c, stop_z_pl,
-        ("apron_thick", "desk_w - leg_size - apron_thick - stop_l", stop_z),
-        {"x": "runner_w", "y": "stop_l"}, "LeftStop_Sk", ev)
-    ls_ext = af.ext_new(apron_c, pr, "drawer_h_inner", "LeftStop")
-    ls_ext.bodies.item(0).name = "Stop_Left"
-    af.mirror_feats(apron_c, [ls_ext], a_xmid, "RightStopMir").bodies.item(0).name = "Stop_Right"
+    for sname, sx in [("Stop_LL", "apron_thick"),
+                       ("Stop_LR", "mid_x - divider_thick / 2 - runner_w"),
+                       ("Stop_RL", "mid_x + divider_thick / 2"),
+                       ("Stop_RR", "desk_l - apron_thick - runner_w")]:
+        _, pr = af.sketch_rect_model(apron_c, stop_z_pl,
+            (sx, "desk_w - leg_size - apron_thick - stop_l", stop_z),
+            {"x": "runner_w", "y": "stop_l"}, f"{sname}_Sk", ev)
+        af.ext_new(apron_c, pr, "drawer_h_inner", sname).bodies.item(0).name = sname
 
-    print(">>> Aprons: 4 + 2 runners + 2 stops")
+    print(">>> Aprons: 4 + divider + 4 runners + 4 stops")
 
     # ==============================================================
     #  3. TOP — with cable grommet
@@ -221,10 +263,11 @@ def run(context):
     print(">>> Top: 1 (with grommet)")
 
     # ==============================================================
-    #  4. DRAWER
+    #  4. DRAWERS — left and right, separated by center divider
     # ==============================================================
-    dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev)
-    print(">>> Drawer: %d bodies" % len(dd_result["all_bodies"]))
+    ddl_result = dovetailed_drawer.build(drawer_l_c, prefix="ddl", ev=ev)
+    ddr_result = dovetailed_drawer.build(drawer_r_c, prefix="ddr", ev=ev)
+    print(f">>> Drawers: {len(ddl_result['all_bodies'])} + {len(ddr_result['all_bodies'])} bodies")
 
     # ==============================================================
     #  5. JOINERY — dominos for all connections
@@ -249,17 +292,19 @@ def run(context):
     bl_p = leg_bl.createForAssemblyContext(leg_occ)
     br_p = leg_br.createForAssemblyContext(leg_occ)
 
-    ba_body = la_body = ra_body = fr_body = None
+    ba_body = la_body = ra_body = fr_body = div_body = None
     for i in range(apron_c.bRepBodies.count):
         b = apron_c.bRepBodies.item(i)
         if b.name == "Apron_Back": ba_body = b
         elif b.name == "Apron_Left": la_body = b
         elif b.name == "Apron_Right": ra_body = b
         elif b.name == "Apron_FrontRail": fr_body = b
+        elif b.name == "Divider": div_body = b
     ba_p = ba_body.createForAssemblyContext(apron_occ)
     la_p = la_body.createForAssemblyContext(apron_occ)
     ra_p = ra_body.createForAssemblyContext(apron_occ)
     fr_p_body = fr_body.createForAssemblyContext(apron_occ)
+    div_p = div_body.createForAssemblyContext(apron_occ)
 
     dm_fl = af.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
     dm_fr = af.off_plane(root, root.yZConstructionPlane, "desk_l - leg_size", "DM_FR")
@@ -291,6 +336,13 @@ def run(context):
     domino.grid(root, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_p_body, fr_p, "DM_FR_R", ev)
 
+    # Divider → front rail and back apron (1 domino each end)
+    dm_div = af.off_plane(root, root.yZConstructionPlane, "mid_x", "DM_Div")
+    domino.grid(root, dm_div, ("mid_x", "apron_thick / 2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", div_p, fr_p_body, "DM_Div_F", ev)
+    domino.grid(root, dm_div, ("mid_x", "desk_w - leg_size - apron_thick / 2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", div_p, ba_p, "DM_Div_B", ev)
+
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
     # Vertical leg against apron inner face, horizontal leg under top
     bracket_occ = af.make_comp(root, "Brackets")
@@ -320,15 +372,17 @@ def run(context):
         step_axis="y", step_expr=str(ev("short_apron_l") / 3),
         count=2, name="TB_R", ev=ev)
 
-    # Front rail: inner face at Y = apron_thick
-    # face_dir=+1: horizontal leg extends toward +Y (into the desk)
+    # Front rail: 2 brackets (one per drawer opening, centered in each)
     front_y = ev("apron_thick")
-    tabletop_bracket.row(bracket_c, face_axis="y", face_dir=1,
-        start=(ev("leg_size") + ev("long_apron_l") / 4, front_y, top_z),
-        step_axis="x", step_expr=str(ev("long_apron_l") / 4),
-        count=3, name="TB_F", ev=ev)
+    drawer_w_cm = ev("drawer_w")
+    left_center = ev("leg_size") + ev("drawer_gap") + drawer_w_cm / 2
+    right_center = ev("mid_x") + ev("divider_thick") / 2 + ev("drawer_gap") + drawer_w_cm / 2
+    tabletop_bracket.single(bracket_c, face_axis="y", face_dir=1,
+        pos=(left_center, front_y, top_z), name="TB_FL", ev=ev)
+    tabletop_bracket.single(bracket_c, face_axis="y", face_dir=1,
+        pos=(right_center, front_y, top_z), name="TB_FR", ev=ev)
 
-    print(">>> Brackets: 10 tabletop L-brackets (3 front + 3 back + 2 left + 2 right)")
+    print(">>> Brackets: 9 tabletop L-brackets (2 front + 3 back + 2 left + 2 right)")
     print(">>> Dominos: 8 apron-leg + 2 front-rail = 10 joints")
 
     # ==============================================================
@@ -353,7 +407,7 @@ def run(context):
     # ==============================================================
     #  EPILOGUE
     # ==============================================================
-    for comp in [leg_c, apron_c, top_c, drawer_c, bracket_c]:
+    for comp in [leg_c, apron_c, top_c, drawer_l_c, drawer_r_c, bracket_c]:
         for sk in comp.sketches:
             sk.isVisible = False
         for cp in comp.constructionPlanes:
@@ -364,8 +418,8 @@ def run(context):
         cp.isLightBulbOn = False
 
     for cn, c in [("Legs", leg_c), ("Aprons", apron_c),
-                   ("Top", top_c), ("Drawer", drawer_c),
-                   ("Brackets", bracket_c)]:
+                   ("Top", top_c), ("DrawerL", drawer_l_c),
+                   ("DrawerR", drawer_r_c), ("Brackets", bracket_c)]:
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cn}: {len(names)} bodies -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
