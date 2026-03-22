@@ -17,7 +17,7 @@ A parametric modern writing desk — 48"L × 24"W × 30"H with tapered legs, two
 
 ---
 
-**Script:** [`desk.py`](desk.py) — 28 structural bodies + 14 domino voids.
+**Script:** [`desk.py`](desk.py) — 27 structural bodies + 18 domino voids.
 
 ### Structure
 - **4 tapered legs** — 2" square at top, taper to 1.25" at floor on inner faces
@@ -36,8 +36,8 @@ A parametric modern writing desk — 48"L × 24"W × 30"H with tapered legs, two
 ### Joinery
 - **Aprons → legs:** 2 dominos per joint (6 apron joints)
 - **Front rail → legs:** 1 domino each side (2 joints)
-- **Divider → front rail + back apron:** dado joints (CUT, no dominos — domino depth would block drawers)
-- **Top → aprons:** 9 L-brackets with slotted holes (wood movement)
+- **Divider → front rail + back apron:** 2 dominos each end (short depth to fit thin divider)
+- **Top → aprons:** 8 L-brackets with slotted holes (wood movement, 2 per side)
 - **Drawers:** dovetails at all 4 corners
 
 ### Appearance

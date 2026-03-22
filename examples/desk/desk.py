@@ -320,11 +320,19 @@ def run(context):
     domino.grid(root, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_p_body, fr_p, "DM_FR_R", ev)
 
-    # Divider → front rail and back apron (dado joint — CUT divider into both)
-    # No dominos here — domino depth would protrude past the thin divider
-    # into the drawer path. CUT creates a perfect-fit dado slot instead.
-    af.combine(root, fr_p_body, [div_p], CUT, True, "Div_FrontRailDado")
-    af.combine(root, ba_p, [div_p], CUT, True, "Div_BackApronDado")
+    # Divider → front rail and back apron (dominos with short depth)
+    # Domino plane at Y interfaces (XZ planes), depth fits in apron thickness.
+    # long_axis="z" keeps the domino narrow (dm_t=8mm) across the divider width (19mm).
+    params.add("div_dm_d", VI("apron_thick / 2"), "in", "")  # short depth for thin joints
+    dm_div_f = af.off_plane(root, root.xZConstructionPlane, "apron_thick", "DM_DivF")
+    dm_div_b = af.off_plane(root, root.xZConstructionPlane,
+                             "desk_w - leg_size - apron_thick", "DM_DivB")
+    domino.grid(root, dm_div_f, ("mid_x", "apron_thick", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "div_dm_d",
+        div_p, fr_p_body, "DM_Div_F", ev)
+    domino.grid(root, dm_div_b, ("mid_x", "desk_w - leg_size - apron_thick", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "div_dm_d",
+        div_p, ba_p, "DM_Div_B", ev)
 
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
     # Vertical leg against apron inner face, horizontal leg under top
@@ -332,14 +340,17 @@ def run(context):
     bracket_c = bracket_occ.component
     tabletop_bracket._define_params(params)
     top_z = ev("leg_h")  # top underside Z
+    drawer_w_cm = ev("drawer_w")
+    left_center = ev("leg_size") + ev("drawer_gap") + drawer_w_cm / 2
+    right_center = ev("mid_x") + ev("divider_thick") / 2 + ev("drawer_gap") + drawer_w_cm / 2
 
-    # Back apron: inner face at Y = desk_w - leg_size - apron_thick
-    # face_dir=-1: horizontal leg extends toward -Y (into the desk)
+    # Back apron: 2 brackets (one per drawer opening, centered in each)
+    # Skip center — divider is there
     back_y = ev("desk_w") - ev("leg_size") - ev("apron_thick")
-    tabletop_bracket.row(bracket_c, face_axis="y", face_dir=-1,
-        start=(ev("leg_size") + ev("long_apron_l") / 4, back_y, top_z),
-        step_axis="x", step_expr=str(ev("long_apron_l") / 4),
-        count=3, name="TB_B", ev=ev)
+    tabletop_bracket.single(bracket_c, face_axis="y", face_dir=-1,
+        pos=(left_center, back_y, top_z), name="TB_BL", ev=ev)
+    tabletop_bracket.single(bracket_c, face_axis="y", face_dir=-1,
+        pos=(right_center, back_y, top_z), name="TB_BR", ev=ev)
 
     # Left apron: inner face at X = apron_thick
     # face_dir=+1: horizontal leg extends toward +X (into the desk)
@@ -357,15 +368,12 @@ def run(context):
 
     # Front rail: 2 brackets (one per drawer opening, centered in each)
     front_y = ev("apron_thick")
-    drawer_w_cm = ev("drawer_w")
-    left_center = ev("leg_size") + ev("drawer_gap") + drawer_w_cm / 2
-    right_center = ev("mid_x") + ev("divider_thick") / 2 + ev("drawer_gap") + drawer_w_cm / 2
     tabletop_bracket.single(bracket_c, face_axis="y", face_dir=1,
         pos=(left_center, front_y, top_z), name="TB_FL", ev=ev)
     tabletop_bracket.single(bracket_c, face_axis="y", face_dir=1,
         pos=(right_center, front_y, top_z), name="TB_FR", ev=ev)
 
-    print(">>> Brackets: 9 tabletop L-brackets (2 front + 3 back + 2 left + 2 right)")
+    print(">>> Brackets: 8 tabletop L-brackets (2 front + 2 back + 2 left + 2 right)")
     print(">>> Dominos: 8 apron-leg + 2 front-rail = 10 joints")
 
     # ==============================================================
