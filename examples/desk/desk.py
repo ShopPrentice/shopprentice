@@ -297,7 +297,7 @@ def run(context):
     bracket_c = bracket_occ.component
     # Define bracket params early so we can use them for positioning
     tabletop_bracket._define_params(params)
-    bracket_z = ev("leg_h") - ev("tb_leg_h") / 2  # center vertically near top
+    bracket_z = ev("leg_h")  # top underside — bracket hangs down from here
 
     # Back apron brackets (3 evenly spaced along X)
     tabletop_bracket.row(bracket_c, ba_body, top_body,
@@ -369,6 +369,23 @@ def run(context):
     print(f"Root: {root.bRepBodies.count} domino voids")
 
     af.apply_appearance("walnut")
+
+    # Re-apply metal appearance to brackets (walnut overwrites them)
+    try:
+        for matlib in app.materialLibraries:
+            for i in range(matlib.appearances.count):
+                a = matlib.appearances.item(i)
+                if "Steel" in a.name and "Satin" in a.name:
+                    local = design.appearances.itemByName(a.name)
+                    if not local:
+                        local = design.appearances.addByCopy(a, a.name)
+                    for bi in range(bracket_c.bRepBodies.count):
+                        bracket_c.bRepBodies.item(bi).appearance = local
+                    raise StopIteration  # break out of nested loops
+    except StopIteration:
+        pass
+    except Exception:
+        pass
 
     vp = app.activeViewport
     vp.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle

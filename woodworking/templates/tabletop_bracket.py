@@ -137,19 +137,19 @@ def single(comp, apron_body, top_body,
         sk.name = f"{name}_Sk"
         m2s = sk.modelToSketchSpace
 
-        # L-profile: start at top-outer corner, go down, across, up, across
+        # L-profile: vertical leg against apron, horizontal leg flush with top underside
+        # pos Z = top underside. Bracket hangs down from there.
         inward = face_dir  # +1 or -1
-        # Top-outer corner of the L
-        y_face = cy  # face position
-        z_top = cz + leg_h / 2
-        z_bot = cz - leg_h / 2
+        y_face = cy  # apron inner face position
+        z_top = cz   # top underside = horizontal leg top surface
+        z_bot = cz - leg_h  # bottom of vertical leg
 
-        # L-profile points (outer boundary)
+        # L-profile points (outer boundary, counterclockwise)
         pts = [
-            (y_face, z_top),                          # top-outer
+            (y_face, z_top),                          # top-outer (apron face, at top underside)
             (y_face, z_bot),                          # bottom-outer
-            (y_face + inward * leg_w, z_bot),         # bottom-inner
-            (y_face + inward * leg_w, z_bot + thick), # step up
+            (y_face + inward * leg_w, z_bot),         # bottom-inner (horizontal leg extends inward)
+            (y_face + inward * leg_w, z_bot + thick), # step up (horizontal leg thickness)
             (y_face + inward * thick, z_bot + thick), # inner corner
             (y_face + inward * thick, z_top),         # top-inner
         ]
@@ -186,8 +186,8 @@ def single(comp, apron_body, top_body,
 
         inward = face_dir
         x_face = cx
-        z_top = cz + leg_h / 2
-        z_bot = cz - leg_h / 2
+        z_top = cz       # top underside
+        z_bot = cz - leg_h
 
         pts = [
             (x_face, z_top),
@@ -226,8 +226,8 @@ def single(comp, apron_body, top_body,
     if cut and apron_body is not None and top_body is not None:
         # Slot on vertical face (allows cross-grain movement)
         # Two slots, evenly spaced on the vertical leg
-        slot_z1 = cz + leg_h / 4
-        slot_z2 = cz - leg_h / 4
+        slot_z1 = cz - leg_h / 4       # upper quarter
+        slot_z2 = cz - 3 * leg_h / 4   # lower quarter
 
         for si, sz in enumerate([slot_z1, slot_z2]):
             slot_sk = comp.sketches.add(comp.xYConstructionPlane
