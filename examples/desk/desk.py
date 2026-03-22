@@ -328,13 +328,11 @@ def run(context):
     dm_div_b = af.off_plane(root, root.xZConstructionPlane,
                              "desk_w - leg_size - apron_thick", "DM_DivB")
     domino.between(root, dm_div_f, div_p, fr_p_body,
-        interface_axis="y", long_axis="x", long_expr="dm_w",
-        short_expr="dm_t", depth_expr="div_dm_d",
-        count=1, name="DM_Div_F", ev=ev)
+        interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
+        long_expr="dm_w", count=1, name="DM_Div_F", ev=ev)
     domino.between(root, dm_div_b, div_p, ba_p,
-        interface_axis="y", long_axis="x", long_expr="dm_w",
-        short_expr="dm_t", depth_expr="div_dm_d",
-        count=2, name="DM_Div_B", ev=ev)
+        interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
+        long_expr="dm_w", count=2, name="DM_Div_B", ev=ev)
 
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
     # Vertical leg against apron inner face, horizontal leg under top

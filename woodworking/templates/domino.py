@@ -207,24 +207,69 @@ def _bodies_overlap_bbox(body_a, body_b):
     return (min_x, min_y, min_z, max_x, max_y, max_z)
 
 
+def _check_domino_containment(void_body, body_a, body_b, name):
+    """Verify a domino void is fully inside the two target bodies.
+
+    Checks bounding box corners and face center points. Any point outside
+    both bodies means the domino is exposed — it protrudes into free space.
+    """
+    P3 = adsk.core.Point3D
+    INSIDE = adsk.fusion.PointContainment.PointInsidePointContainment
+    ON = adsk.fusion.PointContainment.PointOnPointContainment
+
+    def _is_contained(pt):
+        """True if point is inside or on the surface of either body."""
+        try:
+            c_a = body_a.pointContainment(pt)
+            if c_a == INSIDE or c_a == ON:
+                return True
+        except Exception:
+            pass
+        try:
+            c_b = body_b.pointContainment(pt)
+            if c_b == INSIDE or c_b == ON:
+                return True
+        except Exception:
+            pass
+        return False
+
+    # Check face center points (more precise than just corners)
+    exposed = []
+    for i in range(void_body.faces.count):
+        face = void_body.faces.item(i)
+        pt = face.pointOnFace
+        if not _is_contained(pt):
+            exposed.append(f"({pt.x:.2f},{pt.y:.2f},{pt.z:.2f})")
+
+    if exposed:
+        print(f"WARNING: {name} has {len(exposed)} exposed face(s) — "
+              f"domino protrudes outside mating bodies")
+        return False
+    return True
+
+
 def between(comp, plane, body_a, body_b, interface_axis,
-            long_axis, long_expr, short_expr, depth_expr,
+            short_expr, depth_expr,
+            long_expr=None, long_axis=None,
             count=2, name="DM", ev=None, cut=True):
     """Create dominos at the mating area between two bodies.
 
-    Auto-computes where body_a and body_b overlap in the interface plane,
-    then evenly spaces dominos within that overlap region. This avoids
-    placing dominos outside the actual mating area (e.g., a narrow front
-    rail meeting a full-height divider — dominos go in the rail zone only).
+    Auto-computes where body_a and body_b overlap, determines the best
+    domino orientation (long side along the longer mating dimension),
+    and evenly spaces dominos within the overlap region.
 
     Args:
         comp: Component to create features in.
         plane: Construction plane at the mating interface.
         body_a, body_b: The two bodies being joined.
         interface_axis: 'x', 'y', or 'z' — axis perpendicular to the interface.
-            This is the axis the domino depth extends along.
-        long_axis: Model axis for the long dimension of each slot.
-        long_expr, short_expr, depth_expr: Dimension expressions.
+        short_expr: Domino thickness expression (e.g. "dm_t").
+        depth_expr: Domino depth per side expression (e.g. "dm_d").
+        long_expr: Domino width expression (e.g. "dm_w"). If None, uses
+            the shorter mating dimension (auto-sized to fit).
+        long_axis: Override for the long dimension axis. If None, auto-
+            determined from the mating area (long side of the domino
+            aligns with the longer dimension of the mating surface).
         count: Number of dominos (int). Default 2.
         name: Feature name prefix.
         ev: Evaluator function.
@@ -242,55 +287,62 @@ def between(comp, plane, body_a, body_b, interface_axis,
         return []
 
     min_x, min_y, min_z, max_x, max_y, max_z = overlap
-
-    # Determine the step axis (the axis to space dominos along)
-    # It's the axis in the interface plane that ISN'T the long_axis
-    axes = {"x", "y", "z"}
-    axes.discard(interface_axis)
-    axes.discard(long_axis)
-    if axes:
-        step_axis = axes.pop()
-    else:
-        # long_axis == one of the remaining — step along the other
-        step_axis = long_axis  # fallback
-
-    # Compute spacing within the overlap region along step_axis
     axis_map = {"x": (min_x, max_x), "y": (min_y, max_y), "z": (min_z, max_z)}
+
+    # Find the two in-plane axes (excluding interface_axis)
+    in_plane = [a for a in ["x", "y", "z"] if a != interface_axis]
+    dim_0 = axis_map[in_plane[0]][1] - axis_map[in_plane[0]][0]
+    dim_1 = axis_map[in_plane[1]][1] - axis_map[in_plane[1]][0]
+
+    # Auto-determine orientation: long axis = longer mating dimension
+    if long_axis is None:
+        if dim_0 >= dim_1:
+            long_axis = in_plane[0]
+            step_axis = in_plane[1]
+        else:
+            long_axis = in_plane[1]
+            step_axis = in_plane[0]
+    else:
+        step_axis = in_plane[0] if in_plane[0] != long_axis else in_plane[1]
+
+    # If long_expr not given, default to "dm_w"
+    if long_expr is None:
+        long_expr = "dm_w"
+
+    long_min, long_max = axis_map[long_axis]
     step_min, step_max = axis_map[step_axis]
+    long_range = long_max - long_min
     step_range = step_max - step_min
 
-    # Interface center (where the domino is placed along interface_axis)
+    # Interface center
     iface_min, iface_max = axis_map[interface_axis]
     iface_center = (iface_min + iface_max) / 2
 
     # Long axis center
-    long_min, long_max = axis_map[long_axis]
     long_center = (long_min + long_max) / 2
 
-    # Evenly space dominos with margins from edges
+    # Compute spacing along step_axis
     dm_long = ev(long_expr) if isinstance(long_expr, str) else long_expr
-    margin = dm_long / 2 + 0.2  # half a domino width + small clearance
+    margin = dm_long / 2 + 0.2  # half domino + clearance
 
     usable = step_range - 2 * margin
     if usable <= 0 or count < 1:
-        # Not enough room — place one at center
         count = 1
 
     if count == 1:
-        spacing = 0
         first = (step_min + step_max) / 2
+        spacing = 0
     else:
         spacing = usable / (count - 1)
         first = step_min + margin
 
     # Build dominos
+    axis_idx = {"x": 0, "y": 1, "z": 2}
     void_bodies = []
     for i in range(count):
         step_pos = first + i * spacing
 
-        # Assemble the (x, y, z) position
         pos = [0.0, 0.0, 0.0]
-        axis_idx = {"x": 0, "y": 1, "z": 2}
         pos[axis_idx[interface_axis]] = iface_center
         pos[axis_idx[long_axis]] = long_center
         pos[axis_idx[step_axis]] = step_pos
@@ -311,8 +363,15 @@ def between(comp, plane, body_a, body_b, interface_axis,
         if body_b is not None and body_b != body_a:
             af.combine(comp, body_b, void_bodies, CUT, True, f"{name}_CutB")
 
-    print(f">>> {name}: {len(void_bodies)} domino(s) in mating area "
-          f"({step_axis}=[{step_min:.1f},{step_max:.1f}])")
+    # Validate containment — domino must be fully inside both bodies
+    all_ok = True
+    for void in void_bodies:
+        if not _check_domino_containment(void, body_a, body_b, void.name):
+            all_ok = False
+
+    status = "OK" if all_ok else "EXPOSED"
+    print(f">>> {name}: {len(void_bodies)} domino(s), long_axis={long_axis}, "
+          f"mating {step_axis}=[{step_min:.1f},{step_max:.1f}] — {status}")
     return void_bodies
 
 
