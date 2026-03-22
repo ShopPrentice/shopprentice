@@ -393,7 +393,7 @@ def run(context):
         new_t = orig_t.copy()
         new_t.transformBy(slide_t)
         dr_occ.transform = new_t
-        design.snapshots.add()  # force recompute
+        adsk.doEvents()
 
         # Collect all bodies for interference check
         all_bodies = adsk.core.ObjectCollection.create()
@@ -434,6 +434,7 @@ def run(context):
 
         # Restore original position
         dr_occ.transform = orig_t
+        adsk.doEvents()
 
     # ==============================================================
     #  7. DETAILS — edge chamfers

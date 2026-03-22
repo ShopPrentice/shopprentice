@@ -294,9 +294,11 @@ def between(comp, plane, body_a, body_b, interface_axis,
     dim_0 = axis_map[in_plane[0]][1] - axis_map[in_plane[0]][0]
     dim_1 = axis_map[in_plane[1]][1] - axis_map[in_plane[1]][0]
 
-    # Auto-determine orientation: long axis = longer mating dimension
+    # Auto-determine orientation: long axis = SHORTER mating dimension,
+    # step axis = LONGER dimension. This maximizes how many dominos fit
+    # (step along the tall/long direction, domino width spans the narrow one).
     if long_axis is None:
-        if dim_0 >= dim_1:
+        if dim_0 <= dim_1:
             long_axis = in_plane[0]
             step_axis = in_plane[1]
         else:
