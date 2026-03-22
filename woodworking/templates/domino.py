@@ -183,6 +183,139 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
     return void_bodies
 
 
+def _bodies_overlap_bbox(body_a, body_b):
+    """Compute the bounding box overlap of two bodies.
+
+    Returns (min_x, min_y, min_z, max_x, max_y, max_z) of the overlap region,
+    or None if they don't overlap.
+    """
+    bb_a = body_a.boundingBox
+    bb_b = body_b.boundingBox
+
+    min_x = max(bb_a.minPoint.x, bb_b.minPoint.x)
+    min_y = max(bb_a.minPoint.y, bb_b.minPoint.y)
+    min_z = max(bb_a.minPoint.z, bb_b.minPoint.z)
+    max_x = min(bb_a.maxPoint.x, bb_b.maxPoint.x)
+    max_y = min(bb_a.maxPoint.y, bb_b.maxPoint.y)
+    max_z = min(bb_a.maxPoint.z, bb_b.maxPoint.z)
+
+    # Check for valid overlap (with tolerance for touching faces)
+    TOL = 0.01  # 0.1mm
+    if max_x - min_x < -TOL or max_y - min_y < -TOL or max_z - min_z < -TOL:
+        return None
+
+    return (min_x, min_y, min_z, max_x, max_y, max_z)
+
+
+def between(comp, plane, body_a, body_b, interface_axis,
+            long_axis, long_expr, short_expr, depth_expr,
+            count=2, name="DM", ev=None, cut=True):
+    """Create dominos at the mating area between two bodies.
+
+    Auto-computes where body_a and body_b overlap in the interface plane,
+    then evenly spaces dominos within that overlap region. This avoids
+    placing dominos outside the actual mating area (e.g., a narrow front
+    rail meeting a full-height divider — dominos go in the rail zone only).
+
+    Args:
+        comp: Component to create features in.
+        plane: Construction plane at the mating interface.
+        body_a, body_b: The two bodies being joined.
+        interface_axis: 'x', 'y', or 'z' — axis perpendicular to the interface.
+            This is the axis the domino depth extends along.
+        long_axis: Model axis for the long dimension of each slot.
+        long_expr, short_expr, depth_expr: Dimension expressions.
+        count: Number of dominos (int). Default 2.
+        name: Feature name prefix.
+        ev: Evaluator function.
+        cut: If True, CUT into both bodies.
+
+    Returns:
+        List of void bodies.
+    """
+    if ev is None:
+        ev = af._make_ev()
+
+    overlap = _bodies_overlap_bbox(body_a, body_b)
+    if overlap is None:
+        print(f"WARNING: {name} — bodies don't overlap, skipping dominos")
+        return []
+
+    min_x, min_y, min_z, max_x, max_y, max_z = overlap
+
+    # Determine the step axis (the axis to space dominos along)
+    # It's the axis in the interface plane that ISN'T the long_axis
+    axes = {"x", "y", "z"}
+    axes.discard(interface_axis)
+    axes.discard(long_axis)
+    if axes:
+        step_axis = axes.pop()
+    else:
+        # long_axis == one of the remaining — step along the other
+        step_axis = long_axis  # fallback
+
+    # Compute spacing within the overlap region along step_axis
+    axis_map = {"x": (min_x, max_x), "y": (min_y, max_y), "z": (min_z, max_z)}
+    step_min, step_max = axis_map[step_axis]
+    step_range = step_max - step_min
+
+    # Interface center (where the domino is placed along interface_axis)
+    iface_min, iface_max = axis_map[interface_axis]
+    iface_center = (iface_min + iface_max) / 2
+
+    # Long axis center
+    long_min, long_max = axis_map[long_axis]
+    long_center = (long_min + long_max) / 2
+
+    # Evenly space dominos with margins from edges
+    dm_long = ev(long_expr) if isinstance(long_expr, str) else long_expr
+    margin = dm_long / 2 + 0.2  # half a domino width + small clearance
+
+    usable = step_range - 2 * margin
+    if usable <= 0 or count < 1:
+        # Not enough room — place one at center
+        count = 1
+
+    if count == 1:
+        spacing = 0
+        first = (step_min + step_max) / 2
+    else:
+        spacing = usable / (count - 1)
+        first = step_min + margin
+
+    # Build dominos
+    void_bodies = []
+    for i in range(count):
+        step_pos = first + i * spacing
+
+        # Assemble the (x, y, z) position
+        pos = [0.0, 0.0, 0.0]
+        axis_idx = {"x": 0, "y": 1, "z": 2}
+        pos[axis_idx[interface_axis]] = iface_center
+        pos[axis_idx[long_axis]] = long_center
+        pos[axis_idx[step_axis]] = step_pos
+
+        sk, prof = af.sketch_slot_model(
+            comp, plane, (f"{pos[0]} cm", f"{pos[1]} cm", f"{pos[2]} cm"),
+            long_axis, long_expr, short_expr,
+            name=f"{name}_{i}_Sk", ev=ev)
+        ext = af.ext_new_sym(comp, prof, depth_expr, f"{name}_{i}")
+        void = ext.bodies.item(0)
+        void.name = f"{name}_{i}"
+        void_bodies.append(void)
+        sk.isVisible = False
+
+    # Bulk CUT into both bodies
+    if cut and void_bodies:
+        af.combine(comp, body_a, void_bodies, CUT, True, f"{name}_CutA")
+        if body_b is not None and body_b != body_a:
+            af.combine(comp, body_b, void_bodies, CUT, True, f"{name}_CutB")
+
+    print(f">>> {name}: {len(void_bodies)} domino(s) in mating area "
+          f"({step_axis}=[{step_min:.1f},{step_max:.1f}])")
+    return void_bodies
+
+
 def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
                  depth_expr, top_body, leg_bodies, x_mid, y_mid,
                  name="DM", ev=None):

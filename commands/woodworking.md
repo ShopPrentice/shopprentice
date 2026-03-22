@@ -946,15 +946,12 @@ After generating each component's code, run this loop:
 
 1. **Execute** — call `execute_script` to run the full script in Fusion 360. The script rebuilds from scratch each time (document reuse pattern).
 2. **On error** — the `content` field contains the full Python stack trace. Analyze, fix only the current component's code, and re-execute (see Error Retry Rules below).
-3. **On success — validate with `capture_design`:**
-   - Call `capture_design` to get the actual model state.
-   - Verify body count and names for the component just built. Earlier components should still be correct (unchanged code).
-   - Check bounding boxes and volumes for the new bodies.
-   - Report a brief summary: `"Shelves OK: 5 bodies [shelf_0..shelf_4], positions correct. Total: 12 bodies."`
+3. **On success — validate with `capture_design` + `validate_design`:**
+   - Call `capture_design` to verify body count, names, bounding boxes.
+   - **ALWAYS call `validate_design`** — checks connectivity (1 cluster) and interference (0 overlaps). This is mandatory after every successful execution, not just the final cycle. Skipping it risks undetected body collisions (e.g., a divider overlapping a rail).
+   - Report: `"12 bodies, validate_design PASSED."`
 4. **If validation fails** — use `get_timeline_state` to bisect the timeline and pinpoint the problem feature (see Diagnosing with Timeline Rollback below). Fix and re-execute.
 5. **Auto-proceed** to the next component if validation passes.
-6. **After the final cycle — structural validation:**
-   - Call `validate_design` — single call that runs connectivity + interference checks. Must return `passed: true`. If it fails, the response tells you which check failed and why.
 7. **Appearance + product shots at the end** — after structural validation passes, call `apply_appearance` then `get_product_shots`. Product shots auto-hide construction artifacts, frame the model properly, and capture multiple views in one call. See `woodworking/appearance.md` for species and grain details.
 
 ### Diagnosing with Timeline Rollback

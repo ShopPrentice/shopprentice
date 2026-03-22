@@ -320,19 +320,21 @@ def run(context):
     domino.grid(root, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_p_body, fr_p, "DM_FR_R", ev)
 
-    # Divider → front rail and back apron (dominos with short depth)
-    # Domino plane at Y interfaces (XZ planes), depth fits in apron thickness.
-    # long_axis="z" keeps the domino narrow (dm_t=8mm) across the divider width (19mm).
-    params.add("div_dm_d", VI("apron_thick / 2"), "in", "")  # short depth for thin joints
+    # Divider → front rail and back apron (auto-placed in mating area)
+    # domino.between() finds where the bodies overlap and places dominos there.
+    # Short depth so dominos fit within the thin apron/divider.
+    params.add("div_dm_d", VI("apron_thick / 2"), "in", "")
     dm_div_f = af.off_plane(root, root.xZConstructionPlane, "apron_thick", "DM_DivF")
     dm_div_b = af.off_plane(root, root.xZConstructionPlane,
                              "desk_w - leg_size - apron_thick", "DM_DivB")
-    domino.grid(root, dm_div_f, ("mid_x", "apron_thick", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "div_dm_d",
-        div_p, fr_p_body, "DM_Div_F", ev)
-    domino.grid(root, dm_div_b, ("mid_x", "desk_w - leg_size - apron_thick", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "div_dm_d",
-        div_p, ba_p, "DM_Div_B", ev)
+    domino.between(root, dm_div_f, div_p, fr_p_body,
+        interface_axis="y", long_axis="x", long_expr="dm_w",
+        short_expr="dm_t", depth_expr="div_dm_d",
+        count=1, name="DM_Div_F", ev=ev)
+    domino.between(root, dm_div_b, div_p, ba_p,
+        interface_axis="y", long_axis="x", long_expr="dm_w",
+        short_expr="dm_t", depth_expr="div_dm_d",
+        count=2, name="DM_Div_B", ev=ev)
 
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
     # Vertical leg against apron inner face, horizontal leg under top
