@@ -292,39 +292,33 @@ def run(context):
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_p_body, fr_p, "DM_FR_R", ev)
 
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
-    # Brackets sit on apron inner face, horizontal leg screws into top underside
+    # Vertical leg against apron inner face, horizontal leg under top
     bracket_occ = af.make_comp(root, "Brackets")
     bracket_c = bracket_occ.component
-    # Define bracket params early so we can use them for positioning
     tabletop_bracket._define_params(params)
-    bracket_z = ev("leg_h")  # top underside — bracket hangs down from here
+    top_z = ev("leg_h")  # top underside Z
 
-    # Back apron brackets (3 evenly spaced along X)
-    tabletop_bracket.row(bracket_c, ba_body, top_body,
-        face_axis="y", face_dir=-1,
-        start=(ev("leg_size") + ev("long_apron_l") / 4,
-               ev("desk_w") - ev("leg_size") - ev("apron_thick"),
-               bracket_z),
-        step_axis="x", step_expr=str(ev("long_apron_l") / 2),
-        count=3, name="TB_B", ev=ev, cut=False)
+    # Back apron: inner face at Y = desk_w - leg_size - apron_thick
+    # face_dir=-1: horizontal leg extends toward -Y (into the desk)
+    back_y = ev("desk_w") - ev("leg_size") - ev("apron_thick")
+    tabletop_bracket.row(bracket_c, face_axis="y", face_dir=-1,
+        start=(ev("leg_size") + ev("long_apron_l") / 4, back_y, top_z),
+        step_axis="x", step_expr=str(ev("long_apron_l") / 4),
+        count=3, name="TB_B", ev=ev)
 
-    # Left apron brackets (2 evenly spaced along Y)
-    tabletop_bracket.row(bracket_c, la_body, top_body,
-        face_axis="x", face_dir=1,
-        start=(ev("apron_thick"),
-               ev("leg_size") + ev("short_apron_l") / 3,
-               bracket_z),
+    # Left apron: inner face at X = apron_thick
+    # face_dir=+1: horizontal leg extends toward +X (into the desk)
+    tabletop_bracket.row(bracket_c, face_axis="x", face_dir=1,
+        start=(ev("apron_thick"), ev("leg_size") + ev("short_apron_l") / 3, top_z),
         step_axis="y", step_expr=str(ev("short_apron_l") / 3),
-        count=2, name="TB_L", ev=ev, cut=False)
+        count=2, name="TB_L", ev=ev)
 
-    # Right apron brackets (2 evenly spaced along Y)
-    tabletop_bracket.row(bracket_c, ra_body, top_body,
-        face_axis="x", face_dir=-1,
-        start=(ev("desk_l") - ev("apron_thick"),
-               ev("leg_size") + ev("short_apron_l") / 3,
-               bracket_z),
+    # Right apron: inner face at X = desk_l - apron_thick
+    # face_dir=-1: horizontal leg extends toward -X (into the desk)
+    tabletop_bracket.row(bracket_c, face_axis="x", face_dir=-1,
+        start=(ev("desk_l") - ev("apron_thick"), ev("leg_size") + ev("short_apron_l") / 3, top_z),
         step_axis="y", step_expr=str(ev("short_apron_l") / 3),
-        count=2, name="TB_R", ev=ev, cut=False)
+        count=2, name="TB_R", ev=ev)
 
     print(">>> Brackets: 7 tabletop L-brackets (3 back + 2 left + 2 right)")
     print(">>> Dominos: 8 apron-leg + 2 front-rail = 10 joints")
@@ -370,22 +364,9 @@ def run(context):
 
     af.apply_appearance("walnut")
 
-    # Re-apply metal appearance to brackets (walnut overwrites them)
-    try:
-        for matlib in app.materialLibraries:
-            for i in range(matlib.appearances.count):
-                a = matlib.appearances.item(i)
-                if "Steel" in a.name and "Satin" in a.name:
-                    local = design.appearances.itemByName(a.name)
-                    if not local:
-                        local = design.appearances.addByCopy(a, a.name)
-                    for bi in range(bracket_c.bRepBodies.count):
-                        bracket_c.bRepBodies.item(bi).appearance = local
-                    raise StopIteration  # break out of nested loops
-    except StopIteration:
-        pass
-    except Exception:
-        pass
+    # Re-apply steel to brackets (walnut overwrites them)
+    tabletop_bracket._apply_steel(bracket_c,
+        [bracket_c.bRepBodies.item(i) for i in range(bracket_c.bRepBodies.count)])
 
     vp = app.activeViewport
     vp.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
