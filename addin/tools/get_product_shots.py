@@ -123,7 +123,7 @@ def _capture_one(viewport, width, height):
 
 
 def handler(views: list = None, width: int = 2048, height: int = 2048,
-            bodies: list = None, fill: float = 0.60,
+            bodies: list = None, fill: float = 0.80,
             style: str = "shaded") -> dict:
     """Capture product-quality screenshots with artifact cleanup."""
 
@@ -283,9 +283,9 @@ tool = Tool.create_simple(
 ).add_input_property(
     "fill",
     {
-        "description": "Fraction of frame to fill (0.0-1.0). Default 0.60 for product shots (generous whitespace). Use 0.85+ for detail shots.",
+        "description": "Fraction of frame to fill (0.0-1.0). Default 0.80. Use 0.90+ for detail shots, 0.60 for extra whitespace.",
         "type": "number",
-        "default": 0.60
+        "default": 0.80
     }
 ).add_input_property(
     "style",
