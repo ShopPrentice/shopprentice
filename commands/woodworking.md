@@ -56,6 +56,8 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 | **MCP Advanced** | Modifying existing designs, fixing dimensions, adding features to built models, delete-and-rebuild timeline sections | Tested (bar side table) | `woodworking/mcp-advanced.md` |
 | **Appearance** | Applying wood species, grain direction, multi-species designs — read before calling `apply_appearance` | Tested (blanket box) | `woodworking/appearance.md` |
 | **Hardware Installation** | Importing STEP hardware (bed rail fasteners, hinges), positioning, caching, direction detection, component organization | Tested (queen + twin beds) | `woodworking/hardware-installation.md` |
+| **Joinery Rules** | Combine-based joinery, tooling bodies, edge rabbets, cross-component CUT patterns | Tested | `woodworking/joinery.md` |
+| **Screenshots** | Camera positioning, standard shots, transparent views, detail framing | Tested | `woodworking/screenshots.md` |
 
 ### Joinery Reference Files
 
@@ -76,6 +78,8 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | **Spline Joint** | Reinforced miters, decorative accents across a joint line | Draft | `joinery/spline-joint.md` |
 | **Dowel Joint** | Edge joining, panel glue-ups, face frames — round-peg alignment | Draft | `joinery/dowel-joint.md` |
 | **Pocket Hole** | Face frames, quick assemblies, tabletop attachment — screw-based | Draft | `joinery/pocket-hole.md` |
+| **Bed Rail Fastener** | Bed rail to post — detachable STEP hardware (mortise bedlock, hooks + slots) | Tested (queen + twin beds) | `helpers/templates/bed_rail_fastener.py` + `woodworking/hardware-installation.md` |
+| **Bowtie / Butterfly Key** | Live edge slab crack stabilization, decorative inlay | Tested (twin bed) | `helpers/templates/bowtie.py` |
 
 **Read the topic/joinery file BEFORE writing code** that uses those techniques. The core skill provides the routing — the reference files provide the implementation details. For Draft files, treat instructions as a starting point and validate aggressively.
 
@@ -119,6 +123,7 @@ Before planning, identify the **furniture type** and **design style** from the u
 | Craftsman | exposed tenons, corbels, quartersawn oak, thick stock, Arts & Crafts | `woodworking/styles/craftsman.md` |
 | Mid-century | tapered legs, floating tops, thin profiles, hidden joinery, Danish, Scandinavian | `woodworking/styles/mid-century.md` |
 | Rustic | thick boards, farmhouse, reclaimed, visible fasteners, breadboard ends | `woodworking/styles/rustic.md` |
+| Nakashima | live edge, natural edge, slab, organic, bowties, butterfly keys, walnut slab, free-form | `woodworking/styles/nakashima.md` |
 
 **If no style is specified or identifiable, default to Modern.**
 
