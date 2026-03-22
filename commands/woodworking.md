@@ -752,6 +752,7 @@ Name every feature and body for a readable timeline and easy debugging:
 5. Section Analysis > verify joinery alignment
 6. Verify no overlapping joints at corners
 7. Body count matches expected (diagnostic print confirms no accidental merges or orphans)
+8. **`validate_design` → passed.** Single call checks connectivity (1 cluster) + interference (0 real overlaps). Fix disconnected clusters by adding mechanical joinery; fix interferences by checking CUT operations.
 
 ## Common Errors and Fixes
 | Error | Cause | Fix |
@@ -781,6 +782,7 @@ Name every feature and body for a readable timeline and easy debugging:
 | Symmetric extrude body 2× too thick | Passed full thickness to `ext_new_sym` — it applies `dist` to EACH side | Pass half-thickness: `ext_new_sym(comp, prof, "board_t / 2", ...)` |
 | `sketch_rect_model` places body on wrong side of origin | Position dimensions use absolute distance — negative coordinates reflect to positive | Use manual sketch with `modelToSketchSpace` + width/height dimensions only (no position dimensions) |
 | Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `woodworking/joinery/mortise-tenon.md`) |
+| Orphan body in model from rewritten code | Rewrote a feature but only partially removed the old code (e.g., deleted old sketch but left its extrude) | Replace the entire old block when rewriting — don't patch around it. Partial cleanup like `deleteMe()` calls leaves orphan geometry. Old code is recoverable from git. |
 | Domino has square corners (rectangular cross-section) | Used `sketch_rect` instead of `sketch_slot` for domino void body | **Always use `sketch_slot`** — real Festool dominos have stadium (rounded-end) cross-sections. See `woodworking/joinery/domino-joint.md` for the full implementation. |
 
 ## Incremental Build Strategy
@@ -839,6 +841,7 @@ Details: fillets → bounded context → done
 7. **Cross-component operations are a separate cycle.** After all components are built, one final cycle adds root-level CUTs via assembly proxies.
 8. **Details are the last cycle.** Fillets and chamfers require all geometry to exist first.
 9. **Show final result.** After the last cycle, apply wood appearance via `apply_appearance`, then screenshot and present to the user.
+10. **Replace, don't patch.** When an approach doesn't work and you rewrite it, **replace the old code block entirely** — don't add new code below while partially cleaning up the old (e.g., calling `deleteMe()` on an old sketch but leaving its extrude). Partial cleanup creates orphan bodies invisible in code review but visible in the model. The old code is always recoverable from git or undo, so replacing is safe.
 
 ### What Goes Where
 
@@ -880,7 +883,7 @@ Use `execute_script` with `clean=True` for a fresh slate — it deletes all time
 
 ### Script Epilogue
 
-Every script should end with four standard steps:
+Every script should end with five standard steps:
 
 ```python
 # 1. Hide construction elements (clean viewport)
@@ -891,13 +894,15 @@ for cp in root.constructionPlanes:
 for ca in root.constructionAxes:
     ca.isLightBulbOn = False
 
-# 2. Diagnostic body count (appears in MCP execution result)
-names = [root.bRepBodies.item(i).name
-         for i in range(root.bRepBodies.count)]
-print(f"Root: {len(names)} bodies -> {names}")
+# 2. Diagnostic body count per component
+for comp_name, comp in [("Posts", post_c), ("Rails", rail_c), ...]:
+    names = [comp.bRepBodies.item(i).name for i in range(comp.bRepBodies.count)]
+    print(f"{comp_name}: {len(names)} bodies")
+names = [root.bRepBodies.item(i).name for i in range(root.bRepBodies.count)]
+print(f"Root: {len(names)} joinery voids")
 
 # 3. Apply wood appearance (grain-aligned texture on all bodies)
-af.apply_appearance("white oak")  # use species from user request, default white oak
+af.apply_appearance("white oak")
 
 # 4. Fit view (ensures screenshot captures complete model)
 cam = app.activeViewport.camera
@@ -905,7 +910,7 @@ cam.isFitView = True
 app.activeViewport.camera = cam
 ```
 
-**Step 3 is required** — scripts without `af.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for supported species and grain details.
+**Step 4 is required** — scripts without `af.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for supported species and grain details.
 
 ## MCP Live Execution
 
@@ -922,7 +927,9 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 | `get_selection` | Read the user's current UI selection. Returns structured info per entity type (body, face, edge, occurrence) AND full feature details when a feature is selected (Sketch with curves/dimensions/constraints, Extrude with operation/distance/sketch, Combine with target/tool bodies, Mirror, Pattern, Move, Chamfer, Fillet). Use when the user says "what is this?" or "make this thicker". |
 | `set_selection` | Highlight entities in the UI by name or token. Use after `capture_design` identifies a problem body — select it so the user sees which one. |
 | `modify_parameters` | Change parameter expressions with incremental recompute. Much faster than re-running the script. Use for iterative tuning ("make shelves deeper"). |
-| `check_interference` | Detect body collisions. Use to validate joinery — confirm tenons fit, no unintended overlaps. Clean designs have zero interferences. |
+| `validate_design` | **Single-call structural validation.** Runs connectivity (1 cluster?) + interference (0 real overlaps?) and returns pass/fail. Call this after the final build cycle — replaces separate `check_connectivity` + `check_interference` calls. |
+| `check_interference` | Detect body collisions. Diagnostic — use standalone when investigating a specific interference. Normally called via `validate_design`. |
+| `check_connectivity` | Verify all structural bodies form 1 connected cluster. Diagnostic — use standalone when investigating disconnected parts. Normally called via `validate_design`. |
 | `suppress_features` | Toggle timeline features on/off. Diagnostic tool — suppress a suspicious feature, check if it fixes the problem, unsuppress to restore. |
 | `get_changes` | Snapshot & diff. First call captures a baseline; subsequent calls return what changed — parameter expression changes, sketch dimension changes, body additions/removals, feature count delta. Use between iterations or when the user says "I changed something". |
 | `sync_script` | Auto-sync UI changes back to a script. Pass the original script source (or omit to use the tracked script from the last execute_script run) — auto-patches user parameter expression changes, reports feature-level param edits, feature additions, and feature removals with script context for the agent to apply. |
@@ -942,7 +949,9 @@ After generating each component's code, run this loop:
    - Report a brief summary: `"Shelves OK: 5 bodies [shelf_0..shelf_4], positions correct. Total: 12 bodies."`
 4. **If validation fails** — use `get_timeline_state` to bisect the timeline and pinpoint the problem feature (see Diagnosing with Timeline Rollback below). Fix and re-execute.
 5. **Auto-proceed** to the next component if validation passes.
-6. **Appearance + screenshot at the end** — after the final cycle succeeds and validates, call `apply_appearance` then `get_screenshot`. See `woodworking/appearance.md` for species and grain details.
+6. **After the final cycle — structural validation:**
+   - Call `validate_design` — single call that runs connectivity + interference checks. Must return `passed: true`. If it fails, the response tells you which check failed and why.
+7. **Appearance + screenshot at the end** — after structural validation passes, call `apply_appearance` then `get_screenshot`. See `woodworking/appearance.md` for species and grain details.
 
 ### Diagnosing with Timeline Rollback
 

@@ -12,6 +12,8 @@ from . import get_selection
 from . import set_selection
 from . import modify_parameters
 from . import check_interference
+from . import check_connectivity
+from . import validate_design
 from . import suppress_features
 from . import get_changes
 from . import sync_script

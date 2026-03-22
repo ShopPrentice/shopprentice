@@ -17,7 +17,9 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 | `get_selection` | Read what the user has selected in the Fusion 360 UI |
 | `set_selection` | Highlight entities for the user (after identifying a problem body, etc.) |
 | `modify_parameters` | Change parameter values without re-running the script — for iterative tuning |
-| `check_interference` | Detect body collisions — validate joinery fits correctly |
+| `validate_design` | Single-call structural validation: connectivity (1 cluster) + interference (0 overlaps) → pass/fail |
+| `check_interference` | Diagnostic: detect body collisions (normally called via `validate_design`) |
+| `check_connectivity` | Diagnostic: detect disconnected parts (normally called via `validate_design`) |
 | `suppress_features` | Toggle timeline features on/off for "what if" diagnostics |
 | `get_changes` | Detect what changed since last call — snapshot & diff parameters, dimensions, bodies |
 | `sync_script` | After UI tweaks — auto-patch parameter changes in script, report feature adds/removes/edits for agent |
@@ -30,7 +32,7 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 2. Plan the build (components, features, joinery)
 3. Execute Phase 1 (structure) → validate with `capture_design`
 4. Execute Phase 2 (joinery) → validate with `capture_design`
-5. Execute Phase 3 (details) → validate → `apply_appearance` → screenshot → present to user
+5. Execute Phase 3 (details) → validate → `validate_design` → `apply_appearance` → screenshot → present to user
 
 ### Key Principles
 

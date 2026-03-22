@@ -45,7 +45,8 @@ def run(context):
         ("support_thick", "0.75 in",  "in"),
         ("slat_w",        "2.5 in",   "in"),
         ("n_slats",       "8",        ""),
-        # (ledger strips removed — support rails connect directly to posts)
+        ("sup_rail_w",    "1.5 in",   "in"),
+        ("sup_rail_h",    "1.5 in",   "in"),
         # Dominos (6mm for rails)
         ("dm_t",          "6 mm",     "in"),
         ("dm_w",          "20 mm",    "in"),
@@ -69,9 +70,12 @@ def run(context):
         ("n_long_sp",     "floor(interior_l / spindle_sp)",             ""),
         ("short_sp_act",  "interior_w / (n_short_sp + 1)",             "in"),
         ("long_sp_act",   "interior_l / (n_long_sp + 1)",              "in"),
-        # Slat support
-        ("slat_l",        "interior_w",                                 "in"),
+        # Support rail positioning — centered on post inner X face for mortise overlap
+        ("sup_rail_inset","post_size - sup_rail_w / 2",                "in"),
+        # Slat support — slats span between support rail inner faces, flush at top
+        ("slat_l",        "outer_w - 2 * sup_rail_inset - 2 * sup_rail_w", "in"),
         ("slat_sp",       "(interior_l - slat_w) / (n_slats - 1)",    "in"),
+        ("slat_z",        "mattress_h - 2 * support_thick",            "in"),
         # Rail domino Z positions (2 per rail end, evenly in rail height)
         ("dm_z1",         "rail_w / 3",                                "in"),
         ("dm_sp",         "rail_w / 3",                                "in"),
@@ -160,32 +164,9 @@ def run(context):
     # ================================================================
     #  3. SPINDLES — cylindrical, between top and bottom rails
     # ================================================================
-    # Front spindle template (short side)
-    fs_pl = af.off_plane(spindle_c, spindle_c.xZConstructionPlane,
-                          "post_size / 2", "FS_Pl")
     P3 = adsk.core.Point3D
-    sk_fs = spindle_c.sketches.add(fs_pl)
-    sk_fs.name = "FSpindle_Sk"
-    m2s = sk_fs.modelToSketchSpace
-    first_x = ev("post_size") + ev("short_sp_act")
-    sp_center = m2s(P3.create(first_x, ev("post_size") / 2, ev("rail_w") + ev("spindle_h") / 2))
-    sk_fs.sketchCurves.sketchCircles.addByCenterRadius(
-        P3.create(sp_center.x, sp_center.y, 0), ev("spindle_dia") / 2)
-    fs_prof = sk_fs.profiles.item(0)
-    fs_ext = af.ext_new_sym(spindle_c, fs_prof, "rail_thick", "FSpindle_1")
-    fs_body = fs_ext.bodies.item(0); fs_body.name = "Spindle_F1"
 
-    # Extend spindle into both rails (top and bottom) with stub tenons
-    # The spindle height spans from rail_w to rail_h - rail_w
-    # Actual spindle extrude should cover the full height including into rails
-    # Let me re-do: extrude spindle from Z=0 to Z=rail_h (full height)
-    # Then it naturally overlaps with both rails for dowel connections
-
-    # Actually, for cylindrical spindles, sketch circle on XY plane, extrude in Z
-    # Let me use a simpler approach
-    spindle_c.sketches.item(0).deleteMe()  # remove the previous sketch
-
-    # Front spindle: circle on XY offset at spindle_z, extrude by spindle_h
+    # Front spindle: circle on XY offset at spindle_z, extrude vertically by spindle_h
     # Spindle inserts spindle_tenon deep into each rail (blind, not through)
     sp_z_pl = af.off_plane(spindle_c, spindle_c.xYConstructionPlane, "spindle_z", "SpZ_Pl")
     sk_fs2 = spindle_c.sketches.add(sp_z_pl)
@@ -237,20 +218,18 @@ def run(context):
     print(f">>> Spindles: {spindle_c.bRepBodies.count}")
 
     # ================================================================
-    #  4. MATTRESS SUPPORT — 2 support rails + slats attached to them
+    #  4. MATTRESS SUPPORT — 2 support rails + slats
     # ================================================================
-    # 2 support rails run lengthwise (Y), connected to front + back posts
-    # Slats span widthwise (X) between the support rails
-    params.add("sup_rail_w", VI("1.5 in"), "in", "")
-    params.add("sup_rail_h", VI("1.5 in"), "in", "")
-    params.add("sup_rail_inset", VI("post_size + 2 in"), "in", "")  # inset from posts
+    # Support rails run lengthwise (Y), centered on post inner X face.
+    # Each end extends into the post (blind mortise — CUT rail into post).
+    # Slats span widthwise (X) between the two support rails, tops flush.
 
-    # Left support rail
+    # Left support rail — Y extends into both front and back posts
     sup_lpl = af.off_plane(support_c, support_c.yZConstructionPlane,
                             "sup_rail_inset", "SupL_Pl")
     _, pr = af.sketch_rect_model(support_c, sup_lpl,
-        ("sup_rail_inset", "post_size", "mattress_h - support_thick - sup_rail_h"),
-        {"y": "interior_l", "z": "sup_rail_h"}, "SupRailL_Sk", ev)
+        ("sup_rail_inset", "post_size / 2", "mattress_h - support_thick - sup_rail_h"),
+        {"y": "outer_l - post_size", "z": "sup_rail_h"}, "SupRailL_Sk", ev)
     srl_ext = af.ext_new(support_c, pr, "sup_rail_w", "SupRailLeft")
     sup_rail_l = srl_ext.bodies.item(0); sup_rail_l.name = "SupRail_Left"
 
@@ -258,12 +237,12 @@ def run(context):
     sup_xmid = af.off_plane(support_c, support_c.yZConstructionPlane, "mid_x", "SupXMid")
     af.mirror_feats(support_c, [srl_ext], sup_xmid, "SupRailRMir").bodies.item(0).name = "SupRail_Right"
 
-    # Slats span between support rails, resting on top
+    # Slats span between support rail inner faces, tops flush with rail tops
     slat_z_pl = af.off_plane(support_c, support_c.xYConstructionPlane,
-                              "mattress_h - support_thick", "SlatZ_Pl")
+                              "slat_z", "SlatZ_Pl")
     _, pr = af.sketch_rect_model(support_c, slat_z_pl,
-        ("sup_rail_inset", "post_size", "mattress_h - support_thick"),
-        {"x": "outer_w - 2 * sup_rail_inset", "y": "slat_w"}, "Slat_Sk", ev)
+        ("sup_rail_inset + sup_rail_w", "post_size", "slat_z"),
+        {"x": "slat_l", "y": "slat_w"}, "Slat_Sk", ev)
     slat_ext = af.ext_new(support_c, pr, "support_thick", "Slat_1")
     slat_body = slat_ext.bodies.item(0); slat_body.name = "Slat_1"
 
@@ -271,7 +250,7 @@ def run(context):
         af.body_pattern(support_c, slat_body, support_c.yConstructionAxis,
                          "n_slats", "slat_sp", "SlatPat")
 
-    # CUT slats into support rails (mortise connection)
+    # Assembly proxies for cross-component operations
     srl_p = sup_rail_l.createForAssemblyContext(support_occ)
     srr_body = None
     for i in range(support_c.bRepBodies.count):
@@ -280,20 +259,7 @@ def run(context):
             break
     srr_p = srr_body.createForAssemblyContext(support_occ) if srr_body else None
 
-    slat_bodies_proxies = []
-    for i in range(support_c.bRepBodies.count):
-        b = support_c.bRepBodies.item(i)
-        if b.name.startswith("Slat_"):
-            slat_bodies_proxies.append(b.createForAssemblyContext(support_occ))
-
-    if slat_bodies_proxies:
-        af.combine(root, srl_p, slat_bodies_proxies, CUT, True, "SlatCut_SupL")
-        if srr_p:
-            af.combine(root, srr_p, slat_bodies_proxies, CUT, True, "SlatCut_SupR")
-
-    # Support rail dominos are in the cross-component section below (needs dm_yf/dm_yb planes)
-
-    print(f">>> Support: 2 rails + {int(ev('n_slats'))} slats (attached)")
+    print(f">>> Support: 2 rails + {int(ev('n_slats'))} slats")
 
     # ================================================================
     #  5. CROSS-COMPONENT: Dominos (rails→posts) + Dowels (spindles→rails)
@@ -458,28 +424,58 @@ def run(context):
 
     print(">>> Spindle mortises: 8 bulk CUTs into rails")
 
-    # --- Support rails → front/back bottom rails (dominos, 1 per end, 4 total) ---
-    # Connect to bottom rails (not posts) — bottom rails span the full interior width
-    # so the domino at the support rail's X position overlaps both bodies
-    params.add("sup_dm_z", VI("mattress_h - support_thick - sup_rail_h / 2"), "in", "")
-    domino.grid(root, dm_yf,
-        ("sup_rail_inset + sup_rail_w / 2", "post_size", "sup_dm_z"),
-        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        srl_p, fbr_p, "DM_SRL_F", ev)
-    domino.grid(root, dm_yb,
-        ("sup_rail_inset + sup_rail_w / 2", "outer_l - post_size", "sup_dm_z"),
-        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        srl_p, bbr_p, "DM_SRL_B", ev)
+    # --- Support rails → posts (blind mortise — CUT rail ends into posts) ---
+    # Support rail ends extend into the posts. CUT creates mortise pockets.
+    post_fl_p = post_fl.createForAssemblyContext(post_occ)
+    post_fr_p = post_fr.createForAssemblyContext(post_occ)
+    post_bl_p = post_bl.createForAssemblyContext(post_occ)
+    post_br_p = post_br.createForAssemblyContext(post_occ)
+
+    af.combine(root, post_fl_p, [srl_p], CUT, True, "SupRailMort_FL")
+    af.combine(root, post_bl_p, [srl_p], CUT, True, "SupRailMort_BL")
     if srr_p:
-        domino.grid(root, dm_yf,
-            ("outer_w - sup_rail_inset - sup_rail_w / 2", "post_size", "sup_dm_z"),
-            "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-            srr_p, fbr_p, "DM_SRR_F", ev)
-        domino.grid(root, dm_yb,
-            ("outer_w - sup_rail_inset - sup_rail_w / 2", "outer_l - post_size", "sup_dm_z"),
-            "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-            srr_p, bbr_p, "DM_SRR_B", ev)
-    print(">>> Support rail dominos: 4 joints (into front/back bottom rails)")
+        af.combine(root, post_fr_p, [srr_p], CUT, True, "SupRailMort_FR")
+        af.combine(root, post_br_p, [srr_p], CUT, True, "SupRailMort_BR")
+    print(">>> Support rail mortises: CUT into 4 posts")
+
+    # --- Slats → support rails (dominos at each slat end) ---
+    # Interface planes at support rail inner faces
+    dm_slat_xl = af.off_plane(root, root.yZConstructionPlane,
+                               "sup_rail_inset + sup_rail_w", "DM_SlatXL")
+    dm_slat_xr = af.off_plane(root, root.yZConstructionPlane,
+                               "outer_w - sup_rail_inset - sup_rail_w", "DM_SlatXR")
+    # Domino center Z = middle of slat thickness
+    params.add("slat_dm_z", VI("slat_z + support_thick / 2"), "in", "")
+    # First slat Y center
+    params.add("slat_dm_y0", VI("post_size + slat_w / 2"), "in", "")
+
+    # Create domino voids without CUT (we'll CUT manually)
+    left_voids = domino.grid(root, dm_slat_xl,
+        ("sup_rail_inset + sup_rail_w", "slat_dm_y0", "slat_dm_z"),
+        "y", "slat_sp", "n_slats", "y", "dm_w", "dm_t", "dm_d",
+        body_a=None, body_b=None, name="DM_SlatL", ev=ev, cut=False)
+    right_voids = domino.grid(root, dm_slat_xr,
+        ("outer_w - sup_rail_inset - sup_rail_w", "slat_dm_y0", "slat_dm_z"),
+        "y", "slat_sp", "n_slats", "y", "dm_w", "dm_t", "dm_d",
+        body_a=None, body_b=None, name="DM_SlatR", ev=ev, cut=False)
+
+    # Bulk CUT all domino voids into support rails (all overlap the long rail)
+    af.combine(root, srl_p, left_voids, CUT, True, "DM_SlatL_CutRail")
+    if srr_p:
+        af.combine(root, srr_p, right_voids, CUT, True, "DM_SlatR_CutRail")
+
+    # Collect slat proxies and bulk CUT all voids into each slat
+    # (only the domino at each slat's Y position actually intersects)
+    slat_bodies_proxies = []
+    for i in range(support_c.bRepBodies.count):
+        b = support_c.bRepBodies.item(i)
+        if b.name.startswith("Slat_"):
+            slat_bodies_proxies.append(b.createForAssemblyContext(support_occ))
+
+    all_voids = left_voids + right_voids
+    for sp in slat_bodies_proxies:
+        af.combine(root, sp, all_voids, CUT, True, "DM_Slat_Cut")
+    print(f">>> Slat dominos: {int(ev('n_slats')) * 2} joints (into support rails)")
 
     # ================================================================
     #  6. DETAILS — post top chamfers (safety: flush, slight ease)
