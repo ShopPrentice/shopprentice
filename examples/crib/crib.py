@@ -53,7 +53,8 @@ def run(context):
         ("dm_d",          "15 mm",    "in"),
         # (Spindle mortises created by bulk CUT — no separate dowel params needed)
         # Details
-        ("post_chamfer",  "0.0625 in","in"),   # 1/16" — flush, safety
+        ("post_chamfer",  "0.0625 in","in"),   # 1/16" — post tops, safety
+        ("edge_chamfer",  "0.03125 in","in"),  # 1/32" — general edge break
     ]:
         params.add(pname, VI(expr), unit, "")
 
@@ -478,8 +479,14 @@ def run(context):
     print(f">>> Slat dominos: {int(ev('n_slats')) * 2} joints (into support rails)")
 
     # ================================================================
-    #  6. DETAILS — post top chamfers (safety: flush, slight ease)
+    #  6. DETAILS — chamfers on all exposed edges
     # ================================================================
+    # Post tops first (larger chamfer for safety), then general edge break.
+    # Order matters: general chamfer runs on already-chamfered post tops,
+    # but the small size (1/32") on the new chamfer faces is fine.
+
+    # 6a. Post top chamfers (larger, safety)
+    post_top_edges = adsk.core.ObjectCollection.create()
     for body_name in ["Post_FL", "Post_FR", "Post_BL", "Post_BR"]:
         body = None
         for bi in range(post_c.bRepBodies.count):
@@ -494,20 +501,35 @@ def run(context):
             if isinstance(f.geometry, adsk.core.Plane):
                 if abs(f.geometry.normal.z) > 0.9 and f.pointOnFace.z > top_z:
                     top_z = f.pointOnFace.z
-        top_edges = adsk.core.ObjectCollection.create()
         for ei in range(body.edges.count):
             edge = body.edges.item(ei)
             sv = edge.startVertex.geometry
             ev_p = edge.endVertex.geometry
             if sv.z > top_z - 0.1 and ev_p.z > top_z - 0.1:
-                top_edges.add(edge)
-        if top_edges.count > 0:
-            ch_inp = post_c.features.chamferFeatures.createInput2()
-            ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
-                top_edges, VI("post_chamfer"), True)
-            post_c.features.chamferFeatures.add(ch_inp).name = f"{body_name}_TopCh"
+                post_top_edges.add(edge)
+    if post_top_edges.count > 0:
+        ch_inp = post_c.features.chamferFeatures.createInput2()
+        ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+            post_top_edges, VI("post_chamfer"), True)
+        post_c.features.chamferFeatures.add(ch_inp).name = "PostTops_Ch"
 
-    print(">>> Post top chamfers applied")
+    # 6b. General edge break — one chamfer per component, all structural edges
+    for comp_name, comp in [("Posts", post_c), ("Rails", rail_c),
+                             ("Spindles", spindle_c), ("Support", support_c)]:
+        edges = adsk.core.ObjectCollection.create()
+        for bi in range(comp.bRepBodies.count):
+            body = comp.bRepBodies.item(bi)
+            if body.name.startswith("DM_"):
+                continue
+            for ei in range(body.edges.count):
+                edges.add(body.edges.item(ei))
+        if edges.count > 0:
+            ch_inp = comp.features.chamferFeatures.createInput2()
+            ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                edges, VI("edge_chamfer"), True)
+            comp.features.chamferFeatures.add(ch_inp).name = f"{comp_name}_Ch"
+
+    print(">>> Chamfers: post tops + 4 component edge breaks")
 
     # ================================================================
     #  EPILOGUE
@@ -530,6 +552,9 @@ def run(context):
 
     af.apply_appearance("maple")
 
-    cam = app.activeViewport.camera
+    # Set visual style with edge lines visible
+    vp = app.activeViewport
+    vp.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
+    cam = vp.camera
     cam.isFitView = True
-    app.activeViewport.camera = cam
+    vp.camera = cam

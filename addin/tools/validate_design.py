@@ -143,10 +143,10 @@ def _check_interference(root_comp, exclude_prefixes):
             pass
         all_interferences.append(entry)
 
-        # Filter: exclude void-on-void (both bodies match exclude prefixes)
+        # Filter: exclude any interference involving a void body
         b1_void = any(entry["body1"].startswith(p) for p in exclude_prefixes)
         b2_void = any(entry["body2"].startswith(p) for p in exclude_prefixes)
-        if not (b1_void and b2_void):
+        if not (b1_void or b2_void):
             real_interferences.append(entry)
 
     return {
