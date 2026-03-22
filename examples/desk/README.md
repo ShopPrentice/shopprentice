@@ -1,6 +1,6 @@
 # Writing Desk
 
-A parametric modern writing desk — 48"L x 28"W x 30"H with single dovetailed drawer, domino joinery at apron-to-leg connections. No front apron — drawer front fills the front face.
+A parametric modern writing desk — 48"L × 28"W × 30"H with tapered legs, single dovetailed drawer with runners and stops, front rail above drawer, cable grommet, domino joinery throughout. Walnut appearance.
 
 ![Desk — iso top-right](screenshots/iso-top-right.png)
 
@@ -9,27 +9,37 @@ A parametric modern writing desk — 48"L x 28"W x 30"H with single dovetailed d
   <img src="screenshots/right.png" width="49%" />
 </p>
 
-### Transparent Views
+### Transparent View
 
 <p float="left">
   <img src="screenshots/transparent-iso-top-left.png" width="49%" />
-  <img src="screenshots/transparent-iso-top-right.png" width="49%" />
 </p>
 
-## Example Prompt
+---
 
-```
-/woodworking
-Build a modern writing desk: 48"L x 28"W x 30"H, 1" thick top,
-single dovetailed drawer, domino joinery, square legs. All parametric.
-```
+**Script:** [`desk.py`](desk.py) — 18 structural bodies + 20 domino voids.
+
+### Structure
+- **4 tapered legs** — 2" square at top, taper to 1.25" at floor on inner faces
+- **3 aprons** — back + 2 sides (no front apron — drawer front fills it)
+- **Front rail** — 1.5" strip above drawer opening, domino'd to front legs
+- **2 drawer runners** — wooden strips on side aprons for drawer slides
+- **2 drawer stops** — blocks at back of runners preventing push-through
+- **Top** — 1" thick with 2" cable grommet at back-right corner
+
+### Drawer
+- Dovetailed drawer box (half-blind front, through back)
+- 5 bodies: front, back, 2 sides, bottom
+- Slides on wooden runners, stopped by blocks at back
+
+### Joinery
+- **Aprons → legs:** 2 dominos per joint (6 apron joints)
+- **Front rail → legs:** 1 domino each side (2 joints)
+- **Top → aprons:** 2 dominos per apron (6 joints)
+- **Drawer:** dovetails at all 4 corners
 
 ### Appearance
 
 ```
 apply_appearance(species="walnut")
 ```
-
----
-
-**Script:** [`desk.py`](desk.py) — 13 structural bodies + 12 domino voids. Uses `dovetailed_drawer` template for half-blind front / through back dovetails. Domino grid at 6 apron-to-leg joints.
