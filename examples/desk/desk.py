@@ -189,10 +189,10 @@ def run(context):
         {"x": "long_apron_l", "y": "apron_thick"}, "FrontRail_Sk", ev)
     af.ext_new(apron_c, pr, "front_rail_h", "FrontRail").bodies.item(0).name = "Apron_FrontRail"
 
-    # Center divider — runs front-to-back between the two drawer openings
+    # Center divider — runs between front rail back face and back apron front face
     _, pr = af.sketch_rect_model(apron_c, az_pl,
-        ("mid_x - divider_thick / 2", "0 in", "apron_z"),
-        {"x": "divider_thick", "y": "desk_w - leg_size - apron_thick"}, "Divider_Sk", ev)
+        ("mid_x - divider_thick / 2", "apron_thick", "apron_z"),
+        {"x": "divider_thick", "y": "desk_w - leg_size - 2 * apron_thick"}, "Divider_Sk", ev)
     af.ext_new(apron_c, pr, "apron_h", "Divider").bodies.item(0).name = "Divider"
 
     # Drawer runners — 2 on side aprons only (divider sides have no runners
