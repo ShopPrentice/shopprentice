@@ -2,14 +2,21 @@
 Modern Crib
 ===========
 52"L x 28"W interior, 34"H rail height.
-4 corner posts, side rails with spindles, head/foot panels.
+4 corner posts, top+bottom rails on all 4 sides with spindles,
+slatted mattress support with ledger strips.
+All joints mechanically connected: rails with dominos, spindles with dowels.
+
+Safety (CPSC): spindle gap ≤ 2.375", post tops flush with rails.
 
 Coordinate system:
-  X = width (28" interior)  Y = length (52" interior)  Z = height (34")
+  X = width (33" outer)  Y = length (57" outer)  Z = height (34")
 """
 import adsk.core, adsk.fusion
 
 from helpers import af
+from woodworking.templates import domino
+
+CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
 
 def run(context):
@@ -22,35 +29,58 @@ def run(context):
     ev = lambda e: (params.itemByName(e).value if params.itemByName(e)
                     else design.unitsManager.evaluateExpression(e, "cm"))
 
+    # === USER PARAMETERS ===
     for pname, expr, unit in [
-        ("interior_l",  "52 in",    "in"),
-        ("interior_w",  "28 in",    "in"),
-        ("rail_h",      "34 in",    "in"),
-        ("post_size",   "2.5 in",   "in"),
-        ("rail_w",      "3 in",     "in"),
-        ("rail_thick",  "0.75 in",  "in"),
-        ("spindle_dia", "0.75 in",  "in"),
-        ("spindle_sp",  "2.25 in",  "in"),  # center-to-center (max 2.375" gap)
-        ("mattress_h",  "6 in",     "in"),  # mattress support height
-        ("support_thick","0.75 in", "in"),
+        ("interior_l",    "52 in",    "in"),
+        ("interior_w",    "28 in",    "in"),
+        ("rail_h",        "34 in",    "in"),
+        ("post_size",     "2.5 in",   "in"),
+        ("rail_w",        "3 in",     "in"),
+        ("rail_thick",    "0.75 in",  "in"),
+        ("spindle_dia",   "0.75 in",  "in"),
+        ("spindle_sp",    "2.25 in",  "in"),   # center-to-center (gap = sp - dia ≤ 2.375")
+        # Mattress support
+        ("mattress_h",    "6 in",     "in"),   # lowest position
+        ("support_thick", "0.75 in",  "in"),
+        ("slat_w",        "2.5 in",   "in"),
+        ("n_slats",       "8",        ""),
+        ("ledger_h",      "1.5 in",   "in"),
+        ("ledger_thick",  "0.75 in",  "in"),
+        # Dominos (6mm for rails)
+        ("dm_t",          "6 mm",     "in"),
+        ("dm_w",          "20 mm",    "in"),
+        ("dm_d",          "15 mm",    "in"),
+        # (Spindle mortises created by bulk CUT — no separate dowel params needed)
+        # Details
+        ("post_chamfer",  "0.0625 in","in"),   # 1/16" — flush, safety
     ]:
         params.add(pname, VI(expr), unit, "")
 
+    # === DERIVED PARAMETERS ===
     for pname, expr, unit in [
-        ("outer_l",     "interior_l + 2 * post_size",               "in"),
-        ("outer_w",     "interior_w + 2 * post_size",               "in"),
-        ("spindle_h",   "rail_h - 2 * rail_w",                      "in"),
-        ("n_long_spindles", "floor(interior_l / spindle_sp)",        ""),
-        ("n_short_spindles","floor(interior_w / spindle_sp)",        ""),
-        ("long_sp_actual",  "interior_l / (n_long_spindles + 1)",   "in"),
-        ("short_sp_actual", "interior_w / (n_short_spindles + 1)",  "in"),
-        ("mid_x",       "outer_w / 2",                               "in"),
-        ("mid_y",       "outer_l / 2",                               "in"),
+        ("outer_w",       "interior_w + 2 * post_size",                "in"),
+        ("outer_l",       "interior_l + 2 * post_size",                "in"),
+        ("mid_x",         "outer_w / 2",                                "in"),
+        ("mid_y",         "outer_l / 2",                                "in"),
+        # Spindle counts + actual spacing
+        ("spindle_h",     "rail_h - 2 * rail_w",                       "in"),
+        ("n_short_sp",    "floor(interior_w / spindle_sp)",             ""),
+        ("n_long_sp",     "floor(interior_l / spindle_sp)",             ""),
+        ("short_sp_act",  "interior_w / (n_short_sp + 1)",             "in"),
+        ("long_sp_act",   "interior_l / (n_long_sp + 1)",              "in"),
+        # Slat support
+        ("slat_l",        "interior_w",                                 "in"),
+        ("slat_sp",       "(interior_l - slat_w) / (n_slats - 1)",    "in"),
+        ("ledger_z",      "mattress_h - ledger_h - support_thick",     "in"),
+        # Rail domino Z positions (2 per rail end, evenly in rail height)
+        ("dm_z1",         "rail_w / 3",                                "in"),
+        ("dm_sp",         "rail_w / 3",                                "in"),
     ]:
         params.add(pname, VI(expr), unit, "")
 
     print(">>> Parameters done")
 
+    # === COMPONENTS ===
     post_occ    = af.make_comp(root, "Posts")
     rail_occ    = af.make_comp(root, "Rails")
     spindle_occ = af.make_comp(root, "Spindles")
@@ -61,50 +91,62 @@ def run(context):
     spindle_c = spindle_occ.component
     support_c = support_occ.component
 
-    # ==== POSTS ====
+    # ================================================================
+    #  1. POSTS — 4 corners, all same height (flush with top rails)
+    # ================================================================
     _, pr = af.sketch_rect_model(post_c, post_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "post_size", "y": "post_size"}, "PostFL_Sk", ev)
     fl_ext = af.ext_new(post_c, pr, "rail_h", "PostFL")
-    fl_ext.bodies.item(0).name = "Post_FL"
+    post_fl = fl_ext.bodies.item(0); post_fl.name = "Post_FL"
 
     p_xmid = af.off_plane(post_c, post_c.yZConstructionPlane, "mid_x", "PXMid")
     p_ymid = af.off_plane(post_c, post_c.xZConstructionPlane, "mid_y", "PYMid")
-    af.mirror_body(post_c, fl_ext.bodies.item(0), p_xmid, "PostFR").bodies.item(0).name = "Post_FR"
-    pbl = af.mirror_body(post_c, fl_ext.bodies.item(0), p_ymid, "PostBL").bodies.item(0)
-    pbl.name = "Post_BL"
-    af.mirror_body(post_c, pbl, p_xmid, "PostBR").bodies.item(0).name = "Post_BR"
+
+    post_fr = af.mirror_body(post_c, post_fl, p_xmid, "PostFR").bodies.item(0)
+    post_fr.name = "Post_FR"
+    post_bl = af.mirror_body(post_c, post_fl, p_ymid, "PostBL").bodies.item(0)
+    post_bl.name = "Post_BL"
+    post_br = af.mirror_body(post_c, post_bl, p_xmid, "PostBR").bodies.item(0)
+    post_br.name = "Post_BR"
+
     print(">>> Posts: 4")
 
-    # ==== RAILS (top and bottom on all 4 sides) ====
-    # Front bottom rail
-    _, pr = af.sketch_rect_model(rail_c, rail_c.xZConstructionPlane,
-        ("post_size", "0 in", "0 in"),
+    # ================================================================
+    #  2. RAILS — top + bottom on all 4 sides, centered on posts
+    # ================================================================
+    # Front bottom rail (short side, X direction)
+    fbr_pl = af.off_plane(rail_c, rail_c.xZConstructionPlane,
+                           "post_size / 2 - rail_thick / 2", "FBR_Pl")
+    _, pr = af.sketch_rect_model(rail_c, fbr_pl,
+        ("post_size", "post_size / 2 - rail_thick / 2", "0 in"),
         {"x": "interior_w", "z": "rail_w"}, "FrontBotRail_Sk", ev)
     fbr_ext = af.ext_new(rail_c, pr, "rail_thick", "FrontBotRail")
-    fbr_ext.bodies.item(0).name = "Rail_FrontBot"
+    fbr = fbr_ext.bodies.item(0); fbr.name = "Rail_FrontBot"
 
     # Front top rail
-    _, pr = af.sketch_rect_model(rail_c, rail_c.xZConstructionPlane,
-        ("post_size", "0 in", "rail_h - rail_w"),
+    _, pr = af.sketch_rect_model(rail_c, fbr_pl,
+        ("post_size", "post_size / 2 - rail_thick / 2", "rail_h - rail_w"),
         {"x": "interior_w", "z": "rail_w"}, "FrontTopRail_Sk", ev)
     ftr_ext = af.ext_new(rail_c, pr, "rail_thick", "FrontTopRail")
-    ftr_ext.bodies.item(0).name = "Rail_FrontTop"
+    ftr = ftr_ext.bodies.item(0); ftr.name = "Rail_FrontTop"
 
     # Mirror front rails to back
     r_ymid = af.off_plane(rail_c, rail_c.xZConstructionPlane, "mid_y", "RYMid")
     af.mirror_feats(rail_c, [fbr_ext], r_ymid, "BackBotRailMir").bodies.item(0).name = "Rail_BackBot"
     af.mirror_feats(rail_c, [ftr_ext], r_ymid, "BackTopRailMir").bodies.item(0).name = "Rail_BackTop"
 
-    # Left side rails
-    _, pr = af.sketch_rect_model(rail_c, rail_c.yZConstructionPlane,
-        ("0 in", "post_size", "0 in"),
+    # Left bottom rail (long side, Y direction)
+    lbr_pl = af.off_plane(rail_c, rail_c.yZConstructionPlane,
+                           "post_size / 2 - rail_thick / 2", "LBR_Pl")
+    _, pr = af.sketch_rect_model(rail_c, lbr_pl,
+        ("post_size / 2 - rail_thick / 2", "post_size", "0 in"),
         {"y": "interior_l", "z": "rail_w"}, "LeftBotRail_Sk", ev)
     lbr_ext = af.ext_new(rail_c, pr, "rail_thick", "LeftBotRail")
     lbr_ext.bodies.item(0).name = "Rail_LeftBot"
 
-    _, pr = af.sketch_rect_model(rail_c, rail_c.yZConstructionPlane,
-        ("0 in", "post_size", "rail_h - rail_w"),
+    _, pr = af.sketch_rect_model(rail_c, lbr_pl,
+        ("post_size / 2 - rail_thick / 2", "post_size", "rail_h - rail_w"),
         {"y": "interior_l", "z": "rail_w"}, "LeftTopRail_Sk", ev)
     ltr_ext = af.ext_new(rail_c, pr, "rail_thick", "LeftTopRail")
     ltr_ext.bodies.item(0).name = "Rail_LeftTop"
@@ -112,41 +154,75 @@ def run(context):
     r_xmid = af.off_plane(rail_c, rail_c.yZConstructionPlane, "mid_x", "RXMid")
     af.mirror_feats(rail_c, [lbr_ext], r_xmid, "RightBotRailMir").bodies.item(0).name = "Rail_RightBot"
     af.mirror_feats(rail_c, [ltr_ext], r_xmid, "RightTopRailMir").bodies.item(0).name = "Rail_RightTop"
+
     print(">>> Rails: 8")
 
-    # ==== SPINDLES (rectangular approximation) ====
-    # Front spindle template
-    _, pr = af.sketch_rect_model(spindle_c, spindle_c.xZConstructionPlane,
-        ("post_size + long_sp_actual - spindle_dia / 2", "0 in", "rail_w"),
-        {"x": "spindle_dia", "z": "spindle_h"}, "FSpindle_Sk", ev)
-    fs_ext = af.ext_new(spindle_c, pr, "spindle_dia", "FSpindle_1")
-    fs_ext.bodies.item(0).name = "Spindle_F1"
+    # ================================================================
+    #  3. SPINDLES — cylindrical, between top and bottom rails
+    # ================================================================
+    # Front spindle template (short side)
+    fs_pl = af.off_plane(spindle_c, spindle_c.xZConstructionPlane,
+                          "post_size / 2", "FS_Pl")
+    P3 = adsk.core.Point3D
+    sk_fs = spindle_c.sketches.add(fs_pl)
+    sk_fs.name = "FSpindle_Sk"
+    m2s = sk_fs.modelToSketchSpace
+    first_x = ev("post_size") + ev("short_sp_act")
+    sp_center = m2s(P3.create(first_x, ev("post_size") / 2, ev("rail_w") + ev("spindle_h") / 2))
+    sk_fs.sketchCurves.sketchCircles.addByCenterRadius(
+        P3.create(sp_center.x, sp_center.y, 0), ev("spindle_dia") / 2)
+    fs_prof = sk_fs.profiles.item(0)
+    fs_ext = af.ext_new_sym(spindle_c, fs_prof, "rail_thick", "FSpindle_1")
+    fs_body = fs_ext.bodies.item(0); fs_body.name = "Spindle_F1"
 
-    # Pattern front spindles along X (note: using short_sp for front side)
-    n_short = int(ev("n_short_spindles"))
+    # Extend spindle into both rails (top and bottom) with stub tenons
+    # The spindle height spans from rail_w to rail_h - rail_w
+    # Actual spindle extrude should cover the full height including into rails
+    # Let me re-do: extrude spindle from Z=0 to Z=rail_h (full height)
+    # Then it naturally overlaps with both rails for dowel connections
+
+    # Actually, for cylindrical spindles, sketch circle on XY plane, extrude in Z
+    # Let me use a simpler approach
+    spindle_c.sketches.item(0).deleteMe()  # remove the previous sketch
+
+    # Front spindle: circle on XY offset at Z=0, extrude to rail_h
+    sp_xy_pl = spindle_c.xYConstructionPlane
+    sk_fs2 = spindle_c.sketches.add(sp_xy_pl)
+    sk_fs2.name = "FSpindle_Sk"
+    first_x_cm = ev("post_size") + ev("short_sp_act")
+    center_y_cm = ev("post_size") / 2
+    sk_fs2.sketchCurves.sketchCircles.addByCenterRadius(
+        P3.create(first_x_cm, center_y_cm, 0), ev("spindle_dia") / 2)
+    fs_prof2 = sk_fs2.profiles.item(0)
+    fs_ext2 = af.ext_new(spindle_c, fs_prof2, "rail_h", "FSpindle_1")
+    fs_body2 = fs_ext2.bodies.item(0); fs_body2.name = "Spindle_F1"
+
+    # Pattern front spindles along X
+    n_short = int(ev("n_short_sp"))
     if n_short > 1:
-        af.body_pattern(spindle_c, fs_ext.bodies.item(0),
-                         spindle_c.xConstructionAxis,
-                         "n_short_spindles", "short_sp_actual", "FSpindlePat")
+        af.body_pattern(spindle_c, fs_body2, spindle_c.xConstructionAxis,
+                         "n_short_sp", "short_sp_act", "FSpindlePat")
 
-    # Left side spindle template
-    _, pr = af.sketch_rect_model(spindle_c, spindle_c.yZConstructionPlane,
-        ("0 in", "post_size + long_sp_actual - spindle_dia / 2", "rail_w"),
-        {"y": "spindle_dia", "z": "spindle_h"}, "LSpindle_Sk", ev)
-    ls_ext = af.ext_new(spindle_c, pr, "spindle_dia", "LSpindle_1")
-    ls_ext.bodies.item(0).name = "Spindle_L1"
+    # Left spindle template (long side)
+    sk_ls = spindle_c.sketches.add(sp_xy_pl)
+    sk_ls.name = "LSpindle_Sk"
+    center_x_cm = ev("post_size") / 2
+    first_y_cm = ev("post_size") + ev("long_sp_act")
+    sk_ls.sketchCurves.sketchCircles.addByCenterRadius(
+        P3.create(center_x_cm, first_y_cm, 0), ev("spindle_dia") / 2)
+    ls_prof = sk_ls.profiles.item(0)
+    ls_ext = af.ext_new(spindle_c, ls_prof, "rail_h", "LSpindle_1")
+    ls_body = ls_ext.bodies.item(0); ls_body.name = "Spindle_L1"
 
-    n_long = int(ev("n_long_spindles"))
+    n_long = int(ev("n_long_sp"))
     if n_long > 1:
-        af.body_pattern(spindle_c, ls_ext.bodies.item(0),
-                         spindle_c.yConstructionAxis,
-                         "n_long_spindles", "long_sp_actual", "LSpindlePat")
+        af.body_pattern(spindle_c, ls_body, spindle_c.yConstructionAxis,
+                         "n_long_sp", "long_sp_act", "LSpindlePat")
 
     # Mirror front spindles to back, left to right
     s_ymid = af.off_plane(spindle_c, spindle_c.xZConstructionPlane, "mid_y", "SYMid")
     s_xmid = af.off_plane(spindle_c, spindle_c.yZConstructionPlane, "mid_x", "SXMid")
 
-    # Mirror all front spindle bodies to back
     front_spindles = [spindle_c.bRepBodies.item(i) for i in range(spindle_c.bRepBodies.count)
                       if spindle_c.bRepBodies.item(i).name.startswith("Spindle_F")]
     if front_spindles:
@@ -157,27 +233,252 @@ def run(context):
     if left_spindles:
         af.mirror_bodies(spindle_c, left_spindles, s_xmid, "RightSpindleMir")
 
-    print(">>> Spindles done")
+    print(f">>> Spindles: {spindle_c.bRepBodies.count}")
 
-    # ==== MATTRESS SUPPORT ====
-    sup_pl = af.off_plane(support_c, support_c.xYConstructionPlane, "mattress_h", "SupPl")
-    _, pr = af.sketch_rect_model(support_c, sup_pl,
-        ("post_size", "post_size", "mattress_h"),
-        {"x": "interior_w", "y": "interior_l"}, "Support_Sk", ev)
-    af.ext_new(support_c, pr, "support_thick", "SupportBoard").bodies.item(0).name = "MattressSupport"
-    print(">>> Mattress support: 1")
+    # ================================================================
+    #  4. MATTRESS SUPPORT — slats on ledger strips
+    # ================================================================
+    # Ledger strips on left + right side rails (inside face)
+    ldg_pl = af.off_plane(support_c, support_c.yZConstructionPlane,
+                           "post_size / 2 + rail_thick / 2", "LDG_Pl")
+    _, pr = af.sketch_rect_model(support_c, ldg_pl,
+        ("post_size / 2 + rail_thick / 2", "post_size", "ledger_z"),
+        {"y": "interior_l", "z": "ledger_h"}, "LedgerL_Sk", ev)
+    ll_ext = af.ext_new(support_c, pr, "ledger_thick", "LedgerLeft")
+    ll_ext.bodies.item(0).name = "Ledger_Left"
 
-    # ==== EPILOGUE ====
+    sup_xmid = af.off_plane(support_c, support_c.yZConstructionPlane, "mid_x", "SupXMid")
+    af.mirror_feats(support_c, [ll_ext], sup_xmid, "LedgerRMir").bodies.item(0).name = "Ledger_Right"
+
+    # Slats
+    slat_z_pl = af.off_plane(support_c, support_c.xYConstructionPlane,
+                              "mattress_h - support_thick", "SlatZ_Pl")
+    _, pr = af.sketch_rect_model(support_c, slat_z_pl,
+        ("post_size / 2 + rail_thick / 2 + ledger_thick", "post_size",
+         "mattress_h - support_thick"),
+        {"x": "slat_l - 2 * ledger_thick", "y": "slat_w"}, "Slat_Sk", ev)
+    slat_ext = af.ext_new(support_c, pr, "support_thick", "Slat_1")
+    slat_body = slat_ext.bodies.item(0); slat_body.name = "Slat_1"
+
+    if int(ev("n_slats")) > 1:
+        af.body_pattern(support_c, slat_body, support_c.yConstructionAxis,
+                         "n_slats", "slat_sp", "SlatPat")
+
+    print(f">>> Support: 2 ledgers + {int(ev('n_slats'))} slats")
+
+    # ================================================================
+    #  5. CROSS-COMPONENT: Dominos (rails→posts) + Dowels (spindles→rails)
+    # ================================================================
+    params.add("dm_count", VI("2"), "", "")
+
+    fl_p = post_fl.createForAssemblyContext(post_occ)
+    fr_p = post_fr.createForAssemblyContext(post_occ)
+    bl_p = post_bl.createForAssemblyContext(post_occ)
+    br_p = post_br.createForAssemblyContext(post_occ)
+
+    # Get rail bodies as proxies
+    def get_rail_proxy(name):
+        for i in range(rail_c.bRepBodies.count):
+            b = rail_c.bRepBodies.item(i)
+            if b.name == name:
+                return b.createForAssemblyContext(rail_occ)
+        return None
+
+    fbr_p = get_rail_proxy("Rail_FrontBot")
+    ftr_p = get_rail_proxy("Rail_FrontTop")
+    bbr_p = get_rail_proxy("Rail_BackBot")
+    btr_p = get_rail_proxy("Rail_BackTop")
+    lbr_p = get_rail_proxy("Rail_LeftBot")
+    ltr_p = get_rail_proxy("Rail_LeftTop")
+    rbr_p = get_rail_proxy("Rail_RightBot")
+    rtr_p = get_rail_proxy("Rail_RightTop")
+
+    # Domino planes at post inner faces
+    dm_xl = af.off_plane(root, root.yZConstructionPlane, "post_size", "DM_XL")
+    dm_xr = af.off_plane(root, root.yZConstructionPlane, "outer_w - post_size", "DM_XR")
+    dm_yf = af.off_plane(root, root.xZConstructionPlane, "post_size", "DM_YF")
+    dm_yb = af.off_plane(root, root.xZConstructionPlane, "outer_l - post_size", "DM_YB")
+
+    # --- Front bottom rail → FL, FR (2 dominos per end) ---
+    domino.grid(root, dm_xl,
+        ("post_size", "post_size / 2", "dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        fbr_p, fl_p, "DM_FBR_L", ev)
+    domino.grid(root, dm_xr,
+        ("outer_w - post_size", "post_size / 2", "dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        fbr_p, fr_p, "DM_FBR_R", ev)
+
+    # --- Front top rail → FL, FR ---
+    domino.grid(root, dm_xl,
+        ("post_size", "post_size / 2", "rail_h - rail_w + dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        ftr_p, fl_p, "DM_FTR_L", ev)
+    domino.grid(root, dm_xr,
+        ("outer_w - post_size", "post_size / 2", "rail_h - rail_w + dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        ftr_p, fr_p, "DM_FTR_R", ev)
+
+    # --- Back rails (mirror positions) ---
+    domino.grid(root, dm_xl,
+        ("post_size", "outer_l - post_size / 2", "dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        bbr_p, bl_p, "DM_BBR_L", ev)
+    domino.grid(root, dm_xr,
+        ("outer_w - post_size", "outer_l - post_size / 2", "dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        bbr_p, br_p, "DM_BBR_R", ev)
+    domino.grid(root, dm_xl,
+        ("post_size", "outer_l - post_size / 2", "rail_h - rail_w + dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        btr_p, bl_p, "DM_BTR_L", ev)
+    domino.grid(root, dm_xr,
+        ("outer_w - post_size", "outer_l - post_size / 2", "rail_h - rail_w + dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        btr_p, br_p, "DM_BTR_R", ev)
+
+    # --- Left side rails → FL, BL ---
+    domino.grid(root, dm_yf,
+        ("post_size / 2", "post_size", "dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        lbr_p, fl_p, "DM_LBR_F", ev)
+    domino.grid(root, dm_yb,
+        ("post_size / 2", "outer_l - post_size", "dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        lbr_p, bl_p, "DM_LBR_B", ev)
+    domino.grid(root, dm_yf,
+        ("post_size / 2", "post_size", "rail_h - rail_w + dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        ltr_p, fl_p, "DM_LTR_F", ev)
+    domino.grid(root, dm_yb,
+        ("post_size / 2", "outer_l - post_size", "rail_h - rail_w + dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        ltr_p, bl_p, "DM_LTR_B", ev)
+
+    # --- Right side rails → FR, BR ---
+    domino.grid(root, dm_yf,
+        ("outer_w - post_size / 2", "post_size", "dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        rbr_p, fr_p, "DM_RBR_F", ev)
+    domino.grid(root, dm_yb,
+        ("outer_w - post_size / 2", "outer_l - post_size", "dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        rbr_p, br_p, "DM_RBR_B", ev)
+    domino.grid(root, dm_yf,
+        ("outer_w - post_size / 2", "post_size", "rail_h - rail_w + dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        rtr_p, fr_p, "DM_RTR_F", ev)
+    domino.grid(root, dm_yb,
+        ("outer_w - post_size / 2", "outer_l - post_size", "rail_h - rail_w + dm_z1"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        rtr_p, br_p, "DM_RTR_B", ev)
+
+    print(">>> Dominos: 16 rail-to-post joints (32 voids)")
+
+    # --- Spindle mortises: bulk CUT spindles into rails ---
+    # Spindles span full height (Z=0 to rail_h) and overlap with both
+    # top and bottom rails. CUT the spindle bodies into the rails —
+    # the cylindrical shape creates perfect round mortises. 8 bulk CUTs
+    # instead of 140 individual dowels.
+
+    # Collect spindle proxies by side
+    def get_spindle_proxies(prefix):
+        proxies = []
+        for i in range(spindle_c.bRepBodies.count):
+            b = spindle_c.bRepBodies.item(i)
+            if b.name.startswith(prefix):
+                proxies.append(b.createForAssemblyContext(spindle_occ))
+        return proxies
+
+    front_sp = get_spindle_proxies("Spindle_F")
+    # Back spindles are mirrored — their names start with "Spindle_F" too
+    # but they're at different Y positions. Use bounding box to separate.
+    all_f_named = [spindle_c.bRepBodies.item(i) for i in range(spindle_c.bRepBodies.count)
+                   if spindle_c.bRepBodies.item(i).name.startswith("Spindle_F")]
+    mid_y_cm = ev("mid_y")
+    front_bodies = [b for b in all_f_named
+                    if (b.boundingBox.minPoint.y + b.boundingBox.maxPoint.y) / 2 < mid_y_cm]
+    back_bodies_f = [b for b in all_f_named
+                     if (b.boundingBox.minPoint.y + b.boundingBox.maxPoint.y) / 2 > mid_y_cm]
+    front_sp = [b.createForAssemblyContext(spindle_occ) for b in front_bodies]
+    back_sp = [b.createForAssemblyContext(spindle_occ) for b in back_bodies_f]
+
+    all_l_named = [spindle_c.bRepBodies.item(i) for i in range(spindle_c.bRepBodies.count)
+                   if spindle_c.bRepBodies.item(i).name.startswith("Spindle_L")]
+    mid_x_cm = ev("mid_x")
+    left_bodies = [b for b in all_l_named
+                   if (b.boundingBox.minPoint.x + b.boundingBox.maxPoint.x) / 2 < mid_x_cm]
+    right_bodies = [b for b in all_l_named
+                    if (b.boundingBox.minPoint.x + b.boundingBox.maxPoint.x) / 2 > mid_x_cm]
+    left_sp = [b.createForAssemblyContext(spindle_occ) for b in left_bodies]
+    right_sp = [b.createForAssemblyContext(spindle_occ) for b in right_bodies]
+
+    # 8 bulk CUTs (one per rail)
+    if front_sp:
+        af.combine(root, fbr_p, front_sp, CUT, True, "SpindleCut_FBot")
+        af.combine(root, ftr_p, front_sp, CUT, True, "SpindleCut_FTop")
+    if back_sp:
+        af.combine(root, bbr_p, back_sp, CUT, True, "SpindleCut_BBot")
+        af.combine(root, btr_p, back_sp, CUT, True, "SpindleCut_BTop")
+    if left_sp:
+        af.combine(root, lbr_p, left_sp, CUT, True, "SpindleCut_LBot")
+        af.combine(root, ltr_p, left_sp, CUT, True, "SpindleCut_LTop")
+    if right_sp:
+        af.combine(root, rbr_p, right_sp, CUT, True, "SpindleCut_RBot")
+        af.combine(root, rtr_p, right_sp, CUT, True, "SpindleCut_RTop")
+
+    print(">>> Spindle mortises: 8 bulk CUTs into rails")
+
+    # ================================================================
+    #  6. DETAILS — post top chamfers (safety: flush, slight ease)
+    # ================================================================
+    for body_name in ["Post_FL", "Post_FR", "Post_BL", "Post_BR"]:
+        body = None
+        for bi in range(post_c.bRepBodies.count):
+            if post_c.bRepBodies.item(bi).name == body_name:
+                body = post_c.bRepBodies.item(bi)
+                break
+        if not body:
+            continue
+        top_z = -1e10
+        for fi in range(body.faces.count):
+            f = body.faces.item(fi)
+            if isinstance(f.geometry, adsk.core.Plane):
+                if abs(f.geometry.normal.z) > 0.9 and f.pointOnFace.z > top_z:
+                    top_z = f.pointOnFace.z
+        top_edges = adsk.core.ObjectCollection.create()
+        for ei in range(body.edges.count):
+            edge = body.edges.item(ei)
+            sv = edge.startVertex.geometry
+            ev_p = edge.endVertex.geometry
+            if sv.z > top_z - 0.1 and ev_p.z > top_z - 0.1:
+                top_edges.add(edge)
+        if top_edges.count > 0:
+            ch_inp = post_c.features.chamferFeatures.createInput2()
+            ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                top_edges, VI("post_chamfer"), True)
+            post_c.features.chamferFeatures.add(ch_inp).name = f"{body_name}_TopCh"
+
+    print(">>> Post top chamfers applied")
+
+    # ================================================================
+    #  EPILOGUE
+    # ================================================================
     for comp in [post_c, rail_c, spindle_c, support_c]:
         for sk in comp.sketches:
             sk.isVisible = False
         for cp in comp.constructionPlanes:
             cp.isLightBulbOn = False
+    for sk in root.sketches:
+        sk.isVisible = False
+    for cp in root.constructionPlanes:
+        cp.isLightBulbOn = False
 
     for cn, c in [("Posts", post_c), ("Rails", rail_c),
                    ("Spindles", spindle_c), ("Support", support_c)]:
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cn}: {len(names)} bodies")
+    print(f"Root: {root.bRepBodies.count} joinery voids")
 
     af.apply_appearance("maple")
 
