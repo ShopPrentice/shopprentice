@@ -458,26 +458,28 @@ def run(context):
 
     print(">>> Spindle mortises: 8 bulk CUTs into rails")
 
-    # --- Support rails → posts (dominos, 1 per end, 4 total) ---
+    # --- Support rails → front/back bottom rails (dominos, 1 per end, 4 total) ---
+    # Connect to bottom rails (not posts) — bottom rails span the full interior width
+    # so the domino at the support rail's X position overlaps both bodies
     params.add("sup_dm_z", VI("mattress_h - support_thick - sup_rail_h / 2"), "in", "")
     domino.grid(root, dm_yf,
         ("sup_rail_inset + sup_rail_w / 2", "post_size", "sup_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        srl_p, fl_p, "DM_SRL_F", ev)
+        srl_p, fbr_p, "DM_SRL_F", ev)
     domino.grid(root, dm_yb,
         ("sup_rail_inset + sup_rail_w / 2", "outer_l - post_size", "sup_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        srl_p, bl_p, "DM_SRL_B", ev)
+        srl_p, bbr_p, "DM_SRL_B", ev)
     if srr_p:
         domino.grid(root, dm_yf,
             ("outer_w - sup_rail_inset - sup_rail_w / 2", "post_size", "sup_dm_z"),
             "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-            srr_p, fr_p, "DM_SRR_F", ev)
+            srr_p, fbr_p, "DM_SRR_F", ev)
         domino.grid(root, dm_yb,
             ("outer_w - sup_rail_inset - sup_rail_w / 2", "outer_l - post_size", "sup_dm_z"),
             "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-            srr_p, br_p, "DM_SRR_B", ev)
-    print(">>> Support rail dominos: 4 joints")
+            srr_p, bbr_p, "DM_SRR_B", ev)
+    print(">>> Support rail dominos: 4 joints (into front/back bottom rails)")
 
     # ================================================================
     #  6. DETAILS — post top chamfers (safety: flush, slight ease)
