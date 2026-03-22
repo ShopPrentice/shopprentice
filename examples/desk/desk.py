@@ -195,48 +195,32 @@ def run(context):
         {"x": "divider_thick", "y": "desk_w - leg_size - apron_thick"}, "Divider_Sk", ev)
     af.ext_new(apron_c, pr, "apron_h", "Divider").bodies.item(0).name = "Divider"
 
-    # Drawer runners — 4 total: left apron, left side of divider,
-    # right side of divider, right apron. All run front-to-back (Y).
+    # Drawer runners — 2 on side aprons only (divider sides have no runners
+    # to avoid blocking drawer slide path)
     runner_z = "apron_z + drawer_gap"
     runner_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, runner_z, "RunnerZ_Pl")
 
-    # Left apron runner (inner face at X=apron_thick)
+    # Left apron runner
     _, pr = af.sketch_rect_model(apron_c, runner_z_pl,
         ("apron_thick", "leg_size", runner_z),
-        {"x": "runner_w", "y": "short_apron_l"}, "RunnerLL_Sk", ev)
-    af.ext_new(apron_c, pr, "runner_h", "RunnerLL").bodies.item(0).name = "Runner_LL"
+        {"x": "runner_w", "y": "short_apron_l"}, "RunnerL_Sk", ev)
+    lr_ext = af.ext_new(apron_c, pr, "runner_h", "RunnerL")
+    lr_ext.bodies.item(0).name = "Runner_L"
 
-    # Left side of divider (X = mid_x - divider_thick/2 - runner_w)
-    _, pr = af.sketch_rect_model(apron_c, runner_z_pl,
-        ("mid_x - divider_thick / 2 - runner_w", "leg_size", runner_z),
-        {"x": "runner_w", "y": "short_apron_l"}, "RunnerLR_Sk", ev)
-    af.ext_new(apron_c, pr, "runner_h", "RunnerLR").bodies.item(0).name = "Runner_LR"
+    # Right apron runner (mirror)
+    af.mirror_feats(apron_c, [lr_ext], a_xmid, "RunnerRMir").bodies.item(0).name = "Runner_R"
 
-    # Right side of divider (X = mid_x + divider_thick/2)
-    _, pr = af.sketch_rect_model(apron_c, runner_z_pl,
-        ("mid_x + divider_thick / 2", "leg_size", runner_z),
-        {"x": "runner_w", "y": "short_apron_l"}, "RunnerRL_Sk", ev)
-    af.ext_new(apron_c, pr, "runner_h", "RunnerRL").bodies.item(0).name = "Runner_RL"
-
-    # Right apron runner (inner face at X=desk_l-apron_thick-runner_w)
-    _, pr = af.sketch_rect_model(apron_c, runner_z_pl,
-        ("desk_l - apron_thick - runner_w", "leg_size", runner_z),
-        {"x": "runner_w", "y": "short_apron_l"}, "RunnerRR_Sk", ev)
-    af.ext_new(apron_c, pr, "runner_h", "RunnerRR").bodies.item(0).name = "Runner_RR"
-
-    # Drawer stops — 4 blocks at back of each runner
+    # Drawer stops — 2 blocks at back of each runner
     stop_z = "apron_z + drawer_gap + runner_h"
     stop_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, stop_z, "StopZ_Pl")
-    for sname, sx in [("Stop_LL", "apron_thick"),
-                       ("Stop_LR", "mid_x - divider_thick / 2 - runner_w"),
-                       ("Stop_RL", "mid_x + divider_thick / 2"),
-                       ("Stop_RR", "desk_l - apron_thick - runner_w")]:
-        _, pr = af.sketch_rect_model(apron_c, stop_z_pl,
-            (sx, "desk_w - leg_size - apron_thick - stop_l", stop_z),
-            {"x": "runner_w", "y": "stop_l"}, f"{sname}_Sk", ev)
-        af.ext_new(apron_c, pr, "drawer_h_inner", sname).bodies.item(0).name = sname
+    _, pr = af.sketch_rect_model(apron_c, stop_z_pl,
+        ("apron_thick", "desk_w - leg_size - apron_thick - stop_l", stop_z),
+        {"x": "runner_w", "y": "stop_l"}, "StopL_Sk", ev)
+    sl_ext = af.ext_new(apron_c, pr, "drawer_h_inner", "StopL")
+    sl_ext.bodies.item(0).name = "Stop_L"
+    af.mirror_feats(apron_c, [sl_ext], a_xmid, "StopRMir").bodies.item(0).name = "Stop_R"
 
-    print(">>> Aprons: 4 + divider + 4 runners + 4 stops")
+    print(">>> Aprons: 4 + divider + 2 runners + 2 stops")
 
     # ==============================================================
     #  3. TOP — with cable grommet
@@ -336,12 +320,11 @@ def run(context):
     domino.grid(root, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_p_body, fr_p, "DM_FR_R", ev)
 
-    # Divider → front rail and back apron (1 domino each end)
-    dm_div = af.off_plane(root, root.yZConstructionPlane, "mid_x", "DM_Div")
-    domino.grid(root, dm_div, ("mid_x", "apron_thick / 2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", div_p, fr_p_body, "DM_Div_F", ev)
-    domino.grid(root, dm_div, ("mid_x", "desk_w - leg_size - apron_thick / 2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", div_p, ba_p, "DM_Div_B", ev)
+    # Divider → front rail and back apron (dado joint — CUT divider into both)
+    # No dominos here — domino depth would protrude past the thin divider
+    # into the drawer path. CUT creates a perfect-fit dado slot instead.
+    af.combine(root, fr_p_body, [div_p], CUT, True, "Div_FrontRailDado")
+    af.combine(root, ba_p, [div_p], CUT, True, "Div_BackApronDado")
 
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
     # Vertical leg against apron inner face, horizontal leg under top
@@ -391,7 +374,8 @@ def run(context):
     # Slide each drawer to 75% open position, check for interference
     slide_dist = ev("drawer_d") * 0.75  # 75% of drawer depth
 
-    for dr_name, dr_occ in [("DrawerL", drawer_l_occ), ("DrawerR", drawer_r_occ)]:
+    for dr_name, dr_prefix, dr_occ in [("DrawerL", "ddl_", drawer_l_occ),
+                                        ("DrawerR", "ddr_", drawer_r_occ)]:
         # Save original transform
         orig_t = dr_occ.transform.copy()
 
@@ -424,7 +408,7 @@ def run(context):
                     b2 = r.entityTwo.name
                 except Exception:
                     continue
-                if b1.startswith(dr_name[:3].lower()) or b2.startswith(dr_name[:3].lower()):
+                if b1.startswith(dr_prefix) or b2.startswith(dr_prefix):
                     vol = 0
                     try:
                         vol = r.interferenceBody.volume
