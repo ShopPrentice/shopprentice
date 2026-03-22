@@ -13,7 +13,8 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 | `execute_script` | Run a Fusion 360 Python script (one phase at a time). Set `sandbox=true` for throwaway validation, `clean=true` to rebuild an existing model (Ctrl+Z reverts). |
 | `capture_design` | After every `execute_script` — validate body count, positions, volumes |
 | `get_timeline_state` | When `capture_design` shows unexpected state — bisect timeline to find the bad feature |
-| `get_screenshot` | Once at the end — present the final result to the user |
+| `get_screenshot` | Quick viewport capture for build validation (1024x1024, as-is) |
+| `get_product_shots` | Final presentation shots — hides artifacts, proper framing, multiple views (2048x2048) |
 | `get_selection` | Read what the user has selected in the Fusion 360 UI |
 | `set_selection` | Highlight entities for the user (after identifying a problem body, etc.) |
 | `modify_parameters` | Change parameter values without re-running the script — for iterative tuning |
@@ -32,7 +33,7 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 2. Plan the build (components, features, joinery)
 3. Execute Phase 1 (structure) → validate with `capture_design`
 4. Execute Phase 2 (joinery) → validate with `capture_design`
-5. Execute Phase 3 (details) → validate → `validate_design` → `apply_appearance` → screenshot → present to user
+5. Execute Phase 3 (details) → validate → `validate_design` → `apply_appearance` → `get_product_shots` → present to user
 
 ### Key Principles
 

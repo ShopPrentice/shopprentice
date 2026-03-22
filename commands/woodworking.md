@@ -923,7 +923,8 @@ When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), y
 | `capture_design` | Full design introspection: parameters, component tree with body geometry and sketch dimension details, timeline features (including chamfers and fillets). |
 | `get_timeline_state` | Roll timeline to any index, capture body geometry at that point, restore position. |
 | `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. Set `sandbox=true` to run in a throwaway document. Set `clean=true` to delete all existing features before running — enables clean rebuild of an existing model. The entire clean+execute is one transaction: Ctrl+Z reverts to the previous state. |
-| `get_screenshot` | Capture the current Fusion 360 viewport. Use to verify results visually. |
+| `get_screenshot` | Quick viewport capture for build validation (1024x1024, as-is with artifacts). Use during builds to verify geometry. |
+| `get_product_shots` | Final presentation screenshots. Hides construction artifacts, FOV-aware framing, multiple views in one call (default: iso-top-right + front + right at 2048x2048). Supports `style` (shaded/transparent) and `bodies` (detail framing). Use after `apply_appearance`. |
 | `get_selection` | Read the user's current UI selection. Returns structured info per entity type (body, face, edge, occurrence) AND full feature details when a feature is selected (Sketch with curves/dimensions/constraints, Extrude with operation/distance/sketch, Combine with target/tool bodies, Mirror, Pattern, Move, Chamfer, Fillet). Use when the user says "what is this?" or "make this thicker". |
 | `set_selection` | Highlight entities in the UI by name or token. Use after `capture_design` identifies a problem body — select it so the user sees which one. |
 | `modify_parameters` | Change parameter expressions with incremental recompute. Much faster than re-running the script. Use for iterative tuning ("make shelves deeper"). |
@@ -951,7 +952,7 @@ After generating each component's code, run this loop:
 5. **Auto-proceed** to the next component if validation passes.
 6. **After the final cycle — structural validation:**
    - Call `validate_design` — single call that runs connectivity + interference checks. Must return `passed: true`. If it fails, the response tells you which check failed and why.
-7. **Appearance + screenshot at the end** — after structural validation passes, call `apply_appearance` then `get_screenshot`. See `woodworking/appearance.md` for species and grain details.
+7. **Appearance + product shots at the end** — after structural validation passes, call `apply_appearance` then `get_product_shots`. Product shots auto-hide construction artifacts, frame the model properly, and capture multiple views in one call. See `woodworking/appearance.md` for species and grain details.
 
 ### Diagnosing with Timeline Rollback
 
