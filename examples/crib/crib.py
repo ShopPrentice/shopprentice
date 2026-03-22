@@ -514,8 +514,9 @@ def run(context):
         post_c.features.chamferFeatures.add(ch_inp).name = "PostTops_Ch"
 
     # 6b. General edge break — one chamfer per component, all structural edges
+    # Skip Spindles (already round) — chamfer posts, rails, support only
     for comp_name, comp in [("Posts", post_c), ("Rails", rail_c),
-                             ("Spindles", spindle_c), ("Support", support_c)]:
+                             ("Support", support_c)]:
         edges = adsk.core.ObjectCollection.create()
         for bi in range(comp.bRepBodies.count):
             body = comp.bRepBodies.item(bi)
@@ -529,7 +530,7 @@ def run(context):
                 edges, VI("edge_chamfer"), True)
             comp.features.chamferFeatures.add(ch_inp).name = f"{comp_name}_Ch"
 
-    print(">>> Chamfers: post tops + 4 component edge breaks")
+    print(">>> Chamfers: post tops + 3 component edge breaks")
 
     # ================================================================
     #  EPILOGUE
