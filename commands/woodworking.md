@@ -43,6 +43,12 @@ Before writing any code, plan the modeling steps the way an experienced designer
    - **End grain to side grain** (fiber ends meeting a surface) — mechanical joint required (rail into leg = M&T, board corner = dovetail).
    - **End grain to end grain** — weakest possible bond. Always reinforce with a cross-grain element (spline, domino, biscuit).
 
+   **Wood movement determines attachment method:**
+   - Wood expands/contracts across the grain (perpendicular to fiber direction). Narrow parts (legs, rails) are negligible. Wide panels (desk tops, table tops, seats > ~6") move measurably with seasonal humidity changes.
+   - **Never rigidly attach a wide panel to a cross-grain apron.** Dominos, dowels, or screws through fixed holes lock the panel — when it shrinks, the cross-grain apron holds it in tension, splitting it.
+   - **Use slotted fasteners** for cross-grain top-to-apron connections: `tabletop_bracket` (L-bracket with slotted screw holes), Z-clips, or figure-8 fasteners. The slot allows the panel to slide across the grain while staying flat.
+   - **Rigid attachment is OK** when the apron runs WITH the grain (both parts move together).
+
 ## Topic Reference
 
 This skill is modular. The core (this file) covers fundamentals needed for every project. Read additional topic files based on your project's needs:

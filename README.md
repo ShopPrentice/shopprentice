@@ -136,6 +136,7 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 | `splayed_legs` | Compound-splayed legs with floor trim |
 | `dowel` | Spindle-to-rail, panel alignment, edge joining |
 | `bowtie` | Live edge slab inlays (Nakashima style) |
+| `tabletop_bracket` | L-bracket with slotted holes for cross-grain top attachment |
 | `bed_rail_fastener` | STEP hardware for rail-to-post connections |
 | `dovetailed_drawer` | Complete drawer box |
 
