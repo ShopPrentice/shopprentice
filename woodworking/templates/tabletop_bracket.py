@@ -114,18 +114,20 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         return f"{val} cm"
 
     if face_axis == "y":
-        # Vertical plate: XZ rectangle at Y=cy
+        # Vertical plate sits ON the apron inner face, extending inward
+        # ext_new always goes +Y, so offset plane for face_dir=-1
+        vp_y = cy if face_dir > 0 else cy - thick
         vp_pl = af.off_plane(comp, comp.xZConstructionPlane,
-                              cm(cy), f"{name}_VP_Pl")
+                              cm(vp_y), f"{name}_VP_Pl")
         _, vp_prof = af.sketch_rect_model(comp, vp_pl,
-            (cm(cx - w/2), cm(cy), cm(cz - v_h)),
+            (cm(cx - w/2), cm(vp_y), cm(cz - v_h)),
             {"x": f"{prefix}_w", "z": f"{prefix}_leg_h"},
             f"{name}_VP_Sk", ev)
         vp_ext = af.ext_new(comp, vp_prof, f"{prefix}_thick", f"{name}_VP")
         vert_body = vp_ext.bodies.item(0)
         vert_body.name = f"{name}_V"
 
-        # Horizontal plate: XY rectangle at Z=cz-thick
+        # Horizontal plate at top, extending inward from apron face
         hp_pl = af.off_plane(comp, comp.xYConstructionPlane,
                               cm(cz - thick), f"{name}_HP_Pl")
         hp_y0 = cy if face_dir > 0 else cy - h_w
@@ -141,11 +143,12 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         vert_body.name = name
 
     elif face_axis == "x":
-        # Vertical plate: YZ rectangle at X=cx
+        # Vertical plate sits ON apron inner face
+        vp_x = cx if face_dir > 0 else cx - thick
         vp_pl = af.off_plane(comp, comp.yZConstructionPlane,
-                              cm(cx), f"{name}_VP_Pl")
+                              cm(vp_x), f"{name}_VP_Pl")
         _, vp_prof = af.sketch_rect_model(comp, vp_pl,
-            (cm(cx), cm(cy - w/2), cm(cz - v_h)),
+            (cm(vp_x), cm(cy - w/2), cm(cz - v_h)),
             {"y": f"{prefix}_w", "z": f"{prefix}_leg_h"},
             f"{name}_VP_Sk", ev)
         vp_ext = af.ext_new(comp, vp_prof, f"{prefix}_thick", f"{name}_VP")

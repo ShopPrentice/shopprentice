@@ -320,7 +320,15 @@ def run(context):
         step_axis="y", step_expr=str(ev("short_apron_l") / 3),
         count=2, name="TB_R", ev=ev)
 
-    print(">>> Brackets: 7 tabletop L-brackets (3 back + 2 left + 2 right)")
+    # Front rail: inner face at Y = apron_thick
+    # face_dir=+1: horizontal leg extends toward +Y (into the desk)
+    front_y = ev("apron_thick")
+    tabletop_bracket.row(bracket_c, face_axis="y", face_dir=1,
+        start=(ev("leg_size") + ev("long_apron_l") / 4, front_y, top_z),
+        step_axis="x", step_expr=str(ev("long_apron_l") / 4),
+        count=3, name="TB_F", ev=ev)
+
+    print(">>> Brackets: 10 tabletop L-brackets (3 front + 3 back + 2 left + 2 right)")
     print(">>> Dominos: 8 apron-leg + 2 front-rail = 10 joints")
 
     # ==============================================================
