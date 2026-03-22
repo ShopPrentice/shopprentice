@@ -15,6 +15,7 @@ import adsk.core, adsk.fusion
 from helpers import af
 from woodworking.templates import dovetailed_drawer
 from woodworking.templates import domino
+from woodworking.templates import tabletop_bracket
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -290,28 +291,43 @@ def run(context):
     domino.grid(root, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_p_body, fr_p, "DM_FR_R", ev)
 
-    # Top → aprons (2 dominos per apron, 3 aprons = 6 joints)
-    top_p = top_body.createForAssemblyContext(top_occ)
-    top_dm_pl = af.off_plane(root, root.xYConstructionPlane, "leg_h", "DM_Top_Pl")
-    params.add("top_dm_sp", VI("long_apron_l / 3"), "in", "")
+    # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
+    # Brackets sit on apron inner face, horizontal leg screws into top underside
+    bracket_occ = af.make_comp(root, "Brackets")
+    bracket_c = bracket_occ.component
+    # Define bracket params early so we can use them for positioning
+    tabletop_bracket._define_params(params)
+    bracket_z = ev("leg_h") - ev("tb_leg_h") / 2  # center vertically near top
 
-    # Top → back apron
-    domino.grid(root, top_dm_pl,
-        ("leg_size + long_apron_l / 3", "desk_w - leg_size - apron_thick / 2", "leg_h"),
-        "x", "top_dm_sp", "2", "x", "dm_w", "dm_t", "dm_d",
-        top_p, ba_p, "DM_Top_B", ev)
-    # Top → left apron
-    domino.grid(root, top_dm_pl,
-        ("apron_thick / 2", "leg_size + short_apron_l / 3", "leg_h"),
-        "y", "short_apron_l / 3", "2", "y", "dm_w", "dm_t", "dm_d",
-        top_p, la_p, "DM_Top_L", ev)
-    # Top → right apron
-    domino.grid(root, top_dm_pl,
-        ("desk_l - apron_thick / 2", "leg_size + short_apron_l / 3", "leg_h"),
-        "y", "short_apron_l / 3", "2", "y", "dm_w", "dm_t", "dm_d",
-        top_p, ra_p, "DM_Top_R", ev)
+    # Back apron brackets (3 evenly spaced along X)
+    tabletop_bracket.row(bracket_c, ba_body, top_body,
+        face_axis="y", face_dir=-1,
+        start=(ev("leg_size") + ev("long_apron_l") / 4,
+               ev("desk_w") - ev("leg_size") - ev("apron_thick"),
+               bracket_z),
+        step_axis="x", step_expr=str(ev("long_apron_l") / 2),
+        count=3, name="TB_B", ev=ev, cut=False)
 
-    print(">>> Dominos: 8 apron-leg + 2 front-rail + 6 top-apron = 16 joints")
+    # Left apron brackets (2 evenly spaced along Y)
+    tabletop_bracket.row(bracket_c, la_body, top_body,
+        face_axis="x", face_dir=1,
+        start=(ev("apron_thick"),
+               ev("leg_size") + ev("short_apron_l") / 3,
+               bracket_z),
+        step_axis="y", step_expr=str(ev("short_apron_l") / 3),
+        count=2, name="TB_L", ev=ev, cut=False)
+
+    # Right apron brackets (2 evenly spaced along Y)
+    tabletop_bracket.row(bracket_c, ra_body, top_body,
+        face_axis="x", face_dir=-1,
+        start=(ev("desk_l") - ev("apron_thick"),
+               ev("leg_size") + ev("short_apron_l") / 3,
+               bracket_z),
+        step_axis="y", step_expr=str(ev("short_apron_l") / 3),
+        count=2, name="TB_R", ev=ev, cut=False)
+
+    print(">>> Brackets: 7 tabletop L-brackets (3 back + 2 left + 2 right)")
+    print(">>> Dominos: 8 apron-leg + 2 front-rail = 10 joints")
 
     # ==============================================================
     #  6. DETAILS — edge chamfers
@@ -335,7 +351,7 @@ def run(context):
     # ==============================================================
     #  EPILOGUE
     # ==============================================================
-    for comp in [leg_c, apron_c, top_c, drawer_c]:
+    for comp in [leg_c, apron_c, top_c, drawer_c, bracket_c]:
         for sk in comp.sketches:
             sk.isVisible = False
         for cp in comp.constructionPlanes:
@@ -346,7 +362,8 @@ def run(context):
         cp.isLightBulbOn = False
 
     for cn, c in [("Legs", leg_c), ("Aprons", apron_c),
-                   ("Top", top_c), ("Drawer", drawer_c)]:
+                   ("Top", top_c), ("Drawer", drawer_c),
+                   ("Brackets", bracket_c)]:
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cn}: {len(names)} bodies -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
