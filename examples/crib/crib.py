@@ -36,8 +36,9 @@ def run(context):
         ("rail_h",        "34 in",    "in"),
         ("post_size",     "2.5 in",   "in"),
         ("rail_w",        "3 in",     "in"),
-        ("rail_thick",    "0.75 in",  "in"),
+        ("rail_thick",    "1.5 in",   "in"),   # thick enough for spindle mortises
         ("spindle_dia",   "0.75 in",  "in"),
+        ("spindle_tenon", "0.5 in",   "in"),  # how deep spindle inserts into rail
         ("spindle_sp",    "2.25 in",  "in"),   # center-to-center (gap = sp - dia ≤ 2.375")
         # Mattress support
         ("mattress_h",    "6 in",     "in"),   # lowest position
@@ -63,7 +64,8 @@ def run(context):
         ("mid_x",         "outer_w / 2",                                "in"),
         ("mid_y",         "outer_l / 2",                                "in"),
         # Spindle counts + actual spacing
-        ("spindle_h",     "rail_h - 2 * rail_w",                       "in"),
+        ("spindle_h",     "rail_h - 2 * rail_w + 2 * spindle_tenon",    "in"),
+        ("spindle_z",     "rail_w - spindle_tenon",                    "in"),
         ("n_short_sp",    "floor(interior_w / spindle_sp)",             ""),
         ("n_long_sp",     "floor(interior_l / spindle_sp)",             ""),
         ("short_sp_act",  "interior_w / (n_short_sp + 1)",             "in"),
@@ -185,16 +187,17 @@ def run(context):
     # Let me use a simpler approach
     spindle_c.sketches.item(0).deleteMe()  # remove the previous sketch
 
-    # Front spindle: circle on XY offset at Z=0, extrude to rail_h
-    sp_xy_pl = spindle_c.xYConstructionPlane
-    sk_fs2 = spindle_c.sketches.add(sp_xy_pl)
+    # Front spindle: circle on XY offset at spindle_z, extrude by spindle_h
+    # Spindle inserts spindle_tenon deep into each rail (blind, not through)
+    sp_z_pl = af.off_plane(spindle_c, spindle_c.xYConstructionPlane, "spindle_z", "SpZ_Pl")
+    sk_fs2 = spindle_c.sketches.add(sp_z_pl)
     sk_fs2.name = "FSpindle_Sk"
     first_x_cm = ev("post_size") + ev("short_sp_act")
     center_y_cm = ev("post_size") / 2
     sk_fs2.sketchCurves.sketchCircles.addByCenterRadius(
         P3.create(first_x_cm, center_y_cm, 0), ev("spindle_dia") / 2)
     fs_prof2 = sk_fs2.profiles.item(0)
-    fs_ext2 = af.ext_new(spindle_c, fs_prof2, "rail_h", "FSpindle_1")
+    fs_ext2 = af.ext_new(spindle_c, fs_prof2, "spindle_h", "FSpindle_1")
     fs_body2 = fs_ext2.bodies.item(0); fs_body2.name = "Spindle_F1"
 
     # Pattern front spindles along X
@@ -204,14 +207,14 @@ def run(context):
                          "n_short_sp", "short_sp_act", "FSpindlePat")
 
     # Left spindle template (long side)
-    sk_ls = spindle_c.sketches.add(sp_xy_pl)
+    sk_ls = spindle_c.sketches.add(sp_z_pl)
     sk_ls.name = "LSpindle_Sk"
     center_x_cm = ev("post_size") / 2
     first_y_cm = ev("post_size") + ev("long_sp_act")
     sk_ls.sketchCurves.sketchCircles.addByCenterRadius(
         P3.create(center_x_cm, first_y_cm, 0), ev("spindle_dia") / 2)
     ls_prof = sk_ls.profiles.item(0)
-    ls_ext = af.ext_new(spindle_c, ls_prof, "rail_h", "LSpindle_1")
+    ls_ext = af.ext_new(spindle_c, ls_prof, "spindle_h", "LSpindle_1")
     ls_body = ls_ext.bodies.item(0); ls_body.name = "Spindle_L1"
 
     n_long = int(ev("n_long_sp"))
