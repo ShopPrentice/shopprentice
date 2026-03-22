@@ -123,7 +123,7 @@ def _capture_one(viewport, width, height):
 
 
 def handler(views: list = None, width: int = 2048, height: int = 2048,
-            bodies: list = None, fill: float = 0.80,
+            bodies: list = None, fill: float = 0.60,
             style: str = "shaded") -> dict:
     """Capture product-quality screenshots with artifact cleanup."""
 
@@ -183,6 +183,10 @@ def handler(views: list = None, width: int = 2048, height: int = 2048,
         for view_name in view_list:
             eye_dir = _VIEW_DIRECTIONS[view_name]
             af.screenshot_cam(eye_dir=eye_dir, bodies=target_bodies, fill=fill)
+            # Let Fusion fully update the viewport before capturing
+            import time
+            adsk.doEvents()
+            time.sleep(0.5)
             adsk.doEvents()
 
             data = _capture_one(viewport, width, height)
@@ -279,9 +283,9 @@ tool = Tool.create_simple(
 ).add_input_property(
     "fill",
     {
-        "description": "Fraction of frame to fill (0.0-1.0). Default 0.80.",
+        "description": "Fraction of frame to fill (0.0-1.0). Default 0.60 for product shots (generous whitespace). Use 0.85+ for detail shots.",
         "type": "number",
-        "default": 0.80
+        "default": 0.60
     }
 ).add_input_property(
     "style",
