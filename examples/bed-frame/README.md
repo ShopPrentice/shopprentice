@@ -88,5 +88,6 @@ A Nakashima-inspired twin bed with a 2" thick slab headboard and 3 decorative bo
 ### Appearance
 
 ```
-apply_appearance(species="walnut")
+apply_appearance(species="white oak")
+apply_appearance(species="walnut", bodies=[bowtie_names])
 ```

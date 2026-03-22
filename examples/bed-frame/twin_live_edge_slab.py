@@ -394,7 +394,9 @@ def run(context):
         print(f"{cn}: {len(names)} -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
 
-    af.apply_appearance("walnut")
+    af.apply_appearance("white oak")
+    bt_names = [b.name for b in bt_bodies]
+    af.apply_appearance("walnut", bodies=bt_names)
 
     cam = app.activeViewport.camera
     cam.isFitView = True
