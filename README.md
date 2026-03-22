@@ -86,12 +86,15 @@ Each folder under `examples/` contains a complete Fusion 360 project with screen
 </tr>
 <tr>
 <td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/twin-live-edge-slab.png" width="200" /><br /><b>Twin Bed (Live Edge)</b></a><br />Slab headboard, bowtie inlays, Nakashima style</td>
+<td align="center"><a href="examples/crib/"><img src="examples/crib/screenshots/iso-top-right.png" width="200" /><br /><b>Crib</b></a><br />CPSC spindles, dominos, mattress support</td>
 <td align="center"><a href="examples/coffee-table/"><img src="examples/coffee-table/screenshots/iso-top-right.png" width="200" /><br /><b>Coffee Table</b></a><br />Tapered legs, slatted top, dominos</td>
-<td align="center"><a href="examples/bench/"><img src="examples/bench/screenshots/iso-top-right.png" width="200" /><br /><b>Bench</b></a><br />Simple construction, domino joinery</td>
 </tr>
 <tr>
+<td align="center"><a href="examples/bench/"><img src="examples/bench/screenshots/iso-top-right.png" width="200" /><br /><b>Bench</b></a><br />Simple construction, domino joinery</td>
 <td align="center"><a href="examples/side-table/"><img src="examples/side-table/screenshots/iso-top-right.png" width="200" /><br /><b>Side Table</b></a><br />Compact, tapered legs</td>
 <td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a><br />Writing desk with aprons</td>
+</tr>
+<tr>
 <td align="center"><a href="examples/shelf/"><img src="examples/shelf/screenshots/iso-top-right.png" width="200" /><br /><b>Wall Shelf</b></a><br />Floating shelf, hidden hardware</td>
 </tr>
 </table>
