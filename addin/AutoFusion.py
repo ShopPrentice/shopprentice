@@ -15,6 +15,11 @@ _addin_dir = os.path.dirname(os.path.abspath(__file__))
 if _addin_dir not in sys.path:
     sys.path.insert(0, _addin_dir)
 
+# Also add repo root so scripts can import from woodworking/templates/
+_repo_root = os.path.dirname(_addin_dir)
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
 import adsk.core
 import adsk.fusion
 

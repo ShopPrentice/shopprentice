@@ -35,7 +35,7 @@ def build_box(root, prefix, l_expr, w_expr, h_expr, t_expr,
         Dict with component, bodies, and body count.
     """
     from helpers import af
-    from helpers.templates import dovetail
+    from woodworking.templates import dovetail
 
     occ = af.make_comp(root, prefix)
     comp = occ.component
@@ -154,7 +154,7 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
 
     from helpers import af
-    from helpers.templates import dovetail
+    from woodworking.templates import dovetail
 
     ctx = af.DesignContext(design)
 

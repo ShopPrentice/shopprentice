@@ -20,7 +20,7 @@ def run(context):
     Point3D = adsk.core.Point3D
 
     from helpers import af
-    from helpers.templates import splayed_legs
+    from woodworking.templates import splayed_legs
 
     ctx = af.DesignContext(design)
 

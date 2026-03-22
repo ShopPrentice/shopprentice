@@ -67,7 +67,7 @@ def run(context):
 
     global af, mt
     from helpers import af
-    from helpers.templates import mortise_tenon as mt
+    from woodworking.templates import mortise_tenon as mt
 
     ctx = af.DesignContext(design)
 

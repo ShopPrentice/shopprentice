@@ -133,7 +133,7 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 | `splayed_legs` | Compound-splayed legs with floor trim |
 | `dovetailed_drawer` | Complete drawer box |
 
-**Reference files** (`joinery/`) provide orientation rules, sizing constraints, and variant selection for all joint types:
+**Reference files** (`woodworking/joinery/`) provide orientation rules, sizing constraints, and variant selection for all joint types:
 
 | Joint | Reference | Template | Best For |
 |-------|-----------|----------|----------|

@@ -5,7 +5,7 @@ dovetails with automatic tail count, pin width derivation, and parametric
 half-pin layout.
 
 Usage:
-    from helpers.templates import dovetail
+    from woodworking.templates import dovetail
 
     # Through dovetail at a box corner
     dovetail.corner(root, plane,

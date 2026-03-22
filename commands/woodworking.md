@@ -68,18 +68,18 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | Joint | When to Read | Status | File |
 |-------|-------------|--------|------|
 | **Mortise & Tenon** | Leg-to-rail, stretcher-to-leg, frame-and-panel, table aprons, any rail-into-post connection | Tested (counter stool — blind, through & angled variants) | Inline in skill + `mortise_tenon` template |
-| **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `joinery/domino-joint.md` |
-| **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `joinery/dovetail.md` |
-| **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `joinery/box-joint.md` |
-| **Dado & Rabbet** | Shelves into sides, case backs, drawer bottoms, any panel-into-groove connection | Tested (bookshelf, template fixtures — through/stopped dado, rabbet, panel groove) | `joinery/dado-rabbet.md` |
-| **Bridle Joint** | Frame corners, T-connections, open mortise-and-tenon at end of a rail | Draft | `joinery/bridle-joint.md` |
-| **Lap Joint** | Flat frames, cross braces, grid assemblies, half-lap at crossings | Draft | `joinery/lap-joint.md` |
-| **Miter Joint** | Picture frames, trim, hidden end grain at corners | Draft | `joinery/miter-joint.md` |
-| **Spline Joint** | Reinforced miters, decorative accents across a joint line | Draft | `joinery/spline-joint.md` |
-| **Dowel Joint** | Edge joining, panel glue-ups, face frames — round-peg alignment | Draft | `joinery/dowel-joint.md` |
-| **Pocket Hole** | Face frames, quick assemblies, tabletop attachment — screw-based | Draft | `joinery/pocket-hole.md` |
-| **Bed Rail Fastener** | Bed rail to post — detachable STEP hardware (mortise bedlock, hooks + slots) | Tested (queen + twin beds) | `helpers/templates/bed_rail_fastener.py` + `woodworking/hardware-installation.md` |
-| **Bowtie / Butterfly Key** | Live edge slab crack stabilization, decorative inlay | Tested (twin bed) | `helpers/templates/bowtie.py` |
+| **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `woodworking/joinery/domino-joint.md` |
+| **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `woodworking/joinery/dovetail.md` |
+| **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `woodworking/joinery/box-joint.md` |
+| **Dado & Rabbet** | Shelves into sides, case backs, drawer bottoms, any panel-into-groove connection | Tested (bookshelf, template fixtures — through/stopped dado, rabbet, panel groove) | `woodworking/joinery/dado-rabbet.md` |
+| **Bridle Joint** | Frame corners, T-connections, open mortise-and-tenon at end of a rail | Draft | `woodworking/joinery/bridle-joint.md` |
+| **Lap Joint** | Flat frames, cross braces, grid assemblies, half-lap at crossings | Draft | `woodworking/joinery/lap-joint.md` |
+| **Miter Joint** | Picture frames, trim, hidden end grain at corners | Draft | `woodworking/joinery/miter-joint.md` |
+| **Spline Joint** | Reinforced miters, decorative accents across a joint line | Draft | `woodworking/joinery/spline-joint.md` |
+| **Dowel Joint** | Edge joining, panel glue-ups, face frames — round-peg alignment | Draft | `woodworking/joinery/dowel-joint.md` |
+| **Pocket Hole** | Face frames, quick assemblies, tabletop attachment — screw-based | Draft | `woodworking/joinery/pocket-hole.md` |
+| **Bed Rail Fastener** | Bed rail to post — detachable STEP hardware (mortise bedlock, hooks + slots) | Tested (queen + twin beds) | `woodworking/templates/bed_rail_fastener.py` + `woodworking/hardware-installation.md` |
+| **Bowtie / Butterfly Key** | Live edge slab crack stabilization, decorative inlay | Tested (twin bed) | `woodworking/templates/bowtie.py` |
 
 **Read the topic/joinery file BEFORE writing code** that uses those techniques. The core skill provides the routing — the reference files provide the implementation details. For Draft files, treat instructions as a starting point and validate aggressively.
 
@@ -615,7 +615,7 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 ## Joinery Rules
 
-> **Joint-specific references:** See the Joinery Reference Files table in Topic Reference above. Each `joinery/*.md` file has full parameters, workflow, and pitfalls for that joint type.
+> **Joint-specific references:** See the Joinery Reference Files table in Topic Reference above. Each `woodworking/joinery/*.md` file has full parameters, workflow, and pitfalls for that joint type.
 
 **Core principle:** Never draw separate mortise/socket sketches. Build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), then JOIN to the owner. The body IS the cutting tool — one shape, perfect fit.
 
@@ -623,11 +623,11 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Cross-component:** Use `body.createForAssemblyContext(occ)` for CUT in root. Bulk CUT all tools in one Combine.
 
-**Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `helpers/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `joinery/domino-joint.md`.
+**Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `woodworking/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `woodworking/joinery/domino-joint.md`.
 
 **Hardware (STEP imports):** When a design uses detachable or mechanical hardware (bed rail fasteners, hinges from STEP files), read `woodworking/hardware-installation.md` for import caching, positioning, direction detection, determinant validation, and component organization rules. Most furniture uses joinery templates instead — only load this topic when hardware is needed.
 
-**Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `helpers/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`af.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `joinery/mortise-tenon.md`.
+**Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `woodworking/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`af.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `woodworking/joinery/mortise-tenon.md`.
 
 **Tenon collision at corners — interlock, don't shorten.** When two rails meet in the same leg from perpendicular directions, their tenons collide inside the mortise. The naive fix — shortening one tenon — sacrifices bonding surface and therefore joint strength (less side-grain glue area, less fiber interlock). Instead, notch both tenons so they weave past each other at full depth:
 
@@ -774,8 +774,8 @@ Name every feature and body for a readable timeline and easy debugging:
 | Face-sketch extrudes wrong profile | `profiles.item(0)` is the outer region on face sketches (face minus rectangle) | Use `af.smallest_profile(sk)` to get the inner drawn rectangle |
 | Symmetric extrude body 2× too thick | Passed full thickness to `ext_new_sym` — it applies `dist` to EACH side | Pass half-thickness: `ext_new_sym(comp, prof, "board_t / 2", ...)` |
 | `sketch_rect_model` places body on wrong side of origin | Position dimensions use absolute distance — negative coordinates reflect to positive | Use manual sketch with `modelToSketchSpace` + width/height dimensions only (no position dimensions) |
-| Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `joinery/mortise-tenon.md`) |
-| Domino has square corners (rectangular cross-section) | Used `sketch_rect` instead of `sketch_slot` for domino void body | **Always use `sketch_slot`** — real Festool dominos have stadium (rounded-end) cross-sections. See `joinery/domino-joint.md` for the full implementation. |
+| Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `woodworking/joinery/mortise-tenon.md`) |
+| Domino has square corners (rectangular cross-section) | Used `sketch_rect` instead of `sketch_slot` for domino void body | **Always use `sketch_slot`** — real Festool dominos have stadium (rounded-end) cross-sections. See `woodworking/joinery/domino-joint.md` for the full implementation. |
 
 ## Incremental Build Strategy
 

@@ -5,7 +5,7 @@ for boxes and chests. The lock body is modeled as a rectangular block
 that CUTs its pocket into the front board.
 
 Usage:
-    from helpers.templates import chest_lock
+    from woodworking.templates import chest_lock
 
     lp = chest_lock.define_params(params, prefix="lk", size="small")
 

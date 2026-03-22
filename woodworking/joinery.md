@@ -1,6 +1,6 @@
 # Joinery Rules
 
-Read this file when the project involves joinery (Phase 2+). For specific joint types beyond the ones covered inline here, read the corresponding file from `joinery/`.
+Read this file when the project involves joinery (Phase 2+). For specific joint types beyond the ones covered inline here, read the corresponding file from `woodworking/joinery/`.
 
 ## Templates (Preferred for Complex Joints)
 
@@ -19,7 +19,7 @@ domino.grid(comp, plane, start=(...), step_axis="x", step_expr="dm_sp",
 mortise_tenon.blind(comp, rail_body, leg_body, face_axis="y", ...)
 ```
 
-**Check for a template first.** If one exists, use it. Only write inline for simple joints (dado, rabbet, T&G) or joints without templates. See `joinery/README.md` for the full template table.
+**Check for a template first.** If one exists, use it. Only write inline for simple joints (dado, rabbet, T&G) or joints without templates. See `woodworking/joinery/README.md` for the full template table.
 
 ## Combine-Based Joinery (CRITICAL)
 
@@ -192,13 +192,13 @@ For joints beyond M&T, T&G, and gap filling, **check for a template first** (`fr
 
 | Joint | File | Template | Prefix | Use For |
 |-------|------|----------|--------|---------|
-| Dado & Rabbet | `joinery/dado-rabbet.md` | — (inline) | `dr_` | Shelves, case backs, drawer bottoms |
-| Lap Joint | `joinery/lap-joint.md` | — | `lj_` | Frames, cross braces, lattice |
-| Box Joint | `joinery/box-joint.md` | `finger_joint` | `bj_` | Boxes, drawers, decorative corners |
-| Bridle Joint | `joinery/bridle-joint.md` | — | `br_` | Frame corners, open mortise T-connections |
-| Dowel Joint | `joinery/dowel-joint.md` | — | `dw_` | Edge joining, panel glue-ups, face frames |
-| Spline Joint | `joinery/spline-joint.md` | — | `sp_` | Reinforced miters, decorative accents |
-| Miter Joint | `joinery/miter-joint.md` | — | `mj_` | Picture frames, trim, hidden end grain |
-| Dovetail | `joinery/dovetail.md` | `dovetail` | `dt_` | Drawer fronts, premium boxes, visible joints |
-| Pocket Hole | `joinery/pocket-hole.md` | — | `ph_` | Face frames, quick assemblies, tabletops |
-| Domino Joint | `joinery/domino-joint.md` | `domino` | `dm_` | Hidden structural connections, kick boards |
+| Dado & Rabbet | `woodworking/joinery/dado-rabbet.md` | — (inline) | `dr_` | Shelves, case backs, drawer bottoms |
+| Lap Joint | `woodworking/joinery/lap-joint.md` | — | `lj_` | Frames, cross braces, lattice |
+| Box Joint | `woodworking/joinery/box-joint.md` | `finger_joint` | `bj_` | Boxes, drawers, decorative corners |
+| Bridle Joint | `woodworking/joinery/bridle-joint.md` | — | `br_` | Frame corners, open mortise T-connections |
+| Dowel Joint | `woodworking/joinery/dowel-joint.md` | — | `dw_` | Edge joining, panel glue-ups, face frames |
+| Spline Joint | `woodworking/joinery/spline-joint.md` | — | `sp_` | Reinforced miters, decorative accents |
+| Miter Joint | `woodworking/joinery/miter-joint.md` | — | `mj_` | Picture frames, trim, hidden end grain |
+| Dovetail | `woodworking/joinery/dovetail.md` | `dovetail` | `dt_` | Drawer fronts, premium boxes, visible joints |
+| Pocket Hole | `woodworking/joinery/pocket-hole.md` | — | `ph_` | Face frames, quick assemblies, tabletops |
+| Domino Joint | `woodworking/joinery/domino-joint.md` | `domino` | `dm_` | Hidden structural connections, kick boards |

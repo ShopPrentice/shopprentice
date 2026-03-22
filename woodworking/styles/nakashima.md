@@ -21,9 +21,9 @@ What we can build today in AutoFusion:
 | Feature | Status | Template |
 |---------|--------|----------|
 | Rectangular slab headboard/top | Working | `sketch_rect_model` |
-| Bowtie inlay pockets | Working | `helpers/templates/bowtie.py` |
+| Bowtie inlay pockets | Working | `woodworking/templates/bowtie.py` |
 | Bowtie row along crack line | Working | `bowtie.row()` |
-| Domino slab-to-post attachment | Working | `helpers/templates/domino.py` |
+| Domino slab-to-post attachment | Working | `woodworking/templates/domino.py` |
 | Post chamfer alignment with slab | Working | Chamfer alignment rule in core skill |
 
 ## Planned Capabilities (Not Yet Built)

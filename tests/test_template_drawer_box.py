@@ -19,7 +19,7 @@ def run(context):
     Point3D = adsk.core.Point3D
 
     from helpers import af
-    from helpers.templates import drawer_box
+    from woodworking.templates import drawer_box
 
     ctx = af.DesignContext(design)
 

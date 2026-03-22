@@ -5,7 +5,7 @@ technique. Builds one near-left leg, trims it against the seat/top body,
 then mirrors to all 4 corners.
 
 Usage:
-    from helpers.templates import splayed_legs
+    from woodworking.templates import splayed_legs
 
     # Define splay parameters
     splayed_legs.define_params(params,

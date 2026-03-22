@@ -39,7 +39,7 @@ def build_box(root, prefix, l_expr, w_expr, h_expr,
         Dict with component, bodies, and body count.
     """
     from helpers import af
-    from helpers.templates import half_blind_dovetail
+    from woodworking.templates import half_blind_dovetail
 
     if lap_expr is None:
         lap_expr = f"{hbd_prefix}_lap"
@@ -172,7 +172,7 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
 
     from helpers import af
-    from helpers.templates import half_blind_dovetail
+    from woodworking.templates import half_blind_dovetail
 
     ctx = af.DesignContext(design)
 

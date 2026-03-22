@@ -1,6 +1,6 @@
 import adsk.core, adsk.fusion, math
 from helpers import af
-from helpers.templates import dovetail
+from woodworking.templates import dovetail
 
 def run(context):
     ctx = af.DesignContext()

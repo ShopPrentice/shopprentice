@@ -5,7 +5,7 @@ bottom panel + bottom grooves + optional pull groove. Designed for
 stacking in a case via body_pattern.
 
 Usage:
-    from helpers.templates import drawer_box
+    from woodworking.templates import drawer_box
 
     # Define drawer parameters
     drawer_box.define_params(params,

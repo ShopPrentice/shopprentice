@@ -7,7 +7,7 @@ Traditional high-quality drawer construction:
 - Optional taller front board (lip above sides)
 
 Usage:
-    from helpers.templates import dovetailed_drawer
+    from woodworking.templates import dovetailed_drawer
 
     dovetailed_drawer.define_params(params, prefix="dd",
         drawer_w="22 in", drawer_d="14 in", drawer_h="4 in",
@@ -22,8 +22,8 @@ import adsk.core
 import adsk.fusion
 
 from helpers import af
-from helpers.templates import dovetail
-from helpers.templates import half_blind_dovetail
+from woodworking.templates import dovetail
+from woodworking.templates import half_blind_dovetail
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 

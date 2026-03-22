@@ -9,7 +9,7 @@ Shoulders are implicit — when the tenon is smaller than the rail face,
 the remaining material forms the shoulder naturally.
 
 Usage:
-    from helpers.templates import mortise_tenon as mt
+    from woodworking.templates import mortise_tenon as mt
 
     mt.define_params(params, prefix="mt",
         tenon_w="2 in", tenon_thick="0.375 in", tenon_depth="1 in")

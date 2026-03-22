@@ -12,8 +12,8 @@ Coordinate system:
 import adsk.core, adsk.fusion
 
 from helpers import af
-from helpers.templates import domino
-from helpers.templates import bed_rail_fastener as brf
+from woodworking.templates import domino
+from woodworking.templates import bed_rail_fastener as brf
 from helpers import hardware as hw_mgr
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation

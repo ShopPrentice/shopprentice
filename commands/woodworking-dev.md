@@ -27,16 +27,16 @@ After completing a build (or a build session with notable discoveries), when the
 | File | Status |
 |------|--------|
 | Mortise & Tenon | Tested (inline in skill + `mortise_tenon` template) |
-| `joinery/domino-joint.md` | Tested |
-| `joinery/dovetail.md` | Tested |
-| `joinery/dado-rabbet.md` | Tested |
-| `joinery/box-joint.md` | Tested (template) |
-| `joinery/bridle-joint.md` | Draft |
-| `joinery/lap-joint.md` | Draft |
-| `joinery/miter-joint.md` | Draft |
-| `joinery/spline-joint.md` | Draft |
-| `joinery/dowel-joint.md` | Draft |
-| `joinery/pocket-hole.md` | Draft |
+| `woodworking/joinery/domino-joint.md` | Tested |
+| `woodworking/joinery/dovetail.md` | Tested |
+| `woodworking/joinery/dado-rabbet.md` | Tested |
+| `woodworking/joinery/box-joint.md` | Tested (template) |
+| `woodworking/joinery/bridle-joint.md` | Draft |
+| `woodworking/joinery/lap-joint.md` | Draft |
+| `woodworking/joinery/miter-joint.md` | Draft |
+| `woodworking/joinery/spline-joint.md` | Draft |
+| `woodworking/joinery/dowel-joint.md` | Draft |
+| `woodworking/joinery/pocket-hole.md` | Draft |
 
 Joinery files live at: `/Users/frankzha/.autofusion/repo/joinery/`
 
@@ -88,7 +88,7 @@ Summarize findings to the user before making changes.
 | New technique for an existing topic | New section in the topic file |
 | New pitfall for an existing topic | Add to that topic's Common Pitfalls table |
 | New topic area (doesn't fit existing files) | New file in `woodworking/` + routing entry in `woodworking.md` |
-| Joint-specific finding | The specific `joinery/*.md` file |
+| Joint-specific finding | The specific `woodworking/joinery/*.md` file |
 | Routing gap (agent wouldn't have found the right file) | Update trigger phrases in the routing tables in `woodworking.md` |
 | General API rule | Core skill `woodworking.md` |
 | Stable pattern confirmed across multiple builds | Auto-memory `MEMORY.md` |

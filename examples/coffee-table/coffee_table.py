@@ -10,7 +10,7 @@ Coordinate system:
 import adsk.core, adsk.fusion
 
 from helpers import af
-from helpers.templates import domino
+from woodworking.templates import domino
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 

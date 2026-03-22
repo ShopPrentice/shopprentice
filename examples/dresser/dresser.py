@@ -32,7 +32,7 @@ def run(context):
 def _run(app):
     print(">>> Script starting")
     from helpers import af
-    from helpers.templates import dovetailed_drawer
+    from woodworking.templates import dovetailed_drawer
 
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType

@@ -1,9 +1,9 @@
 """TV Console — dovetailed case, M&T frame, dovetailed drawers."""
 import adsk.core, adsk.fusion, math
 from helpers import af
-from helpers.templates import domino
-from helpers.templates import dovetail
-from helpers.templates import dovetailed_drawer
+from woodworking.templates import domino
+from woodworking.templates import dovetail
+from woodworking.templates import dovetailed_drawer
 
 CUT  = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation

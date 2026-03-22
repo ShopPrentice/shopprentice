@@ -32,7 +32,7 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
 
     from helpers import af
-    from helpers.templates import butt_hinge, pull, chest_lock
+    from woodworking.templates import butt_hinge, pull, chest_lock
 
     ctx = af.DesignContext(design)
 

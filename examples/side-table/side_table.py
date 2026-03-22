@@ -16,7 +16,7 @@ Components:
 import adsk.core, adsk.fusion
 
 from helpers import af
-from helpers.templates import dovetailed_drawer
+from woodworking.templates import dovetailed_drawer
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 

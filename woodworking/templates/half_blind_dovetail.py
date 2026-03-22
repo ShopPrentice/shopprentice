@@ -13,7 +13,7 @@ Geometry:
     Narrow face of tail: at inner face of pin board (entry/opening)
 
 Usage:
-    from helpers.templates import half_blind_dovetail
+    from woodworking.templates import half_blind_dovetail
 
     half_blind_dovetail.define_params(params, prefix="hbd",
         angle="8 deg", tail_w="0.5 in", tail_count="3",

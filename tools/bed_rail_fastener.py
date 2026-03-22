@@ -328,7 +328,7 @@ def run(context):
     # ================================================================
     # TEST FIXTURES — one for each size (80mm, 100mm, 120mm)
     # ================================================================
-    from helpers.templates import bed_rail_fastener as brf
+    from woodworking.templates import bed_rail_fastener as brf
 
     fix_ev = lambda e: design.unitsManager.evaluateExpression(e, "cm")
     post_w_cm = fix_ev("3 in")

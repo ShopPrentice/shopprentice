@@ -19,7 +19,7 @@ Bodies created per hinge pair (5-knuckle):
   2 plates + 5 knuckles + 1 pin = 8 hardware bodies (plus 2 boards)
 
 Usage:
-    from helpers.templates import butt_hinge
+    from woodworking.templates import butt_hinge
 
     hp = butt_hinge.define_params(params, prefix="bh", size="medium")
 

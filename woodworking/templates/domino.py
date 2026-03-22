@@ -13,7 +13,7 @@ Three primary use cases:
 3. Case/panel joints (grid) — side-to-back, shelf-to-back T-joints
 
 Usage:
-    from helpers.templates import domino
+    from woodworking.templates import domino
 
     # M&T replacement — 4 symmetric dominos (legs to seat)
     domino.four_corners(comp, seat_pl,

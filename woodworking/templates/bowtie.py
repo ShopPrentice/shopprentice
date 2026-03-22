@@ -9,7 +9,7 @@ Since cracks run parallel to the wood fiber, the bowtie's long axis must
 cross the grain. On a slab with fiber in X, bowties are vertical (long_axis="z").
 
 Usage:
-    from helpers.templates import bowtie
+    from woodworking.templates import bowtie
 
     # Single bowtie at a specific position
     bowtie.single(comp, plane, center=("12 in", "y0", "20 in"),

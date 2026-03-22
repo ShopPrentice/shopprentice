@@ -41,7 +41,7 @@ def build_box(root, prefix, l_expr, w_expr, h_expr, t_expr,
         Dict with component, bodies, and body count.
     """
     from helpers import af
-    from helpers.templates import finger_joint
+    from woodworking.templates import finger_joint
 
     occ = af.make_comp(root, prefix)
     comp = occ.component
@@ -73,7 +73,7 @@ def _build_standard(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
                     joint_axis, thick_axis, ox, oy):
     """Standard box: joint along Z, thick along Y."""
     from helpers import af
-    from helpers.templates import finger_joint
+    from woodworking.templates import finger_joint
 
     front_y_expr = y_off_expr
     back_y_expr = (f"{y_off_expr} + {w_expr} - {t_expr}"
@@ -150,7 +150,7 @@ def _build_x_joint(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
                    x_off_expr, y_off_expr, fj_prefix, ev, corners, ox, oy):
     """Box with joint along X, thick along Z (lying flat)."""
     from helpers import af
-    from helpers.templates import finger_joint
+    from woodworking.templates import finger_joint
 
     # Front/back: span X×Y, thin in Z
     sk, pr = af.sketch_rect_model(comp, comp.xYConstructionPlane,
@@ -202,7 +202,7 @@ def _build_y_joint(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
                    x_off_expr, y_off_expr, fj_prefix, ev, corners, ox, oy):
     """Box with joint along Y, thick along X (on its side)."""
     from helpers import af
-    from helpers.templates import finger_joint
+    from woodworking.templates import finger_joint
 
     # Front/back: span Y×Z, thin in X
     front_pl = af.off_plane(comp, comp.yZConstructionPlane,
@@ -267,7 +267,7 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
 
     from helpers import af
-    from helpers.templates import finger_joint
+    from woodworking.templates import finger_joint
 
     ctx = af.DesignContext(design)
 

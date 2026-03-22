@@ -5,7 +5,7 @@ handle bodies. Bolt holes are CUT through the board; the handle body
 sits proud of the surface.
 
 Usage:
-    from helpers.templates import pull
+    from woodworking.templates import pull
 
     pp = pull.define_params(params, prefix="pl", style="bar_3in")
 

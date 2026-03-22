@@ -13,7 +13,7 @@ Three entry points:
   - corner(): create a single finger joint at one corner (lower-level)
 
 Usage:
-    from helpers.templates import finger_joint
+    from woodworking.templates import finger_joint
 
     # Define parameters (count derived from joint height)
     fp = finger_joint.define_params(params, prefix="fj",

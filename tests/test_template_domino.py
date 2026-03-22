@@ -33,7 +33,7 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
 
     from helpers import af
-    from helpers.templates import domino
+    from woodworking.templates import domino
 
     ctx = af.DesignContext(design)
 

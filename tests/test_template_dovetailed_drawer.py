@@ -120,7 +120,7 @@ def run(context):
 
     global af, dovetailed_drawer
     from helpers import af
-    from helpers.templates import dovetailed_drawer
+    from woodworking.templates import dovetailed_drawer
 
     ctx = af.DesignContext(design)
 

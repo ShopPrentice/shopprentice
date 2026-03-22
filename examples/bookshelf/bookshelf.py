@@ -26,8 +26,8 @@ def run(context):
     CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
     from helpers import af
-    from helpers.templates import domino
-    from helpers.templates import dovetail
+    from woodworking.templates import domino
+    from woodworking.templates import dovetail
 
     ctx = af.DesignContext(design)
 

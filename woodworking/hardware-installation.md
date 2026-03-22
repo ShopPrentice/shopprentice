@@ -138,6 +138,6 @@ Split STEP files retain the original generator coordinates, including spacing of
 
 | Hardware | Template | STEP Files | Status |
 |----------|----------|-----------|--------|
-| Bed rail fastener | `helpers/templates/bed_rail_fastener.py` | `~/.autofusion/hardware/bed_rail_fastener/` | Tested (queen + twin beds) |
-| Butt hinge | `helpers/templates/butt_hinge.py` | Inline (parametric, no STEP) | Tested (pencil box, wrap box) |
-| Bowtie inlay | `helpers/templates/bowtie.py` | Inline (parametric, no STEP) | Tested (twin bed) |
+| Bed rail fastener | `woodworking/templates/bed_rail_fastener.py` | `~/.autofusion/hardware/bed_rail_fastener/` | Tested (queen + twin beds) |
+| Butt hinge | `woodworking/templates/butt_hinge.py` | Inline (parametric, no STEP) | Tested (pencil box, wrap box) |
+| Bowtie inlay | `woodworking/templates/bowtie.py` | Inline (parametric, no STEP) | Tested (twin bed) |
