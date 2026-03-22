@@ -43,5 +43,5 @@ A parametric modern writing desk — 48"L × 24"W × 30"H with tapered legs, two
 ### Appearance
 
 ```
-apply_appearance(species="walnut")
+apply_appearance(species="maple")
 ```

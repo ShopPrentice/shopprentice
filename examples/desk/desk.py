@@ -475,7 +475,7 @@ def run(context):
         print(f"{cn}: {len(names)} bodies -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
 
-    af.apply_appearance("walnut")
+    af.apply_appearance("maple")
 
     # Re-apply steel to brackets (walnut overwrites them)
     tabletop_bracket._apply_steel(bracket_c,
