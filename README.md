@@ -98,7 +98,7 @@ Each folder under `examples/` contains a complete Fusion 360 project with screen
 <td align="center"><a href="examples/shelf/"><img src="examples/shelf/screenshots/iso-top-right.png" width="200" /><br /><b>Wall Shelf</b></a><br />Floating shelf, hidden hardware</td>
 </tr>
 <tr>
-<td align="center"><a href="examples/sofa/"><img src="examples/sofa/screenshots/iso-top-right.png" width="200" /><br /><b>Hall Bench</b></a><br />Back frame, slab seat, domino joinery</td>
+<td align="center"><a href="examples/hall_bench/"><img src="examples/hall_bench/screenshots/iso-top-right.png" width="200" /><br /><b>Hall Bench</b></a><br />Raked back, profiled posts, slab seat</td>
 </tr>
 </table>
 
