@@ -234,9 +234,22 @@ def run(context):
     #  3. TOP — with cable grommet
     # ==============================================================
     top_pl = af.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
-    _, pr = af.sketch_rect_model(top_c, top_pl,
-        ("-top_overhang", "0 in", "leg_h"),
-        {"x": "desk_l + 2 * top_overhang", "y": "desk_w"}, "Top_Sk", ev)
+    # Use a YZ offset plane at -overhang so the sketch starts in negative X
+    top_x_pl = af.off_plane(top_c, top_c.yZConstructionPlane,
+                             "0 in - top_overhang", "TopX_Pl")
+    sk_top = top_c.sketches.add(top_pl)
+    sk_top.name = "Top_Sk"
+    P3 = adsk.core.Point3D
+    m2s = sk_top.modelToSketchSpace
+    p1 = m2s(P3.create(-ev("top_overhang"), 0, ev("leg_h")))
+    p2 = m2s(P3.create(ev("desk_l") + ev("top_overhang"), ev("desk_w"), ev("leg_h")))
+    rect = sk_top.sketchCurves.sketchLines.addTwoPointRectangle(
+        P3.create(p1.x, p1.y, 0), P3.create(p2.x, p2.y, 0))
+    sk_top.geometricConstraints.addHorizontal(rect[0])
+    sk_top.geometricConstraints.addHorizontal(rect[2])
+    sk_top.geometricConstraints.addVertical(rect[1])
+    sk_top.geometricConstraints.addVertical(rect[3])
+    pr = sk_top.profiles.item(0)
     top_ext = af.ext_new(top_c, pr, "top_thick", "TopBoard")
     top_body = top_ext.bodies.item(0); top_body.name = "Top"
 
