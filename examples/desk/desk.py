@@ -39,6 +39,7 @@ def run(context):
         ("desk_w",      "24 in",    "in"),
         ("desk_h",      "30 in",    "in"),
         ("top_thick",   "1 in",     "in"),
+        ("top_overhang","0.75 in",  "in"),   # overhang past legs on each end
         ("leg_size",    "2 in",     "in"),
         ("leg_taper",   "0.75 in",  "in"),   # how much each inner face tapers
         ("apron_h",     "5 in",     "in"),
@@ -234,8 +235,8 @@ def run(context):
     # ==============================================================
     top_pl = af.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
     _, pr = af.sketch_rect_model(top_c, top_pl,
-        ("0 in", "0 in", "leg_h"),
-        {"x": "desk_l", "y": "desk_w"}, "Top_Sk", ev)
+        ("-top_overhang", "0 in", "leg_h"),
+        {"x": "desk_l + 2 * top_overhang", "y": "desk_w"}, "Top_Sk", ev)
     top_ext = af.ext_new(top_c, pr, "top_thick", "TopBoard")
     top_body = top_ext.bodies.item(0); top_body.name = "Top"
 

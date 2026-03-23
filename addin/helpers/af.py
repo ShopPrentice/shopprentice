@@ -1020,14 +1020,22 @@ def _grain_axis(body):
 
 
 def _grain_transform(grain_dir):
-    """Rotate texture so grain (texture Z) aligns with model axis."""
+    """Rotate texture so grain aligns with model axis.
+
+    Fusion wood textures typically have grain running along texture Y.
+    Box projection maps texture XYZ to model XYZ by default.
+    We rotate so texture Y (grain) aligns with the desired model axis.
+    """
     m = adsk.core.Matrix3D.create()
     if grain_dir == "x":
-        m.setToRotation(math.pi / 2, adsk.core.Vector3D.create(0, 1, 0),
+        # Rotate 90° around Z: texture Y → model X
+        m.setToRotation(math.pi / 2, adsk.core.Vector3D.create(0, 0, 1),
                         Point3D.create(0, 0, 0))
-    elif grain_dir == "y":
-        m.setToRotation(-math.pi / 2, adsk.core.Vector3D.create(1, 0, 0),
+    elif grain_dir == "z":
+        # Rotate 90° around X: texture Y → model Z
+        m.setToRotation(math.pi / 2, adsk.core.Vector3D.create(1, 0, 0),
                         Point3D.create(0, 0, 0))
+    # grain_dir == "y": identity (grain already along Y)
     return m
 
 
