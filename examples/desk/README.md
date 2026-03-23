@@ -22,7 +22,7 @@ A parametric modern writing desk — 48"L × 24"W × 30"H with tapered legs, two
 ### Structure
 - **4 tapered legs** — 2" square at top, taper to 1.25" at floor on inner faces
 - **3 aprons** — back + 2 sides (no front apron — drawer fronts fill it)
-- **Front rail** — 1.5" strip above drawer openings
+- **Front stretcher** — 1.5" rail below drawer openings
 - **Center divider** — dado'd into front rail + back apron
 - **2 drawer runners** — on side aprons (not divider — would block drawer slide)
 - **2 drawer stops** — blocks at back of each runner
@@ -35,7 +35,7 @@ A parametric modern writing desk — 48"L × 24"W × 30"H with tapered legs, two
 
 ### Joinery
 - **Aprons → legs:** 2 dominos per joint (6 apron joints)
-- **Front rail → legs:** 1 domino each side (2 joints)
+- **Front stretcher → legs:** 1 domino each side (2 joints)
 - **Divider → front rail + back apron:** 2 dominos each end (short depth to fit thin divider)
 - **Top → aprons:** 8 L-brackets with slotted holes (wood movement, 2 per side)
 - **Drawers:** dovetails at all 4 corners

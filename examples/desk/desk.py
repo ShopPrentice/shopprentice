@@ -43,7 +43,7 @@ def run(context):
         ("leg_taper",   "0.75 in",  "in"),   # how much each inner face tapers
         ("apron_h",     "5 in",     "in"),
         ("apron_thick", "0.75 in",  "in"),
-        ("front_rail_h","1.5 in",   "in"),   # rail above drawer opening
+        ("stretcher_h", "1.5 in",   "in"),   # front stretcher below drawers
         ("divider_thick","0.75 in", "in"),  # center divider between drawers
         ("drawer_gap",  "0.0625 in","in"),
         ("runner_w",    "0.75 in",  "in"),   # drawer runner width
@@ -64,7 +64,7 @@ def run(context):
         ("mid_x",         "desk_l / 2",                                  "in"),
         ("mid_y",         "desk_w / 2",                                  "in"),
         # Drawer opening = apron_h minus front_rail_h
-        ("drawer_opening","apron_h - front_rail_h",                     "in"),
+        ("drawer_opening","apron_h - stretcher_h",                       "in"),
         ("drawer_w",      "(long_apron_l - divider_thick - 4 * drawer_gap) / 2", "in"),
         ("drawer_d",      "short_apron_l",                              "in"),
         ("drawer_h_inner","drawer_opening - 2 * drawer_gap",           "in"),
@@ -83,7 +83,7 @@ def run(context):
         dt_angle="8 deg", dt_tail_w="0.625 in",
         front_tail_count="2", back_tail_count="2",
         x_offset="leg_size + drawer_gap",
-        z_offset="apron_z + drawer_gap")
+        z_offset="apron_z + stretcher_h + drawer_gap")
     # Right drawer x_offset: after divider
     dovetailed_drawer.define_params(params, prefix="ddr",
         drawer_w="drawer_w", drawer_d="drawer_d",
@@ -94,7 +94,7 @@ def run(context):
         dt_angle="8 deg", dt_tail_w="0.625 in",
         front_tail_count="2", back_tail_count="2",
         x_offset="mid_x + divider_thick / 2 + drawer_gap",
-        z_offset="apron_z + drawer_gap")
+        z_offset="apron_z + stretcher_h + drawer_gap")
 
     print(">>> Parameters done")
 
@@ -181,13 +181,11 @@ def run(context):
     a_xmid = af.off_plane(apron_c, apron_c.yZConstructionPlane, "mid_x", "AXMid")
     af.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir").bodies.item(0).name = "Apron_Right"
 
-    # Front rail (thin strip above drawer opening)
-    fr_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane,
-                            "desk_h - top_thick - front_rail_h", "FrontRail_Pl")
-    _, pr = af.sketch_rect_model(apron_c, fr_z_pl,
-        ("leg_size", "0 in", "desk_h - top_thick - front_rail_h"),
-        {"x": "long_apron_l", "y": "apron_thick"}, "FrontRail_Sk", ev)
-    af.ext_new(apron_c, pr, "front_rail_h", "FrontRail").bodies.item(0).name = "Apron_FrontRail"
+    # Front stretcher (below drawers, at bottom of apron zone)
+    _, pr = af.sketch_rect_model(apron_c, az_pl,
+        ("leg_size", "0 in", "apron_z"),
+        {"x": "long_apron_l", "y": "apron_thick"}, "FrontStretcher_Sk", ev)
+    af.ext_new(apron_c, pr, "stretcher_h", "FrontStretcher").bodies.item(0).name = "Apron_FrontStretcher"
 
     # Center divider — runs between front rail back face and back apron front face
     _, pr = af.sketch_rect_model(apron_c, az_pl,
@@ -196,16 +194,17 @@ def run(context):
     div_ext = af.ext_new(apron_c, pr, "apron_h", "Divider")
     div_body = div_ext.bodies.item(0); div_body.name = "Divider"
 
-    # Divider front extension — fills the gap between drawer fronts
-    # Only spans the drawer opening height (below front rail, not overlapping it)
-    _, pr = af.sketch_rect_model(apron_c, az_pl,
-        ("mid_x - divider_thick / 2", "0 in", "apron_z"),
+    # Divider front extension — fills gap between drawer fronts above stretcher
+    div_front_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane,
+                                   "apron_z + stretcher_h", "DivFrontZ_Pl")
+    _, pr = af.sketch_rect_model(apron_c, div_front_z_pl,
+        ("mid_x - divider_thick / 2", "0 in", "apron_z + stretcher_h"),
         {"x": "divider_thick", "y": "apron_thick"}, "DivFront_Sk", ev)
     af.ext_new(apron_c, pr, "drawer_opening", "DivFront").bodies.item(0).name = "Divider_Front"
 
     # Drawer runners — 2 on side aprons only (divider sides have no runners
     # to avoid blocking drawer slide path)
-    runner_z = "apron_z + drawer_gap"
+    runner_z = "apron_z + stretcher_h + drawer_gap"
     runner_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, runner_z, "RunnerZ_Pl")
 
     # Left apron runner
@@ -219,12 +218,12 @@ def run(context):
     af.mirror_feats(apron_c, [lr_ext], a_xmid, "RunnerRMir").bodies.item(0).name = "Runner_R"
 
     # Drawer stops — 2 blocks at back of each runner
-    stop_z = "apron_z + drawer_gap + runner_h"
+    stop_z = "apron_z + stretcher_h + drawer_gap + runner_h"
     stop_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, stop_z, "StopZ_Pl")
     _, pr = af.sketch_rect_model(apron_c, stop_z_pl,
         ("apron_thick", "desk_w - leg_size - apron_thick - stop_l", stop_z),
         {"x": "runner_w", "y": "stop_l"}, "StopL_Sk", ev)
-    sl_ext = af.ext_new(apron_c, pr, "drawer_h_inner", "StopL")
+    sl_ext = af.ext_new(apron_c, pr, "drawer_h_inner / 2", "StopL")
     sl_ext.bodies.item(0).name = "Stop_L"
     af.mirror_feats(apron_c, [sl_ext], a_xmid, "StopRMir").bodies.item(0).name = "Stop_R"
 
@@ -290,7 +289,7 @@ def run(context):
         if b.name == "Apron_Back": ba_body = b
         elif b.name == "Apron_Left": la_body = b
         elif b.name == "Apron_Right": ra_body = b
-        elif b.name == "Apron_FrontRail": fr_body = b
+        elif b.name == "Apron_FrontStretcher": fr_body = b
         elif b.name == "Divider": div_body = b
     ba_p = ba_body.createForAssemblyContext(apron_occ)
     la_p = la_body.createForAssemblyContext(apron_occ)
@@ -321,8 +320,8 @@ def run(context):
     domino.grid(root, dm_lb, ("desk_l - apron_thick/2", "desk_w - leg_size", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_p, br_p, "DM_RA_B", ev)
 
-    # Front rail → FL, FR legs (1 domino each)
-    params.add("fr_dm_z", VI("desk_h - top_thick - front_rail_h / 2"), "in", "")
+    # Front stretcher → FL, FR legs (1 domino each, centered in stretcher)
+    params.add("fr_dm_z", VI("apron_z + stretcher_h / 2"), "in", "")
     domino.grid(root, dm_fl, ("leg_size", "apron_thick / 2", "fr_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_p_body, fl_p, "DM_FR_L", ev)
     domino.grid(root, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
