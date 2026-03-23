@@ -17,5 +17,15 @@ tests/import_*.py
 tests/move_*.py
 tests/reexport_*.py
 
+# Scratch furniture scripts (not examples)
+bar_side_table.py
+rebuild_stretchers.py
+toy_box.py
+tv_console.py
+tools/WoodPlanterV2_generated.py
+
+# Untracked add-in build artifacts
+addin/addin
+
 # OS
 Thumbs.db
