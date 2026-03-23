@@ -106,7 +106,7 @@ def handler(output_path: str = "/tmp/demo.mp4",
             fps: int = 30,
             orbit_seconds: float = 3.0,
             drawer_seconds: float = 2.0,
-            transparent_orbit_seconds: float = 4.0,
+            transparent_orbit_seconds: float = 8.0,
             drawer_pull: float = -1.0,
             elevation: float = 0.4) -> dict:
     """Create demo: orbit → drawer pull → transparent orbit → drawer push → orbit."""
@@ -139,25 +139,34 @@ def handler(output_path: str = "/tmp/demo.mp4",
         # Ensure opaque visual style
         vp.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
 
-        # Identify drawer components
-        drawer_occs = []
+        # Identify drawer components — store index for reliable re-access
+        drawer_indices = []
         for i in range(root.occurrences.count):
             occ = root.occurrences.item(i)
-            if "drawer" in occ.component.name.lower() and occ.isLightBulbOn:
-                drawer_occs.append(occ)
-                orig_transforms.append((occ, occ.transform.copy()))
+            comp_name = occ.component.name.lower()
+            if "drawer" in comp_name and occ.isLightBulbOn:
+                drawer_indices.append(i)
+                orig_transforms.append((i, occ.transform.copy()))
+                app.log(f"  Drawer found: {occ.component.name} (index {i})")
 
-        # Auto-calculate drawer pull distance
-        if drawer_pull < 0 and drawer_occs:
-            occ0 = drawer_occs[0]
+        # Auto-calculate drawer pull distance from world-space bounding box
+        if drawer_pull < 0 and drawer_indices:
+            occ0 = root.occurrences.item(drawer_indices[0])
+            d_min_y = 1e10
+            d_max_y = -1e10
             for j in range(occ0.component.bRepBodies.count):
                 b = occ0.component.bRepBodies.item(j)
                 proxy = b.createForAssemblyContext(occ0)
                 bb = proxy.boundingBox
                 if bb:
-                    drawer_pull = abs(bb.maxPoint.y - bb.minPoint.y) * 0.9
-                    break
-        has_drawers = drawer_pull > 0 and len(drawer_occs) > 0
+                    d_min_y = min(d_min_y, bb.minPoint.y)
+                    d_max_y = max(d_max_y, bb.maxPoint.y)
+            if d_max_y > d_min_y:
+                drawer_pull = (d_max_y - d_min_y) * 0.95
+            app.log(f"  Drawer pull distance: {drawer_pull:.2f} cm")
+
+        has_drawers = drawer_pull > 0 and len(drawer_indices) > 0
+        app.log(f"  has_drawers={has_drawers}, count={len(drawer_indices)}, pull={drawer_pull:.2f}")
 
         # Frame counts
         orbit1 = int(orbit_seconds * fps)
@@ -186,11 +195,12 @@ def handler(output_path: str = "/tmp/demo.mp4",
         if has_drawers:
             for i in range(drawer_out):
                 t = _ease_in_out(i / max(drawer_out - 1, 1))
-                for occ in drawer_occs:
-                    # Find original transform
+                for idx in drawer_indices:
+                    occ = root.occurrences.item(idx)
+                    # Find original transform by index
                     orig_t = None
-                    for o, ot in orig_transforms:
-                        if o.name == occ.name:
+                    for stored_idx, ot in orig_transforms:
+                        if stored_idx == idx:
                             orig_t = ot
                             break
                     if orig_t is None:
@@ -212,7 +222,7 @@ def handler(output_path: str = "/tmp/demo.mp4",
         adsk.doEvents()
 
         for i in range(trans_orbit):
-            last_angle += (2 * math.pi) / trans_orbit  # full rotation
+            last_angle += (math.pi * 1.5) / trans_orbit  # 270° rotation (slower)
             _set_camera(vp, root, last_angle, elevation)
             adsk.doEvents()
             _capture(vp, frame_dir, n, width, height)
@@ -225,10 +235,11 @@ def handler(output_path: str = "/tmp/demo.mp4",
         if has_drawers:
             for i in range(drawer_in):
                 t = _ease_in_out(1.0 - i / max(drawer_in - 1, 1))
-                for occ in drawer_occs:
+                for idx in drawer_indices:
+                    occ = root.occurrences.item(idx)
                     orig_t = None
-                    for o, ot in orig_transforms:
-                        if o.name == occ.name:
+                    for stored_idx, ot in orig_transforms:
+                        if stored_idx == idx:
                             orig_t = ot
                             break
                     if orig_t is None:
@@ -253,8 +264,8 @@ def handler(output_path: str = "/tmp/demo.mp4",
             n += 1
 
         # Restore
-        for occ, orig_t in orig_transforms:
-            occ.transform = orig_t
+        for idx, orig_t in orig_transforms:
+            root.occurrences.item(idx).transform = orig_t
         adsk.doEvents()
         vp.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
         cam = vp.camera
@@ -345,7 +356,7 @@ tool = Tool.create_simple(
     "drawer_seconds", {"type": "number", "default": 2.0,
         "description": "Duration of drawer pull/push."}
 ).add_input_property(
-    "transparent_orbit_seconds", {"type": "number", "default": 4.0,
+    "transparent_orbit_seconds", {"type": "number", "default": 8.0,
         "description": "Duration of transparent flyaround."}
 ).add_input_property(
     "drawer_pull", {"type": "number", "default": -1.0,
