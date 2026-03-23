@@ -369,9 +369,9 @@ class ActionLog:
 
     @classmethod
     def _ensure_log_dir(cls):
-        """Ensure ~/.autofusion/logs/ exists."""
+        """Ensure ~/.shopprentice/logs/ exists."""
         if cls._log_dir is None:
-            cls._log_dir = os.path.join(os.path.expanduser("~"), ".autofusion", "logs")
+            cls._log_dir = os.path.join(os.path.expanduser("~"), ".shopprentice", "logs")
             os.makedirs(cls._log_dir, exist_ok=True)
         return cls._log_dir
 

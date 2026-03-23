@@ -1,22 +1,22 @@
 #!/bin/bash
 set -e
 
-# AutoFusion OpenClaw Installer
+# ShopPrentice OpenClaw Installer
 # Single command install for OpenClaw users with Fusion 360
-# Usage: curl -sSL https://raw.githubusercontent.com/YLZha/autofusion/main/install-openclaw.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install-openclaw.sh | bash
 
-echo "=== AutoFusion for OpenClaw ==="
+echo "=== ShopPrentice for OpenClaw ==="
 echo
 
-# 1. Clone/sync autofusion repo
-AUTOFUSION_DIR="$HOME/.autofusion/repo"
+# 1. Clone/sync shopprentice repo
+AUTOFUSION_DIR="$HOME/.shopprentice/repo"
 if [ -d "$AUTOFUSION_DIR" ]; then
-    echo "Updating AutoFusion repo..."
+    echo "Updating ShopPrentice repo..."
     git -C "$AUTOFUSION_DIR" pull --ff-only 2>/dev/null || echo "Pull failed, using existing"
 else
-    echo "Cloning AutoFusion repo..."
+    echo "Cloning ShopPrentice repo..."
     mkdir -p "$(dirname "$AUTOFUSION_DIR")"
-    git clone https://github.com/YLZha/autofusion.git "$AUTOFUSION_DIR"
+    git clone https://github.com/ShopPrentice/shopprentice.git "$AUTOFUSION_DIR"
 fi
 
 # 2. Install Fusion 360 add-in
@@ -28,8 +28,8 @@ else
 fi
 
 if [ -d "$ADDIN_DIR" ]; then
-    ln -sf "$AUTOFUSION_DIR/addin" "$ADDIN_DIR/AutoFusion"
-    echo "  ✓ Added: $ADDIN_DIR/AutoFusion"
+    ln -sf "$AUTOFUSION_DIR/addin" "$ADDIN_DIR/ShopPrentice"
+    echo "  ✓ Added: $ADDIN_DIR/ShopPrentice"
 else
     echo "  ⚠ Fusion 360 AddIns directory not found"
     echo "    Expected: $ADDIN_DIR"
@@ -68,7 +68,7 @@ echo "=== Installation Complete ==="
 echo
 echo "Next steps:"
 echo "1. Start Fusion 360"
-echo "2. In Fusion 360: Tools > Add-Ins > AutoFusion > Run"
+echo "2. In Fusion 360: Tools > Add-Ins > ShopPrentice > Run"
 echo "3. Say hi! Try: /woodworking Build a simple shelf"
 echo
-echo "To update later: git -C ~/.autofusion/repo pull"
+echo "To update later: git -C ~/.shopprentice/repo pull"

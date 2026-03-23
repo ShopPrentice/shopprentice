@@ -917,7 +917,7 @@ After the script runs, call `get_product_shots` via MCP to capture presentation 
 
 ## MCP Live Execution
 
-When an MCP connection to Fusion 360 is available (via the AutoFusion add-in), you MUST automatically execute the script after generating it. Do not wait for the user to ask — the full generate-execute-verify loop is the default workflow.
+When an MCP connection to Fusion 360 is available (via the ShopPrentice add-in), you MUST automatically execute the script after generating it. Do not wait for the user to ask — the full generate-execute-verify loop is the default workflow.
 
 ### Available MCP Tools
 
@@ -1047,7 +1047,7 @@ After the final phase, call `get_product_shots` for presentation images. It hand
 
 ### MCP Timeout
 
-The AutoFusion add-in's main-thread execution timeout is set in:
+The ShopPrentice add-in's main-thread execution timeout is set in:
 `addin/server/mcp_server.py` → `_execute_on_main_thread` → `timeout = 300`
 
 Default is 300s (5 min). If scripts still time out, increase this value and restart the add-in.

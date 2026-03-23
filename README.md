@@ -1,15 +1,15 @@
-# AutoFusion
+# ShopPrentice
 
 Parametric furniture modeling for Fusion 360, driven by AI agents via MCP.
 
-Describe a piece of furniture in natural language — or show the AI a photo — and AutoFusion generates a fully parametric Fusion 360 Python script with proper feature timelines, mirror/pattern replication, and joinery. Connect to a running Fusion 360 instance via the built-in MCP server for live execution, validation, and iterative refinement.
+Describe a piece of furniture in natural language — or show the AI a photo — and ShopPrentice generates a fully parametric Fusion 360 Python script with proper feature timelines, mirror/pattern replication, and joinery. Connect to a running Fusion 360 instance via the built-in MCP server for live execution, validation, and iterative refinement.
 
 ## How It Works
 
 ```
 You: "Build a bar-height side table, 36" tall, 4 splayed legs, shelf stretchers with angled tenons"
 
-AutoFusion agent:
+ShopPrentice agent:
   1. Plans the build (components, features, joinery)
   2. Writes a parametric Fusion 360 Python script
   3. Executes it in Fusion 360 via MCP
@@ -25,7 +25,7 @@ Every dimension uses parameter expressions — change any value in Modify > Chan
 One command — no clone needed:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/YLZha/autofusion/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash
 ```
 
 This installs the `/woodworking` skill for Claude Code and optionally sets up the MCP server for live Fusion 360 execution.
@@ -44,8 +44,8 @@ curl ... | bash -s -- --all             # skill + MCP
 ### Local install (from a clone)
 
 ```bash
-git clone https://github.com/YLZha/autofusion.git
-cd autofusion
+git clone https://github.com/ShopPrentice/shopprentice.git
+cd shopprentice
 ./install.sh            # auto-detect + MCP
 ./install.sh --all      # everything
 ```
@@ -184,21 +184,21 @@ Reconstruct a parametric script from an existing Fusion 360 design:
 
 The pergola example (43 bodies, 97 features) was rebuilt this way at 0.000% volume tolerance. See [examples/pergola-rebuild/](examples/pergola-rebuild/) and `tools/search_build.py`.
 
-## MCP Integration (AutoFusion Add-in)
+## MCP Integration (ShopPrentice Add-in)
 
-Connect your AI assistant to a running Fusion 360 instance via the AutoFusion add-in — a built-in MCP-compatible JSON-RPC server on `localhost:9100`.
+Connect your AI assistant to a running Fusion 360 instance via the ShopPrentice add-in — a built-in MCP-compatible JSON-RPC server on `localhost:9100`.
 
 ```bash
 # Include --mcp during install
-curl -sSL https://raw.githubusercontent.com/YLZha/autofusion/main/install.sh | bash -s -- --mcp
+curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash -s -- --mcp
 
 # Or add MCP to an existing install
-cd ~/.autofusion/repo && ./install.sh --mcp
+cd ~/.shopprentice/repo && ./install.sh --mcp
 ```
 
 The installer symlinks the `addin/` directory into Fusion 360's AddIns folder and configures MCP for Claude Code.
 
-After install, enable it in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
+After install, enable it in Fusion 360: **Tools > Add-Ins > ShopPrentice > Run**
 
 ### Available Tools
 
@@ -221,14 +221,14 @@ After install, enable it in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
 ### Verify
 
 ```bash
-curl http://localhost:9100/health          # {"status": "healthy", "server": "AutoFusion"}
+curl http://localhost:9100/health          # {"status": "healthy", "server": "ShopPrentice"}
 curl http://localhost:9100/tools           # lists all 16 tools
 ```
 
 ## Project Structure
 
 ```
-autofusion/
+shopprentice/
   addin/              Fusion 360 add-in (MCP server + tools)
     helpers/           Runtime helpers (af.py — sketch, extrude, combine utilities)
       templates/       Reusable joinery templates (domino, mortise_tenon, dovetail, etc.)
@@ -247,7 +247,7 @@ autofusion/
 ## Updating
 
 ```bash
-cd ~/.autofusion/repo && git pull && ./install.sh
+cd ~/.shopprentice/repo && git pull && ./install.sh
 ```
 
 This pulls the latest skill and joinery references.
@@ -255,10 +255,10 @@ This pulls the latest skill and joinery references.
 ## Uninstall
 
 ```bash
-~/.autofusion/repo/uninstall.sh
+~/.shopprentice/repo/uninstall.sh
 ```
 
-Removes all autofusion-installed files: `~/.autofusion/`, the Claude Code skill, and MCP configurations.
+Removes all shopprentice-installed files: `~/.shopprentice/`, the Claude Code skill, and MCP configurations.
 
 ## License
 

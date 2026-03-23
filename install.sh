@@ -1,22 +1,22 @@
 #!/bin/bash
 set -e
 
-# autofusion installer
+# shopprentice installer
 # Usage:
-#   Remote: curl -sSL https://raw.githubusercontent.com/YLZha/autofusion/main/install.sh | bash
+#   Remote: curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash
 #           curl -sSL ... | bash -s -- --mcp
 #   Local:  ./install.sh [flags]
 #
 # Flags:
 #   --claude-code   Install for Claude Code
-#   --mcp           Install AutoFusion add-in + auto-configure MCP tools
+#   --mcp           Install ShopPrentice add-in + auto-configure MCP tools
 #   --no-mcp        Skip MCP setup
 #   --all           All of the above
 #   (no flags)      Auto-detect installed tools + install MCP
 
-AUTOFUSION_HOME="$HOME/.autofusion"
+AUTOFUSION_HOME="$HOME/.shopprentice"
 REPO_DIR="$AUTOFUSION_HOME/repo"
-REPO_URL="https://github.com/YLZha/autofusion.git"
+REPO_URL="https://github.com/ShopPrentice/shopprentice.git"
 
 # --- Parse flags ---
 opt_claude_code=false
@@ -34,8 +34,8 @@ for arg in "$@"; do
     esac
 done
 
-# --- Bootstrap: ensure ~/.autofusion/repo/ exists ---
-echo "=== autofusion installer ==="
+# --- Bootstrap: ensure ~/.shopprentice/repo/ exists ---
+echo "=== shopprentice installer ==="
 echo
 
 # Detect if we're running from inside a repo checkout (local install)
@@ -105,7 +105,7 @@ if [ "$opt_claude_code" = true ]; then
 
     # Add global hint so agents know /woodworking exists
     CLAUDE_MD="$HOME/.claude/CLAUDE.md"
-    HINT_MARKER="<!-- autofusion -->"
+    HINT_MARKER="<!-- shopprentice -->"
     HINT_LINE="$HINT_MARKER For Fusion 360 furniture modeling, invoke the \`/woodworking\` skill."
     if [ -f "$CLAUDE_MD" ] && grep -q "$HINT_MARKER" "$CLAUDE_MD"; then
         echo "Global /woodworking hint already in $CLAUDE_MD"
@@ -117,9 +117,9 @@ if [ "$opt_claude_code" = true ]; then
     echo
 fi
 
-# --- MCP setup (AutoFusion add-in) ---
+# --- MCP setup (ShopPrentice add-in) ---
 if [ "$opt_mcp" = true ]; then
-    echo "--- MCP (AutoFusion Add-in) ---"
+    echo "--- MCP (ShopPrentice Add-in) ---"
 
     # Check Node.js (required for mcp-remote proxy)
     if ! command -v npx &>/dev/null; then
@@ -128,14 +128,14 @@ if [ "$opt_mcp" = true ]; then
     fi
     echo "Node.js $(node --version) OK"
 
-    # Install the AutoFusion add-in via symlink
+    # Install the ShopPrentice add-in via symlink
     ADDIN_SRC="$REPO_DIR/addin"
     if [ "$(uname)" = "Darwin" ]; then
         ADDIN_DIR="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns"
     else
         ADDIN_DIR="$APPDATA/Autodesk/Autodesk Fusion 360/API/AddIns"
     fi
-    ADDIN_LINK="$ADDIN_DIR/AutoFusion"
+    ADDIN_LINK="$ADDIN_DIR/ShopPrentice"
 
     if [ -d "$ADDIN_DIR" ]; then
         # Remove old Fusion MCP Addin if present
@@ -145,13 +145,13 @@ if [ "$opt_mcp" = true ]; then
             rm -rf "$OLD_ADDIN"
         fi
 
-        echo "Symlinking AutoFusion add-in..."
+        echo "Symlinking ShopPrentice add-in..."
         ln -sf "$ADDIN_SRC" "$ADDIN_LINK"
         echo "Installed: $ADDIN_LINK -> $ADDIN_SRC"
     else
         echo "Warning: Fusion 360 AddIns directory not found at $ADDIN_DIR"
         echo "Create a symlink manually:"
-        echo "  ln -sf \"$ADDIN_SRC\" \"<your AddIns dir>/AutoFusion\""
+        echo "  ln -sf \"$ADDIN_SRC\" \"<your AddIns dir>/ShopPrentice\""
     fi
 
     # Configure MCP for Claude Code
@@ -182,7 +182,7 @@ with open(path, 'w') as f:
 
     echo
     echo "MCP setup complete!"
-    echo "  Next: In Fusion 360, go to Tools > Add-Ins > AutoFusion > Run"
+    echo "  Next: In Fusion 360, go to Tools > Add-Ins > ShopPrentice > Run"
     echo "  Then restart Claude Code to pick up the MCP config."
     echo
 fi

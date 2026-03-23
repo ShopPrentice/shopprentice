@@ -1,1 +1,1 @@
-"""AutoFusion reusable joinery and sub-assembly templates."""
+"""ShopPrentice reusable joinery and sub-assembly templates."""

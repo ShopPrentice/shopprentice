@@ -3,7 +3,7 @@
 Imports real hardware STEP files from the catalog, positions them
 in the model, and CUTs leaf rebates into boards.
 
-Catalog and STEP files live in the autofusion repo under hardware/.
+Catalog and STEP files live in the shopprentice repo under hardware/.
 
 4 hinge installation styles:
 
@@ -63,8 +63,8 @@ def _find_hardware_dir():
     if os.path.isdir(hw_dir):
         return hw_dir
     for candidate in [
-        os.path.expanduser("~/projects/autofusion/hardware"),
-        os.path.expanduser("~/.autofusion/hardware"),
+        os.path.expanduser("~/projects/shopprentice/hardware"),
+        os.path.expanduser("~/.shopprentice/hardware"),
     ]:
         if os.path.isdir(candidate):
             return candidate

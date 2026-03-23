@@ -1,12 +1,12 @@
-# Contributing to AutoFusion
+# Contributing to ShopPrentice
 
-AutoFusion needs two kinds of contributions: **code** (tools, templates, bug fixes) and **woodworking knowledge** (furniture types, styles, joinery techniques). Both are equally valuable.
+ShopPrentice needs two kinds of contributions: **code** (tools, templates, bug fixes) and **woodworking knowledge** (furniture types, styles, joinery techniques). Both are equally valuable.
 
 ## Ways to Contribute
 
 ### 1. Build something and report what happened
 
-The most valuable contribution is simply using AutoFusion to build furniture, then telling us what worked and what didn't. Open an issue with:
+The most valuable contribution is simply using ShopPrentice to build furniture, then telling us what worked and what didn't. Open an issue with:
 
 - What you asked for (the prompt)
 - What went wrong or could be better
@@ -61,8 +61,8 @@ Standard PR workflow. See Development Setup below.
 ## Development Setup
 
 ```bash
-git clone https://github.com/YLZha/autofusion.git
-cd autofusion
+git clone https://github.com/ShopPrentice/shopprentice.git
+cd shopprentice
 ./install.sh --all
 ```
 

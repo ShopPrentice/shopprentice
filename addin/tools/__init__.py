@@ -1,5 +1,5 @@
 """
-AutoFusion Tools package
+ShopPrentice Tools package
 
 Import all tools to trigger registration.
 """

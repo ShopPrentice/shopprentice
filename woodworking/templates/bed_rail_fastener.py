@@ -6,7 +6,7 @@ INSTALLATION RULE:
   - Hardware auto-moves into a "Hardwares" sub-folder in the parent component
   - Templates hidden in _HW
 
-STEP files at: ~/.autofusion/hardware/bed_rail_fastener/
+STEP files at: ~/.shopprentice/hardware/bed_rail_fastener/
 Generate with: tools/bed_rail_fastener.py
 """
 
@@ -18,7 +18,7 @@ from helpers import af
 from helpers import hardware as hw_mgr
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
-HARDWARE_DIR = os.path.expanduser("~/.autofusion/hardware/bed_rail_fastener")
+HARDWARE_DIR = os.path.expanduser("~/.shopprentice/hardware/bed_rail_fastener")
 PLATE_T = 0.25  # cm
 
 # Module-level cache: import each plate STEP once, copy for each use

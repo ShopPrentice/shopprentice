@@ -1,5 +1,5 @@
 """
-AutoFusion Runtime Helpers
+ShopPrentice Runtime Helpers
 
 Shared utilities for Fusion 360 scripts executed via execute_script.
 Import with: from helpers import af

@@ -16,7 +16,7 @@ Nakashima-style furniture uses thick wood slabs with their natural bark edges pr
 
 ## Current Capabilities (Tested)
 
-What we can build today in AutoFusion:
+What we can build today in ShopPrentice:
 
 | Feature | Status | Template |
 |---------|--------|----------|

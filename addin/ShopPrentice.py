@@ -1,5 +1,5 @@
 """
-AutoFusion Add-in for Fusion 360
+ShopPrentice Add-in for Fusion 360
 
 Provides MCP-compatible JSON-RPC tools for design introspection,
 timeline state capture, script execution, and viewport screenshots.
@@ -87,21 +87,21 @@ def run(context):
         )
 
         # Store MCP ref for hot-reload access
-        sys._autofusion_mcp = mcp
+        sys._shopprentice_mcp = mcp
 
         if mcp:
             app.log(
-                f"AutoFusion started successfully!\n\n"
+                f"ShopPrentice started successfully!\n\n"
                 f"MCP server running on {HOST}:{PORT}\n"
                 f"Tools: {len(registered_tools)}"
             )
         else:
             if ui:
-                ui.messageBox("Failed to start AutoFusion")
+                ui.messageBox("Failed to start ShopPrentice")
             if app:
-                app.log("Failed to start AutoFusion")
+                app.log("Failed to start ShopPrentice")
     except Exception:
-        app.log(f'Failed to start AutoFusion:\n{traceback.format_exc()}')
+        app.log(f'Failed to start ShopPrentice:\n{traceback.format_exc()}')
 
 
 def stop(context):
@@ -117,11 +117,11 @@ def stop(context):
 
         if stop_mcp_server(server, thread):
             if app:
-                app.log("AutoFusion stopped successfully.")
+                app.log("ShopPrentice stopped successfully.")
         else:
             if app:
-                app.log("Error stopping AutoFusion")
+                app.log("Error stopping ShopPrentice")
 
     except Exception:
         if app:
-            app.log(f"Error stopping AutoFusion:\n{traceback.format_exc()}")
+            app.log(f"Error stopping ShopPrentice:\n{traceback.format_exc()}")

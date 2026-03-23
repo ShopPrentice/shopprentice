@@ -16,7 +16,7 @@ Reusable Python templates in `addin/helpers/templates/` encapsulate complex join
 | `splayed_legs` | `from helpers.templates import splayed_legs` | `define_params()`, `build()`, `splay_offset()` | 4 compound-splayed legs with floor trim |
 | `dovetailed_drawer` | `from helpers.templates import dovetailed_drawer` | `define_params()`, `build()`, `pattern()` | Complete drawer box |
 
-Templates require the AutoFusion add-in's `helpers/` directory on the Python path (automatic via `execute_script`). For standalone use, copy `addin/helpers/` alongside your script.
+Templates require the ShopPrentice add-in's `helpers/` directory on the Python path (automatic via `execute_script`). For standalone use, copy `addin/helpers/` alongside your script.
 
 ### When NOT to template
 

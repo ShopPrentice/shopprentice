@@ -15,7 +15,7 @@ Rules for importing, positioning, and organizing STEP hardware (bed rail fastene
 If two hardware parts need different orientations (e.g., hook plate vs strike plate), generate **separate STEP files**. Never put opposite-facing parts in one STEP — you can't rotate them independently within one occurrence.
 
 ```
-~/.autofusion/hardware/bed_rail_fastener/
+~/.shopprentice/hardware/bed_rail_fastener/
   hook_plate_100mm.step    # hook plate + its screws
   strike_plate_100mm.step  # strike plate + its screws
 ```
@@ -138,6 +138,6 @@ Split STEP files retain the original generator coordinates, including spacing of
 
 | Hardware | Template | STEP Files | Status |
 |----------|----------|-----------|--------|
-| Bed rail fastener | `woodworking/templates/bed_rail_fastener.py` | `~/.autofusion/hardware/bed_rail_fastener/` | Tested (queen + twin beds) |
+| Bed rail fastener | `woodworking/templates/bed_rail_fastener.py` | `~/.shopprentice/hardware/bed_rail_fastener/` | Tested (queen + twin beds) |
 | Butt hinge | `woodworking/templates/butt_hinge.py` | Inline (parametric, no STEP) | Tested (pencil box, wrap box) |
 | Bowtie inlay | `woodworking/templates/bowtie.py` | Inline (parametric, no STEP) | Tested (twin bed) |

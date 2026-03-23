@@ -176,7 +176,7 @@ def handler(output_path: str = "/tmp/demo.mp4",
         orbit2 = int(orbit_seconds * fps)
         total = orbit1 + drawer_out + trans_orbit + drawer_in + orbit2
 
-        frame_dir = tempfile.mkdtemp(prefix="autofusion_video_")
+        frame_dir = tempfile.mkdtemp(prefix="shopprentice_video_")
         n = 0
         angle = 0.0
 

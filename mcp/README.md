@@ -1,6 +1,6 @@
 # MCP Integration for Fusion 360
 
-Run Fusion 360 scripts and inspect designs directly from Claude Code using the AutoFusion add-in — a built-in MCP-compatible JSON-RPC server.
+Run Fusion 360 scripts and inspect designs directly from Claude Code using the ShopPrentice add-in — a built-in MCP-compatible JSON-RPC server.
 
 ## Prerequisites
 
@@ -15,11 +15,11 @@ Run Fusion 360 scripts and inspect designs directly from Claude Code using the A
 ./install.sh --mcp
 
 # Or manually: symlink the add-in
-ln -sf ~/.autofusion/repo/addin \
-  ~/Library/Application\ Support/Autodesk/Autodesk\ Fusion\ 360/API/AddIns/AutoFusion
+ln -sf ~/.shopprentice/repo/addin \
+  ~/Library/Application\ Support/Autodesk/Autodesk\ Fusion\ 360/API/AddIns/ShopPrentice
 ```
 
-Then in Fusion 360: **Tools > Add-Ins > AutoFusion > Run**
+Then in Fusion 360: **Tools > Add-Ins > ShopPrentice > Run**
 
 ## Available Tools
 
@@ -63,7 +63,7 @@ The installer (`./install.sh --mcp`) auto-configures this. To set it up manually
 ## Verify
 
 ```bash
-curl http://localhost:9100/health    # {"status": "healthy", "server": "AutoFusion"}
+curl http://localhost:9100/health    # {"status": "healthy", "server": "ShopPrentice"}
 curl http://localhost:9100/tools     # lists all 11 tools
 ```
 
@@ -71,7 +71,7 @@ curl http://localhost:9100/tools     # lists all 11 tools
 
 | Issue | Fix |
 |-------|-----|
-| "Connection refused" | Make sure the AutoFusion add-in is running (Tools > Add-Ins) |
+| "Connection refused" | Make sure the ShopPrentice add-in is running (Tools > Add-Ins) |
 | Add-in not visible | Verify the symlink exists in your AddIns directory |
 | Script errors | Check Fusion 360's Text Commands window for stack traces |
 | MCP server not detected | Restart Claude Code after editing settings.json |

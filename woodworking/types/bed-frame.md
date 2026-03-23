@@ -92,7 +92,7 @@ brf.install(root, post_proxy, rail_proxy,
 # Consolidate all _Hardware/_Imports/BRF_* into one hidden _HW component
 ```
 
-Three sizes: 80mm (light rails), **100mm (standard)**, 120mm (heavy/tall rails). STEP files at `~/.autofusion/hardware/bed_rail_fastener/`. Generate with `tools/bed_rail_fastener.py` if missing.
+Three sizes: 80mm (light rails), **100mm (standard)**, 120mm (heavy/tall rails). STEP files at `~/.shopprentice/hardware/bed_rail_fastener/`. Generate with `tools/bed_rail_fastener.py` if missing.
 
 **Hook direction rule:** Hooks always face OUTWARD from the rail they're attached to — toward the connecting post. The template auto-detects direction by comparing the rail body center vs interface coordinate. Each rail end gets the correct outward-facing hooks automatically.
 

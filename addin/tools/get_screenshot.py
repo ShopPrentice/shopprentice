@@ -65,7 +65,7 @@ def handler(view: str = "current", width: int = 1024, height: int = 1024) -> dic
         # Capture
         timestamp = str(int(time.time() * 1000))
         with tempfile.NamedTemporaryFile(
-                prefix=f'autofusion_ss_{timestamp}_',
+                prefix=f'shopprentice_ss_{timestamp}_',
                 suffix='.png', delete=False) as f:
             image_path = os.path.abspath(f.name)
 

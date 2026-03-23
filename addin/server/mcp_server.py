@@ -33,7 +33,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 class SimpleMCPServer:
     """Simple MCP-compatible server that can run in Fusion 360's Python environment."""
 
-    def __init__(self, name: str = "AutoFusion"):
+    def __init__(self, name: str = "ShopPrentice"):
         self.name = name
         self.tools: Dict[str, Item] = {}
         self.resources: Dict[str, Item] = {}
@@ -188,7 +188,7 @@ class SimpleMCPServer:
         if app:
             app.log(f"Posted {operation_type} execution task {task_id} to main thread")
 
-        timeout = 600  # 10 minute timeout
+        timeout = 1800  # 30 minute timeout
         start_time = time.time()
 
         while time.time() - start_time < timeout:
@@ -346,13 +346,13 @@ class MCPHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         """Handle GET requests for health checks"""
         if self.path == '/health':
-            self._send_json_response({"status": "healthy", "server": "AutoFusion"})
+            self._send_json_response({"status": "healthy", "server": "ShopPrentice"})
         elif self.path == '/tools':
             response = self.mcp_server._handle_tools_list(1)
             self._send_json_response(response)
         elif self.path == '/':
             self._send_json_response({
-                "message": "AutoFusion MCP Server",
+                "message": "ShopPrentice MCP Server",
                 "endpoints": ["POST / (MCP protocol)", "GET /health", "GET /tools"]
             })
         else:
@@ -379,9 +379,9 @@ def start_mcp_server(
     tools: Optional[Dict[str, Any]] = None,
     resources: Optional[Dict[str, Any]] = None
 ) -> Tuple[Optional[SimpleMCPServer], Optional[ThreadedHTTPServer], Optional[threading.Thread]]:
-    """Start the AutoFusion MCP server over HTTP."""
+    """Start the ShopPrentice MCP server over HTTP."""
     try:
-        mcp = SimpleMCPServer("AutoFusion")
+        mcp = SimpleMCPServer("ShopPrentice")
 
         if tools:
             for tool in tools:
@@ -402,24 +402,24 @@ def start_mcp_server(
         server_thread = threading.Thread(
             target=http_server.serve_forever,
             daemon=True,
-            name=f"AutoFusion-Server-{host}:{port}"
+            name=f"ShopPrentice-Server-{host}:{port}"
         )
         server_thread.start()
 
-        print(f"AutoFusion server started on http://{host}:{port}")
+        print(f"ShopPrentice server started on http://{host}:{port}")
         if app:
-            app.log(f"AutoFusion server started on http://{host}:{port}")
+            app.log(f"ShopPrentice server started on http://{host}:{port}")
         return mcp, http_server, server_thread
 
     except Exception as e:
-        print(f"Failed to start AutoFusion server: {str(e)}")
+        print(f"Failed to start ShopPrentice server: {str(e)}")
         if app:
-            app.log(f"Failed to start AutoFusion server: {str(e)}\n{traceback.format_exc()}")
+            app.log(f"Failed to start ShopPrentice server: {str(e)}\n{traceback.format_exc()}")
         return None, None, None
 
 
 def stop_mcp_server(http_server, server_thread, timeout=5):
-    """Stop the AutoFusion MCP server."""
+    """Stop the ShopPrentice MCP server."""
     try:
         if http_server:
             http_server.shutdown()
@@ -432,7 +432,7 @@ def stop_mcp_server(http_server, server_thread, timeout=5):
         return True
 
     except Exception as e:
-        print(f"Error stopping AutoFusion server: {str(e)}")
+        print(f"Error stopping ShopPrentice server: {str(e)}")
         if app:
-            app.log(f"Error stopping AutoFusion server: {str(e)}")
+            app.log(f"Error stopping ShopPrentice server: {str(e)}")
         return False

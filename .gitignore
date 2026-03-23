@@ -27,5 +27,8 @@ tools/WoodPlanterV2_generated.py
 # Untracked add-in build artifacts
 addin/addin
 
+# Promo / video assets
+promo/
+
 # OS
 Thumbs.db

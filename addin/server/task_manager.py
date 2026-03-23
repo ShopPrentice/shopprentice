@@ -56,7 +56,7 @@ class TaskManager:
             return True
 
         try:
-            cls._custom_event = app.registerCustomEvent('AutoFusion.TaskManagerEvent')
+            cls._custom_event = app.registerCustomEvent('ShopPrentice.TaskManagerEvent')
 
             cls._event_handler = TaskEventHandler(cls._pending_tasks)
             cls._custom_event.add(cls._event_handler)

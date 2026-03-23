@@ -102,7 +102,7 @@ def _capture_one(viewport, width, height):
     """Save viewport to temp file and return base64."""
     timestamp = str(int(time.time() * 1000))
     with tempfile.NamedTemporaryFile(
-            prefix=f'autofusion_prod_{timestamp}_',
+            prefix=f'shopprentice_prod_{timestamp}_',
             suffix='.png', delete=False) as f:
         image_path = os.path.abspath(f.name)
 

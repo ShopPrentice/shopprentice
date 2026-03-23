@@ -2,7 +2,7 @@
 
 Upholstered seating for multiple people — sofas, couches, settees, loveseats. The wood frame provides structure; cushions and upholstery provide comfort.
 
-**Note:** AutoFusion models the wood frame only. Upholstery, cushions, springs, and webbing are not modeled — they are specified in the README as finishing details.
+**Note:** ShopPrentice models the wood frame only. Upholstery, cushions, springs, and webbing are not modeled — they are specified in the README as finishing details.
 
 ## Components
 

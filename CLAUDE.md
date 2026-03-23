@@ -1,4 +1,4 @@
-# AutoFusion
+# ShopPrentice
 
 Parametric furniture modeling for Fusion 360, driven by AI agents via MCP.
 

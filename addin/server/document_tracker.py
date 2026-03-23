@@ -7,7 +7,7 @@ sync cursor, and stores a reference snapshot of model parameters for
 state-diff based change detection in sync_script.
 
 In-memory state is authoritative during a session. A JSON sidecar file
-at ~/.autofusion/provenance.json persists script source, hash, and
+at ~/.shopprentice/provenance.json persists script source, hash, and
 reference model parameters across add-in restarts, keyed by document name.
 """
 
@@ -22,7 +22,7 @@ try:
 except ImportError:
     app = None
 
-_PROVENANCE_DIR = os.path.join(os.path.expanduser("~"), ".autofusion")
+_PROVENANCE_DIR = os.path.join(os.path.expanduser("~"), ".shopprentice")
 _PROVENANCE_FILE = os.path.join(_PROVENANCE_DIR, "provenance.json")
 
 

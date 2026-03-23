@@ -17,7 +17,7 @@ Unlike the other examples in this repo, **this script was not hand-written or AI
 3. **Search build** — `search_build.py` rebuilt the model feature-by-feature on a scratch document, using breadth-first search over ambiguous reconstructions (sketch projection methods, extrude directions, profile selections) and validating each step against ground truth volumes and bounding boxes
 4. **Result** — 43/43 bodies match at 0.000% volume tolerance in a 3,922-line fully parametric script
 
-This demonstrates that AutoFusion can faithfully reproduce complex multi-component designs purely from introspection data, without access to the original modeling steps.
+This demonstrates that ShopPrentice can faithfully reproduce complex multi-component designs purely from introspection data, without access to the original modeling steps.
 
 ### Pipeline
 

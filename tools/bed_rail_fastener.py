@@ -61,7 +61,7 @@ def run(context):
 
     gap_y = 5.0
     gap_x = 16.0
-    export_dir = os.path.expanduser("~/.autofusion/hardware/bed_rail_fastener")
+    export_dir = os.path.expanduser("~/.shopprentice/hardware/bed_rail_fastener")
     os.makedirs(export_dir, exist_ok=True)
 
     for idx, (size_name, dims) in enumerate(sizes.items()):

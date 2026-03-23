@@ -38,7 +38,7 @@ After completing a build (or a build session with notable discoveries), when the
 | `woodworking/joinery/dowel-joint.md` | Draft |
 | `woodworking/joinery/pocket-hole.md` | Draft |
 
-Joinery files live at: `~/.autofusion/repo/joinery/` (or the repo's `joinery/` directory)
+Joinery files live at: `~/.shopprentice/repo/joinery/` (or the repo's `joinery/` directory)
 
 ### Joinery templates (reusable Python modules in addin/helpers/templates/)
 

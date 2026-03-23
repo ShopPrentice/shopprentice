@@ -1,6 +1,6 @@
 #!/bin/bash
 # Deprecated: MCP setup is now handled by the main installer.
-# The AutoFusion add-in replaces FusionMCPSample.
+# The ShopPrentice add-in replaces FusionMCPSample.
 echo "MCP setup is now part of the main installer."
 echo "Run: ./install.sh --mcp"
 echo

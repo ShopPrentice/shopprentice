@@ -3,7 +3,7 @@
   "type": "addin",
   "author": "",
   "description": {
-    "": "AutoFusion MCP Server"
+    "": "ShopPrentice MCP Server"
   },
   "version": "0.1.0",
   "runOnStartup": true,

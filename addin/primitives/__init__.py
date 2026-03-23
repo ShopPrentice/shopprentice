@@ -1,5 +1,5 @@
 """
-AutoFusion Primitives package
+ShopPrentice Primitives package
 
 MCP protocol schema classes and registry.
 """

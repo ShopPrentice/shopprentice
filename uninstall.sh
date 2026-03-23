@@ -1,27 +1,27 @@
 #!/bin/bash
 set -e
 
-# autofusion uninstaller
-# Removes all autofusion-installed files from the system.
+# shopprentice uninstaller
+# Removes all shopprentice-installed files from the system.
 
-AUTOFUSION_HOME="$HOME/.autofusion"
+AUTOFUSION_HOME="$HOME/.shopprentice"
 removed=()
 
-echo "=== autofusion uninstaller ==="
+echo "=== shopprentice uninstaller ==="
 echo
 
-# --- Remove AutoFusion add-in symlink ---
+# --- Remove ShopPrentice add-in symlink ---
 if [ "$(uname)" = "Darwin" ]; then
-    ADDIN_LINK="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion"
+    ADDIN_LINK="$HOME/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/ShopPrentice"
 else
-    ADDIN_LINK="$APPDATA/Autodesk/Autodesk Fusion 360/API/AddIns/AutoFusion"
+    ADDIN_LINK="$APPDATA/Autodesk/Autodesk Fusion 360/API/AddIns/ShopPrentice"
 fi
 if [ -L "$ADDIN_LINK" ]; then
     rm "$ADDIN_LINK"
     removed+=("$ADDIN_LINK (symlink)")
 fi
 
-# --- Remove ~/.autofusion/ ---
+# --- Remove ~/.shopprentice/ ---
 if [ -d "$AUTOFUSION_HOME" ]; then
     rm -rf "$AUTOFUSION_HOME"
     removed+=("$AUTOFUSION_HOME/")
@@ -36,7 +36,7 @@ fi
 
 # --- Remove /woodworking hint from global CLAUDE.md ---
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
-HINT_MARKER="<!-- autofusion -->"
+HINT_MARKER="<!-- shopprentice -->"
 if [ -f "$CLAUDE_MD" ] && grep -q "$HINT_MARKER" "$CLAUDE_MD"; then
     grep -v "$HINT_MARKER" "$CLAUDE_MD" > "$CLAUDE_MD.tmp"
     mv "$CLAUDE_MD.tmp" "$CLAUDE_MD"
@@ -45,7 +45,7 @@ if [ -f "$CLAUDE_MD" ] && grep -q "$HINT_MARKER" "$CLAUDE_MD"; then
         rm "$CLAUDE_MD"
         removed+=("$CLAUDE_MD (empty, removed)")
     else
-        removed+=("autofusion hint from $CLAUDE_MD")
+        removed+=("shopprentice hint from $CLAUDE_MD")
     fi
 fi
 
@@ -73,7 +73,7 @@ fi
 # --- Summary ---
 echo
 if [ ${#removed[@]} -eq 0 ]; then
-    echo "Nothing to remove — autofusion was not installed."
+    echo "Nothing to remove — shopprentice was not installed."
 else
     echo "Removed:"
     for item in "${removed[@]}"; do

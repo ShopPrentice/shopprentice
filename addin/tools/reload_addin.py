@@ -1,7 +1,7 @@
 """
 Reload Add-in Tool
 
-Hot-reload the AutoFusion add-in: flush and re-import all tool, primitive,
+Hot-reload the ShopPrentice add-in: flush and re-import all tool, primitive,
 and helper modules, then re-register tools in the running MCP server.
 The HTTP server stays alive so the MCP connection is uninterrupted.
 """
@@ -20,13 +20,13 @@ except:
 
 
 def handler() -> dict:
-    """Hot-reload all AutoFusion modules and re-register tools."""
+    """Hot-reload all ShopPrentice modules and re-register tools."""
     try:
-        # Get MCP server ref stored on app object by AutoFusion.run()
-        mcp_server = getattr(sys, '_autofusion_mcp', None)
+        # Get MCP server ref stored on app object by ShopPrentice.run()
+        mcp_server = getattr(sys, '_shopprentice_mcp', None)
         if not mcp_server:
             return {
-                "content": [{"type": "text", "text": "No MCP server reference found on sys._autofusion_mcp"}],
+                "content": [{"type": "text", "text": "No MCP server reference found on sys._shopprentice_mcp"}],
                 "isError": True,
                 "message": "MCP server not found",
             }
@@ -108,7 +108,7 @@ def handler() -> dict:
             summary += f"\nIMPORT ERROR: {import_error}"
 
         if app:
-            app.log(f"AutoFusion hot-reload: {new_tool_count} tools" +
+            app.log(f"ShopPrentice hot-reload: {new_tool_count} tools" +
                     (f" (import error: {import_error})" if import_error else ""))
 
         return {
@@ -120,7 +120,7 @@ def handler() -> dict:
     except Exception as e:
         # Last resort: try to re-register ourselves
         try:
-            mcp_server = getattr(sys, '_autofusion_mcp', None)
+            mcp_server = getattr(sys, '_shopprentice_mcp', None)
             if mcp_server and "reload_addin" not in mcp_server.tools and _self_item:
                 mcp_server.tools["reload_addin"] = _self_item
         except Exception:
@@ -140,7 +140,7 @@ def handler() -> dict:
 tool = Tool.create_simple(
     name="reload_addin",
     description=(
-        "Hot-reload the AutoFusion add-in. Flushes and re-imports all tool, "
+        "Hot-reload the ShopPrentice add-in. Flushes and re-imports all tool, "
         "primitive, and helper modules, then re-registers tools in the running "
         "MCP server. The HTTP server stays alive so the MCP connection is "
         "uninterrupted. Use after editing add-in source code."

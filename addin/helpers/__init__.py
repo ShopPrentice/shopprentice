@@ -1,1 +1,1 @@
-"""AutoFusion runtime helpers for execute_script scripts."""
+"""ShopPrentice runtime helpers for execute_script scripts."""

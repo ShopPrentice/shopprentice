@@ -1,5 +1,5 @@
 """
-Server Package for AutoFusion Add-in
+Server Package for ShopPrentice Add-in
 
 MCP-compatible JSON-RPC server and thread-safe execution for Fusion 360.
 """
