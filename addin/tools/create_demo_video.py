@@ -79,6 +79,33 @@ def _set_camera(vp, eye_x, eye_y, eye_z, cx, cy, cz):
     vp.camera = cam
 
 
+def _dynamic_camera(vp, root, angle, elevation, fill=0.75):
+    """Set camera based on current model bounding box + orbit angle.
+
+    Recalculates the bounding box each call so the camera adapts as
+    components move during explode/reassemble.
+    """
+    cx, cy, cz, radius = _model_center_and_radius(root)
+
+    # Get FOV for distance calculation
+    cam = vp.camera
+    cam.cameraType = adsk.core.CameraTypes.PerspectiveCameraType
+    cam.isFitView = True
+    vp.camera = cam
+    adsk.doEvents()
+    fov = vp.camera.perspectiveAngle
+    half_fov = fov / 2
+
+    # Distance to frame the model at the given fill fraction
+    cam_dist = radius / (math.tan(half_fov) * fill)
+
+    ex = cx + cam_dist * math.cos(angle)
+    ey = cy + cam_dist * math.sin(angle)
+    ez = cz + cam_dist * elevation
+
+    _set_camera(vp, ex, ey, ez, cx, cy, cz)
+
+
 def _capture_frame(vp, frame_dir, frame_num, width, height):
     """Save one frame."""
     path = os.path.join(frame_dir, f"frame_{frame_num:04d}.png")
@@ -162,9 +189,8 @@ def handler(output_path: str = "/tmp/demo.mp4",
         for cp in root.constructionPlanes:
             cp.isLightBulbOn = False
 
-        # Model center and camera distance
-        cx, cy, cz, radius = _model_center_and_radius(root)
-        cam_dist = radius * 3.0  # camera distance from center
+        # Original model center (for computing explode offsets)
+        cx, cy, cz, _ = _model_center_and_radius(root)
 
         # Frame counts
         orbit_frames = int(orbit_seconds * fps)
@@ -187,13 +213,11 @@ def handler(output_path: str = "/tmp/demo.mp4",
         # === Phase 1: Initial orbit (half rotation) ===
         for i in range(orbit_frames):
             angle = (i / orbit_frames) * math.pi  # 0 to π
-            ex = cx + cam_dist * math.cos(angle)
-            ey = cy + cam_dist * math.sin(angle)
-            ez = cz + cam_dist * elevation
-            _set_camera(vp, ex, ey, ez, cx, cy, cz)
+            _dynamic_camera(vp, root, angle, elevation)
             adsk.doEvents()
             _capture_frame(vp, frame_dir, frame_num, width, height)
             frame_num += 1
+        last_angle = math.pi  # remember where orbit ended
 
         # === Phase 2: Explode ===
         for i in range(explode_frames):
@@ -216,15 +240,20 @@ def handler(output_path: str = "/tmp/demo.mp4",
                 trans.translation = adsk.core.Vector3D.create(dx, dy, dz)
                 new_t.transformBy(trans)
                 occ.transform = new_t
+            # Recalculate camera to fit the exploded state
+            _dynamic_camera(vp, root, last_angle, elevation)
             adsk.doEvents()
-            # Keep camera at last orbit position
             _capture_frame(vp, frame_dir, frame_num, width, height)
             frame_num += 1
 
-        # === Phase 3: Hold exploded view ===
+        # === Phase 3: Hold exploded view (slow orbit) ===
         for i in range(hold_frames):
+            hold_angle = last_angle + (i / max(hold_frames, 1)) * 0.3  # subtle rotation
+            _dynamic_camera(vp, root, hold_angle, elevation)
+            adsk.doEvents()
             _capture_frame(vp, frame_dir, frame_num, width, height)
             frame_num += 1
+        last_angle = last_angle + 0.3
 
         # === Phase 4: Reassemble ===
         for i in range(explode_frames):
@@ -246,17 +275,15 @@ def handler(output_path: str = "/tmp/demo.mp4",
                 trans.translation = adsk.core.Vector3D.create(dx, dy, dz)
                 new_t.transformBy(trans)
                 occ.transform = new_t
+            _dynamic_camera(vp, root, last_angle, elevation)
             adsk.doEvents()
             _capture_frame(vp, frame_dir, frame_num, width, height)
             frame_num += 1
 
         # === Phase 5: Final orbit (second half rotation) ===
         for i in range(orbit_frames):
-            angle = math.pi + (i / orbit_frames) * math.pi  # π to 2π
-            ex = cx + cam_dist * math.cos(angle)
-            ey = cy + cam_dist * math.sin(angle)
-            ez = cz + cam_dist * elevation
-            _set_camera(vp, ex, ey, ez, cx, cy, cz)
+            angle = last_angle + (i / orbit_frames) * (2 * math.pi - last_angle)
+            _dynamic_camera(vp, root, angle, elevation)
             adsk.doEvents()
             _capture_frame(vp, frame_dir, frame_num, width, height)
             frame_num += 1
