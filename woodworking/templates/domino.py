@@ -102,6 +102,10 @@ def single(comp, plane, center, long_axis, long_expr, short_expr,
     if ev is None:
         ev = af._make_ev()
 
+    # Validate mating surfaces before building the joint
+    if body_a is not None and body_b is not None:
+        af.validate_joint_contact(body_a, body_b)
+
     if use_model_coords:
         sk, prof = af.sketch_slot_model(
             comp, plane, center, long_axis,
@@ -153,6 +157,10 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
     """
     if ev is None:
         ev = af._make_ev()
+
+    # Validate mating surfaces before building the joint
+    if body_a is not None and body_b is not None:
+        af.validate_joint_contact(body_a, body_b)
 
     # Build ONE template void at start position
     sk, prof = af.sketch_slot_model(
@@ -429,6 +437,10 @@ def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
     """
     if ev is None:
         ev = af._make_ev()
+
+    # Validate mating surfaces — top must contact each leg
+    for leg in leg_bodies:
+        af.validate_joint_contact(top_body, leg)
 
     # 1. Build near-left domino
     sk, prof = af.sketch_slot_model(

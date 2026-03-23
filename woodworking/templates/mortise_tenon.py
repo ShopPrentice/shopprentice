@@ -149,6 +149,9 @@ def blind(comp, plane, origin, size, depth_expr,
     if ev is None:
         ev = af._make_ev()
 
+    # Validate mating surfaces before building the joint
+    af.validate_joint_contact(tenon_body, mortise_body)
+
     sk, _prof = af.sketch_rect_model(comp, plane, origin, size,
                                       name=f"{name}_Sk", ev=ev)
     # On body-face sketches the face boundary creates multiple profiles.
@@ -197,6 +200,9 @@ def through(comp, plane, origin, size, depth_expr,
     """
     if ev is None:
         ev = af._make_ev()
+
+    # Validate mating surfaces before building the joint
+    af.validate_joint_contact(tenon_body, mortise_body)
 
     sk, _prof = af.sketch_rect_model(comp, plane, origin, size,
                                       name=f"{name}_Sk", ev=ev)

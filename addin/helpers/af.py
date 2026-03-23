@@ -742,6 +742,92 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
     return sk, sk.profiles.item(0)
 
 
+# ── Joint Validation ───────────────────────────────────────────────
+
+def validate_joint_contact(body_a, body_b, joint_axis=None, tol_cm=0.1):
+    """Validate that two bodies have touching/overlapping faces.
+
+    Checks that body_a and body_b are adjacent (gap < tol) or overlapping
+    along the joint axis, and that they overlap in the perpendicular plane.
+
+    If joint_axis is None, auto-detects by finding the axis with the
+    smallest gap between the two bounding boxes.
+
+    Args:
+        body_a: First body (e.g. rail/stretcher).
+        body_b: Second body (e.g. leg/post).
+        joint_axis: 'x', 'y', or 'z' — axis along which bodies should meet.
+            If None, auto-detected.
+        tol_cm: Maximum allowed gap in cm (default 0.1 = 1mm).
+
+    Raises:
+        ValueError with diagnostic message if bodies don't contact.
+
+    Returns:
+        Dict with 'axis', 'gap_cm', 'perp_overlaps'.
+    """
+    bb_a = body_a.boundingBox
+    bb_b = body_b.boundingBox
+    all_axes = ['x', 'y', 'z']
+
+    def _bb_range(bb, ax):
+        return (getattr(bb.minPoint, ax), getattr(bb.maxPoint, ax))
+
+    if joint_axis is None:
+        # Auto-detect: find axis with smallest gap
+        best_axis = None
+        best_gap = 1e10
+        for ax in all_axes:
+            a_min, a_max = _bb_range(bb_a, ax)
+            b_min, b_max = _bb_range(bb_b, ax)
+            overlap = min(a_max, b_max) - max(a_min, b_min)
+            if overlap >= -tol_cm:
+                # Bodies overlap or touch on this axis — not the gap axis
+                continue
+            gap = -overlap
+            if gap < best_gap:
+                best_gap = gap
+                best_axis = ax
+        if best_axis is None:
+            # Bodies overlap on all axes (they intersect) — contact is fine
+            return {"axis": None, "gap_cm": 0.0, "perp_overlaps": {}}
+        joint_axis = best_axis
+
+    a_min, a_max = _bb_range(bb_a, joint_axis)
+    b_min, b_max = _bb_range(bb_b, joint_axis)
+
+    # Check adjacency or overlap along joint axis
+    overlap_along = min(a_max, b_max) - max(a_min, b_min)
+    if overlap_along < -tol_cm:
+        gap = -overlap_along
+        raise ValueError(
+            f"Joint contact failed: {body_a.name} and {body_b.name} "
+            f"have a {gap:.2f} cm gap along {joint_axis} axis. "
+            f"{body_a.name} {joint_axis}=[{a_min:.2f}, {a_max:.2f}], "
+            f"{body_b.name} {joint_axis}=[{b_min:.2f}, {b_max:.2f}]")
+
+    # Check perpendicular overlap (bodies must share area in the other 2 axes)
+    perp_axes = [ax for ax in all_axes if ax != joint_axis]
+    perp_overlaps = {}
+    for pax in perp_axes:
+        pa_min, pa_max = _bb_range(bb_a, pax)
+        pb_min, pb_max = _bb_range(bb_b, pax)
+        p_overlap = min(pa_max, pb_max) - max(pa_min, pb_min)
+        perp_overlaps[pax] = p_overlap
+        if p_overlap < -tol_cm:
+            raise ValueError(
+                f"Joint contact failed: {body_a.name} and {body_b.name} "
+                f"don't overlap in {pax} axis — no shared mating area. "
+                f"{body_a.name} {pax}=[{pa_min:.2f}, {pa_max:.2f}], "
+                f"{body_b.name} {pax}=[{pb_min:.2f}, {pb_max:.2f}]")
+
+    return {
+        "axis": joint_axis,
+        "gap_cm": max(0, -overlap_along),
+        "perp_overlaps": perp_overlaps,
+    }
+
+
 # ── Internal Helpers ────────────────────────────────────────────────
 
 def _make_ev():
