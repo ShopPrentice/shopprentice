@@ -37,8 +37,9 @@ def run(context):
         ("seat_h",        "18 in",   "in", "Seat height"),
         ("seat_thick",    "1.5 in",  "in", "Seat slab thickness"),
         ("leg_size",      "2 in",    "in", "Leg cross-section (square)"),
-        ("apron_h",       "4 in",    "in", "Apron height"),
+        ("apron_h",       "3 in",    "in", "Apron height"),
         ("apron_thick",   "0.75 in", "in", "Apron thickness"),
+        ("front_inset",   "20 mm",   "in", "Front leg inset from seat edge"),
         ("back_board_w",  "20 cm",   "in", "Back board width"),
         ("back_board_t",  "0.75 in", "in", "Back board thickness"),
         ("back_rake",     "8",       "",   "Back rake angle (degrees)"),
@@ -60,7 +61,7 @@ def run(context):
     for pname, expr, unit, desc in [
         ("leg_h",            "seat_h - seat_thick",                                    "in", "Front leg height"),
         ("inner_l",          "bench_l - 2 * leg_size",                                "in", "Length between legs"),
-        ("inner_d",          "bench_d - 2 * leg_size",                                "in", "Depth between legs"),
+        ("inner_d",          "bench_d - 2 * leg_size - front_inset",                   "in", "Depth between legs"),
         ("apron_z",          "seat_h - seat_thick - apron_h",                         "in", "Apron bottom Z"),
         ("bend_z",           "seat_h + bend_above",                                   "in", "Z where bend starts"),
         ("upper_post_len",   "back_board_offset + back_board_w / 2 + upper_post_margin","in","Angled post length above bend"),
@@ -84,7 +85,7 @@ def run(context):
     leg_c = leg_occ.component
 
     _, pr = af.sketch_rect_model(leg_c, root.xYConstructionPlane,
-        ("0 in", "0 in", "0 in"),
+        ("0 in", "front_inset", "0 in"),
         {"x": "leg_size", "y": "leg_size"},
         "LegFL_Sk", ev=ev)
     leg_fl = af.ext_new(leg_c, pr, "leg_h", "LegFL").bodies.item(0)
@@ -175,8 +176,10 @@ def run(context):
     apr_occ = af.make_comp(root, "Aprons")
     apr_c = apr_occ.component
 
-    _, pr = af.sketch_rect_model(apr_c, root.xZConstructionPlane,
-        ("leg_size", "0 in", "apron_z"),
+    front_apr_pl = af.off_plane(apr_c, root.xZConstructionPlane,
+        "front_inset", "FrontAprY_Pl")
+    _, pr = af.sketch_rect_model(apr_c, front_apr_pl,
+        ("leg_size", "front_inset", "apron_z"),
         {"x": "inner_l", "z": "apron_h"},
         "AprFront_Sk", ev=ev)
     apr_front = af.ext_new(apr_c, pr, "apron_thick", "AprFront").bodies.item(0)
@@ -192,7 +195,7 @@ def run(context):
     apr_back.name = "Apron_Back"
 
     _, pr = af.sketch_rect_model(apr_c, root.yZConstructionPlane,
-        ("0 in", "leg_size", "apron_z"),
+        ("0 in", "front_inset + leg_size", "apron_z"),
         {"y": "inner_d", "z": "apron_h"},
         "AprLeft_Sk", ev=ev)
     apr_left = af.ext_new(apr_c, pr, "apron_thick", "AprLeft").bodies.item(0)
@@ -262,17 +265,17 @@ def run(context):
 
     dm_yz_l = af.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_YZ_L")
     dm_yz_r = af.off_plane(root, root.yZConstructionPlane, "bench_l - leg_size", "DM_YZ_R")
-    dm_xz_f = af.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_XZ_F")
+    dm_xz_f = af.off_plane(root, root.xZConstructionPlane, "front_inset + leg_size", "DM_XZ_F")
     dm_xz_b = af.off_plane(root, root.xZConstructionPlane, "bench_d - leg_size", "DM_XZ_B")
 
-    # Apron dominos (same as before)
+    # Apron dominos
     domino.grid(root, dm_yz_l,
-        start=("leg_size", "apron_thick / 2", "apron_z + dm_sp"),
+        start=("leg_size", "front_inset + apron_thick / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
         depth_expr="dm_d", body_a=fl_p, body_b=fa_p, name="DM_FA_L", ev=ev)
     domino.grid(root, dm_yz_r,
-        start=("bench_l - leg_size", "apron_thick / 2", "apron_z + dm_sp"),
+        start=("bench_l - leg_size", "front_inset + apron_thick / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
         depth_expr="dm_d", body_a=fr_p, body_b=fa_p, name="DM_FA_R", ev=ev)
@@ -287,7 +290,7 @@ def run(context):
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
         depth_expr="dm_d", body_a=br_p, body_b=ba_p, name="DM_BA_R", ev=ev)
     domino.grid(root, dm_xz_f,
-        start=("apron_thick / 2", "leg_size", "apron_z + dm_sp"),
+        start=("apron_thick / 2", "front_inset + leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
         depth_expr="dm_d", body_a=fl_p, body_b=la_p, name="DM_LA_F", ev=ev)
@@ -297,7 +300,7 @@ def run(context):
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
         depth_expr="dm_d", body_a=bl_p, body_b=la_p, name="DM_LA_B", ev=ev)
     domino.grid(root, dm_xz_f,
-        start=("bench_l - apron_thick / 2", "leg_size", "apron_z + dm_sp"),
+        start=("bench_l - apron_thick / 2", "front_inset + leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
         depth_expr="dm_d", body_a=fr_p, body_b=ra_p, name="DM_RA_F", ev=ev)
