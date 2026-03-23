@@ -1020,22 +1020,14 @@ def _grain_axis(body):
 
 
 def _grain_transform(grain_dir):
-    """Rotate texture so grain aligns with model axis.
-
-    Fusion wood textures typically have grain running along texture Y.
-    Box projection maps texture XYZ to model XYZ by default.
-    We rotate so texture Y (grain) aligns with the desired model axis.
-    """
+    """Rotate texture so grain (texture Z) aligns with model axis."""
     m = adsk.core.Matrix3D.create()
     if grain_dir == "x":
-        # Rotate 90° around Z: texture Y → model X
-        m.setToRotation(math.pi / 2, adsk.core.Vector3D.create(0, 0, 1),
+        m.setToRotation(math.pi / 2, adsk.core.Vector3D.create(0, 1, 0),
                         Point3D.create(0, 0, 0))
-    elif grain_dir == "z":
-        # Rotate 90° around X: texture Y → model Z
-        m.setToRotation(math.pi / 2, adsk.core.Vector3D.create(1, 0, 0),
+    elif grain_dir == "y":
+        m.setToRotation(-math.pi / 2, adsk.core.Vector3D.create(1, 0, 0),
                         Point3D.create(0, 0, 0))
-    # grain_dir == "y": identity (grain already along Y)
     return m
 
 
@@ -1064,10 +1056,10 @@ def apply_appearance(species="white oak", bodies=None):
     # Find appearance in libraries
     appearance = None
     for term in search_terms:
-        # Check design local appearances first
+        # Check design local appearances first (skip 3D procedural)
         for i in range(design.appearances.count):
             a = design.appearances.item(i)
-            if term.lower() in a.name.lower():
+            if term.lower() in a.name.lower() and not a.name.startswith("3D "):
                 appearance = a
                 break
         if appearance:
@@ -1079,6 +1071,10 @@ def apply_appearance(species="white oak", bodies=None):
             for ai in range(lib.appearances.count):
                 a = lib.appearances.item(ai)
                 if term.lower() in a.name.lower():
+                    # Skip "3D" procedural textures — they ignore
+                    # the grain transform (texture rotation has no effect)
+                    if a.name.startswith("3D "):
+                        continue
                     if "appearance" in lib.name.lower():
                         appearance = a
                         break
