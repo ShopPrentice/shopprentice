@@ -294,22 +294,47 @@ def between(comp, plane, body_a, body_b, interface_axis,
     dim_0 = axis_map[in_plane[0]][1] - axis_map[in_plane[0]][0]
     dim_1 = axis_map[in_plane[1]][1] - axis_map[in_plane[1]][0]
 
-    # Auto-determine orientation: long axis = SHORTER mating dimension,
-    # step axis = LONGER dimension. This maximizes how many dominos fit
-    # (step along the tall/long direction, domino width spans the narrow one).
-    if long_axis is None:
-        if dim_0 <= dim_1:
-            long_axis = in_plane[0]
-            step_axis = in_plane[1]
-        else:
-            long_axis = in_plane[1]
-            step_axis = in_plane[0]
-    else:
-        step_axis = in_plane[0] if in_plane[0] != long_axis else in_plane[1]
-
     # If long_expr not given, default to "dm_w"
     if long_expr is None:
         long_expr = "dm_w"
+    dm_long = ev(long_expr) if isinstance(long_expr, str) else long_expr
+    dm_short = ev(short_expr) if isinstance(short_expr, str) else short_expr
+
+    # Auto-determine orientation: the domino long side must FIT within its
+    # chosen axis. Pick axes so the domino dimensions don't exceed the
+    # mating area dimensions. Step along the larger remaining axis.
+    if long_axis is None:
+        # Try both orientations, pick the one where both dimensions fit
+        fits_0_as_long = (dm_long <= dim_0 + 0.01 and dm_short <= dim_1 + 0.01)
+        fits_1_as_long = (dm_long <= dim_1 + 0.01 and dm_short <= dim_0 + 0.01)
+
+        if fits_0_as_long and fits_1_as_long:
+            # Both fit — prefer long axis on shorter dimension (more step room)
+            if dim_0 <= dim_1:
+                long_axis = in_plane[0]
+                step_axis = in_plane[1]
+            else:
+                long_axis = in_plane[1]
+                step_axis = in_plane[0]
+        elif fits_0_as_long:
+            long_axis = in_plane[0]
+            step_axis = in_plane[1]
+        elif fits_1_as_long:
+            long_axis = in_plane[1]
+            step_axis = in_plane[0]
+        else:
+            # Neither fits at full size — pick the larger dimension for long axis
+            # and the domino will need to be smaller (caller should adjust dm_w)
+            if dim_0 >= dim_1:
+                long_axis = in_plane[0]
+                step_axis = in_plane[1]
+            else:
+                long_axis = in_plane[1]
+                step_axis = in_plane[0]
+            print(f"WARNING: {name} — domino ({dm_long:.1f}x{dm_short:.1f}mm) "
+                  f"doesn't fit in mating area ({dim_0:.1f}x{dim_1:.1f}mm)")
+    else:
+        step_axis = in_plane[0] if in_plane[0] != long_axis else in_plane[1]
 
     long_min, long_max = axis_map[long_axis]
     step_min, step_max = axis_map[step_axis]
@@ -324,7 +349,6 @@ def between(comp, plane, body_a, body_b, interface_axis,
     long_center = (long_min + long_max) / 2
 
     # Compute spacing along step_axis
-    dm_long = ev(long_expr) if isinstance(long_expr, str) else long_expr
     margin = dm_long / 2 + 0.2  # half domino + clearance
 
     usable = step_range - 2 * margin

@@ -348,12 +348,16 @@ def run(context):
     dm_div_f = af.off_plane(root, root.xZConstructionPlane, "apron_thick", "DM_DivF")
     dm_div_b = af.off_plane(root, root.xZConstructionPlane,
                              "desk_w - leg_size - apron_thick", "DM_DivB")
+    # Divider is narrow (0.75") — use smaller domino that fits.
+    # long=12mm fits in 19mm divider width, short=6mm, depth=apron_thick/2
+    params.add("div_dm_w", VI("12 mm"), "in", "")
+    params.add("div_dm_t", VI("6 mm"), "in", "")
     domino.between(root, dm_div_f, div_p, fr_p_body,
-        interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
-        long_expr="dm_w", count=1, name="DM_Div_F", ev=ev)
+        interface_axis="y", short_expr="div_dm_t", depth_expr="div_dm_d",
+        long_expr="div_dm_w", count=1, name="DM_Div_F", ev=ev)
     domino.between(root, dm_div_b, div_p, ba_p,
-        interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
-        long_expr="dm_w", count=2, name="DM_Div_B", ev=ev)
+        interface_axis="y", short_expr="div_dm_t", depth_expr="div_dm_d",
+        long_expr="div_dm_w", count=2, name="DM_Div_B", ev=ev)
 
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
     # Vertical leg against apron inner face, horizontal leg under top
