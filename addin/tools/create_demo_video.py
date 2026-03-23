@@ -1,18 +1,21 @@
 """
 Create Demo Video Tool
 
-Generates a demo video of the current model by capturing frame sequences:
+Generates a demo video by capturing frame sequences:
 1. Orbit — camera rotates around the model
-2. Explode — components move outward from center
-3. Reassemble — components move back
-4. Stitch frames into MP4 via FFmpeg
+2. Pull drawers out (if present)
+3. Transition to transparent mode
+4. Orbit — transparent flyaround showing internals
+5. Transition back to opaque
+6. Push drawers back in
+7. Final orbit
+Stitches frames into MP4 via FFmpeg.
 """
 
 import math
 import os
 import subprocess
 import tempfile
-import time
 import traceback
 from primitives.tool import Tool
 from primitives.item import Item
@@ -28,23 +31,6 @@ def _model_center_and_radius(root):
     """Compute center and radius of all visible bodies."""
     min_x = min_y = min_z = 1e10
     max_x = max_y = max_z = -1e10
-
-    def _walk(comp, transform=None):
-        nonlocal min_x, min_y, min_z, max_x, max_y, max_z
-        for i in range(comp.bRepBodies.count):
-            b = comp.bRepBodies.item(i)
-            if not b.isVisible:
-                continue
-            bb = b.boundingBox
-            if bb:
-                min_x = min(min_x, bb.minPoint.x)
-                min_y = min(min_y, bb.minPoint.y)
-                min_z = min(min_z, bb.minPoint.z)
-                max_x = max(max_x, bb.maxPoint.x)
-                max_y = max(max_y, bb.maxPoint.y)
-                max_z = max(max_z, bb.maxPoint.z)
-
-    _walk(root)
     for occ in root.allOccurrences:
         for i in range(occ.component.bRepBodies.count):
             b = occ.component.bRepBodies.item(i)
@@ -59,7 +45,18 @@ def _model_center_and_radius(root):
                 max_x = max(max_x, bb.maxPoint.x)
                 max_y = max(max_y, bb.maxPoint.y)
                 max_z = max(max_z, bb.maxPoint.z)
-
+    for i in range(root.bRepBodies.count):
+        b = root.bRepBodies.item(i)
+        if not b.isVisible:
+            continue
+        bb = b.boundingBox
+        if bb:
+            min_x = min(min_x, bb.minPoint.x)
+            min_y = min(min_y, bb.minPoint.y)
+            min_z = min(min_z, bb.minPoint.z)
+            max_x = max(max_x, bb.maxPoint.x)
+            max_y = max(max_y, bb.maxPoint.y)
+            max_z = max(max_z, bb.maxPoint.z)
     cx = (min_x + max_x) / 2
     cy = (min_y + max_y) / 2
     cz = (min_z + max_z) / 2
@@ -68,109 +65,59 @@ def _model_center_and_radius(root):
     return cx, cy, cz, radius
 
 
-def _set_camera(vp, eye_x, eye_y, eye_z, cx, cy, cz):
-    """Set camera position looking at center."""
-    cam = vp.camera
-    cam.isFitView = False
-    cam.cameraType = adsk.core.CameraTypes.PerspectiveCameraType
-    cam.eye = P3.create(eye_x, eye_y, eye_z)
-    cam.target = P3.create(cx, cy, cz)
-    cam.upVector = adsk.core.Vector3D.create(0, 0, 1)
-    vp.camera = cam
-
-
-def _dynamic_camera(vp, root, angle, elevation, fill=0.75):
-    """Set camera based on current model bounding box + orbit angle.
-
-    Recalculates the bounding box each call so the camera adapts as
-    components move during explode/reassemble.
-    """
+def _set_camera(vp, root, angle, elevation, fill=0.70):
+    """Position camera at orbit angle, auto-framing the current model state."""
     cx, cy, cz, radius = _model_center_and_radius(root)
 
-    # Get FOV for distance calculation
     cam = vp.camera
     cam.cameraType = adsk.core.CameraTypes.PerspectiveCameraType
     cam.isFitView = True
     vp.camera = cam
     adsk.doEvents()
     fov = vp.camera.perspectiveAngle
-    half_fov = fov / 2
+    dist = radius / (math.tan(fov / 2) * fill)
 
-    # Distance to frame the model at the given fill fraction
-    cam_dist = radius / (math.tan(half_fov) * fill)
+    ex = cx + dist * math.cos(angle)
+    ey = cy + dist * math.sin(angle)
+    ez = cz + dist * elevation
 
-    ex = cx + cam_dist * math.cos(angle)
-    ey = cy + cam_dist * math.sin(angle)
-    ez = cz + cam_dist * elevation
-
-    _set_camera(vp, ex, ey, ez, cx, cy, cz)
-
-
-def _capture_frame(vp, frame_dir, frame_num, width, height):
-    """Save one frame."""
-    path = os.path.join(frame_dir, f"frame_{frame_num:04d}.png")
-    vp.saveAsImageFile(path, width, height)
-    return path
-
-
-def _get_component_centers(root):
-    """Get each top-level occurrence's bounding box center (for explode).
-
-    Returns list of (occurrence, (cx, cy, cz)) tuples.
-    Uses list instead of dict — Fusion Occurrence objects aren't hashable.
-    """
-    results = []
-    for i in range(root.occurrences.count):
-        occ = root.occurrences.item(i)
-        if not occ.isLightBulbOn:
-            continue
-        min_x = min_y = min_z = 1e10
-        max_x = max_y = max_z = -1e10
-        has_bodies = False
-        for j in range(occ.component.bRepBodies.count):
-            b = occ.component.bRepBodies.item(j)
-            proxy = b.createForAssemblyContext(occ)
-            bb = proxy.boundingBox
-            if bb:
-                has_bodies = True
-                min_x = min(min_x, bb.minPoint.x)
-                min_y = min(min_y, bb.minPoint.y)
-                min_z = min(min_z, bb.minPoint.z)
-                max_x = max(max_x, bb.maxPoint.x)
-                max_y = max(max_y, bb.maxPoint.y)
-                max_z = max(max_z, bb.maxPoint.z)
-        if has_bodies:
-            results.append((occ, (
-                (min_x + max_x) / 2,
-                (min_y + max_y) / 2,
-                (min_z + max_z) / 2,
-            )))
-    return results
+    cam = vp.camera
+    cam.isFitView = False
+    cam.cameraType = adsk.core.CameraTypes.PerspectiveCameraType
+    cam.eye = P3.create(ex, ey, ez)
+    cam.target = P3.create(cx, cy, cz)
+    cam.upVector = adsk.core.Vector3D.create(0, 0, 1)
+    vp.camera = cam
 
 
 def _ease_in_out(t):
-    """Smooth ease-in-out curve (0→1)."""
+    """Smooth ease-in-out (0→1)."""
     return t * t * (3 - 2 * t)
 
 
+def _capture(vp, frame_dir, num, w, h):
+    """Save one frame."""
+    path = os.path.join(frame_dir, f"frame_{num:04d}.png")
+    vp.saveAsImageFile(path, w, h)
+
+
 def handler(output_path: str = "/tmp/demo.mp4",
-            width: int = 1920, height: int = 1080,
+            width: int = 2560, height: int = 1440,
             fps: int = 30,
             orbit_seconds: float = 3.0,
-            explode_seconds: float = 1.5,
-            hold_seconds: float = 1.0,
-            explode_factor: float = 0.5,
+            drawer_seconds: float = 2.0,
+            transparent_orbit_seconds: float = 4.0,
+            drawer_pull: float = -1.0,
             elevation: float = 0.4) -> dict:
-    """Create a demo video: orbit → explode → hold → reassemble → orbit."""
+    """Create demo: orbit → drawer pull → transparent orbit → drawer push → orbit."""
+
+    orig_transforms = []
 
     try:
         design = adsk.fusion.Design.cast(app.activeProduct)
         if not design:
-            return {
-                "content": [{"type": "text", "text": "No active design"}],
-                "isError": True,
-                "message": "No active design"
-            }
+            return {"content": [{"type": "text", "text": "No active design"}],
+                    "isError": True, "message": "No active design"}
 
         root = design.rootComponent
         vp = app.activeViewport
@@ -189,122 +136,136 @@ def handler(output_path: str = "/tmp/demo.mp4",
         for cp in root.constructionPlanes:
             cp.isLightBulbOn = False
 
-        # Original model center (for computing explode offsets)
-        cx, cy, cz, _ = _model_center_and_radius(root)
+        # Ensure opaque visual style
+        vp.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
+
+        # Identify drawer components
+        drawer_occs = []
+        for i in range(root.occurrences.count):
+            occ = root.occurrences.item(i)
+            if "drawer" in occ.component.name.lower() and occ.isLightBulbOn:
+                drawer_occs.append(occ)
+                orig_transforms.append((occ, occ.transform.copy()))
+
+        # Auto-calculate drawer pull distance
+        if drawer_pull < 0 and drawer_occs:
+            occ0 = drawer_occs[0]
+            for j in range(occ0.component.bRepBodies.count):
+                b = occ0.component.bRepBodies.item(j)
+                proxy = b.createForAssemblyContext(occ0)
+                bb = proxy.boundingBox
+                if bb:
+                    drawer_pull = abs(bb.maxPoint.y - bb.minPoint.y) * 0.9
+                    break
+        has_drawers = drawer_pull > 0 and len(drawer_occs) > 0
 
         # Frame counts
-        orbit_frames = int(orbit_seconds * fps)
-        explode_frames = int(explode_seconds * fps)
-        hold_frames = int(hold_seconds * fps)
+        orbit1 = int(orbit_seconds * fps)
+        drawer_out = int(drawer_seconds * fps) if has_drawers else 0
+        trans_orbit = int(transparent_orbit_seconds * fps)
+        drawer_in = int(drawer_seconds * fps) if has_drawers else 0
+        orbit2 = int(orbit_seconds * fps)
+        total = orbit1 + drawer_out + trans_orbit + drawer_in + orbit2
 
-        # Component centers for explode — list of (occ, (cx, cy, cz))
-        comp_centers = _get_component_centers(root)
-        orig_transforms = []  # list of (occ, orig_transform)
-        for occ, _ in comp_centers:
-            orig_transforms.append((occ, occ.transform.copy()))
-
-        # Temp directory for frames
         frame_dir = tempfile.mkdtemp(prefix="autofusion_video_")
-        frame_num = 0
-        total_frames = orbit_frames + explode_frames + hold_frames + explode_frames + orbit_frames
+        n = 0
+        angle = 0.0
 
-        app.log(f"Creating demo video: {total_frames} frames at {fps}fps")
+        app.log(f"Demo video: {total} frames, {total/fps:.1f}s")
 
-        # === Phase 1: Initial orbit (half rotation) ===
-        for i in range(orbit_frames):
-            angle = (i / orbit_frames) * math.pi  # 0 to π
-            _dynamic_camera(vp, root, angle, elevation)
+        # === Phase 1: Opening orbit (opaque) ===
+        for i in range(orbit1):
+            angle = (i / orbit1) * math.pi * 0.8  # ~144° rotation
+            _set_camera(vp, root, angle, elevation)
             adsk.doEvents()
-            _capture_frame(vp, frame_dir, frame_num, width, height)
-            frame_num += 1
-        last_angle = math.pi  # remember where orbit ended
+            _capture(vp, frame_dir, n, width, height)
+            n += 1
+        last_angle = angle
 
-        # === Phase 2: Explode ===
-        for i in range(explode_frames):
-            t = _ease_in_out(i / max(explode_frames - 1, 1))
-            # Move each component outward from model center
-            for occ, (ocx, ocy, ocz) in comp_centers:
-                dx = (ocx - cx) * explode_factor * t
-                dy = (ocy - cy) * explode_factor * t
-                dz = (ocz - cz) * explode_factor * t
-                # Find original transform for this occurrence
-                orig_t = None
-                for o, ot in orig_transforms:
-                    if o.name == occ.name:
-                        orig_t = ot
-                        break
-                if orig_t is None:
-                    continue
-                new_t = orig_t.copy()
-                trans = adsk.core.Matrix3D.create()
-                trans.translation = adsk.core.Vector3D.create(dx, dy, dz)
-                new_t.transformBy(trans)
-                occ.transform = new_t
-            # Recalculate camera to fit the exploded state
-            _dynamic_camera(vp, root, last_angle, elevation)
+        # === Phase 2: Pull drawers out ===
+        if has_drawers:
+            for i in range(drawer_out):
+                t = _ease_in_out(i / max(drawer_out - 1, 1))
+                for occ in drawer_occs:
+                    # Find original transform
+                    orig_t = None
+                    for o, ot in orig_transforms:
+                        if o.name == occ.name:
+                            orig_t = ot
+                            break
+                    if orig_t is None:
+                        continue
+                    new_t = orig_t.copy()
+                    tr = adsk.core.Matrix3D.create()
+                    tr.translation = adsk.core.Vector3D.create(0, -drawer_pull * t, 0)
+                    new_t.transformBy(tr)
+                    occ.transform = new_t
+                # Slow orbit during drawer pull
+                last_angle += 0.3 / drawer_out
+                _set_camera(vp, root, last_angle, elevation)
+                adsk.doEvents()
+                _capture(vp, frame_dir, n, width, height)
+                n += 1
+
+        # === Phase 3: Transition to transparent + orbit ===
+        vp.visualStyle = adsk.core.VisualStyles.ShadedWithHiddenEdgesVisualStyle
+        adsk.doEvents()
+
+        for i in range(trans_orbit):
+            last_angle += (2 * math.pi) / trans_orbit  # full rotation
+            _set_camera(vp, root, last_angle, elevation)
             adsk.doEvents()
-            _capture_frame(vp, frame_dir, frame_num, width, height)
-            frame_num += 1
+            _capture(vp, frame_dir, n, width, height)
+            n += 1
 
-        # === Phase 3: Hold exploded view (slow orbit) ===
-        for i in range(hold_frames):
-            hold_angle = last_angle + (i / max(hold_frames, 1)) * 0.3  # subtle rotation
-            _dynamic_camera(vp, root, hold_angle, elevation)
+        # === Phase 4: Back to opaque + push drawers in ===
+        vp.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
+        adsk.doEvents()
+
+        if has_drawers:
+            for i in range(drawer_in):
+                t = _ease_in_out(1.0 - i / max(drawer_in - 1, 1))
+                for occ in drawer_occs:
+                    orig_t = None
+                    for o, ot in orig_transforms:
+                        if o.name == occ.name:
+                            orig_t = ot
+                            break
+                    if orig_t is None:
+                        continue
+                    new_t = orig_t.copy()
+                    tr = adsk.core.Matrix3D.create()
+                    tr.translation = adsk.core.Vector3D.create(0, -drawer_pull * t, 0)
+                    new_t.transformBy(tr)
+                    occ.transform = new_t
+                last_angle += 0.3 / drawer_in
+                _set_camera(vp, root, last_angle, elevation)
+                adsk.doEvents()
+                _capture(vp, frame_dir, n, width, height)
+                n += 1
+
+        # === Phase 5: Closing orbit ===
+        for i in range(orbit2):
+            last_angle += (math.pi * 0.5) / orbit2  # ~90° more
+            _set_camera(vp, root, last_angle, elevation)
             adsk.doEvents()
-            _capture_frame(vp, frame_dir, frame_num, width, height)
-            frame_num += 1
-        last_angle = last_angle + 0.3
+            _capture(vp, frame_dir, n, width, height)
+            n += 1
 
-        # === Phase 4: Reassemble ===
-        for i in range(explode_frames):
-            t = _ease_in_out(1.0 - i / max(explode_frames - 1, 1))
-            for occ, (ocx, ocy, ocz) in comp_centers:
-                dx = (ocx - cx) * explode_factor * t
-                dy = (ocy - cy) * explode_factor * t
-                dz = (ocz - cz) * explode_factor * t
-                # Find original transform for this occurrence
-                orig_t = None
-                for o, ot in orig_transforms:
-                    if o.name == occ.name:
-                        orig_t = ot
-                        break
-                if orig_t is None:
-                    continue
-                new_t = orig_t.copy()
-                trans = adsk.core.Matrix3D.create()
-                trans.translation = adsk.core.Vector3D.create(dx, dy, dz)
-                new_t.transformBy(trans)
-                occ.transform = new_t
-            _dynamic_camera(vp, root, last_angle, elevation)
-            adsk.doEvents()
-            _capture_frame(vp, frame_dir, frame_num, width, height)
-            frame_num += 1
-
-        # === Phase 5: Final orbit (second half rotation) ===
-        for i in range(orbit_frames):
-            angle = last_angle + (i / orbit_frames) * (2 * math.pi - last_angle)
-            _dynamic_camera(vp, root, angle, elevation)
-            adsk.doEvents()
-            _capture_frame(vp, frame_dir, frame_num, width, height)
-            frame_num += 1
-
-        # Restore original transforms
+        # Restore
         for occ, orig_t in orig_transforms:
             occ.transform = orig_t
         adsk.doEvents()
-
-        # Restore camera
+        vp.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
         cam = vp.camera
         cam.isFitView = True
         vp.camera = cam
 
-        app.log(f"Captured {frame_num} frames to {frame_dir}")
+        app.log(f"Captured {n} frames")
 
-        # === Stitch with FFmpeg ===
-        # Try common FFmpeg paths (Fusion's Python env may not have it in PATH)
+        # === FFmpeg ===
         ffmpeg_bin = "ffmpeg"
-        for p in ["/usr/local/bin/ffmpeg", "/opt/homebrew/bin/ffmpeg",
-                   "/usr/bin/ffmpeg"]:
+        for p in ["/usr/local/bin/ffmpeg", "/opt/homebrew/bin/ffmpeg", "/usr/bin/ffmpeg"]:
             if os.path.exists(p):
                 ffmpeg_bin = p
                 break
@@ -313,152 +274,86 @@ def handler(output_path: str = "/tmp/demo.mp4",
             ffmpeg_bin, "-y",
             "-framerate", str(fps),
             "-i", os.path.join(frame_dir, "frame_%04d.png"),
-            "-c:v", "libx264",
-            "-pix_fmt", "yuv420p",
-            "-crf", "18",  # high quality
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18",
             output_path
         ]
-
         try:
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True,
-                                     timeout=60)
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=120)
             if result.returncode != 0:
-                return {
-                    "content": [{"type": "text", "text":
-                        f"FFmpeg failed: {result.stderr[:500]}"}],
-                    "isError": True,
-                    "message": "FFmpeg encoding failed"
-                }
+                return {"content": [{"type": "text", "text": f"FFmpeg failed: {result.stderr[:500]}"}],
+                        "isError": True, "message": "FFmpeg failed"}
         except FileNotFoundError:
-            # FFmpeg not installed — return frame directory instead
-            return {
-                "content": [{"type": "text", "text":
-                    f"FFmpeg not found. {frame_num} frames saved to: {frame_dir}\n"
-                    f"Run manually: ffmpeg -framerate {fps} -i {frame_dir}/frame_%04d.png "
-                    f"-c:v libx264 -pix_fmt yuv420p {output_path}"}],
-                "isError": False,
-                "message": f"{frame_num} frames captured (FFmpeg not found)"
-            }
+            return {"content": [{"type": "text", "text":
+                f"{n} frames saved to: {frame_dir}\n"
+                f"ffmpeg -framerate {fps} -i {frame_dir}/frame_%04d.png "
+                f"-c:v libx264 -pix_fmt yuv420p {output_path}"}],
+                "isError": False, "message": f"{n} frames (FFmpeg not found)"}
 
         # Cleanup frames
         for f in os.listdir(frame_dir):
             os.unlink(os.path.join(frame_dir, f))
         os.rmdir(frame_dir)
 
-        file_size = os.path.getsize(output_path)
-        return {
-            "content": [{"type": "text", "text":
-                f"Video saved: {output_path} ({file_size // 1024}KB, "
-                f"{frame_num} frames, {frame_num / fps:.1f}s at {fps}fps)\n"
-                f"Sequence: orbit({orbit_seconds}s) → explode({explode_seconds}s) → "
-                f"hold({hold_seconds}s) → reassemble({explode_seconds}s) → "
-                f"orbit({orbit_seconds}s)"}],
-            "isError": False,
-            "message": f"Demo video created: {output_path}"
-        }
+        sz = os.path.getsize(output_path)
+        return {"content": [{"type": "text", "text":
+            f"Video: {output_path} ({sz // 1024}KB, {n} frames, {n / fps:.1f}s)\n"
+            f"Sequence: orbit → drawer pull → transparent orbit → drawer push → orbit"}],
+            "isError": False, "message": f"Demo video: {output_path}"}
 
     except Exception as e:
-        # Restore transforms on error
         try:
             for occ, orig_t in orig_transforms:
                 occ.transform = orig_t
             adsk.doEvents()
+            app.activeViewport.visualStyle = adsk.core.VisualStyles.ShadedVisualStyle
         except Exception:
             pass
         app.log(f"create_demo_video error: {e}\n{traceback.format_exc()}")
-        return {
-            "content": [{"type": "text", "text": f"Error: {e}\n{traceback.format_exc()}"}],
-            "isError": True,
-            "message": "create_demo_video failed"
-        }
+        return {"content": [{"type": "text", "text": f"Error: {e}\n{traceback.format_exc()}"}],
+                "isError": True, "message": "create_demo_video failed"}
 
 
 TOOL_DESCRIPTION = \
 """Create a demo video of the current model.
 
-Captures frame sequences with camera orbit and exploded view animation:
-1. Orbit — camera rotates around the model (first half)
-2. Explode — components move outward from center (ease-in-out)
-3. Hold — pause on exploded view
-4. Reassemble — components return to position
-5. Orbit — camera completes rotation (second half)
+Sequence: orbit → pull drawers out → transparent flyaround → push drawers back → orbit.
 
-Frames are stitched into MP4 via FFmpeg. If FFmpeg is not installed,
-raw frames are saved and the FFmpeg command is provided.
+Drawer components (names containing 'Drawer') are automatically detected and
+slid out. Set drawer_pull=-1 to auto-calculate distance from drawer depth.
 
-Default: 1920x1080, 30fps, ~10 seconds total."""
+Default: 2560x1440, 30fps, ~15 seconds."""
 
 tool = Tool.create_simple(
     name="create_demo_video",
     description=TOOL_DESCRIPTION
 ).add_input_property(
-    "output_path",
-    {
-        "description": "Output video file path. Default: /tmp/demo.mp4",
-        "type": "string",
-        "default": "/tmp/demo.mp4"
-    }
+    "output_path", {"type": "string", "default": "/tmp/demo.mp4",
+        "description": "Output video file path."}
 ).add_input_property(
-    "width",
-    {
-        "description": "Frame width in pixels.",
-        "type": "integer",
-        "default": 1920
-    }
+    "width", {"type": "integer", "default": 2560,
+        "description": "Frame width in pixels."}
 ).add_input_property(
-    "height",
-    {
-        "description": "Frame height in pixels.",
-        "type": "integer",
-        "default": 1080
-    }
+    "height", {"type": "integer", "default": 1440,
+        "description": "Frame height in pixels."}
 ).add_input_property(
-    "fps",
-    {
-        "description": "Frames per second.",
-        "type": "integer",
-        "default": 30
-    }
+    "fps", {"type": "integer", "default": 30,
+        "description": "Frames per second."}
 ).add_input_property(
-    "orbit_seconds",
-    {
-        "description": "Duration of each orbit phase in seconds.",
-        "type": "number",
-        "default": 3.0
-    }
+    "orbit_seconds", {"type": "number", "default": 3.0,
+        "description": "Duration of each orbit phase."}
 ).add_input_property(
-    "explode_seconds",
-    {
-        "description": "Duration of explode/reassemble animation.",
-        "type": "number",
-        "default": 1.5
-    }
+    "drawer_seconds", {"type": "number", "default": 2.0,
+        "description": "Duration of drawer pull/push."}
 ).add_input_property(
-    "hold_seconds",
-    {
-        "description": "Duration to hold the exploded view.",
-        "type": "number",
-        "default": 1.0
-    }
+    "transparent_orbit_seconds", {"type": "number", "default": 4.0,
+        "description": "Duration of transparent flyaround."}
 ).add_input_property(
-    "explode_factor",
-    {
-        "description": "How far to explode (fraction of component offset from center). Default 0.5.",
-        "type": "number",
-        "default": 0.5
-    }
+    "drawer_pull", {"type": "number", "default": -1.0,
+        "description": "Drawer slide distance in cm. -1=auto, 0=skip."}
 ).add_input_property(
-    "elevation",
-    {
-        "description": "Camera elevation factor (0=level, 1=high). Default 0.4.",
-        "type": "number",
-        "default": 0.4
-    }
+    "elevation", {"type": "number", "default": 0.4,
+        "description": "Camera elevation (0=level, 1=high)."}
 )
 
-item = Item.create_tool_item(
-    tool=tool,
-    handler=handler
-)
-
+item = Item.create_tool_item(tool=tool, handler=handler)
 register(item)
