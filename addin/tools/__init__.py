@@ -15,6 +15,7 @@ from . import check_interference
 from . import check_connectivity
 from . import validate_design
 from . import get_product_shots
+from . import create_demo_video
 from . import suppress_features
 from . import get_changes
 from . import sync_script
