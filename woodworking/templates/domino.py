@@ -309,8 +309,8 @@ def between(comp, plane, body_a, body_b, interface_axis,
         fits_1_as_long = (dm_long <= dim_1 + 0.01 and dm_short <= dim_0 + 0.01)
 
         if fits_0_as_long and fits_1_as_long:
-            # Both fit — prefer long axis on shorter dimension (more step room)
-            if dim_0 <= dim_1:
+            # Both fit — long axis on LONGER mating dimension
+            if dim_0 >= dim_1:
                 long_axis = in_plane[0]
                 step_axis = in_plane[1]
             else:
@@ -349,7 +349,8 @@ def between(comp, plane, body_a, body_b, interface_axis,
     long_center = (long_min + long_max) / 2
 
     # Compute spacing along step_axis
-    margin = dm_long / 2 + 0.2  # half domino + clearance
+    # Margin = half domino SHORT dimension + clearance (step-direction extent)
+    margin = dm_short / 2 + 0.1
 
     usable = step_range - 2 * margin
     if usable <= 0 or count < 1:
