@@ -53,7 +53,6 @@ def run(context):
         ("grommet_dia",  "2 in",    "in"),   # cable grommet diameter
         ("grommet_inset","3 in",    "in"),   # from back-right corner
         ("edge_chamfer","0.03125 in","in"),  # 1/32" edge break
-        ("grain_adjust","-8 deg",   "deg"),  # counter-rotate maple grain diagonal
     ]:
         params.add(pname, VI(expr), unit, "")
 
@@ -503,30 +502,10 @@ def run(context):
     print(f"Root: {root.bRepBodies.count} domino voids")
 
     af.apply_appearance("maple")
-
-    # Fine-tune grain angle on the top — counter-rotate to straighten
-    # the maple texture's inherent diagonal grain pattern
-    import math
-    top_body_ref = None
-    for i in range(top_c.bRepBodies.count):
-        if top_c.bRepBodies.item(i).name == "Top":
-            top_body_ref = top_c.bRepBodies.item(i)
-            break
-    if top_body_ref:
-        adsk.doEvents()
-        tmc = top_body_ref.textureMapControl
-        if tmc:
-            ptmc = adsk.core.ProjectedTextureMapControl.cast(tmc)
-            if ptmc:
-                # Get current transform and compose a small Z-rotation
-                t = ptmc.transform
-                adjust = adsk.core.Matrix3D.create()
-                adjust.setToRotation(
-                    ev("grain_adjust"),  # parametric grain angle correction
-                    adsk.core.Vector3D.create(0, 0, 1),
-                    adsk.core.Point3D.create(0, 0, 0))
-                t.transformBy(adjust)
-                ptmc.transform = t
+    # Note: Fusion's "3D Maple" uses a procedural 3D texture — grain direction
+    # is controlled by the procedural algorithm, not the texture map transform.
+    # The ProjectedTextureMapControl.transform has no visible effect on 3D textures.
+    # To change grain direction, use a 2D-mapped wood appearance or white oak.
 
     # Re-apply steel to brackets (walnut overwrites them)
     tabletop_bracket._apply_steel(bracket_c,
