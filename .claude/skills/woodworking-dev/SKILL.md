@@ -38,13 +38,13 @@ After completing a build (or a build session with notable discoveries), when the
 | `joinery/dowel-joint.md` | Draft |
 | `joinery/pocket-hole.md` | Draft |
 
-Joinery files live at: `/Users/frankzha/.autofusion/repo/joinery/`
+Joinery files live at: `~/.autofusion/repo/joinery/` (or the repo's `joinery/` directory)
 
 ### Context from the build
 
 - The model script we just built (e.g., `counter_stool.py`)
 - The conversation history — errors we hit, workarounds we found, techniques that worked
-- Auto-memory at `/Users/frankzha/.claude/projects/-Users-frankzha-projects-autofusion/memory/MEMORY.md`
+- Auto-memory (Claude Code's project memory for this repo)
 
 ## Workflow
 

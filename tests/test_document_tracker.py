@@ -76,7 +76,7 @@ mock_app, MockActionLog = _setup_mocks()
 # Import DocumentTracker from its file location
 spec = importlib.util.spec_from_file_location(
     "server.document_tracker",
-    "/Users/frankzha/projects/autofusion/addin/server/document_tracker.py"
+    os.path.join(os.path.dirname(__file__), "..", "addin", "server", "document_tracker.py")
 )
 mod = importlib.util.module_from_spec(spec)
 sys.modules["server.document_tracker"] = mod

@@ -2,3 +2,20 @@ __pycache__/
 *.pyc
 .DS_Store
 .vscode/
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/worktrees/
+
+# Debug / scratch test scripts
+tests/debug_*.py
+tests/probe_*.py
+tests/export_*.py
+tests/fix_*.py
+tests/show_*.py
+tests/import_*.py
+tests/move_*.py
+tests/reexport_*.py
+
+# OS
+Thumbs.db
