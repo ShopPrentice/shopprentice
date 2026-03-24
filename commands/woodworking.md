@@ -160,9 +160,23 @@ When a constraint chain has N terms, at most N-1 can be independent. Choose the 
 
 **Principle: define count, derive spacing.** When elements repeat across a dimension (tails, slats, fingers), make the *count* a user parameter and derive the *spacing* from `board_dimension / count`. This guarantees elements always fill the space exactly. The alternative — defining element width + gap width independently and using `floor()` to compute count — leaves uneven remainders that break symmetry.
 
-**Principle: every sketch position must be parametric.** Evaluating a parameter at script time (`ev("param")`) bakes the current value into the sketch geometry. If the user later changes the parameter in Change Parameters, the sketch doesn't move. Always add a sketch dimension linked to the parameter expression so Fusion recomputes the position automatically.
+**Parametric positions (MANDATORY):** `ev()` is for approximate placement ONLY. Every `ev()` call that positions sketch geometry MUST be followed by `addDistanceDimension` with a parametric expression. Without this, geometry stays at stale positions when parameters change. This was the #1 source of broken models in testing — dog holes, pins, and vise components all failed when parameters changed because they had `ev()` placement without parametric dimensions.
 
-**Principle: sketch positions are relative to the features they interact with.** When a sketch CUTs or modifies a body (e.g., an arch CUT on a rail), its position must be defined relative to that body's features — not as an absolute coordinate. For example, an arch baseline should be dimensioned with `leg_h - front_rail_h` (the rail's bottom Z), not drawn at an `ev()` position. When the user changes `front_rail_h`, the arch follows the rail. This applies to all sketches: use `modelToSketchSpace` for approximate positions, then add parametric dimensions with expressions that reference the parent body's parameters.
+```python
+# WRONG — positions baked at script time, breaks on parameter change:
+ctr = m2s(P.create(ev("mid_x"), ev("leg_d / 2"), ev("ls_z + ls_w")))
+sk.sketchCurves.sketchCircles.addByCenterRadius(P.create(ctr.x, ctr.y, 0), r)
+# only radial dimension — center position is NOT parametric
+
+# RIGHT — ev() for placement, then parametric dimensions:
+ctr = m2s(P.create(ev("mid_x"), ev("leg_d / 2"), ev("ls_z + ls_w")))
+sk.sketchCurves.sketchCircles.addByCenterRadius(P.create(ctr.x, ctr.y, 0), r)
+d.addRadialDimension(circle, ...).parameter.expression = "dog_dia / 2"
+d.addDistanceDimension(origin, circle.centerSketchPoint, H, ...).parameter.expression = "mid_x"
+d.addDistanceDimension(origin, circle.centerSketchPoint, V, ...).parameter.expression = "ls_z + ls_w"
+```
+
+**Face-relative sketching (MANDATORY):** Sketch positions must be relative to the features they interact with — not absolute world coordinates. When a sketch CUTs or modifies a body, dimension from the body's face edges or a projected reference, not from the sketch origin with `leg_setback + ...`. For example, a tenon on a leg should reference the leg top face, not compute its position from `leg_setback`. When the leg moves, the tenon follows automatically through the face reference. Use `_face_fl_pt(sketch)` to get the face corner point for dimensioning, or project a construction plane from a face with `sp.off_plane(comp, face_proxy, "0 in", ...)` and dimension from the projected reference.
 
 **How to decide:**
 1. Ask: "If the user changes this value, does the model stay valid?" If increasing a width could overflow available space, that width should be derived from a count instead.
@@ -647,7 +661,7 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Hardware (STEP imports):** When a design uses detachable or mechanical hardware (bed rail fasteners, hinges from STEP files), read `woodworking/hardware-installation.md` for import caching, positioning, direction detection, determinant validation, and component organization rules. Most furniture uses joinery templates instead — only load this topic when hardware is needed.
 
-**Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `woodworking/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`sp.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `woodworking/joinery/mortise-tenon.md`.
+**Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `woodworking/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`sp.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. **Extrude direction:** if the tenon height equals the rail height (full-width), the end face causes coincident edges — use a construction plane at the **outer end** of the tenon (proud face or blind stop) and extrude inward. For drawbore M&T with offset pins, use the `drawbore` template. Full reference: `woodworking/joinery/mortise-tenon.md`, `woodworking/joinery/drawbore.md`.
 
 **Tenon collision at corners — interlock, don't shorten.** When two rails meet in the same leg from perpendicular directions, their tenons collide inside the mortise. The naive fix — shortening one tenon — sacrifices bonding surface and therefore joint strength (less side-grain glue area, less fiber interlock). Instead, notch both tenons so they weave past each other at full depth:
 
@@ -792,6 +806,9 @@ Name every feature and body for a readable timeline and easy debugging:
 | Chamfer fails with `createInput()` | Chamfer API requires `createInput2()`, not `createInput()` | Always use `chamferFeatures.createInput2()` and the nested `.chamferEdgeSets` collection |
 | Fillet fails — radius too large | Fillet radius exceeds half the smallest adjacent face dimension | Reduce `fl_r`; keep it < half the shortest edge on any affected face |
 | Fillet/chamfer selects wrong edges | Edge coordinate filter matches unintended edges (e.g., groove interior edges) | Add `edge.body.name` check; filter by both coordinate AND body |
+| Chamfer fails with non-manifold error | Chamfer selected edges at groove/mortise boundaries where two volumes meet | Only chamfer outer perimeter edges (check bounding box), skip edges at joint interfaces. Never chamfer mating lines of joints. |
+| No profile created on face sketch | Drawn rectangle has same height/width as the face — edges coincide with auto-projected face boundary, Fusion merges them | Use a **construction plane** at the same position instead of the face. No auto-projected edges → clean single profile. Common with full-width tenons. |
+| Tenon extrudes into stretcher body | Default extrude direction on construction plane goes in +normal, which may point into the stretcher instead of into the leg | Place the tenon sketch plane at the **outer end** of the tenon (proud face or blind stop). Extrude inward — the default +normal direction goes toward the stretcher body. |
 | Fillet API rejects BRepFace | `addConstantRadiusEdgeSet` requires edges, not faces | Iterate `face.edges`, deduplicate via `tempId`, add individual edges |
 | `InternalValidationError: face` on sketch | CUT/JOIN modifies body topology, invalidating BRepFace references | Re-find face with `sp.find_face()` after each CUT/JOIN before next sketch |
 | Face-sketch extrudes wrong profile | Auto-projected face edges and `sketch.project()` reference lines split profiles into fragments — `smallest_profile` picks a fragment instead of the drawn shape | **Always call `sp.refs_to_construction(sk)` before profile selection.** This converts all reference/projected lines to construction geometry so they don't form profile boundaries. Then `sp.smallest_profile(sk)` returns the correct drawn profile. This is mandatory for ANY sketch on a face or with projected references. |

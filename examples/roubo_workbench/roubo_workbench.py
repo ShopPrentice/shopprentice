@@ -1135,6 +1135,12 @@ def run(context):
             names.append(f"{occ.name}/{c.bRepBodies.item(i).name}")
     print(f"Bodies: {len(names)} -> {names}")
 
+    # Apply white oak appearance to all bodies
+    for occ in root.occurrences:
+        c = occ.component
+        for i in range(c.bRepBodies.count):
+            sp.apply_appearance(c.bRepBodies.item(i), "3D Oak - Semigloss")
+
     # Show edge lines
     app.activeViewport.visualStyle = \
         adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle

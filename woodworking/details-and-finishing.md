@@ -48,6 +48,29 @@ for i in range(face.edges.count):
 
 **CRITICAL:** The fillet/chamfer API requires `BRepEdge` objects, never `BRepFace`. When the design intent is "fillet a face," iterate the face's edges and add them. Use `tempId` to deduplicate shared edges between adjacent faces.
 
+**4. Exposed edges only (skip joint mating lines)** — chamfer visible edges but not where joints meet:
+```python
+# Select outer perimeter edges only (both vertices on bounding box boundary)
+# Skip: mortise slot edges, tongue groove edges, tenon shoulder edges
+bb = body.boundingBox
+tol = 0.05
+edges = adsk.core.ObjectCollection.create()
+for i in range(body.edges.count):
+    e = body.edges.item(i)
+    sv, ev2 = e.startVertex.geometry, e.endVertex.geometry
+    on_bb = lambda pt: (abs(pt.x - bb.minPoint.x) < tol or abs(pt.x - bb.maxPoint.x) < tol
+                        or abs(pt.y - bb.minPoint.y) < tol or abs(pt.y - bb.maxPoint.y) < tol
+                        or abs(pt.z - bb.minPoint.z) < tol or abs(pt.z - bb.maxPoint.z) < tol)
+    if on_bb(sv) and on_bb(ev2):
+        edges.add(e)
+```
+
+**Chamfer edge selection rules:**
+- **Never chamfer joint mating lines** — mortise slot boundaries, tenon shoulders, tongue groove edges. These are structural interfaces.
+- **Non-manifold edges crash chamfers** — groove/mortise cuts that touch the bounding box create non-manifold edges. Filter by specific face (Z=max for top, X=min/max for ends) instead of "all boundary edges."
+- **Dog hole circles and perimeter segments** are safe to chamfer on the top face.
+- **End edges** (at X=min/max for a bench top) are safe — no grooves intersect the end faces.
+
 ## Chamfer Types
 
 | Type | Method | Use For |
