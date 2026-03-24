@@ -75,7 +75,6 @@ def run(context):
         ("st_blind",     "1 in",     "in", "Blind tenon stop depth inside leg"),
         # Drawbore pins
         ("pin_dia",      "0.375 in", "in", "Drawbore pin diameter"),
-        ("pin_offset",   "0.375 in", "in", "Pin offset from tenon shoulder"),
         ("pin_sp",       "2 in",     "in", "Vertical spacing between 2 pins"),
         # Deadman
         ("dm_thick",     "1.5 in",   "in", "Deadman panel thickness"),
@@ -804,22 +803,25 @@ def run(context):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
         sp.combine(root, lp, ls_proxies, CUT, True, f"LSMort_Leg{i}")
 
-    # Drawbore pins — 2 per tenon through each leg, for both LS and SS
+    # Drawbore pins — 2 per tenon, at 1/3 of tenon length from shoulder.
+    # LS tenon goes through leg in X (length = leg_w), pin in Y direction.
+    # SS tenon goes into leg in Y (length = leg_d - st_blind), pin in X direction.
     pin_occ = sp.make_comp(root, "DrawborePins")
     pin_c = pin_occ.component
     _pin_r = ev("pin_dia") / 2
     _pin_half_sp = ev("pin_sp") / 2
     P = adsk.core.Point3D
 
-    # LS pins (Y direction, through leg front-to-back)
-    # 4 legs × 2 pins = 8 pin bodies
+    # LS pins: pin at 1/3 * leg_w from inner leg face (shoulder)
+    _ls_pin_depth = ev("leg_w") / 3
     _ls_z_ctr = ev("ls_z + ls_w / 2")
     _ls_pin_z = [_ls_z_ctr - _pin_half_sp, _ls_z_ctr + _pin_half_sp]
+    # (pin_x, pin_y_start) for each leg — pin_x is 1/3 into leg from shoulder
     _ls_legs = [
-        (ev("leg_setback + pin_offset"), 0),                          # FL
-        (ev("bench_l - leg_setback - pin_offset"), 0),                # FR
-        (ev("leg_setback + pin_offset"), ev("bench_w - leg_d")),      # BL
-        (ev("bench_l - leg_setback - pin_offset"), ev("bench_w - leg_d")),  # BR
+        (ev("leg_setback + leg_w") - _ls_pin_depth, 0),                          # FL
+        (ev("bench_l - leg_setback - leg_w") + _ls_pin_depth, 0),                # FR
+        (ev("leg_setback + leg_w") - _ls_pin_depth, ev("bench_w - leg_d")),      # BL
+        (ev("bench_l - leg_setback - leg_w") + _ls_pin_depth, ev("bench_w - leg_d")),  # BR
     ]
     pin_idx = 0
     for lx, ly in _ls_legs:
@@ -833,23 +835,24 @@ def run(context):
             pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
                 P.create(ctr.x, ctr.y, 0), _pin_r)
         _refs_to_construction(pin_sk)
-        # Extrude all circles together
         for j in range(pin_sk.profiles.count):
             p = pin_sk.profiles.item(j)
-            if p.areaProperties().area < 1.0:  # small = circle
+            if p.areaProperties().area < 1.0:
                 ext = sp.ext_new(pin_c, p, "leg_d", f"LSPin{pin_idx}_{j}")
                 ext.bodies.item(0).name = f"LSPin_{pin_idx}_{j}"
         pin_idx += 1
 
-    # SS pins (X direction, through leg side-to-side)
-    # 4 legs × 2 pins = 8 pin bodies
+    # SS pins: pin at 1/3 * (leg_d - st_blind) from inner leg face (shoulder)
+    _ss_tenon_len = ev("leg_d - st_blind")
+    _ss_pin_depth = _ss_tenon_len / 3
     _ss_z_ctr = ev("ls_z + ls_w + ss_w / 2")
     _ss_pin_z = [_ss_z_ctr - _pin_half_sp, _ss_z_ctr + _pin_half_sp]
+    # (pin_x_start, pin_y) — pin_y is 1/3 into leg from shoulder (inner face)
     _ss_legs = [
-        (ev("leg_setback"), ev("pin_offset")),                          # FL
-        (ev("bench_l - leg_setback - leg_w"), ev("pin_offset")),        # FR
-        (ev("leg_setback"), ev("bench_w - leg_d + pin_offset")),        # BL
-        (ev("bench_l - leg_setback - leg_w"), ev("bench_w - leg_d + pin_offset")),  # BR
+        (ev("leg_setback"), ev("leg_d") - _ss_pin_depth),                          # FL
+        (ev("bench_l - leg_setback - leg_w"), ev("leg_d") - _ss_pin_depth),        # FR
+        (ev("leg_setback"), ev("bench_w - leg_d") + _ss_pin_depth),                # BL
+        (ev("bench_l - leg_setback - leg_w"), ev("bench_w - leg_d") + _ss_pin_depth),  # BR
     ]
     pin_idx = 0
     for lx, ly in _ss_legs:
@@ -923,24 +926,77 @@ def run(context):
         top_c.bRepBodies.item(0), "DMGroove_Top")
 
     # ==============================================================
-    #  DETAILS — chamfers
+    #  DETAILS — chamfers on exposed edges (not on joint mating lines)
     # ==============================================================
-    # Leg bottoms — chamfer Z=0 edges
-    for i in range(leg_c.bRepBodies.count):
-        body = leg_c.bRepBodies.item(i)
+
+    def _chamfer_boundary_edges(comp, body, size_expr, name, z_filter=None):
+        """Chamfer edges on the outer bounding box boundary of a body.
+
+        Only selects edges where BOTH vertices sit on the body's bounding
+        box faces.  Joint/mortise edges are interior — they don't touch
+        the bounding box — so they're automatically excluded.
+        Optional z_filter: 'top', 'bottom', or None (all boundary edges).
+        """
+        bb = body.boundingBox
+        mn, mx = bb.minPoint, bb.maxPoint
+        tol = 0.05  # cm
+
+        def on_bb(pt):
+            return (abs(pt.x - mn.x) < tol or abs(pt.x - mx.x) < tol
+                    or abs(pt.y - mn.y) < tol or abs(pt.y - mx.y) < tol
+                    or abs(pt.z - mn.z) < tol or abs(pt.z - mx.z) < tol)
+
         edges = adsk.core.ObjectCollection.create()
         for j in range(body.edges.count):
             e = body.edges.item(j)
-            sv = e.startVertex.geometry
-            ev2 = e.endVertex.geometry
-            if abs(sv.z) < 0.01 and abs(ev2.z) < 0.01:
-                edges.add(e)
+            sv, ev2 = e.startVertex.geometry, e.endVertex.geometry
+            if not (on_bb(sv) and on_bb(ev2)):
+                continue
+            if z_filter == 'bottom' and not (abs(sv.z - mn.z) < tol
+                                              and abs(ev2.z - mn.z) < tol):
+                continue
+            if z_filter == 'top' and not (abs(sv.z - mx.z) < tol
+                                           and abs(ev2.z - mx.z) < tol):
+                continue
+            edges.add(e)
         if edges.count > 0:
-            ch_inp = leg_c.features.chamferFeatures.createInput2()
+            ch_inp = comp.features.chamferFeatures.createInput2()
             ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
-                edges, VI("ch_leg"), True)
-            ch = leg_c.features.chamferFeatures.add(ch_inp)
-            ch.name = f"LegBot_Ch{i}"
+                edges, VI(size_expr), True)
+            ch = comp.features.chamferFeatures.add(ch_inp)
+            ch.name = name
+
+    # Top slab — chamfer only the 4 perimeter edges at Z=bench_h (safe from joints)
+    _top_body = top_c.bRepBodies.item(0)
+    _bench_h = ev("bench_h")
+    _top_edges = adsk.core.ObjectCollection.create()
+    for j in range(_top_body.edges.count):
+        e = _top_body.edges.item(j)
+        sv, ev2 = e.startVertex.geometry, e.endVertex.geometry
+        if abs(sv.z - _bench_h) < 0.05 and abs(ev2.z - _bench_h) < 0.05:
+            # Only outer perimeter edges (both vertices on BB boundary in X or Y)
+            bb = _top_body.boundingBox
+            on_x_edge = ((abs(sv.x - bb.minPoint.x) < 0.05
+                          and abs(ev2.x - bb.minPoint.x) < 0.05)
+                         or (abs(sv.x - bb.maxPoint.x) < 0.05
+                             and abs(ev2.x - bb.maxPoint.x) < 0.05))
+            on_y_edge = ((abs(sv.y - bb.minPoint.y) < 0.05
+                          and abs(ev2.y - bb.minPoint.y) < 0.05)
+                         or (abs(sv.y - bb.maxPoint.y) < 0.05
+                             and abs(ev2.y - bb.maxPoint.y) < 0.05))
+            if on_x_edge or on_y_edge:
+                _top_edges.add(e)
+    if _top_edges.count > 0:
+        ch_inp = top_c.features.chamferFeatures.createInput2()
+        ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+            _top_edges, VI("ch_top"), True)
+        ch = top_c.features.chamferFeatures.add(ch_inp)
+        ch.name = "TopEdge_Ch"
+
+    # Leg bottoms — chamfer Z=0 edges
+    for i in range(leg_c.bRepBodies.count):
+        _chamfer_boundary_edges(leg_c, leg_c.bRepBodies.item(i),
+                                "ch_leg", f"LegBot_Ch{i}", z_filter='bottom')
 
     # ==============================================================
     #  EPILOGUE
@@ -962,6 +1018,10 @@ def run(context):
         for i in range(c.bRepBodies.count):
             names.append(f"{occ.name}/{c.bRepBodies.item(i).name}")
     print(f"Bodies: {len(names)} -> {names}")
+
+    # Show edge lines
+    app.activeViewport.visualStyle = \
+        adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
 
     cam = app.activeViewport.camera
     cam.isFitView = True
