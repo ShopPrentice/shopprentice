@@ -278,6 +278,23 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
     return sk, sk.profiles.item(0)
 
 
+def refs_to_construction(sk):
+    """Convert all projected/reference lines to construction geometry.
+
+    Call this after dimensioning but before profile selection.  Projected
+    references (from sketch.project() or auto-projected face edges) form
+    profile boundaries, splitting the sketch into fragments.  Setting them
+    to construction removes them from profile computation so only the
+    drawn geometry defines profiles.
+
+    The sketch points from these lines remain valid for dimensions.
+    """
+    for i in range(sk.sketchCurves.sketchLines.count):
+        ln = sk.sketchCurves.sketchLines.item(i)
+        if ln.isReference:
+            ln.isConstruction = True
+
+
 def smallest_profile(sk):
     """Smallest-area profile in a sketch.
 

@@ -19,6 +19,17 @@ CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
 
+def _refs_to_construction(sk):
+    """Convert projected/reference lines to construction (no profile splits).
+
+    Inline fallback — use af.refs_to_construction() once addin is restarted.
+    """
+    for i in range(sk.sketchCurves.sketchLines.count):
+        ln = sk.sketchCurves.sketchLines.item(i)
+        if ln.isReference:
+            ln.isConstruction = True
+
+
 def run(context):
     app = adsk.core.Application.get()
     design = adsk.fusion.Design.cast(app.activeProduct)
@@ -158,7 +169,7 @@ def run(context):
     # Sketch on the mating surface (leg top face) so all dimensions are
     # relative to the leg, not to the table origin.  Full-width tenons
     # cause sketch edges to coincide with auto-projected face edges,
-    # creating fragment profiles — _pick_profile selects by centroid.
+    # creating fragment profiles — refs_to_construction clears them.
     leg_top_face = af.find_face(leg_fl, "z", +1)
 
     def _face_fl_pt(sketch):
@@ -175,19 +186,6 @@ def run(context):
                     g = sp.geometry
                     if best is None or (g.x + g.y) < (best.geometry.x + best.geometry.y):
                         best = sp
-        return best
-
-    def _pick_profile(sketch, target_x, target_y):
-        """Select profile whose bounding box center is nearest target."""
-        best, best_d = None, float('inf')
-        for i in range(sketch.profiles.count):
-            p = sketch.profiles.item(i)
-            bb = p.boundingBox
-            mx = (bb.minPoint.x + bb.maxPoint.x) / 2
-            my = (bb.minPoint.y + bb.maxPoint.y) / 2
-            d2 = (mx - target_x)**2 + (my - target_y)**2
-            if d2 < best_d:
-                best, best_d = p, d2
         return best
 
     # 1. Dovetail tenon (front half) — trapezoidal plan-view cross-section
@@ -262,7 +260,8 @@ def run(context):
         H, P.create(fl_g.x - 0.5, p_bl.y + 1, 0)
     ).parameter.expression = "0 in"
 
-    dt_pr = _pick_profile(sk_dt, cx, dy / 2)
+    _refs_to_construction(sk_dt)
+    dt_pr = af.smallest_profile(sk_dt)
     dt_ext = af.ext_new(leg_c, dt_pr, "top_thick", "DT_FL")
     dt_body = dt_ext.bodies.item(0)
     dt_body.name = "DT_FL"
@@ -318,7 +317,8 @@ def run(context):
         V, P.create(p_mt_fl.x - 2, mt_y0 / 2, 0)
     ).parameter.expression = "dt_thick + jt_gap"
 
-    mt_pr = _pick_profile(sk_mt, (lx + rx) / 2, mt_y0 + mt_dy / 2)
+    _refs_to_construction(sk_mt)
+    mt_pr = af.smallest_profile(sk_mt)
     mt_ext = af.ext_new(leg_c, mt_pr, "top_thick", "MT_FL")
     mt_body = mt_ext.bodies.item(0)
     mt_body.name = "MT_FL"
@@ -569,10 +569,8 @@ def run(context):
         V, P.create(chop_bl.x - 2, chop_bl.y / 2, 0)
     ).parameter.expression = "vise_bottom_gap"
 
-    chop_ext = af.ext_new(vise_c,
-        _pick_profile(chop_sk,
-                      (chop_bl.x + chop_br.x) / 2,
-                      (chop_bl.y + chop_tl.y) / 2),
+    _refs_to_construction(chop_sk)
+    chop_ext = af.ext_new(vise_c, af.smallest_profile(chop_sk),
         "vise_chop_t", "ViseChop")
     chop_body = chop_ext.bodies.item(0)
     chop_body.name = "Vise_Chop"
@@ -732,10 +730,8 @@ def run(context):
         V, P.create(guide_bl.x - 2, guide_bl.y / 2, 0)
     ).parameter.expression = "vise_guide_z - vise_guide_h / 2"
 
-    guide_ext = af.ext_new(vise_c,
-        _pick_profile(guide_sk,
-                      (guide_bl.x + guide_br.x) / 2,
-                      (guide_bl.y + guide_tl.y) / 2),
+    _refs_to_construction(guide_sk)
+    guide_ext = af.ext_new(vise_c, af.smallest_profile(guide_sk),
         "vise_chop_t + vise_distance + leg_d", "ViseGuide")
     guide_body = guide_ext.bodies.item(0)
     guide_body.name = "Vise_Guide"
