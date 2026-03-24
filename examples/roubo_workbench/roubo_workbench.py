@@ -381,10 +381,68 @@ def run(context):
     ls_front = ls_tenon
     ls_front.name = "LS_Front"
 
-    # Mirror across YMid → LS_Back
-    mir_ls = sp.mirror_body(ls_c, ls_front, YMid, "LSMirY")
-    ls_back = mir_ls.bodies.item(0)
-    ls_back.name = "LS_Back"
+    # Drawbore pins at each end of LS_Front (2 per leg = 4 total)
+    # Pin X = 1/3 of leg_w from the shoulder (inner leg face)
+    for side, x_expr in [("L", "leg_setback + 2 * leg_w / 3"),
+                          ("R", "bench_l - leg_setback - 2 * leg_w / 3")]:
+        pin_pl = sp.off_plane(ls_c, root.yZConstructionPlane,
+            x_expr, f"LSPin{side}_Pl")
+        pin_sk = ls_c.sketches.add(pin_pl)
+        pin_sk.name = f"LSPin{side}_Sk"
+        m = pin_sk.modelToSketchSpace
+        P = adsk.core.Point3D
+        _y_val = ev("(leg_d - st_tt) / 2 + st_tt / 2")
+        # Detect axis mapping for Z dimension
+        _o = m(P.create(ev(x_expr), _y_val, 0))
+        _tz = m(P.create(ev(x_expr), _y_val, 1))
+        z_is_H = abs(_tz.x - _o.x) > abs(_tz.y - _o.y)
+        z_orient = H if z_is_H else V
+        y_orient = V if z_is_H else H
+
+        # Place both circles
+        for k, z_expr in enumerate(["ls_z + ls_w / 2 - pin_sp / 2",
+                                     "ls_z + ls_w / 2 + pin_sp / 2"]):
+            ctr = m(P.create(ev(x_expr), _y_val, ev(z_expr)))
+            pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
+                P.create(ctr.x, ctr.y, 0), ev("pin_dia") / 2)
+
+        d = pin_sk.sketchDimensions
+        c0 = pin_sk.sketchCurves.sketchCircles.item(0)
+        c1 = pin_sk.sketchCurves.sketchCircles.item(1)
+        # Radial dims
+        ctr0 = c0.centerSketchPoint.geometry
+        ctr1 = c1.centerSketchPoint.geometry
+        d.addRadialDimension(c0, P.create(ctr0.x + 1, ctr0.y, 0)
+        ).parameter.expression = "pin_dia / 2"
+        d.addRadialDimension(c1, P.create(ctr1.x + 1, ctr1.y, 0)
+        ).parameter.expression = "pin_dia / 2"
+        # First circle: position from origin
+        d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
+            z_orient, P.create(ctr0.x - 1, ctr0.y - 1, 0)
+        ).parameter.expression = "ls_z + ls_w / 2 - pin_sp / 2"
+        d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
+            y_orient, P.create(ctr0.x + 1, ctr0.y + 1, 0)
+        ).parameter.expression = "(leg_d - st_tt) / 2 + st_tt / 2"
+        # Second circle: spacing from first (Z direction only)
+        d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
+            z_orient, P.create((ctr0.x + ctr1.x) / 2, ctr0.y - 1, 0)
+        ).parameter.expression = "pin_sp"
+        _refs_to_construction(pin_sk)
+        for j in range(pin_sk.profiles.count):
+            p = pin_sk.profiles.item(j)
+            if p.areaProperties().area < 1.0:
+                ext = sp.ext_new(ls_c, p, "leg_d", f"LSPin{side}_{j}")
+                ext.bodies.item(0).name = f"LSPin_{side}_{j}"
+
+    # Mirror ALL bodies across YMid → LS_Back + back pins
+    _ls_bodies = [ls_c.bRepBodies.item(i) for i in range(ls_c.bRepBodies.count)]
+    mir_ls = sp.mirror_bodies(ls_c, _ls_bodies, YMid, "LSMirY")
+    # Name the mirrored stretcher (first mirrored body)
+    for i in range(mir_ls.bodies.count):
+        b = mir_ls.bodies.item(i)
+        if "LS_Front" in b.name or b.name == "LS_Front":
+            b.name = "LS_Back"
+            break
 
     # ==============================================================
     #  SHORT STRETCHERS (blind tenon into legs)
@@ -423,10 +481,66 @@ def run(context):
     ss_left = ss_tenon
     ss_left.name = "SS_Left"
 
-    # Mirror across XMid → SS_Right
-    mir_ss = sp.mirror_body(ss_c, ss_left, XMid, "SSMirX")
-    ss_right = mir_ss.bodies.item(0)
-    ss_right.name = "SS_Right"
+    # Drawbore pins at each end of SS_Left (2 per leg = 4 total)
+    # Pin Y = 1/3 of (leg_d - st_blind) from the shoulder (inner leg face)
+    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    for side, y_expr in [("F", "leg_d - (leg_d - st_blind) / 3"),
+                          ("B", "bench_w - leg_d + (leg_d - st_blind) / 3")]:
+        pin_pl = sp.off_plane(ss_c, root.xZConstructionPlane,
+            y_expr, f"SSPin{side}_Pl")
+        pin_sk = ss_c.sketches.add(pin_pl)
+        pin_sk.name = f"SSPin{side}_Sk"
+        m = pin_sk.modelToSketchSpace
+        P = adsk.core.Point3D
+        _x_val = ev("leg_setback + leg_w / 2")
+        _o = m(P.create(_x_val, ev(y_expr), 0))
+        _tz = m(P.create(_x_val, ev(y_expr), 1))
+        z_is_H = abs(_tz.x - _o.x) > abs(_tz.y - _o.y)
+        z_orient = H if z_is_H else V
+        x_orient = V if z_is_H else H
+
+        for k, z_expr in enumerate(["ls_z + ls_w + ss_w / 2 - pin_sp / 2",
+                                     "ls_z + ls_w + ss_w / 2 + pin_sp / 2"]):
+            ctr = m(P.create(_x_val, ev(y_expr), ev(z_expr)))
+            pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
+                P.create(ctr.x, ctr.y, 0), ev("pin_dia") / 2)
+
+        d = pin_sk.sketchDimensions
+        c0 = pin_sk.sketchCurves.sketchCircles.item(0)
+        c1 = pin_sk.sketchCurves.sketchCircles.item(1)
+        ctr0 = c0.centerSketchPoint.geometry
+        ctr1 = c1.centerSketchPoint.geometry
+        d.addRadialDimension(c0, P.create(ctr0.x + 1, ctr0.y, 0)
+        ).parameter.expression = "pin_dia / 2"
+        d.addRadialDimension(c1, P.create(ctr1.x + 1, ctr1.y, 0)
+        ).parameter.expression = "pin_dia / 2"
+        # First circle from origin
+        d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
+            z_orient, P.create(ctr0.x - 1, ctr0.y - 1, 0)
+        ).parameter.expression = "ls_z + ls_w + ss_w / 2 - pin_sp / 2"
+        d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
+            x_orient, P.create(ctr0.x + 1, ctr0.y + 1, 0)
+        ).parameter.expression = "leg_setback + leg_w / 2"
+        # Second circle: spacing from first (Z direction only)
+        d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
+            z_orient, P.create((ctr0.x + ctr1.x) / 2, ctr0.y - 1, 0)
+        ).parameter.expression = "pin_sp"
+        _refs_to_construction(pin_sk)
+        for j in range(pin_sk.profiles.count):
+            p = pin_sk.profiles.item(j)
+            if p.areaProperties().area < 1.0:
+                ext = sp.ext_new(ss_c, p, "leg_w", f"SSPin{side}_{j}")
+                ext.bodies.item(0).name = f"SSPin_{side}_{j}"
+
+    # Mirror ALL bodies across XMid → SS_Right + right pins
+    _ss_bodies = [ss_c.bRepBodies.item(i) for i in range(ss_c.bRepBodies.count)]
+    mir_ss = sp.mirror_bodies(ss_c, _ss_bodies, XMid, "SSMirX")
+    for i in range(mir_ss.bodies.count):
+        b = mir_ss.bodies.item(i)
+        if "SS_Left" in b.name or b.name == "SS_Left":
+            b.name = "SS_Right"
+            break
 
     # ==============================================================
     #  DEADMAN (panel on front stretcher, between front legs)
@@ -829,114 +943,23 @@ def run(context):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
         sp.combine(root, lp, ls_proxies, CUT, True, f"LSMort_Leg{i}")
 
-    # Drawbore pins — 2 per tenon, face-referenced.
-    # Each pin sketch is on a leg face, dimensioned from the face edges:
-    #   - X offset from inner face (shoulder) = tenon_length / 3
-    #   - Z center = stretcher center ± pin_sp / 2
-    # LS pins go through leg in Y, SS pins go through in X.
-    pin_occ = sp.make_comp(root, "DrawborePins")
-    pin_c = pin_occ.component
-    P = adsk.core.Point3D
-    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
-    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    # CUT legs with LS pin proxies (pin holes from stretcher component)
+    ls_pin_proxies = [ls_c.bRepBodies.item(i).createForAssemblyContext(ls_occ)
+                      for i in range(ls_c.bRepBodies.count)
+                      if "Pin" in ls_c.bRepBodies.item(i).name]
+    if ls_pin_proxies:
+        for i in range(leg_c.bRepBodies.count):
+            lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
+            sp.combine(root, lp, ls_pin_proxies, CUT, True, f"LSPinHole_Leg{i}")
 
-    def _make_pin_pair(comp, face_proxy, pin_name, depth_expr,
-                       z_ctr_expr, sp_expr, through_expr):
-        """Create 2 drawbore pin bodies on a leg face.
-
-        face_proxy: the leg face to sketch on (determines pin direction)
-        depth_expr: distance from inner face edge to pin center (e.g. "leg_w / 3")
-        z_ctr_expr: Z center of the stretcher (e.g. "ls_z + ls_w / 2")
-        sp_expr: half-spacing between 2 pins (e.g. "pin_sp / 2")
-        through_expr: extrude distance (e.g. "leg_d" for full leg depth)
-        """
-        sk = comp.sketches.add(face_proxy)
-        sk.name = f"{pin_name}_Sk"
-        m = sk.modelToSketchSpace
-        fl = _face_fl_pt(sk)
-
-        # Runtime placement (for initial geometry — parametric dims follow)
-        _r = ev("pin_dia") / 2
-        _d = ev(depth_expr)
-        _zc = ev(z_ctr_expr)
-        _hs = ev(sp_expr)
-        fl_g = fl.geometry
-
-        # Compute face bounding box to determine axis mapping
-        _test_x = m(P.create(fl_g.x if hasattr(fl_g, 'x') else 0,
-                             fl_g.y if hasattr(fl_g, 'y') else 0,
-                             fl_g.z if hasattr(fl_g, 'z') else 0))
-
-        for k, z_off in enumerate([_zc - _hs, _zc + _hs]):
-            # Place circle at approximate model position
-            bb = face_proxy.boundingBox
-            cx = (bb.minPoint.x + bb.maxPoint.x) / 2
-            cy = (bb.minPoint.y + bb.maxPoint.y) / 2
-            cz = z_off
-            ctr = m(P.create(cx, cy, cz))
-            sk.sketchCurves.sketchCircles.addByCenterRadius(
-                P.create(ctr.x, ctr.y, 0), _r)
-
-        # Add parametric dimensions for both circles
-        _refs_to_construction(sk)
-        d = sk.sketchDimensions
-        for k in range(sk.sketchCurves.sketchCircles.count):
-            circle = sk.sketchCurves.sketchCircles.item(k)
-            cg = circle.centerSketchPoint.geometry
-            d.addRadialDimension(
-                circle, P.create(cg.x + _r + 0.3, cg.y, 0)
-            ).parameter.expression = "pin_dia / 2"
-            # Position from face corner
-            d.addDistanceDimension(
-                fl, circle.centerSketchPoint,
-                H, P.create((fl_g.x + cg.x) / 2, cg.y - 0.5, 0)
-            ).parameter.expression = depth_expr
-            z_expr = (f"{z_ctr_expr} - {sp_expr}" if k == 0
-                      else f"{z_ctr_expr} + {sp_expr}")
-            d.addDistanceDimension(
-                fl, circle.centerSketchPoint,
-                V, P.create(cg.x - 0.5, (fl_g.y + cg.y) / 2, 0)
-            ).parameter.expression = z_expr
-
-        # Extrude each circle
-        bodies = []
-        for j in range(sk.profiles.count):
-            p = sk.profiles.item(j)
-            if p.areaProperties().area < 1.0:
-                ext = sp.ext_new(comp, p, through_expr, f"{pin_name}_{j}")
-                ext.bodies.item(0).name = f"{pin_name}_{j}"
-                bodies.append(ext.bodies.item(0))
-        return bodies
-
-    # LS pins: sketch on each leg's front/back face, pin through in Y
-    # Pin X offset from inner face = leg_w / 3
-    for i in range(leg_c.bRepBodies.count):
-        leg_body = leg_c.bRepBodies.item(i)
-        leg_proxy = leg_body.createForAssemblyContext(leg_occ)
-        # Use the front face (Y=min) for front legs, back face (Y=max) for back legs
-        leg_bb = leg_body.boundingBox
-        is_front = leg_bb.minPoint.y < ev("bench_w") / 2
-        face = sp.find_face(leg_proxy, "y", -1 if is_front else +1)
-        _make_pin_pair(pin_c, face, f"LSPin{i}",
-                       "leg_w / 3", "ls_z + ls_w / 2", "pin_sp / 2", "leg_d")
-
-    # SS pins: sketch on each leg's outer side face, pin through in X
-    # Pin Y offset from inner face = (leg_d - st_blind) / 3
-    for i in range(leg_c.bRepBodies.count):
-        leg_body = leg_c.bRepBodies.item(i)
-        leg_proxy = leg_body.createForAssemblyContext(leg_occ)
-        leg_bb = leg_body.boundingBox
-        is_left = leg_bb.minPoint.x < ev("bench_l") / 2
-        face = sp.find_face(leg_proxy, "x", -1 if is_left else +1)
-        _make_pin_pair(pin_c, face, f"SSPin{i}",
-                       "(leg_d - st_blind) / 3",
-                       "ls_z + ls_w + ss_w / 2", "pin_sp / 2", "leg_w")
-
-    # CUT pin holes into all legs
-    pin_proxies = get_proxies(pin_occ)
-    for i in range(leg_c.bRepBodies.count):
-        lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-        sp.combine(root, lp, pin_proxies, CUT, True, f"PinHole_Leg{i}")
+    # CUT legs with SS pin proxies
+    ss_pin_proxies = [ss_c.bRepBodies.item(i).createForAssemblyContext(ss_occ)
+                      for i in range(ss_c.bRepBodies.count)
+                      if "Pin" in ss_c.bRepBodies.item(i).name]
+    if ss_pin_proxies:
+        for i in range(leg_c.bRepBodies.count):
+            lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
+            sp.combine(root, lp, ss_pin_proxies, CUT, True, f"SSPinHole_Leg{i}")
 
     # CUT FL leg with vise screw bore and guide slot (not chop/handle)
     vise_screw_p = vise_c.bRepBodies.itemByName("Vise_Screw").createForAssemblyContext(vise_occ)
