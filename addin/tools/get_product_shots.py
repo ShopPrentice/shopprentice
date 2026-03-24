@@ -124,7 +124,7 @@ def _capture_one(viewport, width, height):
 
 def handler(views: list = None, width: int = 2048, height: int = 2048,
             bodies: list = None, fill: float = 0.80,
-            style: str = "shaded") -> dict:
+            style: str = "shaded-edges") -> dict:
     """Capture product-quality screenshots with artifact cleanup."""
 
     try:
@@ -171,6 +171,7 @@ def handler(views: list = None, width: int = 2048, height: int = 2048,
         # Set visual style
         style_map = {
             "shaded": adsk.core.VisualStyles.ShadedVisualStyle,
+            "shaded-edges": adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle,
             "transparent": adsk.core.VisualStyles.ShadedWithHiddenEdgesVisualStyle,
             "wireframe": adsk.core.VisualStyles.WireframeVisualStyle,
         }

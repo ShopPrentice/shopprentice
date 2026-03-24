@@ -966,9 +966,9 @@ def run(context):
             ch = comp.features.chamferFeatures.add(ch_inp)
             ch.name = name
 
-    # Top slab — chamfer top face perimeter + end edges (verticals + bottom
-    # at X=0 and X=max).  Avoids the long bottom edges which have the
-    # tongue groove cut (non-manifold).
+    # Top slab — chamfer outer perimeter (skipping tenon mortise slot edges),
+    # dog hole circles, and end edges.  Tenon slot edges are joint mating
+    # lines and must not be chamfered.
     _top_body = top_c.bRepBodies.item(0)
     _top_bb = _top_body.boundingBox
     _top_edges = adsk.core.ObjectCollection.create()
@@ -976,16 +976,45 @@ def run(context):
     for j in range(_top_body.edges.count):
         e = _top_body.edges.item(j)
         sv, ev2 = e.startVertex.geometry, e.endVertex.geometry
-        # Top face perimeter: both vertices at Z=max
-        at_top = (abs(sv.z - _top_bb.maxPoint.z) < tol
-                  and abs(ev2.z - _top_bb.maxPoint.z) < tol)
-        # End edges: both vertices at X=min or X=max (safe from grooves)
+
+        # End edges: both vertices at X=min or X=max (always safe)
         at_left_end = (abs(sv.x - _top_bb.minPoint.x) < tol
                        and abs(ev2.x - _top_bb.minPoint.x) < tol)
         at_right_end = (abs(sv.x - _top_bb.maxPoint.x) < tol
                         and abs(ev2.x - _top_bb.maxPoint.x) < tol)
-        if at_top or at_left_end or at_right_end:
+        if at_left_end or at_right_end:
             _top_edges.add(e)
+            continue
+
+        # Top face (Z=max): perimeter segments + dog hole circles
+        at_top = (abs(sv.z - _top_bb.maxPoint.z) < tol
+                  and abs(ev2.z - _top_bb.maxPoint.z) < tol)
+        if not at_top:
+            continue
+
+        # Dog holes: circular edges (start == end position)
+        is_circle = (abs(sv.x - ev2.x) < tol and abs(sv.y - ev2.y) < tol)
+        if is_circle:
+            _top_edges.add(e)
+            continue
+
+        # Perimeter segments: both vertices on outer Y boundary (front/back)
+        on_front = (abs(sv.y - _top_bb.minPoint.y) < tol
+                    and abs(ev2.y - _top_bb.minPoint.y) < tol)
+        on_back = (abs(sv.y - _top_bb.maxPoint.y) < tol
+                   and abs(ev2.y - _top_bb.maxPoint.y) < tol)
+        if on_front or on_back:
+            _top_edges.add(e)
+            continue
+
+        # Left/right end edges on top face
+        on_left = (abs(sv.x - _top_bb.minPoint.x) < tol
+                   and abs(ev2.x - _top_bb.minPoint.x) < tol)
+        on_right = (abs(sv.x - _top_bb.maxPoint.x) < tol
+                    and abs(ev2.x - _top_bb.maxPoint.x) < tol)
+        if on_left or on_right:
+            _top_edges.add(e)
+
     if _top_edges.count > 0:
         ch_inp = top_c.features.chamferFeatures.createInput2()
         ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(

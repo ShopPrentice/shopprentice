@@ -20,9 +20,9 @@
 |:---:|:---:|
 | ![Front](screenshots/front.png) | ![Back](screenshots/back.png) |
 
-| Left | Perspective |
+| Left | Transparent (joinery) |
 |:---:|:---:|
-| ![Left](screenshots/left.png) | ![Front](screenshots/front.png) |
+| ![Left](screenshots/left.png) | ![Transparent](screenshots/transparent.png) |
 
 ## Key Parameters
 
