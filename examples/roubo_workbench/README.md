@@ -1,28 +1,28 @@
 # Roubo Workbench
 
-84"L x 22"W x 34"H. Classic Andre Roubo French workbench with a massive 5" slab top, heavy legs flush with front/back edges, through-tenon joinery, low stretchers, sliding deadman, dog holes, and a traditional leg vise.
+84"L x 22"W x 34"H. Classic Andre Roubo French workbench in white oak with a massive 5" slab top, heavy legs flush with front/back edges, through-tenon joinery, sliding deadman with tongue-and-groove track, dog holes, and a traditional leg vise.
 
-![Iso view](screenshots/iso-top-right.png)
+![Front view](screenshots/front.png)
 
 ## Features
 
-- **5" slab top** with through-tenon mortises and a row of dog holes along the front edge
-- **Dovetail + tenon paired joint** — each leg has a trapezoidal dovetail tenon (wider on the inside) and a rectangular tenon, both extruding through the top
-- **Leg vise** on the front-left leg with chop, screw, handle, and parallel guide board
-- **Sliding deadman** with vertical dog holes, flush with the front stretcher
-- **Through-tenon stretchers** — front/back long stretchers pass through all four legs
+- **5" slab top** with through-tenon mortises, dog holes along the front edge, and a tongue groove on the underside for the sliding deadman
+- **Full-width dovetail + tenon paired joint** — each leg has a trapezoidal dovetail and a rectangular tenon, both full leg width, extruding through the top. Sketches reference the leg top face directly (no `leg_setback` dependency)
+- **Leg vise** on the front-left leg with wider chop (7"), chamfered top edge, screw, handle, and parallel guide. All vise geometry references the FL leg face via `LegFL_Left` construction plane — vise follows the leg automatically
+- **Sliding deadman** with tongue-and-groove: tongues on top/bottom edges slide in grooves cut into the front stretcher and bench top underside
+- **Through-tenon stretchers** — long and short stretchers have proper tenon shoulders (`st_tw x st_tt`) with the main body between legs at full cross-section
 - **Short stretchers** raised above the long stretchers to avoid mortise conflicts in the legs
 - **Fully parametric** — every dimension uses parameter expressions
 
 ## Views
 
-| Front | Right |
+| Front | Back |
 |:---:|:---:|
-| ![Front](screenshots/front.png) | ![Right](screenshots/right.png) |
+| ![Front](screenshots/front.png) | ![Back](screenshots/back.png) |
 
-| Front-right iso | Front-left iso |
+| Left | Perspective |
 |:---:|:---:|
-| ![Iso right](screenshots/iso-top-right.png) | ![Iso left](screenshots/iso-top-left.png) |
+| ![Left](screenshots/left.png) | ![Front](screenshots/front.png) |
 
 ## Key Parameters
 
@@ -34,22 +34,24 @@
 | `top_thick` | 5 in | Slab top thickness |
 | `leg_w` / `leg_d` | 5 in | Leg cross-section |
 | `leg_setback` | 14 in | Leg setback from each end |
+| `ls_t` / `ss_t` | 3 in | Stretcher thickness |
+| `st_tw` / `st_tt` | 3 / 1.5 in | Stretcher tenon width / thickness |
 | `dt_angle` | 7 deg | Dovetail taper angle |
-| `dog_dia` | 0.75 in | Dog hole diameter |
-| `dog_sp` | 4 in | Dog hole spacing |
-| `vise_chop_t` | 2.5 in | Leg vise chop thickness |
-| `vise_screw_dia` | 1.25 in | Vise screw diameter |
+| `dm_tongue_h` | 1 in | Deadman tongue projection |
+| `vise_chop_w` | 7 in | Vise chop width (wider than leg) |
+| `vise_distance` | 3 in | Gap between vise chop and leg |
+| `ch_vise_chop` | 1 in | Vise chop outer top chamfer |
 
 ## Bodies (14)
 
 | Component | Bodies |
 |-----------|--------|
-| Top | Top (with dog holes and through-mortises) |
-| Legs | Leg_FL, Leg_FR, Leg_BL, Leg_BR (with dovetail + rectangular tenons) |
-| LongStretchers | LS_Front, LS_Back (through-tenon) |
-| ShortStretchers | SS_Left, SS_Right (raised above LS) |
-| Deadman | Deadman (with vertical dog holes) |
-| LegVise | Vise_Chop, Vise_Screw, Vise_Handle, Vise_Guide |
+| Top | Top (with dog holes, through-mortises, and deadman tongue groove) |
+| Legs | Leg_FL, Leg_FR, Leg_BL, Leg_BR (with full-width dovetail + rectangular tenons) |
+| LongStretchers | LS_Front, LS_Back (through-tenon with shoulders, deadman tongue groove in LS_Front) |
+| ShortStretchers | SS_Left, SS_Right (raised above LS, through-tenon with shoulders) |
+| Deadman | Deadman (with tongues top/bottom, vertical dog holes) |
+| LegVise | Vise_Chop (chamfered), Vise_Screw, Vise_Handle, Vise_Guide |
 
 ## Script
 
