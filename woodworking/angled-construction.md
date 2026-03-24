@@ -52,7 +52,7 @@ Sketch on an XZ-offset construction plane at the leg's Y position. The four corn
 
 ```python
 # Construction plane at front face of leg
-LegFront_Pl = af.off_plane(root, root.xZConstructionPlane,
+LegFront_Pl = sp.off_plane(root, root.xZConstructionPlane,
     "leg_inset_y - leg_d / 2", "LegFront_Pl")
 
 sk = root.sketches.add(LegFront_Pl)
@@ -156,7 +156,7 @@ For a leg at `leg_inset_y` with depth `leg_d`, the inner edge (toward seat cente
 After both splay operations, the leg top protrudes into the seat body at an angle. CUT the seat from the leg to create a clean angled surface:
 
 ```python
-af.combine(root, leg_body, [seat_body], CUT, True, "LegTrim_NL")
+sp.combine(root, leg_body, [seat_body], CUT, True, "LegTrim_NL")
 ```
 
 **Do this BEFORE mirroring** — one CUT instead of four. Mirror propagates the trim.
@@ -323,7 +323,7 @@ The front stretcher (mirror of back across YMid) and right stretcher (mirror of 
 Tilting a stretcher can push its surface into adjacent bodies. **Always run `check_interference` after adding splay moves.** Common case: a footrest sitting directly above the front stretcher — the tilted stretcher's top edge rises by `str_w/2 × sin(splay_angle)` and may intersect the footrest. Fix with a trim CUT:
 
 ```python
-af.combine(root, footrest_body, [front_stretcher], CUT, True, "FR_FStrTrim")
+sp.combine(root, footrest_body, [front_stretcher], CUT, True, "FR_FStrTrim")
 ```
 
 ### Build Order
@@ -532,7 +532,7 @@ l4 = lines.addByTwoPoints(l3.endSketchPoint, sp[5])
 l5 = lines.addByTwoPoints(l4.endSketchPoint, l0.startSketchPoint)
 
 # H/V constraints on vertical and horizontal lines only
-h_ax, v_ax = af.probe_sketch_axes(sk)
+h_ax, v_ax = sp.probe_sketch_axes(sk)
 gc = sk.geometricConstraints
 if v_ax == "z":
     gc.addVertical(l0);  gc.addVertical(l4)   # vertical lines
@@ -634,8 +634,8 @@ def tilted_rail_domino(plane, center_x, rail_z_center, rail_body, leg_body, name
     ext = root.features.extrudeFeatures.add(ext_inp)
     dm_body = ext.bodies.item(0)
     # CUT into both bodies
-    af.combine(root, rail_body, [dm_body], CUT, True, f"{name}_CutRail")
-    af.combine(root, leg_body, [dm_body], CUT, True, f"{name}_CutLeg")
+    sp.combine(root, rail_body, [dm_body], CUT, True, f"{name}_CutRail")
+    sp.combine(root, leg_body, [dm_body], CUT, True, f"{name}_CutLeg")
 ```
 
 This creates a domino whose long axis follows the tilted backrest direction, properly aligning with the rail cross-section at the post interface.

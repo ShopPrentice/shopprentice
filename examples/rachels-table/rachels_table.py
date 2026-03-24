@@ -34,7 +34,7 @@ Build order:
     6. CUT cleat mortises into front + back rails (cross-component)
 """
 import adsk.core, adsk.fusion, math
-from helpers import af
+from helpers import sp
 
 
 def run(context):
@@ -877,7 +877,7 @@ def run(context):
             all_bodies.append(comp_c.bRepBodies.item(i).name)
     print(f"Total: {len(all_bodies)} bodies -> {all_bodies}")
 
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

@@ -9,7 +9,7 @@ Coordinate system:
 """
 import adsk.core, adsk.fusion
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import domino
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
@@ -59,9 +59,9 @@ def run(context):
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
-    leg_occ   = af.make_comp(root, "Legs")
-    top_occ   = af.make_comp(root, "Top")
-    shelf_occ = af.make_comp(root, "Shelf")
+    leg_occ   = sp.make_comp(root, "Legs")
+    top_occ   = sp.make_comp(root, "Top")
+    shelf_occ = sp.make_comp(root, "Shelf")
 
     leg_c   = leg_occ.component
     top_c   = top_occ.component
@@ -74,22 +74,22 @@ def run(context):
     #     taper as a future detail. The domino connection is what matters.
     # ==============================================================
     # Front-left leg at (leg_inset - leg_top/2, leg_inset - leg_top/2, 0)
-    _, pr = af.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
         ("leg_inset - leg_top / 2", "leg_inset - leg_top / 2", "0 in"),
         {"x": "leg_top", "y": "leg_top"},
         "LegFL_Sk", ev)
-    fl_ext = af.ext_new(leg_c, pr, "leg_h", "LegFL")
+    fl_ext = sp.ext_new(leg_c, pr, "leg_h", "LegFL")
     leg_fl = fl_ext.bodies.item(0)
     leg_fl.name = "Leg_FL"
 
-    l_xmid = af.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
-    l_ymid = af.off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "LYMid")
+    l_xmid = sp.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
+    l_ymid = sp.off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "LYMid")
 
-    leg_fr = af.mirror_body(leg_c, leg_fl, l_xmid, "LegFR_Mir").bodies.item(0)
+    leg_fr = sp.mirror_body(leg_c, leg_fl, l_xmid, "LegFR_Mir").bodies.item(0)
     leg_fr.name = "Leg_FR"
-    leg_bl = af.mirror_body(leg_c, leg_fl, l_ymid, "LegBL_Mir").bodies.item(0)
+    leg_bl = sp.mirror_body(leg_c, leg_fl, l_ymid, "LegBL_Mir").bodies.item(0)
     leg_bl.name = "Leg_BL"
-    leg_br = af.mirror_body(leg_c, leg_fr, l_ymid, "LegBR_Mir").bodies.item(0)
+    leg_br = sp.mirror_body(leg_c, leg_fr, l_ymid, "LegBR_Mir").bodies.item(0)
     leg_br.name = "Leg_BR"
 
     print(">>> Legs: 4 bodies")
@@ -97,12 +97,12 @@ def run(context):
     # ==============================================================
     #  2. TOP — solid panel
     # ==============================================================
-    top_pl = af.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
-    _, pr = af.sketch_rect_model(top_c, top_pl,
+    top_pl = sp.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
+    _, pr = sp.sketch_rect_model(top_c, top_pl,
         ("0 in", "0 in", "leg_h"),
         {"x": "table_l", "y": "table_w"},
         "Top_Sk", ev)
-    top_ext = af.ext_new(top_c, pr, "top_thick", "TopBoard")
+    top_ext = sp.ext_new(top_c, pr, "top_thick", "TopBoard")
     top_body = top_ext.bodies.item(0)
     top_body.name = "Top"
 
@@ -111,13 +111,13 @@ def run(context):
     # ==============================================================
     #  3. SHELF — lower shelf between legs
     # ==============================================================
-    shelf_z_pl = af.off_plane(shelf_c, shelf_c.xYConstructionPlane,
+    shelf_z_pl = sp.off_plane(shelf_c, shelf_c.xYConstructionPlane,
                                "shelf_z", "Shelf_Pl")
-    _, pr = af.sketch_rect_model(shelf_c, shelf_z_pl,
+    _, pr = sp.sketch_rect_model(shelf_c, shelf_z_pl,
         ("leg_inset", "leg_inset", "shelf_z"),
         {"x": "shelf_l", "y": "shelf_w"},
         "Shelf_Sk", ev)
-    shelf_ext = af.ext_new(shelf_c, pr, "shelf_thick", "ShelfBoard")
+    shelf_ext = sp.ext_new(shelf_c, pr, "shelf_thick", "ShelfBoard")
     shelf_body = shelf_ext.bodies.item(0)
     shelf_body.name = "Shelf"
 
@@ -134,7 +134,7 @@ def run(context):
     top_proxy = top_body.createForAssemblyContext(top_occ)
 
     # Interface plane at leg top (Z = leg_h)
-    dm_pl = af.off_plane(root, root.xYConstructionPlane, "leg_h", "DM_Pl")
+    dm_pl = sp.off_plane(root, root.xYConstructionPlane, "leg_h", "DM_Pl")
 
     # FL leg domino
     domino.single(root, dm_pl,
@@ -180,7 +180,7 @@ def run(context):
         print(f"{cn}: {len(names)} -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
 
-    af.apply_appearance("walnut")
+    sp.apply_appearance("walnut")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

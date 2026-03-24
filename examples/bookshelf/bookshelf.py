@@ -25,11 +25,11 @@ def run(context):
     JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
     CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import domino
     from woodworking.templates import dovetail
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ==============================================================
     #  PARAMETERS
@@ -78,11 +78,11 @@ def run(context):
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
-    sides_occ = af.make_comp(root, "Sides")
-    shelves_occ = af.make_comp(root, "Shelves")
-    top_occ = af.make_comp(root, "Top")
-    kick_occ = af.make_comp(root, "Kick")
-    back_occ = af.make_comp(root, "Back")
+    sides_occ = sp.make_comp(root, "Sides")
+    shelves_occ = sp.make_comp(root, "Shelves")
+    top_occ = sp.make_comp(root, "Top")
+    kick_occ = sp.make_comp(root, "Kick")
+    back_occ = sp.make_comp(root, "Back")
 
     sides = sides_occ.component
     shelves_c = shelves_occ.component
@@ -93,15 +93,15 @@ def run(context):
     # ==============================================================
     #  1. SIDE BOARDS  (Sides component)
     # ==============================================================
-    _, pr = af.sketch_rect(sides, sides.xYConstructionPlane,
+    _, pr = sp.sketch_rect(sides, sides.xYConstructionPlane,
         "0 in", "0 in", "board_thick", "total_depth", "LeftSide_Sk", ctx.ev)
-    left_side = af.ext_new(sides, pr, "total_height", "LeftSide").bodies.item(0)
+    left_side = sp.ext_new(sides, pr, "total_height", "LeftSide").bodies.item(0)
     left_side.name = "Side_Left"
 
-    _, pr = af.sketch_rect(sides, sides.xYConstructionPlane,
+    _, pr = sp.sketch_rect(sides, sides.xYConstructionPlane,
         "total_width - board_thick", "0 in", "board_thick", "total_depth",
         "RightSide_Sk", ctx.ev)
-    right_side = af.ext_new(sides, pr, "total_height", "RightSide").bodies.item(0)
+    right_side = sp.ext_new(sides, pr, "total_height", "RightSide").bodies.item(0)
     right_side.name = "Side_Right"
 
     # ==============================================================
@@ -110,28 +110,28 @@ def run(context):
     #  One shelf + 4 tenons (mirrors) + JOIN → body pattern (BEFORE
     #  any CUTs to avoid ghost bodies) → domino loop per level.
     # ==============================================================
-    sh_YMid = af.off_plane(shelves_c, shelves_c.xZConstructionPlane,
+    sh_YMid = sp.off_plane(shelves_c, shelves_c.xZConstructionPlane,
                             "shelf_depth / 2", "YMid_Pl")
-    sh_XMid = af.off_plane(shelves_c, shelves_c.yZConstructionPlane,
+    sh_XMid = sp.off_plane(shelves_c, shelves_c.yZConstructionPlane,
                             "total_width / 2", "XMid_Pl")
-    sh_pl = af.off_plane(shelves_c, shelves_c.xYConstructionPlane,
+    sh_pl = sp.off_plane(shelves_c, shelves_c.xYConstructionPlane,
                           "kick_height", "Shelf_Pl")
 
     # Shelf body (depth = shelf_depth, recessed for backboard)
-    _, pr = af.sketch_rect(shelves_c, sh_pl, "board_thick", "0 in",
+    _, pr = sp.sketch_rect(shelves_c, sh_pl, "board_thick", "0 in",
                             "inner_width", "shelf_depth", "Shelf_Sk", ctx.ev)
-    ext_sh = af.ext_new(shelves_c, pr, "board_thick", "ShelfBody")
+    ext_sh = sp.ext_new(shelves_c, pr, "board_thick", "ShelfBody")
     sh_body = ext_sh.bodies.item(0)
     sh_body.name = "Shelf"
 
     # One tenon (left-front)
-    _, pr = af.sketch_rect(shelves_c, sh_pl, "0 in", "mt_tenon_y1",
+    _, pr = sp.sketch_rect(shelves_c, sh_pl, "0 in", "mt_tenon_y1",
                             "board_thick", "mt_tenon_w", "Sh_Tenon_Sk", ctx.ev)
-    ext_t = af.ext_new(shelves_c, pr, "board_thick", "Sh_Tenon")
+    ext_t = sp.ext_new(shelves_c, pr, "board_thick", "Sh_Tenon")
 
     # Mirror tenon across YMid → left-back, then across XMid → right pair
-    mir_y = af.mirror_feats(shelves_c, [ext_t], sh_YMid, "Sh_MirY")
-    mir_x = af.mirror_feats(shelves_c, [ext_t, mir_y], sh_XMid, "Sh_MirX")
+    mir_y = sp.mirror_feats(shelves_c, [ext_t], sh_YMid, "Sh_MirY")
+    mir_x = sp.mirror_feats(shelves_c, [ext_t, mir_y], sh_XMid, "Sh_MirX")
 
     # JOIN all 4 tenon bodies into shelf body
     t_bodies = [ext_t.bodies.item(0)]
@@ -139,10 +139,10 @@ def run(context):
         t_bodies.append(mir_y.bodies.item(j))
     for j in range(mir_x.bodies.count):
         t_bodies.append(mir_x.bodies.item(j))
-    af.combine(shelves_c, sh_body, t_bodies, JOIN, False, "Sh_JoinTenons")
+    sp.combine(shelves_c, sh_body, t_bodies, JOIN, False, "Sh_JoinTenons")
 
     # -- Shelf-to-backboard domino voids --
-    sh_dm_pl = af.off_plane(shelves_c, shelves_c.xZConstructionPlane,
+    sh_dm_pl = sp.off_plane(shelves_c, shelves_c.xZConstructionPlane,
                              "shelf_depth", "ShDm_Pl")
 
     # Create template voids at first shelf level, CUT into shelf
@@ -157,7 +157,7 @@ def run(context):
         name="ShDm", ev=ctx.ev)
 
     # Body pattern shelf along Z (ghost void bodies are harmless)
-    shelf_pat = af.body_pattern(shelves_c, sh_body, shelves_c.zConstructionAxis,
+    shelf_pat = sp.body_pattern(shelves_c, sh_body, shelves_c.zConstructionAxis,
                                  "n_shelves", "shelf_spacing", "ShelfPattern")
 
     # Collect all shelf bodies (skip ghost voids by name)
@@ -191,22 +191,22 @@ def run(context):
     left_side_proxy = left_side.createForAssemblyContext(sides_occ)
     right_side_proxy = right_side.createForAssemblyContext(sides_occ)
 
-    af.combine(root, left_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortL")
-    af.combine(root, right_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortR")
+    sp.combine(root, left_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortL")
+    sp.combine(root, right_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortR")
 
     # ==============================================================
     #  4. KICK BOARD + DOMINO VOIDS  (Kick component)
     # ==============================================================
-    _, pr = af.sketch_rect(kick_c, kick_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect(kick_c, kick_c.xYConstructionPlane,
         "board_thick", "0 in", "inner_width", "board_thick", "Kick_Sk", ctx.ev)
-    kick_body = af.ext_new(kick_c, pr, "kick_height", "KickBoard").bodies.item(0)
+    kick_body = sp.ext_new(kick_c, pr, "kick_height", "KickBoard").bodies.item(0)
     kick_body.name = "KickBoard"
 
-    k_XMid = af.off_plane(kick_c, kick_c.yZConstructionPlane,
+    k_XMid = sp.off_plane(kick_c, kick_c.yZConstructionPlane,
                            "total_width / 2", "KXMid_Pl")
 
     # Left-side domino voids + CUT into kick
-    k_dm_pl = af.off_plane(kick_c, kick_c.yZConstructionPlane,
+    k_dm_pl = sp.off_plane(kick_c, kick_c.yZConstructionPlane,
                             "board_thick", "KDm_Pl")
     dm_kick_left = domino.grid(kick_c, k_dm_pl,
         start=("board_thick", "board_thick / 2", "dm_kick_zsp"),
@@ -218,13 +218,13 @@ def run(context):
         name="KDm_L", ev=ctx.ev)
 
     # Right-side: mirror left voids across XMid + CUT into kick
-    mir_k = af.mirror_bodies(kick_c, dm_kick_left, k_XMid, "KDm_MirX")
+    mir_k = sp.mirror_bodies(kick_c, dm_kick_left, k_XMid, "KDm_MirX")
     dm_kick_right = []
     for i in range(mir_k.bodies.count):
         b = mir_k.bodies.item(i)
         b.name = f"KDm_R_{i}"
         dm_kick_right.append(b)
-    af.combine(kick_c, kick_body, dm_kick_right, CUT, True, "KDm_CutR")
+    sp.combine(kick_c, kick_body, dm_kick_right, CUT, True, "KDm_CutR")
 
     # ==============================================================
     #  5. KICK DOMINO MORTISES — CUT sides  (root, assembly proxies)
@@ -233,18 +233,18 @@ def run(context):
                              for b in dm_kick_left]
     dm_kick_right_proxies = [b.createForAssemblyContext(kick_occ)
                               for b in dm_kick_right]
-    af.combine(root, left_side_proxy, dm_kick_left_proxies, CUT, True, "KickDomL")
-    af.combine(root, right_side_proxy, dm_kick_right_proxies, CUT, True, "KickDomR")
+    sp.combine(root, left_side_proxy, dm_kick_left_proxies, CUT, True, "KickDomL")
+    sp.combine(root, right_side_proxy, dm_kick_right_proxies, CUT, True, "KickDomR")
 
     # ==============================================================
     #  6. BACKBOARD  (Back component)
     # ==============================================================
-    bk_pl = af.off_plane(back_c, back_c.xYConstructionPlane,
+    bk_pl = sp.off_plane(back_c, back_c.xYConstructionPlane,
                           "kick_height", "Back_Pl")
-    _, pr = af.sketch_rect(back_c, bk_pl, "board_thick",
+    _, pr = sp.sketch_rect(back_c, bk_pl, "board_thick",
                             "total_depth - back_thick",
                             "inner_width", "back_thick", "Back_Sk", ctx.ev)
-    back_body = af.ext_new(back_c, pr, "back_height", "BackPanel").bodies.item(0)
+    back_body = sp.ext_new(back_c, pr, "back_height", "BackPanel").bodies.item(0)
     back_body.name = "BackPanel"
 
     # ==============================================================
@@ -253,19 +253,19 @@ def run(context):
     all_sh_dm_proxies = [b.createForAssemblyContext(shelves_occ)
                           for b in all_sh_dm_voids]
     back_proxy = back_body.createForAssemblyContext(back_occ)
-    af.combine(root, back_proxy, all_sh_dm_proxies, CUT, True, "BackDomCut")
+    sp.combine(root, back_proxy, all_sh_dm_proxies, CUT, True, "BackDomCut")
 
     # ==============================================================
     #  8. TOP BOARD + THROUGH DOVETAILS  (Top component)
     # ==============================================================
-    t_XMid = af.off_plane(top_c, top_c.yZConstructionPlane,
+    t_XMid = sp.off_plane(top_c, top_c.yZConstructionPlane,
                            "total_width / 2", "XMid_Pl")
 
-    tp = af.off_plane(top_c, top_c.xYConstructionPlane,
+    tp = sp.off_plane(top_c, top_c.xYConstructionPlane,
                        "total_height - board_thick", "Top_Pl")
-    _, pr = af.sketch_rect(top_c, tp, "board_thick", "0 in",
+    _, pr = sp.sketch_rect(top_c, tp, "board_thick", "0 in",
                             "inner_width", "total_depth", "Top_Sk", ctx.ev)
-    top_body = af.ext_new(top_c, pr, "board_thick", "TopBoard").bodies.item(0)
+    top_body = sp.ext_new(top_c, pr, "board_thick", "TopBoard").bodies.item(0)
     top_body.name = "TopBoard"
 
     # Through dovetails: top board (tail) into left/right sides (pin)
@@ -279,7 +279,7 @@ def run(context):
     # The dovetail template's box() expects boards in the same component.
     # Since sides and top are in different components, we use the manual
     # approach: build tails in Top component, CUT sides via proxies.
-    dt_pl = af.off_plane(top_c, top_c.xYConstructionPlane,
+    dt_pl = sp.off_plane(top_c, top_c.xYConstructionPlane,
                           "total_height - board_thick", "DT_Plane")
 
     # ONE left tail — parametric trapezoid sketch
@@ -322,18 +322,18 @@ def run(context):
         V, Point3D.create(bt + 2, (hp + delta) / 2, 0)
     ).parameter.expression = "dt_half_pin + board_thick * tan(dt_angle)"
 
-    ext_dt_l = af.ext_new(top_c, sk_dt.profiles.item(0), "board_thick", "DT_Left")
+    ext_dt_l = sp.ext_new(top_c, sk_dt.profiles.item(0), "board_thick", "DT_Left")
     left_tail = ext_dt_l.bodies.item(0)
     left_tail.name = "DT_Left"
 
     # Mirror → right tail, body pattern each side along Y
-    mir_dt = af.mirror_feats(top_c, [ext_dt_l], t_XMid, "DT_MirX")
+    mir_dt = sp.mirror_feats(top_c, [ext_dt_l], t_XMid, "DT_MirX")
     right_tail = mir_dt.bodies.item(0)
     right_tail.name = "DT_Right"
 
-    left_pat = af.body_pattern(top_c, left_tail, top_c.yConstructionAxis,
+    left_pat = sp.body_pattern(top_c, left_tail, top_c.yConstructionAxis,
                                 "dt_tail_count", "dt_pitch", "DT_PatL")
-    right_pat = af.body_pattern(top_c, right_tail, top_c.yConstructionAxis,
+    right_pat = sp.body_pattern(top_c, right_tail, top_c.yConstructionAxis,
                                  "dt_tail_count", "dt_pitch", "DT_PatR")
 
     all_left_tails = [left_tail]
@@ -350,14 +350,14 @@ def run(context):
                           for b in all_left_tails]
     right_tail_proxies = [b.createForAssemblyContext(top_occ)
                            for b in all_right_tails]
-    af.combine(root, left_side_proxy, left_tail_proxies, CUT, True, "DT_SocketL")
-    af.combine(root, right_side_proxy, right_tail_proxies, CUT, True, "DT_SocketR")
+    sp.combine(root, left_side_proxy, left_tail_proxies, CUT, True, "DT_SocketL")
+    sp.combine(root, right_side_proxy, right_tail_proxies, CUT, True, "DT_SocketR")
 
     # ==============================================================
     # 10. JOIN DOVETAILS INTO TOP  (Top component)
     # ==============================================================
-    af.combine(top_c, top_body, all_left_tails, JOIN, False, "DT_JoinL")
-    af.combine(top_c, top_body, all_right_tails, JOIN, False, "DT_JoinR")
+    sp.combine(top_c, top_body, all_left_tails, JOIN, False, "DT_JoinL")
+    sp.combine(top_c, top_body, all_right_tails, JOIN, False, "DT_JoinR")
 
     # ==============================================================
     #  EPILOGUE
@@ -378,7 +378,7 @@ def run(context):
         total += n
     print(f"\nTotal: {total} bodies")
 
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

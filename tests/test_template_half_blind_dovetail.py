@@ -38,13 +38,13 @@ def build_box(root, prefix, l_expr, w_expr, h_expr,
     Returns:
         Dict with component, bodies, and body count.
     """
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import half_blind_dovetail
 
     if lap_expr is None:
         lap_expr = f"{hbd_prefix}_lap"
 
-    occ = af.make_comp(root, prefix)
+    occ = sp.make_comp(root, prefix)
     comp = occ.component
 
     ox = ev(x_off_expr) if x_off_expr != "0 in" else 0.0
@@ -63,25 +63,25 @@ def build_box(root, prefix, l_expr, w_expr, h_expr,
     if oy == 0.0:
         front_sk_pl = comp.xZConstructionPlane
     else:
-        front_sk_pl = af.off_plane(comp, comp.xZConstructionPlane,
+        front_sk_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                                     y_off_expr, f"{prefix}_FrontYPl")
 
-    sk, pr = af.sketch_rect_model(comp, front_sk_pl,
+    sk, pr = sp.sketch_rect_model(comp, front_sk_pl,
         (x_off_expr, front_y_expr, "0 in"),
         {"x": l_expr, "z": h_expr}, f"{prefix}_Front_Sk", ev)
-    front = af.ext_new(comp, pr, pin_t_expr,
+    front = sp.ext_new(comp, pr, pin_t_expr,
                        f"{prefix}_Front").bodies.item(0)
     front.name = f"{prefix}_Front"
 
     # Back (pin board, only for 4-corner)
     back = None
     if corners == 4:
-        back_pl = af.off_plane(comp, comp.xZConstructionPlane,
+        back_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                                back_y_expr, f"{prefix}_Back_Pl")
-        sk, pr = af.sketch_rect_model(comp, back_pl,
+        sk, pr = sp.sketch_rect_model(comp, back_pl,
             (x_off_expr, back_y_expr, "0 in"),
             {"x": l_expr, "z": h_expr}, f"{prefix}_Back_Sk", ev)
-        back = af.ext_new(comp, pr, pin_t_expr,
+        back = sp.ext_new(comp, pr, pin_t_expr,
                           f"{prefix}_Back").bodies.item(0)
         back.name = f"{prefix}_Back"
 
@@ -91,29 +91,29 @@ def build_box(root, prefix, l_expr, w_expr, h_expr,
     y_mid_expr = (f"{y_off_expr} + {w_expr} / 2"
                   if oy != 0.0 else f"{w_expr} / 2")
 
-    x_mid = af.off_plane(comp, comp.yZConstructionPlane,
+    x_mid = sp.off_plane(comp, comp.yZConstructionPlane,
                           x_mid_expr, f"{prefix}_XMid")
-    y_mid = af.off_plane(comp, comp.xZConstructionPlane,
+    y_mid = sp.off_plane(comp, comp.xZConstructionPlane,
                           y_mid_expr, f"{prefix}_YMid")
 
     # Left (tail board, thinner, narrower by pin_thick on each end)
     if ox == 0.0:
         left_pl = comp.yZConstructionPlane
     else:
-        left_pl = af.off_plane(comp, comp.yZConstructionPlane,
+        left_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                                x_off_expr, f"{prefix}_Left_Pl")
 
-    sk, pr = af.sketch_rect_model(comp, left_pl,
+    sk, pr = sp.sketch_rect_model(comp, left_pl,
         (x_off_expr, tail_y_expr, "0 in"),
         {"y": tail_w_expr, "z": h_expr}, f"{prefix}_Left_Sk", ev)
-    left = af.ext_new(comp, pr, side_t_expr,
+    left = sp.ext_new(comp, pr, side_t_expr,
                       f"{prefix}_Left").bodies.item(0)
     left.name = f"{prefix}_Left"
 
     # Right (tail board via mirror, only for 2+ corners)
     right = None
     if corners >= 2:
-        right_mir = af.mirror_body(comp, left, x_mid,
+        right_mir = sp.mirror_body(comp, left, x_mid,
                                     f"{prefix}_RightMir")
         right = right_mir.bodies.item(0)
         right.name = f"{prefix}_Right"
@@ -171,10 +171,10 @@ def run(context):
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
 
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import half_blind_dovetail
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ================================================================
     # FIXTURE 1: 1-corner — 8x6x4, front 0.75", sides 0.5", lap 0.25"

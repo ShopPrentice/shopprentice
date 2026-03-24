@@ -24,9 +24,9 @@ def run(context):
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
 
-    from helpers import af, hardware
+    from helpers import sp, hardware
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
     all_pass = True
     results = {}
 
@@ -43,23 +43,23 @@ def run(context):
     params.add("s1_h", VI("4 in"), "in", "S1 box height")
     params.add("s1_bt", VI("0.375 in"), "in", "S1 board thick")
 
-    occ1 = af.make_comp(root, "S1")
+    occ1 = sp.make_comp(root, "S1")
     comp1 = occ1.component
 
-    back_pl = af.off_plane(comp1, comp1.xZConstructionPlane,
+    back_pl = sp.off_plane(comp1, comp1.xZConstructionPlane,
                             "s1_w - s1_bt", "S1_BackPl")
-    sk, pr = af.sketch_rect_model(comp1, back_pl,
+    sk, pr = sp.sketch_rect_model(comp1, back_pl,
         ("0 in", "s1_w - s1_bt", "0 in"),
         {"x": "s1_l", "z": "s1_h"}, "S1_Back_Sk", ctx.ev)
-    s1_back = af.ext_new(comp1, pr, "s1_bt", "S1_Back").bodies.item(0)
+    s1_back = sp.ext_new(comp1, pr, "s1_bt", "S1_Back").bodies.item(0)
     s1_back.name = "S1_Back"
 
-    lid_pl = af.off_plane(comp1, comp1.xYConstructionPlane,
+    lid_pl = sp.off_plane(comp1, comp1.xYConstructionPlane,
                            "s1_h", "S1_LidPl")
-    sk, pr = af.sketch_rect_model(comp1, lid_pl,
+    sk, pr = sp.sketch_rect_model(comp1, lid_pl,
         ("0 in", "0 in", "s1_h"),
         {"x": "s1_l", "y": "s1_w"}, "S1_Lid_Sk", ctx.ev)
-    s1_lid = af.ext_new(comp1, pr, "s1_bt", "S1_Lid").bodies.item(0)
+    s1_lid = sp.ext_new(comp1, pr, "s1_bt", "S1_Lid").bodies.item(0)
     s1_lid.name = "S1_Lid"
 
     s1_back_vol = s1_back.volume
@@ -108,23 +108,23 @@ def run(context):
     params.add("s2_bt", VI("0.5 in"), "in", "S2 board thick")
     params.add("s2_off_x", VI("s1_l + 4 in"), "in", "S2 X offset")
 
-    occ2 = af.make_comp(root, "S2")
+    occ2 = sp.make_comp(root, "S2")
     comp2 = occ2.component
 
-    back_pl2 = af.off_plane(comp2, comp2.xZConstructionPlane,
+    back_pl2 = sp.off_plane(comp2, comp2.xZConstructionPlane,
                              "s2_w - s2_bt", "S2_BackPl")
-    sk, pr = af.sketch_rect_model(comp2, back_pl2,
+    sk, pr = sp.sketch_rect_model(comp2, back_pl2,
         ("s2_off_x", "s2_w - s2_bt", "0 in"),
         {"x": "s2_l", "z": "s2_h"}, "S2_Back_Sk", ctx.ev)
-    s2_back = af.ext_new(comp2, pr, "s2_bt", "S2_Back").bodies.item(0)
+    s2_back = sp.ext_new(comp2, pr, "s2_bt", "S2_Back").bodies.item(0)
     s2_back.name = "S2_Back"
 
-    lid_pl2 = af.off_plane(comp2, comp2.xYConstructionPlane,
+    lid_pl2 = sp.off_plane(comp2, comp2.xYConstructionPlane,
                             "s2_h", "S2_LidPl")
-    sk, pr = af.sketch_rect_model(comp2, lid_pl2,
+    sk, pr = sp.sketch_rect_model(comp2, lid_pl2,
         ("s2_off_x", "0 in", "s2_h"),
         {"x": "s2_l", "y": "s2_w"}, "S2_Lid_Sk", ctx.ev)
-    s2_lid = af.ext_new(comp2, pr, "s2_bt", "S2_Lid").bodies.item(0)
+    s2_lid = sp.ext_new(comp2, pr, "s2_bt", "S2_Lid").bodies.item(0)
     s2_lid.name = "S2_Lid"
 
     s2_back_vol = s2_back.volume
@@ -174,19 +174,19 @@ def run(context):
     params.add("s3_depth", VI("14 in"), "in", "S3 cabinet depth")
     params.add("s3_off_y", VI("s2_w + 4 in"), "in", "S3 Y offset")
 
-    occ3 = af.make_comp(root, "S3")
+    occ3 = sp.make_comp(root, "S3")
     comp3 = occ3.component
 
-    sk, pr = af.sketch_rect_model(comp3, comp3.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp3, comp3.xYConstructionPlane,
         ("0 in", "s3_off_y", "0 in"),
         {"x": "s3_bt", "y": "s3_depth"}, "S3_Side_Sk", ctx.ev)
-    s3_side = af.ext_new(comp3, pr, "s3_h", "S3_Side").bodies.item(0)
+    s3_side = sp.ext_new(comp3, pr, "s3_h", "S3_Side").bodies.item(0)
     s3_side.name = "S3_Side"
 
-    sk, pr = af.sketch_rect_model(comp3, comp3.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp3, comp3.xYConstructionPlane,
         ("0 in", "s3_off_y - s3_bt", "0 in"),
         {"x": "s3_door_w", "y": "s3_bt"}, "S3_Door_Sk", ctx.ev)
-    s3_door = af.ext_new(comp3, pr, "s3_h", "S3_Door").bodies.item(0)
+    s3_door = sp.ext_new(comp3, pr, "s3_h", "S3_Door").bodies.item(0)
     s3_door.name = "S3_Door"
 
     s3_side_vol = s3_side.volume
@@ -236,19 +236,19 @@ def run(context):
     params.add("s4_off_x", VI("s3_bt + s3_door_w + 4 in"), "in",
                "S4 X offset")
 
-    occ4 = af.make_comp(root, "S4")
+    occ4 = sp.make_comp(root, "S4")
     comp4 = occ4.component
 
-    sk, pr = af.sketch_rect_model(comp4, comp4.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp4, comp4.xYConstructionPlane,
         ("s4_off_x", "s3_off_y", "0 in"),
         {"x": "s4_bt", "y": "s4_depth"}, "S4_Side_Sk", ctx.ev)
-    s4_side = af.ext_new(comp4, pr, "s4_h", "S4_Side").bodies.item(0)
+    s4_side = sp.ext_new(comp4, pr, "s4_h", "S4_Side").bodies.item(0)
     s4_side.name = "S4_Side"
 
-    sk, pr = af.sketch_rect_model(comp4, comp4.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp4, comp4.xYConstructionPlane,
         ("s4_off_x + s4_bt", "s3_off_y", "0 in"),
         {"x": "s4_door_w", "y": "s4_bt"}, "S4_Door_Sk", ctx.ev)
-    s4_door = af.ext_new(comp4, pr, "s4_h", "S4_Door").bodies.item(0)
+    s4_door = sp.ext_new(comp4, pr, "s4_h", "S4_Door").bodies.item(0)
     s4_door.name = "S4_Door"
 
     s4_side_vol = s4_side.volume
@@ -299,21 +299,21 @@ def run(context):
     params.add("s5_off_x", VI("s4_off_x + s4_bt + s4_door_w + 4 in"),
                "in", "S5 X offset")
 
-    occ5 = af.make_comp(root, "S5")
+    occ5 = sp.make_comp(root, "S5")
     comp5 = occ5.component
 
     # Case side
-    sk, pr = af.sketch_rect_model(comp5, comp5.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp5, comp5.xYConstructionPlane,
         ("s5_off_x", "s3_off_y", "0 in"),
         {"x": "s5_bt", "y": "s5_depth"}, "S5_Side_Sk", ctx.ev)
-    s5_side = af.ext_new(comp5, pr, "s5_h", "S5_Side").bodies.item(0)
+    s5_side = sp.ext_new(comp5, pr, "s5_h", "S5_Side").bodies.item(0)
     s5_side.name = "S5_Side"
 
     # Door with gap: starts at seam + gap
-    sk, pr = af.sketch_rect_model(comp5, comp5.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp5, comp5.xYConstructionPlane,
         ("s5_off_x + s5_bt + s5_gap", "s3_off_y", "0 in"),
         {"x": "s5_door_w", "y": "s5_bt"}, "S5_Door_Sk", ctx.ev)
-    s5_door = af.ext_new(comp5, pr, "s5_h", "S5_Door").bodies.item(0)
+    s5_door = sp.ext_new(comp5, pr, "s5_h", "S5_Door").bodies.item(0)
     s5_door.name = "S5_Door"
 
     s5_side_vol = s5_side.volume

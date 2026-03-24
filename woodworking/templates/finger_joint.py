@@ -30,7 +30,7 @@ Usage:
 import adsk.core
 import adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 Point3D = adsk.core.Point3D
 H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
@@ -132,7 +132,7 @@ def corner(comp, plane, thick_expr, dist_expr,
         'join_pattern', 'pin_cut'.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     p = prefix
     bt = ev(thick_expr)
@@ -204,31 +204,31 @@ def corner(comp, plane, thick_expr, dist_expr,
         TD, Point3D.create(m1.x / 2, m1.y - 1, 0)
     ).parameter.expression = y_wide_expr
 
-    prof = af.smallest_profile(sk)
+    prof = sp.smallest_profile(sk)
 
     # Extrude CUT into pin board
-    cut_feat = af.ext_op(comp, prof, dist_expr, CUT, pin_body,
+    cut_feat = sp.ext_op(comp, prof, dist_expr, CUT, pin_body,
                          f"{name}_Cut")
 
     # Extrude JOIN into finger board
-    join_feat = af.ext_op(comp, prof, dist_expr, JOIN, finger_body,
+    join_feat = sp.ext_op(comp, prof, dist_expr, JOIN, finger_body,
                           f"{name}_Join")
 
     # Pattern both along joint axis
     if pattern_axis is None:
         pattern_axis = comp.zConstructionAxis
 
-    cut_pat = af.feat_pattern(comp, cut_feat, pattern_axis,
+    cut_pat = sp.feat_pattern(comp, cut_feat, pattern_axis,
                               f"{p}_count", f"{p}_pitch",
                               f"{name}_PatCut")
-    join_pat = af.feat_pattern(comp, join_feat, pattern_axis,
+    join_pat = sp.feat_pattern(comp, join_feat, pattern_axis,
                                f"{p}_count", f"{p}_pitch",
                                f"{name}_PatJoin")
 
     # CUT pin board into finger board to create interlocking sockets.
     # The pin board's remaining material IS its fingers — cutting it
     # into the finger board carves matching slots.
-    pin_cut = af.combine(comp, finger_body, pin_body, CUT, True,
+    pin_cut = sp.combine(comp, finger_body, pin_body, CUT, True,
                          f"{name}_PinCut")
 
     return {
@@ -286,7 +286,7 @@ def box(comp, front, left,
         Dict with feature references.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     if fl_plane is None:
         fl_plane = comp.yZConstructionPlane
@@ -386,28 +386,28 @@ def box(comp, front, left,
         TD, Point3D.create(m1.x / 2, m1.y - 1, 0)
     ).parameter.expression = front_expr
 
-    prof = af.smallest_profile(sk)
+    prof = sp.smallest_profile(sk)
 
     # ── JOIN into finger boards (left, right) ──
     finger_boards = [left, right] if right is not None else [left]
-    join_fl = af.ext_op(comp, prof, thick_expr, JOIN, finger_boards,
+    join_fl = sp.ext_op(comp, prof, thick_expr, JOIN, finger_boards,
                         f"{name}_JoinFL")
 
     # ── Mirrors ──
     feats = [join_fl]
     if right is not None and back is not None:
         # 4-corner: 3 mirrors (FL→BL, FL→FR, FR→BR)
-        mir_bl = af.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
-        mir_fr = af.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
-        mir_br = af.mirror_feats(comp, [mir_fr], y_mid, f"{name}_MirBR")
+        mir_bl = sp.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
+        mir_fr = sp.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
+        mir_br = sp.mirror_feats(comp, [mir_fr], y_mid, f"{name}_MirBR")
         feats = [join_fl, mir_bl, mir_fr, mir_br]
     elif right is not None:
         # 2-corner: 1 mirror (FL→FR)
-        mir_fr = af.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
+        mir_fr = sp.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
         feats = [join_fl, mir_fr]
     elif back is not None:
         # 2-corner: 1 mirror (FL→BL)
-        mir_bl = af.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
+        mir_bl = sp.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
         feats = [join_fl, mir_bl]
     # else: 1-corner, no mirrors needed
 
@@ -430,11 +430,11 @@ def box(comp, front, left,
     pat.name = f"{name}_Pat"
 
     # ── CUT slot boards using finger boards as tools ──
-    cut_front = af.combine(comp, front, finger_boards, CUT, True,
+    cut_front = sp.combine(comp, front, finger_boards, CUT, True,
                            f"{name}_CutFront")
     cut_back = None
     if back is not None:
-        cut_back = af.combine(comp, back, finger_boards, CUT, True,
+        cut_back = sp.combine(comp, back, finger_boards, CUT, True,
                               f"{name}_CutBack")
 
     return {

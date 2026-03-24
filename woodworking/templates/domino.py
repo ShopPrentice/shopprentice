@@ -42,7 +42,7 @@ import adsk.core
 import adsk.fusion
 import math
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -100,31 +100,31 @@ def single(comp, plane, center, long_axis, long_expr, short_expr,
         The domino void body (BRepBody).
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     # Validate mating surfaces before building the joint
     if body_a is not None and body_b is not None:
-        af.validate_joint_contact(body_a, body_b)
+        sp.validate_joint_contact(body_a, body_b)
 
     if use_model_coords:
-        sk, prof = af.sketch_slot_model(
+        sk, prof = sp.sketch_slot_model(
             comp, plane, center, long_axis,
             long_expr, short_expr, name=f"{name}_Sk", ev=ev)
     else:
         # center is (cx_expr, cy_expr) in sketch space, long_axis ignored
         vertical = (long_axis == "v" or long_axis == "vertical")
-        sk, prof = af.sketch_slot(
+        sk, prof = sp.sketch_slot(
             comp, plane, center[0], center[1],
             long_expr, short_expr, vertical,
             name=f"{name}_Sk", ev=ev)
 
-    ext = af.ext_new_sym(comp, prof, depth_expr, f"{name}")
+    ext = sp.ext_new_sym(comp, prof, depth_expr, f"{name}")
     void_body = ext.bodies.item(0)
     void_body.name = name
 
     if cut:
-        af.combine(comp, body_a, void_body, CUT, True, f"{name}_CutA")
-        af.combine(comp, body_b, void_body, CUT, True, f"{name}_CutB")
+        sp.combine(comp, body_a, void_body, CUT, True, f"{name}_CutA")
+        sp.combine(comp, body_b, void_body, CUT, True, f"{name}_CutB")
 
     return void_body
 
@@ -156,17 +156,17 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
         List of void bodies (template + pattern copies).
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     # Validate mating surfaces before building the joint
     if body_a is not None and body_b is not None:
-        af.validate_joint_contact(body_a, body_b)
+        sp.validate_joint_contact(body_a, body_b)
 
     # Build ONE template void at start position
-    sk, prof = af.sketch_slot_model(
+    sk, prof = sp.sketch_slot_model(
         comp, plane, start, long_axis,
         long_expr, short_expr, name=f"{name}_Sk", ev=ev)
-    ext = af.ext_new_sym(comp, prof, depth_expr, f"{name}")
+    ext = sp.ext_new_sym(comp, prof, depth_expr, f"{name}")
     template = ext.bodies.item(0)
     template.name = f"{name}_0"
 
@@ -177,16 +177,16 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
         axis_map = {"x": comp.xConstructionAxis,
                      "y": comp.yConstructionAxis,
                      "z": comp.zConstructionAxis}
-        pat = af.body_pattern(comp, template, axis_map[step_axis],
+        pat = sp.body_pattern(comp, template, axis_map[step_axis],
                                count_expr, step_expr, f"{name}_Pat")
         for i in range(pat.bodies.count):
             void_bodies.append(pat.bodies.item(i))
 
     # Bulk CUT all voids into target bodies
     if cut and void_bodies:
-        af.combine(comp, body_a, void_bodies, CUT, True, f"{name}_CutA")
+        sp.combine(comp, body_a, void_bodies, CUT, True, f"{name}_CutA")
         if body_b is not None and body_b != body_a:
-            af.combine(comp, body_b, void_bodies, CUT, True, f"{name}_CutB")
+            sp.combine(comp, body_b, void_bodies, CUT, True, f"{name}_CutB")
 
     return void_bodies
 
@@ -287,7 +287,7 @@ def between(comp, plane, body_a, body_b, interface_axis,
         List of void bodies.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     overlap = _bodies_overlap_bbox(body_a, body_b)
     if overlap is None:
@@ -382,11 +382,11 @@ def between(comp, plane, body_a, body_b, interface_axis,
         pos[axis_idx[long_axis]] = long_center
         pos[axis_idx[step_axis]] = step_pos
 
-        sk, prof = af.sketch_slot_model(
+        sk, prof = sp.sketch_slot_model(
             comp, plane, (f"{pos[0]} cm", f"{pos[1]} cm", f"{pos[2]} cm"),
             long_axis, long_expr, short_expr,
             name=f"{name}_{i}_Sk", ev=ev)
-        ext = af.ext_new_sym(comp, prof, depth_expr, f"{name}_{i}")
+        ext = sp.ext_new_sym(comp, prof, depth_expr, f"{name}_{i}")
         void = ext.bodies.item(0)
         void.name = f"{name}_{i}"
         void_bodies.append(void)
@@ -394,9 +394,9 @@ def between(comp, plane, body_a, body_b, interface_axis,
 
     # Bulk CUT into both bodies
     if cut and void_bodies:
-        af.combine(comp, body_a, void_bodies, CUT, True, f"{name}_CutA")
+        sp.combine(comp, body_a, void_bodies, CUT, True, f"{name}_CutA")
         if body_b is not None and body_b != body_a:
-            af.combine(comp, body_b, void_bodies, CUT, True, f"{name}_CutB")
+            sp.combine(comp, body_b, void_bodies, CUT, True, f"{name}_CutB")
 
     # Validate containment — domino must be fully inside both bodies
     all_ok = True
@@ -436,28 +436,28 @@ def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
         List of 4 void bodies [NL, NR, FL, FR].
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     # Validate mating surfaces — top must contact each leg
     for leg in leg_bodies:
-        af.validate_joint_contact(top_body, leg)
+        sp.validate_joint_contact(top_body, leg)
 
     # 1. Build near-left domino
-    sk, prof = af.sketch_slot_model(
+    sk, prof = sp.sketch_slot_model(
         comp, plane, center, long_axis,
         long_expr, short_expr, name=f"{name}_NL_Sk", ev=ev)
-    ext = af.ext_new_sym(comp, prof, depth_expr, f"{name}_NL")
+    ext = sp.ext_new_sym(comp, prof, depth_expr, f"{name}_NL")
     nl_body = ext.bodies.item(0)
     nl_body.name = f"{name}_NL"
 
     # 2. Mirror NL → NR across XMid (flips X: left → right)
-    mir_nr = af.mirror_bodies(comp, [nl_body], x_mid, f"{name}_NR_Mir")
+    mir_nr = sp.mirror_bodies(comp, [nl_body], x_mid, f"{name}_NR_Mir")
     nr_body = mir_nr.bodies.item(0)
     nr_body.name = f"{name}_NR"
     nl_body = _find_body(comp, f"{name}_NL")
 
     # 3. Mirror NL+NR → FL+FR across YMid (flips Y: near → far)
-    mir_far = af.mirror_bodies(comp, [nl_body, nr_body], y_mid, f"{name}_Far_Mir")
+    mir_far = sp.mirror_bodies(comp, [nl_body, nr_body], y_mid, f"{name}_Far_Mir")
     fl_body = mir_far.bodies.item(0)
     fr_body = mir_far.bodies.item(1)
     fl_body.name = f"{name}_FL"
@@ -468,14 +468,14 @@ def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
     all_voids = [nl_body, nr_body, fl_body, fr_body]
 
     # 4. CUT all into top/seat
-    af.combine(comp, top_body, all_voids, CUT, True, f"{name}_Top_Cut")
+    sp.combine(comp, top_body, all_voids, CUT, True, f"{name}_Top_Cut")
 
     # 5. CUT each into its leg (keepTool=True on all)
     leg_nl, leg_nr, leg_fl, leg_fr = leg_bodies
-    af.combine(comp, leg_nl, [nl_body], CUT, True, f"{name}_Leg_NL")
-    af.combine(comp, leg_nr, [nr_body], CUT, True, f"{name}_Leg_NR")
-    af.combine(comp, leg_fl, [fl_body], CUT, True, f"{name}_Leg_FL")
-    af.combine(comp, leg_fr, [fr_body], CUT, True, f"{name}_Leg_FR")
+    sp.combine(comp, leg_nl, [nl_body], CUT, True, f"{name}_Leg_NL")
+    sp.combine(comp, leg_nr, [nr_body], CUT, True, f"{name}_Leg_NR")
+    sp.combine(comp, leg_fl, [fl_body], CUT, True, f"{name}_Leg_FL")
+    sp.combine(comp, leg_fr, [fr_body], CUT, True, f"{name}_Leg_FR")
 
     return all_voids
 
@@ -487,4 +487,4 @@ def _find_body(comp, name):
         if b.name == name:
             return b
     # Fall back to recursive search
-    return af.DesignContext().find_body(name, comp)
+    return sp.DesignContext().find_body(name, comp)

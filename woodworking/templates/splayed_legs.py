@@ -29,7 +29,7 @@ import adsk.core
 import adsk.fusion
 import math
 
-from helpers import af
+from helpers import sp
 
 Point3D = adsk.core.Point3D
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
@@ -134,10 +134,10 @@ def build(root_comp, inset_x_expr="leg_inset_x", inset_y_expr="leg_inset_y",
               "plane": LegFront_Pl construction plane}.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     # ── Step 1: Construction plane at front face of near-left leg ──
-    leg_front_pl = af.off_plane(root_comp, root_comp.xZConstructionPlane,
+    leg_front_pl = sp.off_plane(root_comp, root_comp.xZConstructionPlane,
                                 f"{inset_y_expr} - leg_d / 2", "LegFront_Pl")
 
     # ── Step 2: Trapezoid sketch (primary X-splay in sketch plane) ──
@@ -185,31 +185,31 @@ def build(root_comp, inset_x_expr="leg_inset_x", inset_y_expr="leg_inset_y",
 
     d.addDistanceDimension(
         ln_top.startSketchPoint, ln_top.endSketchPoint,
-        af.H, mid_top
+        sp.H, mid_top
     ).parameter.expression = "leg_w"
     d.addDistanceDimension(
         ln_bot.startSketchPoint, ln_bot.endSketchPoint,
-        af.H, mid_bot
+        sp.H, mid_bot
     ).parameter.expression = "leg_w"
     d.addDistanceDimension(
         sk.originPoint, ln_top.startSketchPoint,
-        af.V, Point3D.create(s_tl.x - 1, s_tl.y / 2, 0)
+        sp.V, Point3D.create(s_tl.x - 1, s_tl.y / 2, 0)
     ).parameter.expression = "leg_top_z"
     d.addDistanceDimension(
         sk.originPoint, ln_top.startSketchPoint,
-        af.H, Point3D.create(s_tl.x / 2, s_tl.y - 2, 0)
+        sp.H, Point3D.create(s_tl.x / 2, s_tl.y - 2, 0)
     ).parameter.expression = f"{inset_x_expr} - leg_w / 2"
     d.addDistanceDimension(
         ln_top.startSketchPoint, ln_bot.endSketchPoint,
-        af.H, Point3D.create((s_tl.x + s_bl.x) / 2, (s_tl.y + s_bl.y) / 2 - 1, 0)
+        sp.H, Point3D.create((s_tl.x + s_bl.x) / 2, (s_tl.y + s_bl.y) / 2 - 1, 0)
     ).parameter.expression = "(leg_top_z + leg_floor_margin) * tan(splay)"
     d.addDistanceDimension(
         ln_top.startSketchPoint, ln_bot.endSketchPoint,
-        af.V, Point3D.create(s_tl.x - 2, (s_tl.y + s_bl.y) / 2, 0)
+        sp.V, Point3D.create(s_tl.x - 2, (s_tl.y + s_bl.y) / 2, 0)
     ).parameter.expression = "leg_top_z + leg_floor_margin"
 
     # Extrude leg depth along Y
-    ext = af.ext_new(root_comp, sk.profiles.item(0), "leg_d", "Leg_NL")
+    ext = sp.ext_new(root_comp, sk.profiles.item(0), "leg_d", "Leg_NL")
     nl_body = ext.bodies.item(0)
     nl_body.name = "Leg_NL"
 
@@ -254,23 +254,23 @@ def build(root_comp, inset_x_expr="leg_inset_x", inset_y_expr="leg_inset_y",
     p2 = Point3D.create(bb.maxPoint.x + margin, bb.maxPoint.y + margin, 0)
     floor_sk.sketchCurves.sketchLines.addTwoPointRectangle(p1, p2)
     floor_prof = floor_sk.profiles.item(0)
-    floor_ext = af.ext_op(root_comp, floor_prof, "leg_floor_margin + 1 in",
+    floor_ext = sp.ext_op(root_comp, floor_prof, "leg_floor_margin + 1 in",
                           CUT, nl_body, "LegFloor_NL", flip=True)
     nl_body = _find_body(root_comp, "Leg_NL")
 
     # ── Step 4: Trim CUT against seat/top ──
     if seat_body is not None:
-        af.combine(root_comp, nl_body, seat_body, CUT, True, "LegTrim_NL")
+        sp.combine(root_comp, nl_body, seat_body, CUT, True, "LegTrim_NL")
         nl_body = _find_body(root_comp, "Leg_NL")
 
     # ── Step 5: Mirror NL → NR across YMid ──
-    nr_mir = af.mirror_bodies(root_comp, [nl_body], y_mid, "Leg_NR_Mir")
+    nr_mir = sp.mirror_bodies(root_comp, [nl_body], y_mid, "Leg_NR_Mir")
     nr_body = nr_mir.bodies.item(0)
     nr_body.name = "Leg_NR"
     nl_body = _find_body(root_comp, "Leg_NL")
 
     # ── Step 6: Mirror NL+NR → FL, FR across XMid ──
-    far_mir = af.mirror_bodies(root_comp, [nl_body, nr_body], x_mid, "Legs_Far_Mir")
+    far_mir = sp.mirror_bodies(root_comp, [nl_body, nr_body], x_mid, "Legs_Far_Mir")
     fl_body = far_mir.bodies.item(0)
     fr_body = far_mir.bodies.item(1)
     fl_body.name = "Leg_FL"
@@ -299,7 +299,7 @@ def splay_offset(height_cm, ev=None):
         (sx_cm, sy_cm) — splay offsets in cm.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
     top_z = ev("leg_top_z")
     frac = (top_z - height_cm) / top_z
     return ev("splay_shift") * frac, ev("splay_shift_w") * frac
@@ -362,4 +362,4 @@ def _find_body(comp, name):
         b = comp.bRepBodies.item(i)
         if b.name == name:
             return b
-    return af.DesignContext().find_body(name, comp)
+    return sp.DesignContext().find_body(name, comp)

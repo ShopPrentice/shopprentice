@@ -14,7 +14,7 @@ Coordinate system:
   X = length (60")   Y = width (20")   Z = height (40")
 """
 import adsk.core, adsk.fusion, adsk.cam, math
-from helpers import af
+from helpers import sp
 
 
 def run(context):
@@ -789,7 +789,7 @@ def run(context):
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{comp_name}: {len(names)} bodies -> {names}")
 
-    af.apply_appearance("cedar")
+    sp.apply_appearance("cedar")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

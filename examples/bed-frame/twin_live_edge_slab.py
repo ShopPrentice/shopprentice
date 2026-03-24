@@ -10,7 +10,7 @@ Coordinate system:
 """
 import adsk.core, adsk.fusion, math
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import domino
 from woodworking.templates import bowtie
 from woodworking.templates import bed_rail_fastener as brf
@@ -106,10 +106,10 @@ def run(context):
     print(">>> Parameters done")
 
     # === COMPONENTS ===
-    post_occ = af.make_comp(root, "Posts")
-    rail_occ = af.make_comp(root, "Rails")
-    hb_occ   = af.make_comp(root, "Headboard")
-    slat_occ = af.make_comp(root, "Slats")
+    post_occ = sp.make_comp(root, "Posts")
+    rail_occ = sp.make_comp(root, "Rails")
+    hb_occ   = sp.make_comp(root, "Headboard")
+    slat_occ = sp.make_comp(root, "Slats")
 
     post_c = post_occ.component
     rail_c = rail_occ.component
@@ -119,23 +119,23 @@ def run(context):
     # ================================================================
     #  1. POSTS
     # ================================================================
-    _, pr = af.sketch_rect_model(post_c, post_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(post_c, post_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "post_size", "y": "post_size"}, "PostFL_Sk", ev)
-    fl_ext = af.ext_new(post_c, pr, "front_post_h", "PostFL")
+    fl_ext = sp.ext_new(post_c, pr, "front_post_h", "PostFL")
     post_fl = fl_ext.bodies.item(0); post_fl.name = "Post_FL"
 
-    p_xmid = af.off_plane(post_c, post_c.yZConstructionPlane, "mid_x", "PXMid")
-    post_fr = af.mirror_body(post_c, post_fl, p_xmid, "PostFR").bodies.item(0)
+    p_xmid = sp.off_plane(post_c, post_c.yZConstructionPlane, "mid_x", "PXMid")
+    post_fr = sp.mirror_body(post_c, post_fl, p_xmid, "PostFR").bodies.item(0)
     post_fr.name = "Post_FR"
 
-    _, pr = af.sketch_rect_model(post_c, post_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(post_c, post_c.xYConstructionPlane,
         ("0 in", "bed_l + post_size", "0 in"),
         {"x": "post_size", "y": "post_size"}, "PostBL_Sk", ev)
-    bl_ext = af.ext_new(post_c, pr, "headboard_h", "PostBL")
+    bl_ext = sp.ext_new(post_c, pr, "headboard_h", "PostBL")
     post_bl = bl_ext.bodies.item(0); post_bl.name = "Post_BL"
 
-    post_br = af.mirror_body(post_c, post_bl, p_xmid, "PostBR").bodies.item(0)
+    post_br = sp.mirror_body(post_c, post_bl, p_xmid, "PostBR").bodies.item(0)
     post_br.name = "Post_BR"
 
     print(">>> Posts: 4")
@@ -143,45 +143,45 @@ def run(context):
     # ================================================================
     #  2. RAILS — side rails, foot rail, ledger strips
     # ================================================================
-    lr_pl = af.off_plane(rail_c, rail_c.yZConstructionPlane,
+    lr_pl = sp.off_plane(rail_c, rail_c.yZConstructionPlane,
                           "post_size / 2 - rail_thick / 2", "LR_Pl")
-    _, pr = af.sketch_rect_model(rail_c, lr_pl,
+    _, pr = sp.sketch_rect_model(rail_c, lr_pl,
         ("post_size / 2 - rail_thick / 2", "post_size", "rail_z"),
         {"y": "side_rail_l", "z": "rail_h - post_chamfer"}, "LeftRail_Sk", ev)
-    lr_ext = af.ext_new(rail_c, pr, "rail_thick", "LeftRail")
+    lr_ext = sp.ext_new(rail_c, pr, "rail_thick", "LeftRail")
     rail_left = lr_ext.bodies.item(0); rail_left.name = "Rail_Left"
 
-    r_xmid = af.off_plane(rail_c, rail_c.yZConstructionPlane, "mid_x", "RXMid")
-    rail_right = af.mirror_feats(rail_c, [lr_ext], r_xmid, "RightRailMir").bodies.item(0)
+    r_xmid = sp.off_plane(rail_c, rail_c.yZConstructionPlane, "mid_x", "RXMid")
+    rail_right = sp.mirror_feats(rail_c, [lr_ext], r_xmid, "RightRailMir").bodies.item(0)
     rail_right.name = "Rail_Right"
 
-    fr_pl = af.off_plane(rail_c, rail_c.xZConstructionPlane,
+    fr_pl = sp.off_plane(rail_c, rail_c.xZConstructionPlane,
                           "post_size / 2 - rail_thick / 2", "FR_Pl")
-    _, pr = af.sketch_rect_model(rail_c, fr_pl,
+    _, pr = sp.sketch_rect_model(rail_c, fr_pl,
         ("post_size", "post_size / 2 - rail_thick / 2", "rail_z"),
         {"x": "end_rail_l", "z": "rail_h - post_chamfer"}, "FootRail_Sk", ev)
-    fr_ext = af.ext_new(rail_c, pr, "rail_thick", "FootRail")
+    fr_ext = sp.ext_new(rail_c, pr, "rail_thick", "FootRail")
     rail_foot = fr_ext.bodies.item(0); rail_foot.name = "Rail_Foot"
 
     # Back rail: between back posts, shorter, forward of headboard
-    br_pl = af.off_plane(rail_c, rail_c.xZConstructionPlane,
+    br_pl = sp.off_plane(rail_c, rail_c.xZConstructionPlane,
                           "outer_l - post_size + post_size / 2 - rail_thick / 2", "BR_Pl")
-    _, pr = af.sketch_rect_model(rail_c, br_pl,
+    _, pr = sp.sketch_rect_model(rail_c, br_pl,
         ("post_size", "outer_l - post_size + post_size / 2 - rail_thick / 2", "rail_z"),
         {"x": "end_rail_l", "z": "back_rail_h"}, "BackRail_Sk", ev)
-    back_rail_ext = af.ext_new(rail_c, pr, "rail_thick", "BackRail")
+    back_rail_ext = sp.ext_new(rail_c, pr, "rail_thick", "BackRail")
     rail_back = back_rail_ext.bodies.item(0); rail_back.name = "Rail_Back"
 
     # Ledger strips
-    ldg_pl = af.off_plane(rail_c, rail_c.yZConstructionPlane,
+    ldg_pl = sp.off_plane(rail_c, rail_c.yZConstructionPlane,
                            "post_size / 2 + rail_thick / 2", "LDG_Pl")
-    _, pr = af.sketch_rect_model(rail_c, ldg_pl,
+    _, pr = sp.sketch_rect_model(rail_c, ldg_pl,
         ("post_size / 2 + rail_thick / 2", "post_size", "ledger_z"),
         {"y": "side_rail_l", "z": "ledger_h"}, "LedgerL_Sk", ev)
-    ll_ext = af.ext_new(rail_c, pr, "ledger_thick", "LedgerLeft")
+    ll_ext = sp.ext_new(rail_c, pr, "ledger_thick", "LedgerLeft")
     ledger_left = ll_ext.bodies.item(0); ledger_left.name = "Ledger_Left"
 
-    af.mirror_feats(rail_c, [ll_ext], r_xmid, "LedgerRMir").bodies.item(0).name = "Ledger_Right"
+    sp.mirror_feats(rail_c, [ll_ext], r_xmid, "LedgerRMir").bodies.item(0).name = "Ledger_Right"
 
     print(">>> Rails: 4 rails + 2 ledgers")
 
@@ -189,11 +189,11 @@ def run(context):
     #  3. HEADBOARD — live edge slab + 3 bowtie inlays
     # ================================================================
     # Slab: wide plank spanning behind back posts with overhang on each side
-    slab_y_pl = af.off_plane(hb_c, hb_c.xZConstructionPlane, "slab_y", "SlabY_Pl")
-    _, pr = af.sketch_rect_model(hb_c, slab_y_pl,
+    slab_y_pl = sp.off_plane(hb_c, hb_c.xZConstructionPlane, "slab_y", "SlabY_Pl")
+    _, pr = sp.sketch_rect_model(hb_c, slab_y_pl,
         ("0 in", "slab_y", "slab_z"),
         {"x": "slab_w", "z": "slab_h"}, "Slab_Sk", ev)
-    slab_ext = af.ext_new(hb_c, pr, "slab_thick", "Slab")
+    slab_ext = sp.ext_new(hb_c, pr, "slab_thick", "Slab")
     slab = slab_ext.bodies.item(0); slab.name = "Slab"
 
     # Bowties: perpendicular to crack (fiber in X → bowties vertical in Z)
@@ -211,15 +211,15 @@ def run(context):
     # ================================================================
     #  4. SLATS
     # ================================================================
-    slat_z_pl = af.off_plane(slat_c, slat_c.xYConstructionPlane, "slat_z", "SlatZ_Pl")
-    _, pr = af.sketch_rect_model(slat_c, slat_z_pl,
+    slat_z_pl = sp.off_plane(slat_c, slat_c.xYConstructionPlane, "slat_z", "SlatZ_Pl")
+    _, pr = sp.sketch_rect_model(slat_c, slat_z_pl,
         ("post_size / 2 + rail_thick / 2", "post_size", "slat_z"),
         {"x": "slat_l", "y": "slat_w"}, "Slat_Sk", ev)
-    slat_ext = af.ext_new(slat_c, pr, "slat_thick", "Slat_1")
+    slat_ext = sp.ext_new(slat_c, pr, "slat_thick", "Slat_1")
     slat_body = slat_ext.bodies.item(0); slat_body.name = "Slat_1"
 
     if int(ev("n_slats")) > 1:
-        pat = af.body_pattern(slat_c, slat_body, slat_c.yConstructionAxis,
+        pat = sp.body_pattern(slat_c, slat_body, slat_c.yConstructionAxis,
                                "n_slats", "slat_sp", "SlatPat")
         for i in range(pat.bodies.count):
             pat.bodies.item(i).name = f"Slat_{i+2}"
@@ -243,13 +243,13 @@ def run(context):
     slab_p = slab.createForAssemblyContext(hb_occ)
 
     # CUT back posts from slab (slab wraps around posts)
-    af.combine(root, slab_p, [bl_p, br_p], CUT, True, "SlabPostNotch")
+    sp.combine(root, slab_p, [bl_p, br_p], CUT, True, "SlabPostNotch")
 
     # Domino planes
-    dm_xl = af.off_plane(root, root.yZConstructionPlane, "post_size", "DM_XL")
-    dm_xr = af.off_plane(root, root.yZConstructionPlane, "outer_w - post_size", "DM_XR")
-    dm_yf = af.off_plane(root, root.xZConstructionPlane, "post_size", "DM_YF")
-    dm_yb = af.off_plane(root, root.xZConstructionPlane, "outer_l - post_size", "DM_YB")
+    dm_xl = sp.off_plane(root, root.yZConstructionPlane, "post_size", "DM_XL")
+    dm_xr = sp.off_plane(root, root.yZConstructionPlane, "outer_w - post_size", "DM_XR")
+    dm_yf = sp.off_plane(root, root.xZConstructionPlane, "post_size", "DM_YF")
+    dm_yb = sp.off_plane(root, root.xZConstructionPlane, "outer_l - post_size", "DM_YB")
 
     # --- Rails → posts (bed rail fasteners — detachable) ---
     rail_center_z = ev("rail_z") + (ev("rail_top_z") - ev("rail_z")) / 2
@@ -299,14 +299,14 @@ def run(context):
     params.add("ledger_dm_y0", VI("post_size + ledger_dm_sp"), "in", "")
     params.add("ledger_dm_z", VI("ledger_z + ledger_h / 2"), "in", "")
 
-    ledger_dm_pl_l = af.off_plane(root, root.yZConstructionPlane,
+    ledger_dm_pl_l = sp.off_plane(root, root.yZConstructionPlane,
         "post_size / 2 + rail_thick / 2", "LedgerDM_PlL")
     domino.grid(root, ledger_dm_pl_l,
         ("post_size / 2 + rail_thick / 2", "ledger_dm_y0", "ledger_dm_z"),
         "y", "ledger_dm_sp", "ledger_dm_count", "y", "ldm_w", "ldm_t", "ldm_d",
         ll_p, rl_p, "DM_LL", ev)
 
-    ledger_dm_pl_r = af.off_plane(root, root.yZConstructionPlane,
+    ledger_dm_pl_r = sp.off_plane(root, root.yZConstructionPlane,
         "outer_w - post_size / 2 - rail_thick / 2", "LedgerDM_PlR")
     lr_p = None
     for i in range(rail_c.bRepBodies.count):
@@ -394,9 +394,9 @@ def run(context):
         print(f"{cn}: {len(names)} -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
 
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
     bt_names = [b.name for b in bt_bodies]
-    af.apply_appearance("walnut", bodies=bt_names)
+    sp.apply_appearance("walnut", bodies=bt_names)
 
     cam = app.activeViewport.camera
     cam.isFitView = True

@@ -34,10 +34,10 @@ def build_box(root, prefix, l_expr, w_expr, h_expr, t_expr,
     Returns:
         Dict with component, bodies, and body count.
     """
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import dovetail
 
-    occ = af.make_comp(root, prefix)
+    occ = sp.make_comp(root, prefix)
     comp = occ.component
 
     ox = ev(x_off_expr) if x_off_expr != "0 in" else 0.0
@@ -53,52 +53,52 @@ def build_box(root, prefix, l_expr, w_expr, h_expr, t_expr,
     if oy == 0.0:
         front_sk_pl = comp.xZConstructionPlane
     else:
-        front_sk_pl = af.off_plane(comp, comp.xZConstructionPlane,
+        front_sk_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                                     y_off_expr, f"{prefix}_FrontYPl")
 
-    sk, pr = af.sketch_rect_model(comp, front_sk_pl,
+    sk, pr = sp.sketch_rect_model(comp, front_sk_pl,
         (x_off_expr, front_y_expr, "0 in"),
         {"x": l_expr, "z": h_expr}, f"{prefix}_Front_Sk", ev)
-    front = af.ext_new(comp, pr, t_expr, f"{prefix}_Front").bodies.item(0)
+    front = sp.ext_new(comp, pr, t_expr, f"{prefix}_Front").bodies.item(0)
     front.name = f"{prefix}_Front"
 
     # ── Back (pin board, only for 4-corner) ──
     back = None
     if corners == 4:
-        back_pl = af.off_plane(comp, comp.xZConstructionPlane,
+        back_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                                back_y_expr, f"{prefix}_Back_Pl")
-        sk, pr = af.sketch_rect_model(comp, back_pl,
+        sk, pr = sp.sketch_rect_model(comp, back_pl,
             (x_off_expr, back_y_expr, "0 in"),
             {"x": l_expr, "z": h_expr}, f"{prefix}_Back_Sk", ev)
-        back = af.ext_new(comp, pr, t_expr, f"{prefix}_Back").bodies.item(0)
+        back = sp.ext_new(comp, pr, t_expr, f"{prefix}_Back").bodies.item(0)
         back.name = f"{prefix}_Back"
 
     # ── Midplanes ──
     x_mid_expr = f"{x_off_expr} + {l_expr} / 2" if ox != 0.0 else f"{l_expr} / 2"
     y_mid_expr = f"{y_off_expr} + {w_expr} / 2" if oy != 0.0 else f"{w_expr} / 2"
 
-    x_mid = af.off_plane(comp, comp.yZConstructionPlane,
+    x_mid = sp.off_plane(comp, comp.yZConstructionPlane,
                           x_mid_expr, f"{prefix}_XMid")
-    y_mid = af.off_plane(comp, comp.xZConstructionPlane,
+    y_mid = sp.off_plane(comp, comp.xZConstructionPlane,
                           y_mid_expr, f"{prefix}_YMid")
 
     # ── Left (tail board, narrower) ──
     if ox == 0.0:
         left_pl = comp.yZConstructionPlane
     else:
-        left_pl = af.off_plane(comp, comp.yZConstructionPlane,
+        left_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                                x_off_expr, f"{prefix}_Left_Pl")
 
-    sk, pr = af.sketch_rect_model(comp, left_pl,
+    sk, pr = sp.sketch_rect_model(comp, left_pl,
         (x_off_expr, tail_y_expr, "0 in"),
         {"y": tail_w_expr, "z": h_expr}, f"{prefix}_Left_Sk", ev)
-    left = af.ext_new(comp, pr, t_expr, f"{prefix}_Left").bodies.item(0)
+    left = sp.ext_new(comp, pr, t_expr, f"{prefix}_Left").bodies.item(0)
     left.name = f"{prefix}_Left"
 
     # ── Right (tail board via mirror of left, only for 2+ corners) ──
     right = None
     if corners >= 2:
-        right_mir = af.mirror_body(comp, left, x_mid, f"{prefix}_RightMir")
+        right_mir = sp.mirror_body(comp, left, x_mid, f"{prefix}_RightMir")
         right = right_mir.bodies.item(0)
         right.name = f"{prefix}_Right"
 
@@ -153,10 +153,10 @@ def run(context):
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
 
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import dovetail
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ================================================================
     # FIXTURE 1: 1-corner — 8x6x4, 0.5" thick, 3 tails, 8 deg
@@ -309,44 +309,44 @@ def run(context):
         angle="8 deg", tail_w="0.75 in", tail_count="3",
         joint_h_expr="b9_l", thick_expr="b9_t")
 
-    b9_occ = af.make_comp(root, "B9")
+    b9_occ = sp.make_comp(root, "B9")
     b9_c = b9_occ.component
 
     # Front (pin board): spans X×Y at z=0, thin in Z
-    sk, pr = af.sketch_rect_model(b9_c, b9_c.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(b9_c, b9_c.xYConstructionPlane,
         ("0 in", "b9_y", "0 in"),
         {"x": "b9_l", "y": "b9_w"}, "B9_Front_Sk", ctx.ev)
-    b9_front = af.ext_new(b9_c, pr, "b9_t", "B9_Front").bodies.item(0)
+    b9_front = sp.ext_new(b9_c, pr, "b9_t", "B9_Front").bodies.item(0)
     b9_front.name = "B9_Front"
 
     # Back (pin board): spans X×Y at z=b9_h-b9_t, thin in Z
-    b9_back_pl = af.off_plane(b9_c, b9_c.xYConstructionPlane,
+    b9_back_pl = sp.off_plane(b9_c, b9_c.xYConstructionPlane,
                                "b9_h - b9_t", "B9_Back_Pl")
-    sk, pr = af.sketch_rect_model(b9_c, b9_back_pl,
+    sk, pr = sp.sketch_rect_model(b9_c, b9_back_pl,
         ("0 in", "b9_y", "b9_h - b9_t"),
         {"x": "b9_l", "y": "b9_w"}, "B9_Back_Sk", ctx.ev)
-    b9_back = af.ext_new(b9_c, pr, "b9_t", "B9_Back").bodies.item(0)
+    b9_back = sp.ext_new(b9_c, pr, "b9_t", "B9_Back").bodies.item(0)
     b9_back.name = "B9_Back"
 
     # Midplanes for dovetail mirrors:
     #   x_mid: left→right mirror across ext_axis=Y midplane
-    b9_ext_mid = af.off_plane(b9_c, b9_c.xZConstructionPlane,
+    b9_ext_mid = sp.off_plane(b9_c, b9_c.xZConstructionPlane,
                                "b9_y + b9_w / 2", "B9_ExtMid")
     #   y_mid: front→back mirror across thick_axis=Z midplane
-    b9_thick_mid = af.off_plane(b9_c, b9_c.xYConstructionPlane,
+    b9_thick_mid = sp.off_plane(b9_c, b9_c.xYConstructionPlane,
                                  "b9_h / 2", "B9_ThickMid")
 
     # Left (tail board): spans X×Z at y=b9_y, thin in Y, narrower in Z
-    b9_left_pl = af.off_plane(b9_c, b9_c.xZConstructionPlane,
+    b9_left_pl = sp.off_plane(b9_c, b9_c.xZConstructionPlane,
                                "b9_y", "B9_Left_Pl")
-    sk, pr = af.sketch_rect_model(b9_c, b9_left_pl,
+    sk, pr = sp.sketch_rect_model(b9_c, b9_left_pl,
         ("0 in", "b9_y", "b9_t"),
         {"x": "b9_l", "z": "b9_h - 2 * b9_t"}, "B9_Left_Sk", ctx.ev)
-    b9_left = af.ext_new(b9_c, pr, "b9_t", "B9_Left").bodies.item(0)
+    b9_left = sp.ext_new(b9_c, pr, "b9_t", "B9_Left").bodies.item(0)
     b9_left.name = "B9_Left"
 
     # Right (tail board): mirror of left across ext_mid
-    b9_right_mir = af.mirror_body(b9_c, b9_left, b9_ext_mid, "B9_RightMir")
+    b9_right_mir = sp.mirror_body(b9_c, b9_left, b9_ext_mid, "B9_RightMir")
     b9_right = b9_right_mir.bodies.item(0)
     b9_right.name = "B9_Right"
 
@@ -386,48 +386,48 @@ def run(context):
         angle="8 deg", tail_w="0.625 in", tail_count="4",
         joint_h_expr="b10_w", thick_expr="b10_t")
 
-    b10_occ = af.make_comp(root, "B10")
+    b10_occ = sp.make_comp(root, "B10")
     b10_c = b10_occ.component
 
     b10_ox = ctx.ev("b10_x")
 
     # Front (pin board): spans Y×Z at x=b10_x, thin in X
-    b10_front_pl = af.off_plane(b10_c, b10_c.yZConstructionPlane,
+    b10_front_pl = sp.off_plane(b10_c, b10_c.yZConstructionPlane,
                                  "b10_x", "B10_Front_Pl")
-    sk, pr = af.sketch_rect_model(b10_c, b10_front_pl,
+    sk, pr = sp.sketch_rect_model(b10_c, b10_front_pl,
         ("b10_x", "b10_y", "0 in"),
         {"y": "b10_w", "z": "b10_h"}, "B10_Front_Sk", ctx.ev)
-    b10_front = af.ext_new(b10_c, pr, "b10_t", "B10_Front").bodies.item(0)
+    b10_front = sp.ext_new(b10_c, pr, "b10_t", "B10_Front").bodies.item(0)
     b10_front.name = "B10_Front"
 
     # Back (pin board): at x=b10_x+b10_l-b10_t
-    b10_back_pl = af.off_plane(b10_c, b10_c.yZConstructionPlane,
+    b10_back_pl = sp.off_plane(b10_c, b10_c.yZConstructionPlane,
                                 "b10_x + b10_l - b10_t", "B10_Back_Pl")
-    sk, pr = af.sketch_rect_model(b10_c, b10_back_pl,
+    sk, pr = sp.sketch_rect_model(b10_c, b10_back_pl,
         ("b10_x + b10_l - b10_t", "b10_y", "0 in"),
         {"y": "b10_w", "z": "b10_h"}, "B10_Back_Sk", ctx.ev)
-    b10_back = af.ext_new(b10_c, pr, "b10_t", "B10_Back").bodies.item(0)
+    b10_back = sp.ext_new(b10_c, pr, "b10_t", "B10_Back").bodies.item(0)
     b10_back.name = "B10_Back"
 
     # Left (tail board): spans Y×X at z=0, thin in Z, narrower in X
-    sk, pr = af.sketch_rect_model(b10_c, b10_c.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(b10_c, b10_c.xYConstructionPlane,
         ("b10_x + b10_t", "b10_y", "0 in"),
         {"x": "b10_l - 2 * b10_t", "y": "b10_w"}, "B10_Left_Sk", ctx.ev)
-    b10_left = af.ext_new(b10_c, pr, "b10_t", "B10_Left").bodies.item(0)
+    b10_left = sp.ext_new(b10_c, pr, "b10_t", "B10_Left").bodies.item(0)
     b10_left.name = "B10_Left"
 
     # Right (tail board): mirror of left across z_mid
-    b10_z_mid = af.off_plane(b10_c, b10_c.xYConstructionPlane,
+    b10_z_mid = sp.off_plane(b10_c, b10_c.xYConstructionPlane,
                               "b10_h / 2", "B10_ZMid")
-    b10_right_mir = af.mirror_body(b10_c, b10_left, b10_z_mid,
+    b10_right_mir = sp.mirror_body(b10_c, b10_left, b10_z_mid,
                                     "B10_RightMir")
     b10_right = b10_right_mir.bodies.item(0)
     b10_right.name = "B10_Right"
 
     # Midplanes for dovetail mirrors
-    b10_x_mid = af.off_plane(b10_c, b10_c.yZConstructionPlane,
+    b10_x_mid = sp.off_plane(b10_c, b10_c.yZConstructionPlane,
                               "b10_x + b10_l / 2", "B10_XMid")
-    b10_y_mid = af.off_plane(b10_c, b10_c.xYConstructionPlane,
+    b10_y_mid = sp.off_plane(b10_c, b10_c.xYConstructionPlane,
                               "b10_h / 2", "B10_YMid")
 
     # Dovetails: joint along Y, thick along X

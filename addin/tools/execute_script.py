@@ -324,14 +324,14 @@ DO refer to the documentation of the Fusion API by searching in the Python modul
 
 Workflow: Build complex models in phases (Structure → Joinery → Details). After each successful execution, call capture_design to validate body count and positions before proceeding to the next phase. On error, analyze the stack trace, fix the script, and re-execute (max 3 retries per distinct error). Failed scripts are automatically rolled back.
 
-Helper library: Scripts can `from helpers import af` to use shared utilities:
-- `af.DesignContext()` — replaces app/design/root/params/ev boilerplate
-- `af.find_face(body, axis, direction)` — outermost planar face along axis
-- `af.find_face_at(body, axis, position)` — planar face at specific coordinate
-- `af.sketch_rect(comp, plane, ...)` — parametric rectangle with H/V constraints
-- `af.sketch_rect_model(comp, plane, ...)` — parametric rectangle on any plane
-- `af.probe_sketch_axes(sk)` — detect model axis → sketch H/V mapping
-- `af.smallest_profile(sk)` — smallest-area profile in a sketch
+Helper library: Scripts can `from helpers import sp` to use shared utilities:
+- `sp.DesignContext()` — replaces app/design/root/params/ev boilerplate
+- `sp.find_face(body, axis, direction)` — outermost planar face along axis
+- `sp.find_face_at(body, axis, position)` — planar face at specific coordinate
+- `sp.sketch_rect(comp, plane, ...)` — parametric rectangle with H/V constraints
+- `sp.sketch_rect_model(comp, plane, ...)` — parametric rectangle on any plane
+- `sp.probe_sketch_axes(sk)` — detect model axis → sketch H/V mapping
+- `sp.smallest_profile(sk)` — smallest-area profile in a sketch
 
 Sandbox mode: Set sandbox=true to run the script in a temporary document. Returns a design snapshot without modifying the user's active document. Useful for validating scripts before committing to the real design.
 

@@ -14,7 +14,7 @@ Components:
 """
 import adsk.core, adsk.fusion
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import domino
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
@@ -64,9 +64,9 @@ def run(context):
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
-    leg_occ   = af.make_comp(root, "Legs")
-    apron_occ = af.make_comp(root, "Aprons")
-    seat_occ  = af.make_comp(root, "Seat")
+    leg_occ   = sp.make_comp(root, "Legs")
+    apron_occ = sp.make_comp(root, "Aprons")
+    seat_occ  = sp.make_comp(root, "Seat")
 
     leg_c   = leg_occ.component
     apron_c = apron_occ.component
@@ -75,22 +75,22 @@ def run(context):
     # ==============================================================
     #  1. LEGS
     # ==============================================================
-    _, pr = af.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "leg_size", "y": "leg_size"},
         "LegFL_Sk", ev)
-    fl_ext = af.ext_new(leg_c, pr, "leg_h", "LegFL")
+    fl_ext = sp.ext_new(leg_c, pr, "leg_h", "LegFL")
     leg_fl = fl_ext.bodies.item(0)
     leg_fl.name = "Leg_FL"
 
-    l_xmid = af.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
-    l_ymid = af.off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "LYMid")
+    l_xmid = sp.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
+    l_ymid = sp.off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "LYMid")
 
-    leg_fr = af.mirror_body(leg_c, leg_fl, l_xmid, "LegFR_Mir").bodies.item(0)
+    leg_fr = sp.mirror_body(leg_c, leg_fl, l_xmid, "LegFR_Mir").bodies.item(0)
     leg_fr.name = "Leg_FR"
-    leg_bl = af.mirror_body(leg_c, leg_fl, l_ymid, "LegBL_Mir").bodies.item(0)
+    leg_bl = sp.mirror_body(leg_c, leg_fl, l_ymid, "LegBL_Mir").bodies.item(0)
     leg_bl.name = "Leg_BL"
-    leg_br = af.mirror_body(leg_c, leg_fr, l_ymid, "LegBR_Mir").bodies.item(0)
+    leg_br = sp.mirror_body(leg_c, leg_fr, l_ymid, "LegBR_Mir").bodies.item(0)
     leg_br.name = "Leg_BR"
 
     print(">>> Legs: 4 bodies done")
@@ -98,52 +98,52 @@ def run(context):
     # ==============================================================
     #  2. APRONS — under seat
     # ==============================================================
-    apron_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "ApronZ_Pl")
+    apron_z_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "ApronZ_Pl")
 
     # Front apron (long)
-    _, pr = af.sketch_rect_model(apron_c, apron_z_pl,
+    _, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
         ("leg_size", "0 in", "apron_z"),
         {"x": "long_apron_l", "y": "apron_thick"},
         "FrontApron_Sk", ev)
-    fa_ext = af.ext_new(apron_c, pr, "apron_h", "FrontApron")
+    fa_ext = sp.ext_new(apron_c, pr, "apron_h", "FrontApron")
     fa_ext.bodies.item(0).name = "Apron_Front"
 
-    a_ymid = af.off_plane(apron_c, apron_c.xZConstructionPlane, "mid_y", "AYMid")
-    af.mirror_feats(apron_c, [fa_ext], a_ymid, "BackApronMir").bodies.item(0).name = "Apron_Back"
+    a_ymid = sp.off_plane(apron_c, apron_c.xZConstructionPlane, "mid_y", "AYMid")
+    sp.mirror_feats(apron_c, [fa_ext], a_ymid, "BackApronMir").bodies.item(0).name = "Apron_Back"
 
     # Left apron (short)
-    _, pr = af.sketch_rect_model(apron_c, apron_z_pl,
+    _, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
         ("0 in", "leg_size", "apron_z"),
         {"x": "apron_thick", "y": "short_apron_l"},
         "LeftApron_Sk", ev)
-    la_ext = af.ext_new(apron_c, pr, "apron_h", "LeftApron")
+    la_ext = sp.ext_new(apron_c, pr, "apron_h", "LeftApron")
     la_ext.bodies.item(0).name = "Apron_Left"
 
-    a_xmid = af.off_plane(apron_c, apron_c.yZConstructionPlane, "mid_x", "AXMid")
-    af.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir").bodies.item(0).name = "Apron_Right"
+    a_xmid = sp.off_plane(apron_c, apron_c.yZConstructionPlane, "mid_x", "AXMid")
+    sp.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir").bodies.item(0).name = "Apron_Right"
 
     # Stretchers (long, at lower height)
-    str_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, "stretcher_z", "StrZ_Pl")
-    _, pr = af.sketch_rect_model(apron_c, str_z_pl,
+    str_z_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, "stretcher_z", "StrZ_Pl")
+    _, pr = sp.sketch_rect_model(apron_c, str_z_pl,
         ("leg_size", "0 in", "stretcher_z"),
         {"x": "long_str_l", "y": "stretcher_thick"},
         "FrontStr_Sk", ev)
-    fs_ext = af.ext_new(apron_c, pr, "stretcher_h", "FrontStr")
+    fs_ext = sp.ext_new(apron_c, pr, "stretcher_h", "FrontStr")
     fs_ext.bodies.item(0).name = "Str_Front"
 
-    af.mirror_feats(apron_c, [fs_ext], a_ymid, "BackStrMir").bodies.item(0).name = "Str_Back"
+    sp.mirror_feats(apron_c, [fs_ext], a_ymid, "BackStrMir").bodies.item(0).name = "Str_Back"
 
     print(">>> Aprons + stretchers: 6 bodies done")
 
     # ==============================================================
     #  3. SEAT
     # ==============================================================
-    seat_pl = af.off_plane(seat_c, seat_c.xYConstructionPlane, "leg_h", "Seat_Pl")
-    _, pr = af.sketch_rect_model(seat_c, seat_pl,
+    seat_pl = sp.off_plane(seat_c, seat_c.xYConstructionPlane, "leg_h", "Seat_Pl")
+    _, pr = sp.sketch_rect_model(seat_c, seat_pl,
         ("0 in", "0 in", "leg_h"),
         {"x": "bench_l", "y": "bench_w"},
         "Seat_Sk", ev)
-    seat_ext = af.ext_new(seat_c, pr, "seat_thick", "SeatBoard")
+    seat_ext = sp.ext_new(seat_c, pr, "seat_thick", "SeatBoard")
     seat_ext.bodies.item(0).name = "Seat"
 
     print(">>> Seat: 1 body done")
@@ -186,10 +186,10 @@ def run(context):
     sb_p = sb_body.createForAssemblyContext(apron_occ)
 
     # Apron dominos (same pattern as coffee table)
-    dm_fl = af.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
-    dm_fr = af.off_plane(root, root.yZConstructionPlane, "bench_l - leg_size", "DM_FR")
-    dm_lf = af.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
-    dm_lb = af.off_plane(root, root.xZConstructionPlane, "bench_w - leg_size", "DM_LB")
+    dm_fl = sp.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
+    dm_fr = sp.off_plane(root, root.yZConstructionPlane, "bench_l - leg_size", "DM_FR")
+    dm_lf = sp.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
+    dm_lb = sp.off_plane(root, root.xZConstructionPlane, "bench_w - leg_size", "DM_LB")
 
     # Front apron → FL, FR legs
     domino.grid(root, dm_fl, ("leg_size", "apron_thick/2", "dm_apron_z"),
@@ -255,7 +255,7 @@ def run(context):
         print(f"{comp_name}: {len(names)} bodies -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
 
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

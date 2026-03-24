@@ -11,7 +11,7 @@ Coordinate system:
 """
 import adsk.core, adsk.fusion, math
 
-from helpers import af
+from helpers import sp
 from helpers.templates import domino
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
@@ -76,19 +76,19 @@ def run(context):
     rake_rad = math.radians(ev("back_rake"))
     cos_r, sin_r = math.cos(rake_rad), math.sin(rake_rad)
 
-    XMid = af.off_plane(root, root.yZConstructionPlane, "bench_l / 2", "XMid")
+    XMid = sp.off_plane(root, root.yZConstructionPlane, "bench_l / 2", "XMid")
 
     # ==============================================================
     #  1. LEGS — front legs + profiled back posts with smooth bend
     # ==============================================================
-    leg_occ = af.make_comp(root, "Legs")
+    leg_occ = sp.make_comp(root, "Legs")
     leg_c = leg_occ.component
 
-    _, pr = af.sketch_rect_model(leg_c, root.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(leg_c, root.xYConstructionPlane,
         ("0 in", "front_inset", "0 in"),
         {"x": "leg_size", "y": "leg_size"},
         "LegFL_Sk", ev=ev)
-    leg_fl = af.ext_new(leg_c, pr, "leg_h", "LegFL").bodies.item(0)
+    leg_fl = sp.ext_new(leg_c, pr, "leg_h", "LegFL").bodies.item(0)
     leg_fl.name = "Leg_FL"
 
     # Back-left post — profiled extrusion with square top
@@ -123,7 +123,7 @@ def run(context):
     l4 = lines.addByTwoPoints(l3.endSketchPoint, sp[5])
     l5 = lines.addByTwoPoints(l4.endSketchPoint, l0.startSketchPoint)
 
-    h_ax, v_ax = af.probe_sketch_axes(sk)
+    h_ax, v_ax = sp.probe_sketch_axes(sk)
     gc = sk.geometricConstraints
     if v_ax == "z":
         gc.addVertical(l0);  gc.addVertical(l4)
@@ -164,7 +164,7 @@ def run(context):
         leg_c.features.filletFeatures.add(fil_inp).name = "PostBL_Bend_Fil"
         print(f">>> Bend fillet: {bend_edges.count} edges")
 
-    mir = af.mirror_bodies(leg_c, [leg_fl, post_bl], XMid, "LegR_Mir")
+    mir = sp.mirror_bodies(leg_c, [leg_fl, post_bl], XMid, "LegR_Mir")
     leg_fr = mir.bodies.item(0); leg_fr.name = "Leg_FR"
     post_br = mir.bodies.item(1); post_br.name = "Post_BR"
 
@@ -173,35 +173,35 @@ def run(context):
     # ==============================================================
     #  2. APRONS
     # ==============================================================
-    apr_occ = af.make_comp(root, "Aprons")
+    apr_occ = sp.make_comp(root, "Aprons")
     apr_c = apr_occ.component
 
-    front_apr_pl = af.off_plane(apr_c, root.xZConstructionPlane,
+    front_apr_pl = sp.off_plane(apr_c, root.xZConstructionPlane,
         "front_inset", "FrontAprY_Pl")
-    _, pr = af.sketch_rect_model(apr_c, front_apr_pl,
+    _, pr = sp.sketch_rect_model(apr_c, front_apr_pl,
         ("leg_size", "front_inset", "apron_z"),
         {"x": "inner_l", "z": "apron_h"},
         "AprFront_Sk", ev=ev)
-    apr_front = af.ext_new(apr_c, pr, "apron_thick", "AprFront").bodies.item(0)
+    apr_front = sp.ext_new(apr_c, pr, "apron_thick", "AprFront").bodies.item(0)
     apr_front.name = "Apron_Front"
 
-    back_apr_pl = af.off_plane(apr_c, root.xZConstructionPlane,
+    back_apr_pl = sp.off_plane(apr_c, root.xZConstructionPlane,
         "bench_d - leg_size + (leg_size - apron_thick) / 2", "BackAprY_Pl")
-    _, pr = af.sketch_rect_model(apr_c, back_apr_pl,
+    _, pr = sp.sketch_rect_model(apr_c, back_apr_pl,
         ("leg_size", "0 in", "apron_z"),
         {"x": "inner_l", "z": "apron_h"},
         "AprBack_Sk", ev=ev)
-    apr_back = af.ext_new(apr_c, pr, "apron_thick", "AprBack").bodies.item(0)
+    apr_back = sp.ext_new(apr_c, pr, "apron_thick", "AprBack").bodies.item(0)
     apr_back.name = "Apron_Back"
 
-    _, pr = af.sketch_rect_model(apr_c, root.yZConstructionPlane,
+    _, pr = sp.sketch_rect_model(apr_c, root.yZConstructionPlane,
         ("0 in", "front_inset + leg_size", "apron_z"),
         {"y": "inner_d", "z": "apron_h"},
         "AprLeft_Sk", ev=ev)
-    apr_left = af.ext_new(apr_c, pr, "apron_thick", "AprLeft").bodies.item(0)
+    apr_left = sp.ext_new(apr_c, pr, "apron_thick", "AprLeft").bodies.item(0)
     apr_left.name = "Apron_Left"
 
-    apr_right = af.mirror_body(apr_c, apr_left, XMid, "AprRight_Mir").bodies.item(0)
+    apr_right = sp.mirror_body(apr_c, apr_left, XMid, "AprRight_Mir").bodies.item(0)
     apr_right.name = "Apron_Right"
 
     print(f">>> Aprons: {apr_c.bRepBodies.count} bodies")
@@ -209,16 +209,16 @@ def run(context):
     # ==============================================================
     #  3. BACK — back board (raked to match post angle)
     # ==============================================================
-    back_occ = af.make_comp(root, "Back")
+    back_occ = sp.make_comp(root, "Back")
     back_c = back_occ.component
 
-    bb_y_pl = af.off_plane(back_c, root.xZConstructionPlane,
+    bb_y_pl = sp.off_plane(back_c, root.xZConstructionPlane,
         "bench_d - leg_size + (leg_size - back_board_t) / 2", "BackBoardY_Pl")
-    _, pr = af.sketch_rect_model(back_c, bb_y_pl,
+    _, pr = sp.sketch_rect_model(back_c, bb_y_pl,
         ("leg_size", "0 in", "back_board_z"),
         {"x": "inner_l", "z": "back_board_w"},
         "BackBoard_Sk", ev=ev)
-    back_board = af.ext_new(back_c, pr, "back_board_t", "BackBoard").bodies.item(0)
+    back_board = sp.ext_new(back_c, pr, "back_board_t", "BackBoard").bodies.item(0)
     back_board.name = "Back_Board"
 
     # Rotate board to match post rake — pivot at bend point
@@ -235,16 +235,16 @@ def run(context):
     # ==============================================================
     #  4. SEAT
     # ==============================================================
-    seat_occ = af.make_comp(root, "Seat")
+    seat_occ = sp.make_comp(root, "Seat")
     seat_c = seat_occ.component
 
-    seat_z_pl = af.off_plane(seat_c, root.xYConstructionPlane,
+    seat_z_pl = sp.off_plane(seat_c, root.xYConstructionPlane,
         "seat_h - seat_thick", "SeatZ_Pl")
-    _, pr = af.sketch_rect_model(seat_c, seat_z_pl,
+    _, pr = sp.sketch_rect_model(seat_c, seat_z_pl,
         ("0 in", "0 in", "seat_h - seat_thick"),
         {"x": "bench_l", "y": "bench_d"},
         "Seat_Sk", ev=ev)
-    seat_body = af.ext_new(seat_c, pr, "seat_thick", "SeatBoard").bodies.item(0)
+    seat_body = sp.ext_new(seat_c, pr, "seat_thick", "SeatBoard").bodies.item(0)
     seat_body.name = "Seat"
 
     print(f">>> Seat: {seat_c.bRepBodies.count} body")
@@ -263,10 +263,10 @@ def run(context):
     bb_p = back_board.createForAssemblyContext(back_occ)
     seat_p = seat_body.createForAssemblyContext(seat_occ)
 
-    dm_yz_l = af.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_YZ_L")
-    dm_yz_r = af.off_plane(root, root.yZConstructionPlane, "bench_l - leg_size", "DM_YZ_R")
-    dm_xz_f = af.off_plane(root, root.xZConstructionPlane, "front_inset + leg_size", "DM_XZ_F")
-    dm_xz_b = af.off_plane(root, root.xZConstructionPlane, "bench_d - leg_size", "DM_XZ_B")
+    dm_yz_l = sp.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_YZ_L")
+    dm_yz_r = sp.off_plane(root, root.yZConstructionPlane, "bench_l - leg_size", "DM_YZ_R")
+    dm_xz_f = sp.off_plane(root, root.xZConstructionPlane, "front_inset + leg_size", "DM_XZ_F")
+    dm_xz_b = sp.off_plane(root, root.xZConstructionPlane, "bench_d - leg_size", "DM_XZ_B")
 
     # Apron dominos
     domino.grid(root, dm_yz_l,
@@ -333,7 +333,7 @@ def run(context):
     print(f">>> Dominos done: {root.bRepBodies.count} voids in root")
 
     # Seat notches
-    af.combine(root, seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
+    sp.combine(root, seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
 
     print(">>> Joinery done")
 
@@ -342,7 +342,7 @@ def run(context):
     # ==============================================================
     # --- Seat front fillet (generous rounding on front edge) ---
     seat_p = seat_body.createForAssemblyContext(seat_occ)
-    seat_front = af.find_face(seat_p, "y", -1)
+    seat_front = sp.find_face(seat_p, "y", -1)
     front_edges = adsk.core.ObjectCollection.create()
     fe_added = set()
     for i in range(seat_front.edges.count):
@@ -356,7 +356,7 @@ def run(context):
 
     # --- Seat top edge fillet (remaining edges) ---
     seat_p = seat_body.createForAssemblyContext(seat_occ)
-    seat_top = af.find_face(seat_p, "z", +1)
+    seat_top = sp.find_face(seat_p, "z", +1)
     top_edges = adsk.core.ObjectCollection.create()
     te_added = set()
     for i in range(seat_top.edges.count):
@@ -385,7 +385,7 @@ def run(context):
     for body, name in [(leg_fl, "LegFL"), (leg_fr, "LegFR"),
                        (post_bl, "PostBL"), (post_br, "PostBR")]:
         proxy = body.createForAssemblyContext(leg_occ)
-        bot = af.find_face(proxy, "z", -1)
+        bot = sp.find_face(proxy, "z", -1)
         ch_edges = adsk.core.ObjectCollection.create()
         ch_added = set()
         for i in range(bot.edges.count):
@@ -469,7 +469,7 @@ def run(context):
         print(f"{cn}: {len(names)} -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
 
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

@@ -1,7 +1,7 @@
 """Counter Stool — Parametric Fusion 360 Model
 Splayed legs with through-tenons, stretchers with stopped tenons, footrest."""
 import adsk.core, adsk.fusion, math
-from helpers import af
+from helpers import sp
 
 
 def run(context):
@@ -68,24 +68,24 @@ def run(context):
         params.add(name, VI(expr), unit, comment)
 
     # ── MIDPLANES ─────────────────────────────────────────────────
-    XMid = af.off_plane(root, root.yZConstructionPlane, "seat_l / 2", "XMid")
-    YMid = af.off_plane(root, root.xZConstructionPlane, "seat_w / 2", "YMid")
+    XMid = sp.off_plane(root, root.yZConstructionPlane, "seat_l / 2", "XMid")
+    YMid = sp.off_plane(root, root.xZConstructionPlane, "seat_w / 2", "YMid")
 
     # ── SEAT ──────────────────────────────────────────────────────
-    Seat_Pl = af.off_plane(root, root.xYConstructionPlane, "seat_z", "Seat_Pl")
+    Seat_Pl = sp.off_plane(root, root.xYConstructionPlane, "seat_z", "Seat_Pl")
 
-    sk, prof = af.sketch_rect_model(root, Seat_Pl,
+    sk, prof = sp.sketch_rect_model(root, Seat_Pl,
         ("0 in", "0 in", "seat_z"),
         {"x": "seat_l", "y": "seat_w"},
         "Seat_Sk", ev=ev)
-    SeatBoard = af.ext_new(root, prof, "seat_t", "SeatBoard")
+    SeatBoard = sp.ext_new(root, prof, "seat_t", "SeatBoard")
     Seat = SeatBoard.bodies.item(0)
     Seat.name = "Seat"
 
     # ── NEAR-LEFT LEG ─────────────────────────────────────────────
     # Trapezoid sketch on XZ plane offset to leg front face.
     # X-splay is built into the trapezoid; Y-splay applied via Move.
-    LegFront_Pl = af.off_plane(root, root.xZConstructionPlane,
+    LegFront_Pl = sp.off_plane(root, root.xZConstructionPlane,
         "leg_inset_y - leg_d / 2", "LegFront_Pl")
 
     Leg_NL_Sk = root.sketches.add(LegFront_Pl)
@@ -136,7 +136,7 @@ def run(context):
     d.addDistanceDimension(ln_top.startSketchPoint, ln_bot.endSketchPoint,
         V, P(0, 0, 0)).parameter.expression = "leg_top_z"
 
-    Leg_NL_ext = af.ext_new(root, Leg_NL_Sk.profiles.item(0), "leg_d", "Leg_NL")
+    Leg_NL_ext = sp.ext_new(root, Leg_NL_Sk.profiles.item(0), "leg_d", "Leg_NL")
     Leg_NL_b = Leg_NL_ext.bodies.item(0)
     Leg_NL_b.name = "Leg_NL"
 
@@ -172,19 +172,19 @@ def run(context):
             Leg_NL_b = b
         elif b.name == "Seat":
             Seat_tmp = b
-    af.combine(root, Leg_NL_b, [Seat_tmp], CUT, True, "LegTrim_NL")
+    sp.combine(root, Leg_NL_b, [Seat_tmp], CUT, True, "LegTrim_NL")
 
     # ── MIRROR LEGS ────────────────────────────────────────────────
 
     # Mirror NL across YMid → NR
-    NR_mir = af.mirror_bodies(root, [Leg_NL_b], YMid, "Leg_NR_Mir")
+    NR_mir = sp.mirror_bodies(root, [Leg_NL_b], YMid, "Leg_NR_Mir")
     Leg_NR = NR_mir.bodies.item(0)
     Leg_NR.name = "Leg_NR"
     Leg_NL = NR_mir.bodies.item(1)
     Leg_NL.name = "Leg_NL"
 
     # Mirror NL+NR across XMid → FL, FR
-    Far_mir = af.mirror_bodies(root, [Leg_NL, Leg_NR], XMid, "Legs_Far_Mir")
+    Far_mir = sp.mirror_bodies(root, [Leg_NL, Leg_NR], XMid, "Legs_Far_Mir")
     Leg_FL = Far_mir.bodies.item(0)
     Leg_FL.name = "Leg_FL"
     Leg_FR = Far_mir.bodies.item(1)
@@ -260,19 +260,19 @@ def run(context):
     _, dm_prof = sketch_slot(Seat_Pl,
         "leg_inset_x", "leg_inset_y", "dm_w", "dm_t",
         vertical=False, name="DM_NL_Sk")
-    DM_NL = af.ext_new_sym(root, dm_prof, "dm_d", "DM_NL")
+    DM_NL = sp.ext_new_sym(root, dm_prof, "dm_d", "DM_NL")
     DM_NL_b = DM_NL.bodies.item(0)
     DM_NL_b.name = "DM_NL"
 
     # Mirror NL → NR across YMid
-    DM_NR_mir = af.mirror_bodies(root, [DM_NL_b], YMid, "DM_NR_Mir")
+    DM_NR_mir = sp.mirror_bodies(root, [DM_NL_b], YMid, "DM_NR_Mir")
     DM_NR_b = DM_NR_mir.bodies.item(0)
     DM_NR_b.name = "DM_NR"
     DM_NL_b = DM_NR_mir.bodies.item(1)
     DM_NL_b.name = "DM_NL"
 
     # Mirror NL+NR → FL, FR across XMid
-    DM_Far_mir = af.mirror_bodies(root, [DM_NL_b, DM_NR_b], XMid, "DM_Far_Mir")
+    DM_Far_mir = sp.mirror_bodies(root, [DM_NL_b, DM_NR_b], XMid, "DM_Far_Mir")
     DM_FL_b = DM_Far_mir.bodies.item(0)
     DM_FL_b.name = "DM_FL"
     DM_FR_b = DM_Far_mir.bodies.item(1)
@@ -291,13 +291,13 @@ def run(context):
             break
 
     # CUT all 4 domino voids into seat (keepTool=True — dominos visible)
-    af.combine(root, Seat, [DM_NL_b, DM_NR_b, DM_FL_b, DM_FR_b], CUT, True, "DM_Seat_Cut")
+    sp.combine(root, Seat, [DM_NL_b, DM_NR_b, DM_FL_b, DM_FR_b], CUT, True, "DM_Seat_Cut")
 
     # CUT each domino into its leg (keepTool=True)
-    af.combine(root, Leg_NL, [DM_NL_b], CUT, True, "DM_Leg_NL")
-    af.combine(root, Leg_NR, [DM_NR_b], CUT, True, "DM_Leg_NR")
-    af.combine(root, Leg_FL, [DM_FL_b], CUT, True, "DM_Leg_FL")
-    af.combine(root, Leg_FR, [DM_FR_b], CUT, True, "DM_Leg_FR")
+    sp.combine(root, Leg_NL, [DM_NL_b], CUT, True, "DM_Leg_NL")
+    sp.combine(root, Leg_NR, [DM_NR_b], CUT, True, "DM_Leg_NR")
+    sp.combine(root, Leg_FL, [DM_FL_b], CUT, True, "DM_Leg_FL")
+    sp.combine(root, Leg_FR, [DM_FR_b], CUT, True, "DM_Leg_FR")
 
     # ── STRETCHER DERIVED PARAMS ───────────────────────────────────
     # Splay-adjusted lengths ensure stretchers reach into legs at any splay angle
@@ -338,11 +338,11 @@ def run(context):
     def angled_tenon_end(str_body, leg_body, str_plane, axis, direction, name):
         """CUT leg from stretcher -> sketch tenon on angled face -> sweep -> JOIN."""
         # Step 1: CUT leg from stretcher -> angled mating face
-        af.combine(root, str_body, [leg_body], CUT, True, f"{name}_LegCut")
+        sp.combine(root, str_body, [leg_body], CUT, True, f"{name}_LegCut")
         str_body = find_body(str_body.name)
 
         # Step 2: Find angled face + sketch tenon
-        face = af.find_face(str_body, axis, direction)
+        face = sp.find_face(str_body, axis, direction)
         sk = root.sketches.add(face)
         sk.name = f"{name}_Sk"
         m2s_fn = sk.modelToSketchSpace
@@ -363,7 +363,7 @@ def run(context):
         _gc.addHorizontal(rect[0]); _gc.addHorizontal(rect[2])
         _gc.addVertical(rect[1]); _gc.addVertical(rect[3])
 
-        h_ax, v_ax = af.probe_sketch_axes(sk)
+        h_ax, v_ax = sp.probe_sketch_axes(sk)
         h_expr = "st_w" if h_ax == "z" else "st_d"
         v_expr = "st_w" if v_ax == "z" else "st_d"
 
@@ -409,7 +409,7 @@ def run(context):
         tenon_body.name = f"{name}_Tenon"
 
         # Step 5: JOIN tenon to stretcher
-        af.combine(root, str_body, [tenon_body], JOIN, False, f"{name}_Join")
+        sp.combine(root, str_body, [tenon_body], JOIN, False, f"{name}_Join")
         return find_body(str_body.name)
 
     # ── BACK STRETCHER ────────────────────────────────────────────
@@ -419,7 +419,7 @@ def run(context):
     bstr_y_c = ev("seat_w") - ev("leg_inset_y") + bstr_sy_v
     bstr_z_c = ev("front_str_h")
 
-    BStr_Pl = af.off_plane(root, root.xYConstructionPlane, "front_str_h", "BStr_Pl")
+    BStr_Pl = sp.off_plane(root, root.xYConstructionPlane, "front_str_h", "BStr_Pl")
     BStr_Sk = root.sketches.add(BStr_Pl)
     BStr_Sk.name = "BStr_Sk"
     m2s = BStr_Sk.modelToSketchSpace
@@ -437,7 +437,7 @@ def run(context):
     d.addDistanceDimension(rect[1].startSketchPoint, rect[1].endSketchPoint,
         V, P(s1.x + 1, (s0.y + s1.y) / 2, 0)).parameter.expression = "str_w"
 
-    BStr_ext = af.ext_new_sym(root, BStr_Sk.profiles.item(0), "str_t / 2", "BStr")
+    BStr_ext = sp.ext_new_sym(root, BStr_Sk.profiles.item(0), "str_t / 2", "BStr")
     Str_Back = BStr_ext.bodies.item(0)
     Str_Back.name = "Str_Back"
 
@@ -466,7 +466,7 @@ def run(context):
     Str_Back = angled_tenon_end(Str_Back, Leg_FR, BStr_Pl, "x", +1, "BStr_TnR")
 
     # Mirror back stretcher across YMid → front stretcher
-    FStr_mir = af.mirror_bodies(root, [Str_Back], YMid, "FStr_Mir")
+    FStr_mir = sp.mirror_bodies(root, [Str_Back], YMid, "FStr_Mir")
     Str_Front = FStr_mir.bodies.item(0)
     Str_Front.name = "Str_Front"
     Str_Back = FStr_mir.bodies.item(1)
@@ -479,7 +479,7 @@ def run(context):
     sstr_y0 = ev("leg_inset_y") - sstr_sy_v + ev("leg_d") / 2 - ev("st_l")
     sstr_z_c = ev("side_str_h")
 
-    SStr_Pl = af.off_plane(root, root.xYConstructionPlane, "side_str_h", "SStr_Pl")
+    SStr_Pl = sp.off_plane(root, root.xYConstructionPlane, "side_str_h", "SStr_Pl")
     SStr_Sk = root.sketches.add(SStr_Pl)
     SStr_Sk.name = "SStr_Sk"
     m2s = SStr_Sk.modelToSketchSpace
@@ -497,7 +497,7 @@ def run(context):
     d.addDistanceDimension(rect[1].startSketchPoint, rect[1].endSketchPoint,
         V, P(s1.x + 1, (s0.y + s1.y) / 2, 0)).parameter.expression = "sstr_len"
 
-    SStr_ext = af.ext_new_sym(root, SStr_Sk.profiles.item(0), "str_t / 2", "SStr")
+    SStr_ext = sp.ext_new_sym(root, SStr_Sk.profiles.item(0), "str_t / 2", "SStr")
     SStr_b = SStr_ext.bodies.item(0)
     SStr_b.name = "Str_Left"
 
@@ -526,7 +526,7 @@ def run(context):
     SStr_b = angled_tenon_end(SStr_b, Leg_NR, SStr_Pl, "y", +1, "SStr_TnF")
 
     # Mirror side stretcher across XMid → right side
-    RStr_mir = af.mirror_bodies(root, [SStr_b], XMid, "RStr_Mir")
+    RStr_mir = sp.mirror_bodies(root, [SStr_b], XMid, "RStr_Mir")
     Str_Right = RStr_mir.bodies.item(0)
     Str_Right.name = "Str_Right"
     SStr_b = RStr_mir.bodies.item(1)
@@ -539,7 +539,7 @@ def run(context):
     fr_y_c = ev("leg_inset_y") - bstr_sy_v2  # front stretcher Y center
     fr_z_c = ev("front_str_h") + ev("str_t") / 2 + ev("fr_t") / 2
 
-    FR_Pl = af.off_plane(root, root.xYConstructionPlane,
+    FR_Pl = sp.off_plane(root, root.xYConstructionPlane,
         "front_str_h + str_t / 2 + fr_t / 2", "FR_Pl")
     FR_Sk = root.sketches.add(FR_Pl)
     FR_Sk.name = "FR_Sk"
@@ -558,17 +558,17 @@ def run(context):
     d.addDistanceDimension(rect[1].startSketchPoint, rect[1].endSketchPoint,
         V, P(s1.x + 1, (s0.y + s1.y) / 2, 0)).parameter.expression = "fr_w"
 
-    FR_ext = af.ext_new_sym(root, FR_Sk.profiles.item(0), "fr_t / 2", "FootrestExt")
+    FR_ext = sp.ext_new_sym(root, FR_Sk.profiles.item(0), "fr_t / 2", "FootrestExt")
     FR_b = FR_ext.bodies.item(0)
     FR_b.name = "Footrest"
 
     # Trim footrest where it overlaps front legs
-    af.combine(root, FR_b, [Leg_NL], CUT, True, "FR_LegTrim_NL")
+    sp.combine(root, FR_b, [Leg_NL], CUT, True, "FR_LegTrim_NL")
     FR_b = find_body("Footrest")
-    af.combine(root, FR_b, [Leg_FL], CUT, True, "FR_LegTrim_FL")
+    sp.combine(root, FR_b, [Leg_FL], CUT, True, "FR_LegTrim_FL")
     FR_b = find_body("Footrest")
     Str_Front = find_body("Str_Front")
-    af.combine(root, FR_b, [Str_Front], CUT, True, "FR_FStrTrim")
+    sp.combine(root, FR_b, [Str_Front], CUT, True, "FR_FStrTrim")
 
     # ── STRETCHER MORTISES (CUT into legs) ────────────────────────
     legs = {n: find_body(n) for n in ["Leg_NL", "Leg_NR", "Leg_FL", "Leg_FR"]}
@@ -578,20 +578,20 @@ def run(context):
     Str_Right = find_body("Str_Right")
 
     # Back stretcher CUTs NR and FR legs
-    af.combine(root, legs["Leg_NR"], [Str_Back], CUT, True, "BStr_Mort_NR")
-    af.combine(root, legs["Leg_FR"], [Str_Back], CUT, True, "BStr_Mort_FR")
+    sp.combine(root, legs["Leg_NR"], [Str_Back], CUT, True, "BStr_Mort_NR")
+    sp.combine(root, legs["Leg_FR"], [Str_Back], CUT, True, "BStr_Mort_FR")
 
     # Front stretcher CUTs NL and FL legs
-    af.combine(root, legs["Leg_NL"], [Str_Front], CUT, True, "FStr_Mort_NL")
-    af.combine(root, legs["Leg_FL"], [Str_Front], CUT, True, "FStr_Mort_FL")
+    sp.combine(root, legs["Leg_NL"], [Str_Front], CUT, True, "FStr_Mort_NL")
+    sp.combine(root, legs["Leg_FL"], [Str_Front], CUT, True, "FStr_Mort_FL")
 
     # Left side stretcher CUTs NL and NR legs
-    af.combine(root, legs["Leg_NL"], [Str_Left], CUT, True, "SStr_Mort_NL")
-    af.combine(root, legs["Leg_NR"], [Str_Left], CUT, True, "SStr_Mort_NR")
+    sp.combine(root, legs["Leg_NL"], [Str_Left], CUT, True, "SStr_Mort_NL")
+    sp.combine(root, legs["Leg_NR"], [Str_Left], CUT, True, "SStr_Mort_NR")
 
     # Right side stretcher CUTs FL and FR legs
-    af.combine(root, legs["Leg_FL"], [Str_Right], CUT, True, "SStr_Mort_FL")
-    af.combine(root, legs["Leg_FR"], [Str_Right], CUT, True, "SStr_Mort_FR")
+    sp.combine(root, legs["Leg_FL"], [Str_Right], CUT, True, "SStr_Mort_FL")
+    sp.combine(root, legs["Leg_FR"], [Str_Right], CUT, True, "SStr_Mort_FR")
 
     # ── DETAILS: CHAMFERS ───────────────────────────────────────────
     # Chamfer seat top edges
@@ -602,7 +602,7 @@ def run(context):
             break
 
     if Seat:
-        top_face = af.find_face(Seat, "z", +1)
+        top_face = sp.find_face(Seat, "z", +1)
         if top_face:
             edges = adsk.core.ObjectCollection.create()
             added = set()
@@ -626,7 +626,7 @@ def run(context):
                 leg = root.bRepBodies.item(i)
                 break
         if leg:
-            bot_face = af.find_face(leg, "z", -1)
+            bot_face = sp.find_face(leg, "z", -1)
             if bot_face:
                 edges = adsk.core.ObjectCollection.create()
                 added = set()
@@ -656,7 +656,7 @@ def run(context):
     names = [root.bRepBodies.item(i).name for i in range(root.bRepBodies.count)]
     print(f"Root: {len(names)} bodies -> {names}")
 
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

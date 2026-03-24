@@ -13,7 +13,7 @@ Components:
 """
 import adsk.core, adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -57,8 +57,8 @@ def run(context):
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
-    frame_occ = af.make_comp(root, "Frame")
-    glass_occ = af.make_comp(root, "Glass")
+    frame_occ = sp.make_comp(root, "Frame")
+    glass_occ = sp.make_comp(root, "Glass")
     frame_c = frame_occ.component
     glass_c = glass_occ.component
 
@@ -66,32 +66,32 @@ def run(context):
     #  1. FRAME — 4 boards with rabbet
     # ==============================================================
     # Bottom rail: X=0..outer_w, Z=0..frame_w, extrude frame_thick in Y
-    _, pr = af.sketch_rect_model(frame_c, frame_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(frame_c, frame_c.xZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "outer_w", "z": "frame_w"},
         "Bottom_Sk", ev)
-    bot_ext = af.ext_new(frame_c, pr, "frame_thick", "BottomRail")
+    bot_ext = sp.ext_new(frame_c, pr, "frame_thick", "BottomRail")
     bottom = bot_ext.bodies.item(0)
     bottom.name = "Bottom"
 
     # Top rail: mirror across ZMid
-    z_mid = af.off_plane(frame_c, frame_c.xYConstructionPlane, "mid_z", "ZMid")
-    top_mir = af.mirror_feats(frame_c, [bot_ext], z_mid, "TopMir")
+    z_mid = sp.off_plane(frame_c, frame_c.xYConstructionPlane, "mid_z", "ZMid")
+    top_mir = sp.mirror_feats(frame_c, [bot_ext], z_mid, "TopMir")
     top_body = top_mir.bodies.item(0)
     top_body.name = "Top"
 
     # Left stile: X=0..frame_w, Z=frame_w..outer_h-frame_w (between rails)
-    _, pr = af.sketch_rect_model(frame_c, frame_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(frame_c, frame_c.xZConstructionPlane,
         ("0 in", "0 in", "frame_w"),
         {"x": "frame_w", "z": "inner_h"},
         "Left_Sk", ev)
-    left_ext = af.ext_new(frame_c, pr, "frame_thick", "LeftStile")
+    left_ext = sp.ext_new(frame_c, pr, "frame_thick", "LeftStile")
     left = left_ext.bodies.item(0)
     left.name = "Left"
 
     # Right stile: mirror across XMid
-    x_mid = af.off_plane(frame_c, frame_c.yZConstructionPlane, "mid_x", "XMid")
-    right_mir = af.mirror_feats(frame_c, [left_ext], x_mid, "RightMir")
+    x_mid = sp.off_plane(frame_c, frame_c.yZConstructionPlane, "mid_x", "XMid")
+    right_mir = sp.mirror_feats(frame_c, [left_ext], x_mid, "RightMir")
     right = right_mir.bodies.item(0)
     right.name = "Right"
 
@@ -103,33 +103,33 @@ def run(context):
     #     at the back face, removing rabbet_d deep × rabbet_w wide
     # ==============================================================
     # Rabbet tool: inner rectangle at back face
-    rab_pl = af.off_plane(frame_c, frame_c.xZConstructionPlane,
+    rab_pl = sp.off_plane(frame_c, frame_c.xZConstructionPlane,
                            "frame_thick - rabbet_w", "Rabbet_Pl")
-    _, pr = af.sketch_rect_model(frame_c, rab_pl,
+    _, pr = sp.sketch_rect_model(frame_c, rab_pl,
         ("frame_w - rabbet_d", "frame_thick - rabbet_w", "frame_w - rabbet_d"),
         {"x": "inner_w + 2 * rabbet_d", "z": "inner_h + 2 * rabbet_d"},
         "Rabbet_Sk", ev)
-    rab_ext = af.ext_new(frame_c, pr, "rabbet_w", "RabbetTool")
+    rab_ext = sp.ext_new(frame_c, pr, "rabbet_w", "RabbetTool")
     rab_body = rab_ext.bodies.item(0)
 
     # CUT rabbet into all 4 frame pieces
-    af.combine(frame_c, bottom, [rab_body], CUT, True, "Rab_Bot")
-    af.combine(frame_c, top_body, [rab_body], CUT, True, "Rab_Top")
-    af.combine(frame_c, left, [rab_body], CUT, True, "Rab_Left")
-    af.combine(frame_c, right, [rab_body], CUT, False, "Rab_Right")  # consumes tool
+    sp.combine(frame_c, bottom, [rab_body], CUT, True, "Rab_Bot")
+    sp.combine(frame_c, top_body, [rab_body], CUT, True, "Rab_Top")
+    sp.combine(frame_c, left, [rab_body], CUT, True, "Rab_Left")
+    sp.combine(frame_c, right, [rab_body], CUT, False, "Rab_Right")  # consumes tool
 
     print(">>> Rabbets cut into all 4 frame pieces")
 
     # ==============================================================
     #  3. GLASS — placeholder body in the rabbet
     # ==============================================================
-    glass_pl = af.off_plane(glass_c, glass_c.xZConstructionPlane,
+    glass_pl = sp.off_plane(glass_c, glass_c.xZConstructionPlane,
                              "frame_thick - rabbet_w", "Glass_Pl")
-    _, pr = af.sketch_rect_model(glass_c, glass_pl,
+    _, pr = sp.sketch_rect_model(glass_c, glass_pl,
         ("frame_w", "frame_thick - rabbet_w", "frame_w"),
         {"x": "mirror_w", "z": "mirror_h"},
         "Glass_Sk", ev)
-    glass_ext = af.ext_new(glass_c, pr, "glass_thick", "GlassPanel")
+    glass_ext = sp.ext_new(glass_c, pr, "glass_thick", "GlassPanel")
     glass_body = glass_ext.bodies.item(0)
     glass_body.name = "Glass"
 
@@ -148,7 +148,7 @@ def run(context):
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{comp_name}: {len(names)} bodies -> {names}")
 
-    af.apply_appearance("walnut")
+    sp.apply_appearance("walnut")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

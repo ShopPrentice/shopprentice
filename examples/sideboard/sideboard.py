@@ -9,7 +9,7 @@ Coordinate system:
 """
 import adsk.core, adsk.fusion
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import dovetailed_drawer
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
@@ -69,12 +69,12 @@ def run(context):
 
     print(">>> Parameters done")
 
-    case_occ   = af.make_comp(root, "Case")
-    top_occ    = af.make_comp(root, "Top")
-    kick_occ   = af.make_comp(root, "Kick")
-    door_occ   = af.make_comp(root, "Doors")
-    drawer_occ = af.make_comp(root, "Drawer")
-    back_occ   = af.make_comp(root, "Back")
+    case_occ   = sp.make_comp(root, "Case")
+    top_occ    = sp.make_comp(root, "Top")
+    kick_occ   = sp.make_comp(root, "Kick")
+    door_occ   = sp.make_comp(root, "Doors")
+    drawer_occ = sp.make_comp(root, "Drawer")
+    back_occ   = sp.make_comp(root, "Back")
 
     case_c   = case_occ.component
     top_c    = top_occ.component
@@ -85,79 +85,79 @@ def run(context):
 
     # ==== CASE: sides + bottom + 2 dividers ====
     # Left side
-    _, pr = af.sketch_rect_model(case_c, case_c.yZConstructionPlane,
+    _, pr = sp.sketch_rect_model(case_c, case_c.yZConstructionPlane,
         ("0 in", "0 in", "kick_h"),
         {"y": "case_d", "z": "case_h - kick_h - top_thick"}, "LeftSide_Sk", ev)
-    ls_ext = af.ext_new(case_c, pr, "board_thick", "LeftSide")
+    ls_ext = sp.ext_new(case_c, pr, "board_thick", "LeftSide")
     ls_ext.bodies.item(0).name = "Side_Left"
 
-    x_mid = af.off_plane(case_c, case_c.yZConstructionPlane, "mid_x", "XMid")
-    af.mirror_feats(case_c, [ls_ext], x_mid, "RightMir").bodies.item(0).name = "Side_Right"
+    x_mid = sp.off_plane(case_c, case_c.yZConstructionPlane, "mid_x", "XMid")
+    sp.mirror_feats(case_c, [ls_ext], x_mid, "RightMir").bodies.item(0).name = "Side_Right"
 
     # Bottom board
-    bot_pl = af.off_plane(case_c, case_c.xYConstructionPlane, "kick_h", "Bot_Pl")
-    _, pr = af.sketch_rect_model(case_c, bot_pl,
+    bot_pl = sp.off_plane(case_c, case_c.xYConstructionPlane, "kick_h", "Bot_Pl")
+    _, pr = sp.sketch_rect_model(case_c, bot_pl,
         ("board_thick", "0 in", "kick_h"),
         {"x": "inner_w", "y": "case_d"}, "Bottom_Sk", ev)
-    af.ext_new(case_c, pr, "board_thick", "BottomBoard").bodies.item(0).name = "Bottom"
+    sp.ext_new(case_c, pr, "board_thick", "BottomBoard").bodies.item(0).name = "Bottom"
 
     # Left divider
-    div_l_pl = af.off_plane(case_c, case_c.yZConstructionPlane,
+    div_l_pl = sp.off_plane(case_c, case_c.yZConstructionPlane,
         "board_thick + section_w", "DivL_Pl")
-    _, pr = af.sketch_rect_model(case_c, div_l_pl,
+    _, pr = sp.sketch_rect_model(case_c, div_l_pl,
         ("board_thick + section_w", "0 in", "kick_h + board_thick"),
         {"y": "case_d - back_thick", "z": "inner_h"}, "DivL_Sk", ev)
-    af.ext_new(case_c, pr, "divider_thick", "DivLeft").bodies.item(0).name = "Div_Left"
+    sp.ext_new(case_c, pr, "divider_thick", "DivLeft").bodies.item(0).name = "Div_Left"
 
     # Right divider: mirror
-    af.mirror_feats(case_c, [case_c.features.extrudeFeatures.itemByName("DivLeft")],
+    sp.mirror_feats(case_c, [case_c.features.extrudeFeatures.itemByName("DivLeft")],
                      x_mid, "DivRightMir").bodies.item(0).name = "Div_Right"
 
     print(">>> Case: 5 bodies (2 sides, bottom, 2 dividers)")
 
     # ==== TOP ====
-    _, pr = af.sketch_rect_model(top_c, top_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(top_c, top_c.xYConstructionPlane,
         ("-top_overhang", "-top_overhang", "top_z"),
         {"x": "case_w + 2 * top_overhang", "y": "case_d + top_overhang"},
         "Top_Sk", ev)
-    top_pl = af.off_plane(top_c, top_c.xYConstructionPlane, "top_z", "TopPl")
-    _, pr = af.sketch_rect_model(top_c, top_pl,
+    top_pl = sp.off_plane(top_c, top_c.xYConstructionPlane, "top_z", "TopPl")
+    _, pr = sp.sketch_rect_model(top_c, top_pl,
         ("-top_overhang", "-top_overhang", "top_z"),
         {"x": "case_w + 2 * top_overhang", "y": "case_d + top_overhang"},
         "Top_Sk2", ev)
-    af.ext_new(top_c, pr, "top_thick", "TopBoard").bodies.item(0).name = "Top"
+    sp.ext_new(top_c, pr, "top_thick", "TopBoard").bodies.item(0).name = "Top"
     print(">>> Top: 1")
 
     # ==== KICK ====
-    _, pr = af.sketch_rect_model(kick_c, kick_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(kick_c, kick_c.xZConstructionPlane,
         ("kick_inset", "kick_inset", "0 in"),
         {"x": "case_w - 2 * kick_inset", "z": "kick_h"}, "KickFront_Sk", ev)
-    kf_ext = af.ext_new(kick_c, pr, "board_thick", "KickFront")
+    kf_ext = sp.ext_new(kick_c, pr, "board_thick", "KickFront")
     kf_ext.bodies.item(0).name = "Kick_Front"
 
-    k_ymid = af.off_plane(kick_c, kick_c.xZConstructionPlane, "case_d / 2", "KYMid")
-    af.mirror_feats(kick_c, [kf_ext], k_ymid, "KickBackMir").bodies.item(0).name = "Kick_Back"
+    k_ymid = sp.off_plane(kick_c, kick_c.xZConstructionPlane, "case_d / 2", "KYMid")
+    sp.mirror_feats(kick_c, [kf_ext], k_ymid, "KickBackMir").bodies.item(0).name = "Kick_Back"
 
-    _, pr = af.sketch_rect_model(kick_c, kick_c.yZConstructionPlane,
+    _, pr = sp.sketch_rect_model(kick_c, kick_c.yZConstructionPlane,
         ("kick_inset", "kick_inset + board_thick", "0 in"),
         {"y": "case_d - 2 * kick_inset - 2 * board_thick", "z": "kick_h"},
         "KickLeft_Sk", ev)
-    kl_ext = af.ext_new(kick_c, pr, "board_thick", "KickLeft")
+    kl_ext = sp.ext_new(kick_c, pr, "board_thick", "KickLeft")
     kl_ext.bodies.item(0).name = "Kick_Left"
 
-    k_xmid = af.off_plane(kick_c, kick_c.yZConstructionPlane, "mid_x", "KXMid")
-    af.mirror_feats(kick_c, [kl_ext], k_xmid, "KickRightMir").bodies.item(0).name = "Kick_Right"
+    k_xmid = sp.off_plane(kick_c, kick_c.yZConstructionPlane, "mid_x", "KXMid")
+    sp.mirror_feats(kick_c, [kl_ext], k_xmid, "KickRightMir").bodies.item(0).name = "Kick_Right"
     print(">>> Kick: 4")
 
     # ==== DOORS (2 — left and right sections) ====
-    _, pr = af.sketch_rect_model(door_c, door_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(door_c, door_c.xZConstructionPlane,
         ("board_thick + door_gap", "0 in", "kick_h + board_thick + door_gap"),
         {"x": "door_w", "z": "door_h"}, "DoorL_Sk", ev)
-    dl_ext = af.ext_new(door_c, pr, "door_thick", "DoorLeft")
+    dl_ext = sp.ext_new(door_c, pr, "door_thick", "DoorLeft")
     dl_ext.bodies.item(0).name = "Door_Left"
 
-    d_xmid = af.off_plane(door_c, door_c.yZConstructionPlane, "mid_x", "DXMid")
-    af.mirror_feats(door_c, [dl_ext], d_xmid, "DoorRightMir").bodies.item(0).name = "Door_Right"
+    d_xmid = sp.off_plane(door_c, door_c.yZConstructionPlane, "mid_x", "DXMid")
+    sp.mirror_feats(door_c, [dl_ext], d_xmid, "DoorRightMir").bodies.item(0).name = "Door_Right"
     print(">>> Doors: 2")
 
     # ==== DRAWER (center section) ====
@@ -165,10 +165,10 @@ def run(context):
     print(">>> Drawer: %d" % len(dd_result["all_bodies"]))
 
     # ==== BACK PANEL ====
-    _, pr = af.sketch_rect_model(back_c, back_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
         ("board_thick", "case_d - back_thick", "kick_h + board_thick"),
         {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev)
-    af.ext_new(back_c, pr, "back_thick", "BackPanel").bodies.item(0).name = "BackPanel"
+    sp.ext_new(back_c, pr, "back_thick", "BackPanel").bodies.item(0).name = "BackPanel"
     print(">>> Back: 1")
 
     # ==== EPILOGUE ====
@@ -183,7 +183,7 @@ def run(context):
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cn}: {len(names)} bodies -> {names}")
 
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

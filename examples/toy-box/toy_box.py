@@ -19,7 +19,7 @@ Components:
 """
 import adsk.core, adsk.fusion, math
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import dovetailed_drawer
 
 
@@ -105,12 +105,12 @@ def run(context):
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
-    case_occ   = af.make_comp(root, "Case")
-    bottom_occ = af.make_comp(root, "Bottom")
-    feet_occ   = af.make_comp(root, "Feet")
-    drawer_occ = af.make_comp(root, "Drawer")
-    lid_occ    = af.make_comp(root, "Lid")
-    back_occ   = af.make_comp(root, "BackPanel")
+    case_occ   = sp.make_comp(root, "Case")
+    bottom_occ = sp.make_comp(root, "Bottom")
+    feet_occ   = sp.make_comp(root, "Feet")
+    drawer_occ = sp.make_comp(root, "Drawer")
+    lid_occ    = sp.make_comp(root, "Lid")
+    back_occ   = sp.make_comp(root, "BackPanel")
 
     case_c   = case_occ.component
     bottom_c = bottom_occ.component
@@ -123,44 +123,44 @@ def run(context):
     #  1. CASE — Front, Back, Side_Left, Side_Right
     # ==============================================================
     # Front board: X=0..case_w, Z=foot_h..case_h-lid_thick
-    case_z_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+    case_z_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
                               "foot_h", "Case_Z_Pl")
-    _, pr = af.sketch_rect_model(case_c, case_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(case_c, case_c.xZConstructionPlane,
         ("0 in", "0 in", "foot_h"),
         {"x": "case_w", "z": "case_h - foot_h - lid_thick"},
         "Front_Sk", ev)
-    front_ext = af.ext_new(case_c, pr, "board_thick", "FrontBoard")
+    front_ext = sp.ext_new(case_c, pr, "board_thick", "FrontBoard")
     front = front_ext.bodies.item(0)
     front.name = "Front"
 
     # Back board
-    back_pl = af.off_plane(case_c, case_c.xZConstructionPlane,
+    back_pl = sp.off_plane(case_c, case_c.xZConstructionPlane,
                             "case_d - board_thick", "Back_Pl")
-    _, pr = af.sketch_rect_model(case_c, back_pl,
+    _, pr = sp.sketch_rect_model(case_c, back_pl,
         ("0 in", "case_d - board_thick", "foot_h"),
         {"x": "case_w", "z": "case_h - foot_h - lid_thick"},
         "Back_Sk", ev)
-    back_ext = af.ext_new(case_c, pr, "board_thick", "BackBoard")
+    back_ext = sp.ext_new(case_c, pr, "board_thick", "BackBoard")
     back = back_ext.bodies.item(0)
     back.name = "Back"
 
     # Midplanes for mirror
-    x_mid = af.off_plane(case_c, case_c.yZConstructionPlane, "mid_x", "XMid")
-    y_mid = af.off_plane(case_c, case_c.xZConstructionPlane, "mid_y", "YMid")
+    x_mid = sp.off_plane(case_c, case_c.yZConstructionPlane, "mid_x", "XMid")
+    y_mid = sp.off_plane(case_c, case_c.xZConstructionPlane, "mid_y", "YMid")
 
     # Left side: Y=board_thick..case_d-board_thick, Z=foot_h..case_h-lid_thick
-    left_yz = af.off_plane(case_c, case_c.yZConstructionPlane,
+    left_yz = sp.off_plane(case_c, case_c.yZConstructionPlane,
                             "0 in", "Left_Pl")
-    _, pr = af.sketch_rect_model(case_c, case_c.yZConstructionPlane,
+    _, pr = sp.sketch_rect_model(case_c, case_c.yZConstructionPlane,
         ("0 in", "board_thick", "foot_h"),
         {"y": "inner_d", "z": "case_h - foot_h - lid_thick"},
         "LeftSide_Sk", ev)
-    left_ext = af.ext_new(case_c, pr, "board_thick", "LeftSide")
+    left_ext = sp.ext_new(case_c, pr, "board_thick", "LeftSide")
     left = left_ext.bodies.item(0)
     left.name = "Side_Left"
 
     # Right side: mirror left across XMid
-    right_mir = af.mirror_feats(case_c, [left_ext], x_mid, "RightMir")
+    right_mir = sp.mirror_feats(case_c, [left_ext], x_mid, "RightMir")
     right = right_mir.bodies.item(0)
     right.name = "Side_Right"
 
@@ -169,14 +169,14 @@ def run(context):
     # ==============================================================
     #  2. BOTTOM — divider board between chest and drawer
     # ==============================================================
-    bot_pl = af.off_plane(bottom_c, bottom_c.xYConstructionPlane,
+    bot_pl = sp.off_plane(bottom_c, bottom_c.xYConstructionPlane,
                            "bottom_z", "Bot_Pl")
-    _, pr = af.sketch_rect_model(bottom_c, bot_pl,
+    _, pr = sp.sketch_rect_model(bottom_c, bot_pl,
         ("board_thick - bottom_dado_d", "board_thick - bottom_dado_d", "bottom_z"),
         {"x": "inner_w + 2 * bottom_dado_d",
          "y": "inner_d + 2 * bottom_dado_d"},
         "Bottom_Sk", ev)
-    bot_ext = af.ext_new(bottom_c, pr, "bottom_thick", "BottomBoard")
+    bot_ext = sp.ext_new(bottom_c, pr, "bottom_thick", "BottomBoard")
     bot_body = bot_ext.bodies.item(0)
     bot_body.name = "Bottom"
 
@@ -187,10 +187,10 @@ def run(context):
     right_proxy = right.createForAssemblyContext(case_occ)
     bot_proxy = bot_body.createForAssemblyContext(bottom_occ)
 
-    af.combine(root, front_proxy, [bot_proxy], CUT, True, "BotDado_F")
-    af.combine(root, back_proxy, [bot_proxy], CUT, True, "BotDado_B")
-    af.combine(root, left_proxy, [bot_proxy], CUT, True, "BotDado_L")
-    af.combine(root, right_proxy, [bot_proxy], CUT, True, "BotDado_R")
+    sp.combine(root, front_proxy, [bot_proxy], CUT, True, "BotDado_F")
+    sp.combine(root, back_proxy, [bot_proxy], CUT, True, "BotDado_B")
+    sp.combine(root, left_proxy, [bot_proxy], CUT, True, "BotDado_L")
+    sp.combine(root, right_proxy, [bot_proxy], CUT, True, "BotDado_R")
 
     print(">>> Bottom + dados done")
 
@@ -201,37 +201,37 @@ def run(context):
     #     All foot_h tall with arch CUT
     # ==============================================================
     # Front foot board
-    _, pr = af.sketch_rect_model(feet_c, feet_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(feet_c, feet_c.xZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "case_w", "z": "foot_h"},
         "FootFront_Sk", ev)
-    ff_ext = af.ext_new(feet_c, pr, "foot_thick", "FootFront")
+    ff_ext = sp.ext_new(feet_c, pr, "foot_thick", "FootFront")
     foot_front = ff_ext.bodies.item(0)
     foot_front.name = "Foot_Front"
 
     # Back foot board
-    ff_back_pl = af.off_plane(feet_c, feet_c.xZConstructionPlane,
+    ff_back_pl = sp.off_plane(feet_c, feet_c.xZConstructionPlane,
                                "case_d - foot_thick", "FootBack_Pl")
-    _, pr = af.sketch_rect_model(feet_c, ff_back_pl,
+    _, pr = sp.sketch_rect_model(feet_c, ff_back_pl,
         ("0 in", "case_d - foot_thick", "0 in"),
         {"x": "case_w", "z": "foot_h"},
         "FootBack_Sk", ev)
-    fb_ext = af.ext_new(feet_c, pr, "foot_thick", "FootBack")
+    fb_ext = sp.ext_new(feet_c, pr, "foot_thick", "FootBack")
     foot_back = fb_ext.bodies.item(0)
     foot_back.name = "Foot_Back"
 
     # Left foot board (between front and back foot boards)
-    _, pr = af.sketch_rect_model(feet_c, feet_c.yZConstructionPlane,
+    _, pr = sp.sketch_rect_model(feet_c, feet_c.yZConstructionPlane,
         ("0 in", "foot_thick", "0 in"),
         {"y": "case_d - 2 * foot_thick", "z": "foot_h"},
         "FootLeft_Sk", ev)
-    fl_ext = af.ext_new(feet_c, pr, "foot_thick", "FootLeft")
+    fl_ext = sp.ext_new(feet_c, pr, "foot_thick", "FootLeft")
     foot_left = fl_ext.bodies.item(0)
     foot_left.name = "Foot_Left"
 
     # Right foot: mirror across XMid
-    f_xmid = af.off_plane(feet_c, feet_c.yZConstructionPlane, "mid_x", "FXMid")
-    fr_mir = af.mirror_feats(feet_c, [fl_ext], f_xmid, "FootRightMir")
+    f_xmid = sp.off_plane(feet_c, feet_c.yZConstructionPlane, "mid_x", "FXMid")
+    fr_mir = sp.mirror_feats(feet_c, [fl_ext], f_xmid, "FootRightMir")
     foot_right = fr_mir.bodies.item(0)
     foot_right.name = "Foot_Right"
 
@@ -251,7 +251,7 @@ def run(context):
         """Create an arch cutout on an XZ or YZ construction plane."""
         sk = feet_c.sketches.add(plane)
         sk.name = f"{name}_Sk"
-        ha, va = af.probe_sketch_axes(sk)
+        ha, va = sp.probe_sketch_axes(sk)
         # The arch baseline is along the H axis, arch rises along V
         # Convert model points to sketch space
         m = sk.modelToSketchSpace
@@ -277,8 +277,8 @@ def run(context):
             H, Point3D.create(left_val / 2, -1, 0)
         ).parameter.expression = left_expr
 
-        prof = af.smallest_profile(sk)
-        return af.ext_op(feet_c, prof, "foot_thick", CUT, body, name, flip=True)
+        prof = sp.smallest_profile(sk)
+        return sp.ext_op(feet_c, prof, "foot_thick", CUT, body, name, flip=True)
 
     # Front arch — on XZ plane at Y=0
     make_arch(feet_c.xZConstructionPlane, foot_front,
@@ -286,7 +286,7 @@ def run(context):
               ai, cw - 2 * ai, ah, "FrontArch")
 
     # Back arch — on XZ plane offset to Y=case_d-foot_thick
-    back_arch_pl = af.off_plane(feet_c, feet_c.xZConstructionPlane,
+    back_arch_pl = sp.off_plane(feet_c, feet_c.xZConstructionPlane,
                                  "case_d - foot_thick", "BackArch_Pl")
     make_arch(back_arch_pl, foot_back,
               "arch_inset", "case_w - 2 * arch_inset", "arch_h",
@@ -299,7 +299,7 @@ def run(context):
               ft + ai, cd - 2 * ft - 2 * ai, ah, "LeftArch")
 
     # Right arch — on YZ plane offset to X=case_w-foot_thick
-    right_arch_pl = af.off_plane(feet_c, feet_c.yZConstructionPlane,
+    right_arch_pl = sp.off_plane(feet_c, feet_c.yZConstructionPlane,
                                   "case_w - foot_thick", "RightArch_Pl")
     make_arch(right_arch_pl, foot_right,
               "foot_thick + arch_inset",
@@ -317,32 +317,32 @@ def run(context):
     # ==============================================================
     #  5. LID — solid panel + 2 breadboard battens
     # ==============================================================
-    lid_z_pl = af.off_plane(lid_c, lid_c.xYConstructionPlane,
+    lid_z_pl = sp.off_plane(lid_c, lid_c.xYConstructionPlane,
                              "case_h - lid_thick", "Lid_Pl")
-    _, pr = af.sketch_rect_model(lid_c, lid_z_pl,
+    _, pr = sp.sketch_rect_model(lid_c, lid_z_pl,
         ("-lid_overhang", "-lid_overhang", "case_h - lid_thick"),
         {"x": "case_w + 2 * lid_overhang",
          "y": "case_d + lid_overhang"},
         "Lid_Sk", ev)
-    lid_ext = af.ext_new(lid_c, pr, "lid_thick", "LidPanel")
+    lid_ext = sp.ext_new(lid_c, pr, "lid_thick", "LidPanel")
     lid_body = lid_ext.bodies.item(0)
     lid_body.name = "Lid"
 
     # Breadboard battens on underside — 2 battens running across Y (depth)
     # positioned at batten_inset from each end
-    bat_z_pl = af.off_plane(lid_c, lid_c.xYConstructionPlane,
+    bat_z_pl = sp.off_plane(lid_c, lid_c.xYConstructionPlane,
                              "case_h - lid_thick - batten_thick", "Batten_Pl")
-    _, pr = af.sketch_rect_model(lid_c, bat_z_pl,
+    _, pr = sp.sketch_rect_model(lid_c, bat_z_pl,
         ("batten_inset", "0 in", "case_h - lid_thick - batten_thick"),
         {"x": "batten_w", "y": "case_d - board_thick"},
         "BattenL_Sk", ev)
-    bat_l_ext = af.ext_new(lid_c, pr, "batten_thick", "BattenL")
+    bat_l_ext = sp.ext_new(lid_c, pr, "batten_thick", "BattenL")
     batten_l = bat_l_ext.bodies.item(0)
     batten_l.name = "Batten_Left"
 
     # Mirror left batten to right
-    lid_xmid = af.off_plane(lid_c, lid_c.yZConstructionPlane, "mid_x", "LidXMid")
-    bat_mir = af.mirror_feats(lid_c, [bat_l_ext], lid_xmid, "BattenRightMir")
+    lid_xmid = sp.off_plane(lid_c, lid_c.yZConstructionPlane, "mid_x", "LidXMid")
+    bat_mir = sp.mirror_feats(lid_c, [bat_l_ext], lid_xmid, "BattenRightMir")
     batten_r = bat_mir.bodies.item(0)
     batten_r.name = "Batten_Right"
 
@@ -351,11 +351,11 @@ def run(context):
     # ==============================================================
     #  6. BACK PANEL — plywood, rabbeted into sides
     # ==============================================================
-    _, pr = af.sketch_rect_model(back_c, back_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
         ("board_thick", "case_d - back_thick", "foot_h"),
         {"x": "inner_w", "z": "case_h - foot_h - lid_thick"},
         "BackPanel_Sk", ev)
-    bp_ext = af.ext_new(back_c, pr, "back_thick", "BackPanelBoard")
+    bp_ext = sp.ext_new(back_c, pr, "back_thick", "BackPanelBoard")
     back_panel = bp_ext.bodies.item(0)
     back_panel.name = "BackPanel"
 
@@ -363,23 +363,23 @@ def run(context):
     bp_proxy = back_panel.createForAssemblyContext(back_occ)
 
     # Left side rabbet
-    rab_l_pl = af.off_plane(root, root.yZConstructionPlane, "0 in", "RabL_Pl")
-    _, pr = af.sketch_rect_model(root, rab_l_pl,
+    rab_l_pl = sp.off_plane(root, root.yZConstructionPlane, "0 in", "RabL_Pl")
+    _, pr = sp.sketch_rect_model(root, rab_l_pl,
         ("0 in", "case_d - back_thick", "foot_h"),
         {"y": "back_thick", "z": "case_h - foot_h - lid_thick"},
         "RabL_Sk", ev)
-    rab_l_tool = af.ext_new(root, pr, "board_thick", "RabL_Tool")
-    af.combine(root, left_proxy, [rab_l_tool.bodies.item(0)], CUT, False, "RabL_Cut")
+    rab_l_tool = sp.ext_new(root, pr, "board_thick", "RabL_Tool")
+    sp.combine(root, left_proxy, [rab_l_tool.bodies.item(0)], CUT, False, "RabL_Cut")
 
     # Right side rabbet
-    rab_r_pl = af.off_plane(root, root.yZConstructionPlane,
+    rab_r_pl = sp.off_plane(root, root.yZConstructionPlane,
                              "case_w - board_thick", "RabR_Pl")
-    _, pr = af.sketch_rect_model(root, rab_r_pl,
+    _, pr = sp.sketch_rect_model(root, rab_r_pl,
         ("case_w - board_thick", "case_d - back_thick", "foot_h"),
         {"y": "back_thick", "z": "case_h - foot_h - lid_thick"},
         "RabR_Sk", ev)
-    rab_r_tool = af.ext_new(root, pr, "board_thick", "RabR_Tool")
-    af.combine(root, right_proxy, [rab_r_tool.bodies.item(0)], CUT, False, "RabR_Cut")
+    rab_r_tool = sp.ext_new(root, pr, "board_thick", "RabR_Tool")
+    sp.combine(root, right_proxy, [rab_r_tool.bodies.item(0)], CUT, False, "RabR_Cut")
 
     print(">>> Back panel + rabbets done")
 
@@ -414,14 +414,14 @@ def run(context):
 
     # YZ planes for left and right corners
     dt_left_pl = root.yZConstructionPlane  # X=0
-    dt_right_pl = af.off_plane(root, root.yZConstructionPlane,
+    dt_right_pl = sp.off_plane(root, root.yZConstructionPlane,
                                 "case_w - board_thick", "DT_Right_Pl")
 
     def dt_corner(plane, mx, yw, yn, y_wide_expr, cut_body, join_body, name):
         """One dovetail corner on a YZ plane. Tails along Z."""
         sk = root.sketches.add(plane)
         sk.name = f"{name}_Sk"
-        ha, va = af.probe_sketch_axes(sk)
+        ha, va = sp.probe_sketch_axes(sk)
         of = lambda a: H if a == ha else V
         m = sk.modelToSketchSpace
 
@@ -477,7 +477,7 @@ def run(context):
         prof = sk.profiles.item(0)
 
         # Tail as NewBody, pattern along Z, then bulk CUT + JOIN
-        tail_ext = af.ext_new(root, prof, "board_thick", f"{name}_Tail")
+        tail_ext = sp.ext_new(root, prof, "board_thick", f"{name}_Tail")
         tail_body = tail_ext.bodies.item(0)
         tail_body.name = name
 
@@ -492,8 +492,8 @@ def run(context):
 
         all_tails = [tail_body] + [pat_feat.bodies.item(i)
                                     for i in range(pat_feat.bodies.count)]
-        af.combine(root, cut_body, all_tails, CUT, True, f"{name}_CutPin")
-        af.combine(root, join_body, all_tails, JOIN, False, f"{name}_JoinSide")
+        sp.combine(root, cut_body, all_tails, CUT, True, f"{name}_CutPin")
+        sp.combine(root, join_body, all_tails, JOIN, False, f"{name}_JoinSide")
 
     # 4 corners: FL (front-left), BL (back-left), FR (front-right), BR (back-right)
     dt_corner(dt_left_pl, 0, 0, bt, "0 in",

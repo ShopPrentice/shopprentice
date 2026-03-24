@@ -27,10 +27,10 @@ def make_comp_at(root, name, x_cm=0.0):
 def dado(comp, face, origin, size, depth_expr, body, name, ev):
     """Dado/groove/rabbet — sketch rect on face, CUT inward. 2 features."""
     CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
-    sk, _prof = af.sketch_rect_model(comp, face, origin, size,
+    sk, _prof = sp.sketch_rect_model(comp, face, origin, size,
                                       name=f"{name}_Sk", ev=ev)
-    prof = af.smallest_profile(sk)
-    return af.ext_op(comp, prof, depth_expr, CUT, body, name, flip=True)
+    prof = sp.smallest_profile(sk)
+    return sp.ext_op(comp, prof, depth_expr, CUT, body, name, flip=True)
 
 
 def run(context):
@@ -45,9 +45,9 @@ def run(context):
     CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
     global af
-    from helpers import af
+    from helpers import sp
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ── Shared parameters ──
     params.add("side_h", VI("12 in"), "in", "Side board height")
@@ -68,50 +68,50 @@ def run(context):
 
     f1 = make_comp_at(root, "Through_Dado").component
 
-    f1_mid = af.off_plane(f1, f1.yZConstructionPlane,
+    f1_mid = sp.off_plane(f1, f1.yZConstructionPlane,
                            "inner_w / 2 + side_t", "f1_XMid")
 
     # Left side
-    _, pr = af.sketch_rect_model(f1, f1.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(f1, f1.xZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "side_t", "z": "side_h"}, "f1_SideL_Sk", ctx.ev)
-    side_l = af.ext_new(f1, pr, "side_d", "f1_SideL").bodies.item(0)
+    side_l = sp.ext_new(f1, pr, "side_d", "f1_SideL").bodies.item(0)
     side_l.name = "f1_Side_L"
-    side_r = af.mirror_body(f1, side_l, f1_mid, "f1_SideR_Mir").bodies.item(0)
+    side_r = sp.mirror_body(f1, side_l, f1_mid, "f1_SideR_Mir").bodies.item(0)
     side_r.name = "f1_Side_R"
 
     # Shelves
-    _, pr = af.sketch_rect_model(f1, f1.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(f1, f1.xYConstructionPlane,
         ("side_t", "0 in", "f1_shelf_z1"),
         {"x": "inner_w", "y": "side_d"}, "f1_Shelf1_Sk", ctx.ev)
-    shelf1 = af.ext_new(f1, pr, "shelf_t", "f1_Shelf1").bodies.item(0)
+    shelf1 = sp.ext_new(f1, pr, "shelf_t", "f1_Shelf1").bodies.item(0)
     shelf1.name = "f1_Shelf_1"
 
-    _, pr = af.sketch_rect_model(f1, f1.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(f1, f1.xYConstructionPlane,
         ("side_t", "0 in", "f1_shelf_z2"),
         {"x": "inner_w", "y": "side_d"}, "f1_Shelf2_Sk", ctx.ev)
-    shelf2 = af.ext_new(f1, pr, "shelf_t", "f1_Shelf2").bodies.item(0)
+    shelf2 = sp.ext_new(f1, pr, "shelf_t", "f1_Shelf2").bodies.item(0)
     shelf2.name = "f1_Shelf_2"
 
     # Through dados — sketch on inner face, CUT inward.
     # Re-find face after each CUT (topology invalidates references).
-    dado(f1, af.find_face(side_l, "x", +1),
+    dado(f1, sp.find_face(side_l, "x", +1),
         origin=("side_t", "0 in", "f1_shelf_z1"),
         size={"y": "side_d", "z": "shelf_t"},
         depth_expr="dado_d", body=side_l,
         name="f1_Dado_L1", ev=ctx.ev)
-    dado(f1, af.find_face(side_l, "x", +1),
+    dado(f1, sp.find_face(side_l, "x", +1),
         origin=("side_t", "0 in", "f1_shelf_z2"),
         size={"y": "side_d", "z": "shelf_t"},
         depth_expr="dado_d", body=side_l,
         name="f1_Dado_L2", ev=ctx.ev)
 
-    dado(f1, af.find_face(side_r, "x", -1),
+    dado(f1, sp.find_face(side_r, "x", -1),
         origin=("side_t + inner_w", "0 in", "f1_shelf_z1"),
         size={"y": "side_d", "z": "shelf_t"},
         depth_expr="dado_d", body=side_r,
         name="f1_Dado_R1", ev=ctx.ev)
-    dado(f1, af.find_face(side_r, "x", -1),
+    dado(f1, sp.find_face(side_r, "x", -1),
         origin=("side_t + inner_w", "0 in", "f1_shelf_z2"),
         size={"y": "side_d", "z": "shelf_t"},
         depth_expr="dado_d", body=side_r,
@@ -127,32 +127,32 @@ def run(context):
 
     f2 = make_comp_at(root, "Rabbet", ctx.ev("f2_x")).component
 
-    f2_mid = af.off_plane(f2, f2.yZConstructionPlane,
+    f2_mid = sp.off_plane(f2, f2.yZConstructionPlane,
                            "inner_w / 2 + side_t", "f2_XMid")
 
-    _, pr = af.sketch_rect_model(f2, f2.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(f2, f2.xZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "side_t", "z": "side_h"}, "f2_SideL_Sk", ctx.ev)
-    side_l = af.ext_new(f2, pr, "side_d", "f2_SideL").bodies.item(0)
+    side_l = sp.ext_new(f2, pr, "side_d", "f2_SideL").bodies.item(0)
     side_l.name = "f2_Side_L"
-    side_r = af.mirror_body(f2, side_l, f2_mid, "f2_SideR_Mir").bodies.item(0)
+    side_r = sp.mirror_body(f2, side_l, f2_mid, "f2_SideR_Mir").bodies.item(0)
     side_r.name = "f2_Side_R"
 
-    _, pr = af.sketch_rect_model(f2, f2.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(f2, f2.xZConstructionPlane,
         ("side_t", "side_d - back_t", "0 in"),
         {"x": "inner_w", "z": "side_h"}, "f2_Back_Sk", ctx.ev)
-    back = af.ext_new(f2, pr, "back_t", "f2_Back").bodies.item(0)
+    back = sp.ext_new(f2, pr, "back_t", "f2_Back").bodies.item(0)
     back.name = "f2_Back"
 
     # Rabbet — sketch on inner face, strip along back edge.
     # Creates L-shaped step: rab_w wide × rab_d deep.
-    dado(f2, af.find_face(side_l, "x", +1),
+    dado(f2, sp.find_face(side_l, "x", +1),
         origin=("side_t", "side_d - rab_w", "0 in"),
         size={"y": "rab_w", "z": "side_h"},
         depth_expr="rab_d", body=side_l,
         name="f2_Rab_L", ev=ctx.ev)
 
-    dado(f2, af.find_face(side_r, "x", -1),
+    dado(f2, sp.find_face(side_r, "x", -1),
         origin=("side_t + inner_w", "side_d - rab_w", "0 in"),
         size={"y": "rab_w", "z": "side_h"},
         depth_expr="rab_d", body=side_r,
@@ -171,31 +171,31 @@ def run(context):
 
     f3 = make_comp_at(root, "Stopped_Dado", ctx.ev("f3_x")).component
 
-    f3_mid = af.off_plane(f3, f3.yZConstructionPlane,
+    f3_mid = sp.off_plane(f3, f3.yZConstructionPlane,
                            "inner_w / 2 + side_t", "f3_XMid")
 
-    _, pr = af.sketch_rect_model(f3, f3.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(f3, f3.xZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "side_t", "z": "side_h"}, "f3_SideL_Sk", ctx.ev)
-    side_l = af.ext_new(f3, pr, "side_d", "f3_SideL").bodies.item(0)
+    side_l = sp.ext_new(f3, pr, "side_d", "f3_SideL").bodies.item(0)
     side_l.name = "f3_Side_L"
-    side_r = af.mirror_body(f3, side_l, f3_mid, "f3_SideR_Mir").bodies.item(0)
+    side_r = sp.mirror_body(f3, side_l, f3_mid, "f3_SideR_Mir").bodies.item(0)
     side_r.name = "f3_Side_R"
 
-    _, pr = af.sketch_rect_model(f3, f3.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(f3, f3.xYConstructionPlane,
         ("side_t", "f3_stop", "f3_shelf_z"),
         {"x": "inner_w", "y": "side_d - f3_stop"}, "f3_Shelf_Sk", ctx.ev)
-    shelf = af.ext_new(f3, pr, "shelf_t", "f3_Shelf").bodies.item(0)
+    shelf = sp.ext_new(f3, pr, "shelf_t", "f3_Shelf").bodies.item(0)
     shelf.name = "f3_Shelf"
 
     # Stopped dado — same as through but rect starts at f3_stop
-    dado(f3, af.find_face(side_l, "x", +1),
+    dado(f3, sp.find_face(side_l, "x", +1),
         origin=("side_t", "f3_stop", "f3_shelf_z"),
         size={"y": "side_d - f3_stop", "z": "shelf_t"},
         depth_expr="dado_d", body=side_l,
         name="f3_SDado_L", ev=ctx.ev)
 
-    dado(f3, af.find_face(side_r, "x", -1),
+    dado(f3, sp.find_face(side_r, "x", -1),
         origin=("side_t + inner_w", "f3_stop", "f3_shelf_z"),
         size={"y": "side_d - f3_stop", "z": "shelf_t"},
         depth_expr="dado_d", body=side_r,
@@ -220,41 +220,41 @@ def run(context):
 
     f4 = make_comp_at(root, "Panel_Groove", ctx.ev("f4_x")).component
 
-    f4_xmid = af.off_plane(f4, f4.yZConstructionPlane,
+    f4_xmid = sp.off_plane(f4, f4.yZConstructionPlane,
                              "f4_box_w / 2", "f4_XMid")
-    f4_ymid = af.off_plane(f4, f4.xZConstructionPlane,
+    f4_ymid = sp.off_plane(f4, f4.xZConstructionPlane,
                              "f4_box_d / 2", "f4_YMid")
 
-    _, pr = af.sketch_rect_model(f4, f4.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(f4, f4.xZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "f4_box_w", "z": "f4_box_h"}, "f4_Front_Sk", ctx.ev)
-    front = af.ext_new(f4, pr, "f4_bt", "f4_Front").bodies.item(0)
+    front = sp.ext_new(f4, pr, "f4_bt", "f4_Front").bodies.item(0)
     front.name = "f4_Front"
-    back = af.mirror_body(f4, front, f4_ymid, "f4_Back_Mir").bodies.item(0)
+    back = sp.mirror_body(f4, front, f4_ymid, "f4_Back_Mir").bodies.item(0)
     back.name = "f4_Back"
 
-    left_pl = af.off_plane(f4, f4.yZConstructionPlane, "0 in", "f4_LeftPl")
-    _, pr = af.sketch_rect_model(f4, left_pl,
+    left_pl = sp.off_plane(f4, f4.yZConstructionPlane, "0 in", "f4_LeftPl")
+    _, pr = sp.sketch_rect_model(f4, left_pl,
         ("0 in", "f4_bt", "0 in"),
         {"y": "f4_box_d - 2 * f4_bt", "z": "f4_box_h"}, "f4_Left_Sk", ctx.ev)
-    left = af.ext_new(f4, pr, "f4_bt", "f4_Left").bodies.item(0)
+    left = sp.ext_new(f4, pr, "f4_bt", "f4_Left").bodies.item(0)
     left.name = "f4_Left"
-    right = af.mirror_body(f4, left, f4_xmid, "f4_Right_Mir").bodies.item(0)
+    right = sp.mirror_body(f4, left, f4_xmid, "f4_Right_Mir").bodies.item(0)
     right.name = "f4_Right"
 
     # Bottom panel — extends gd into all 4 boards
-    bg_pl = af.off_plane(f4, f4.xYConstructionPlane, "f4_gu", "f4_BG_Pl")
-    _, pr = af.sketch_rect_model(f4, bg_pl,
+    bg_pl = sp.off_plane(f4, f4.xYConstructionPlane, "f4_gu", "f4_BG_Pl")
+    _, pr = sp.sketch_rect_model(f4, bg_pl,
         ("f4_bt - f4_gd", "f4_bt - f4_gd", "f4_gu"),
         {"x": "f4_box_w - 2 * f4_bt + 2 * f4_gd",
          "y": "f4_box_d - 2 * f4_bt + 2 * f4_gd"},
         "f4_Bottom_Sk", ctx.ev)
-    bottom = af.ext_new(f4, pr, "f4_pt", "f4_Bottom").bodies.item(0)
+    bottom = sp.ext_new(f4, pr, "f4_pt", "f4_Bottom").bodies.item(0)
     bottom.name = "f4_Bottom"
 
     # CUT all 4 boards with bottom panel
     for i, board in enumerate([front, back, left, right]):
-        af.combine(f4, board, [bottom], CUT, True, f"f4_BG_{i}")
+        sp.combine(f4, board, [bottom], CUT, True, f"f4_BG_{i}")
 
     assert f4.bRepBodies.count == 5
     print("Panel_Groove: 5 bodies — PASS")

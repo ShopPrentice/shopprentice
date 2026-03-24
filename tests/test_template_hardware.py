@@ -31,10 +31,10 @@ def run(context):
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
 
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import butt_hinge, pull, chest_lock
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ================================================================
     # H1: Hinge pair — box back-lid joint (barrel along X)
@@ -52,25 +52,25 @@ def run(context):
 
     butt_hinge.define_params(params, prefix="bh1", size="medium")
 
-    occ = af.make_comp(root, "H1")
+    occ = sp.make_comp(root, "H1")
     comp = occ.component
 
     # Back board (XZ at Y = h1_w - h1_bt)
-    back_pl = af.off_plane(comp, comp.xZConstructionPlane,
+    back_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                             "h1_w - h1_bt", "H1_BackPl")
-    sk, pr = af.sketch_rect_model(comp, back_pl,
+    sk, pr = sp.sketch_rect_model(comp, back_pl,
         ("0 in", "h1_w - h1_bt", "0 in"),
         {"x": "h1_l", "z": "h1_h"}, "H1_Back_Sk", ctx.ev)
-    back = af.ext_new(comp, pr, "h1_bt", "H1_Back").bodies.item(0)
+    back = sp.ext_new(comp, pr, "h1_bt", "H1_Back").bodies.item(0)
     back.name = "H1_Back"
 
     # Lid (XY at Z = h1_h)
-    lid_pl = af.off_plane(comp, comp.xYConstructionPlane,
+    lid_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                            "h1_h", "H1_LidPl")
-    sk, pr = af.sketch_rect_model(comp, lid_pl,
+    sk, pr = sp.sketch_rect_model(comp, lid_pl,
         ("0 in", "0 in", "h1_h"),
         {"x": "h1_l", "y": "h1_w"}, "H1_Lid_Sk", ctx.ev)
-    lid = af.ext_new(comp, pr, "h1_bt", "H1_Lid").bodies.item(0)
+    lid = sp.ext_new(comp, pr, "h1_bt", "H1_Lid").bodies.item(0)
     lid.name = "H1_Lid"
 
     result = butt_hinge.pair(comp,
@@ -107,25 +107,25 @@ def run(context):
 
     butt_hinge.define_params(params, prefix="bh2", size="large")
 
-    occ2 = af.make_comp(root, "H2")
+    occ2 = sp.make_comp(root, "H2")
     comp2 = occ2.component
 
     # Side board (YZ at X = h2_off_x)
-    side_pl = af.off_plane(comp2, comp2.yZConstructionPlane,
+    side_pl = sp.off_plane(comp2, comp2.yZConstructionPlane,
                             "h2_off_x", "H2_SidePl")
-    sk, pr = af.sketch_rect_model(comp2, side_pl,
+    sk, pr = sp.sketch_rect_model(comp2, side_pl,
         ("h2_off_x", "0 in", "0 in"),
         {"y": "h2_bt", "z": "h2_h"}, "H2_Side_Sk", ctx.ev)
-    side = af.ext_new(comp2, pr, "h2_bt", "H2_Side").bodies.item(0)
+    side = sp.ext_new(comp2, pr, "h2_bt", "H2_Side").bodies.item(0)
     side.name = "H2_Side"
 
     # Door (YZ at X = h2_off_x + h2_bt)
-    door_pl = af.off_plane(comp2, comp2.yZConstructionPlane,
+    door_pl = sp.off_plane(comp2, comp2.yZConstructionPlane,
                             "h2_off_x + h2_bt", "H2_DoorPl")
-    sk, pr = af.sketch_rect_model(comp2, door_pl,
+    sk, pr = sp.sketch_rect_model(comp2, door_pl,
         ("h2_off_x + h2_bt", "0 in", "0 in"),
         {"y": "h2_door_w", "z": "h2_h"}, "H2_Door_Sk", ctx.ev)
-    door = af.ext_new(comp2, pr, "h2_bt", "H2_Door").bodies.item(0)
+    door = sp.ext_new(comp2, pr, "h2_bt", "H2_Door").bodies.item(0)
     door.name = "H2_Door"
 
     result2 = butt_hinge.pair(comp2,
@@ -163,23 +163,23 @@ def run(context):
 
     butt_hinge.define_params(params, prefix="bh3", size="medium")
 
-    occ3 = af.make_comp(root, "H3")
+    occ3 = sp.make_comp(root, "H3")
     comp3 = occ3.component
 
     # Top panel (XY at Z=0)
-    sk, pr = af.sketch_rect_model(comp3, comp3.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp3, comp3.xYConstructionPlane,
         ("0 in", "h3_off_y", "0 in"),
         {"x": "h3_l", "y": "6 in"}, "H3_Top_Sk", ctx.ev)
-    top = af.ext_new(comp3, pr, "h3_bt", "H3_Top").bodies.item(0)
+    top = sp.ext_new(comp3, pr, "h3_bt", "H3_Top").bodies.item(0)
     top.name = "H3_Top"
 
     # Drop front (XZ at Y = h3_off_y, extending downward)
-    front_pl3 = af.off_plane(comp3, comp3.xZConstructionPlane,
+    front_pl3 = sp.off_plane(comp3, comp3.xZConstructionPlane,
                               "h3_off_y", "H3_FrontPl")
-    sk, pr = af.sketch_rect_model(comp3, front_pl3,
+    sk, pr = sp.sketch_rect_model(comp3, front_pl3,
         ("0 in", "h3_off_y", "-8 in"),
         {"x": "h3_l", "z": "8 in"}, "H3_Front_Sk", ctx.ev)
-    drop = af.ext_new(comp3, pr, "h3_bt", "H3_Drop").bodies.item(0)
+    drop = sp.ext_new(comp3, pr, "h3_bt", "H3_Drop").bodies.item(0)
     drop.name = "H3_Drop"
 
     result3 = butt_hinge.pair(comp3,
@@ -211,16 +211,16 @@ def run(context):
     params.add("p1_off_y", VI("h3_off_y + 10 in"), "in", "P1 Y offset")
     pull.define_params(params, prefix="pl", style="bar_3in")
 
-    occ4 = af.make_comp(root, "P1")
+    occ4 = sp.make_comp(root, "P1")
     comp4 = occ4.component
 
-    sk, pr = af.sketch_rect_model(comp4, comp4.xZConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp4, comp4.xZConstructionPlane,
         ("0 in", "p1_off_y", "0 in"),
         {"x": "8 in", "z": "6 in"}, "P1_Front_Sk", ctx.ev)
-    drawer_front = af.ext_new(comp4, pr, "0.75 in", "P1_Front").bodies.item(0)
+    drawer_front = sp.ext_new(comp4, pr, "0.75 in", "P1_Front").bodies.item(0)
     drawer_front.name = "P1_Front"
 
-    p1_pl = af.off_plane(comp4, comp4.xZConstructionPlane,
+    p1_pl = sp.off_plane(comp4, comp4.xZConstructionPlane,
                           "p1_off_y", "P1_Pl")
     pull.install(comp4, drawer_front, p1_pl,
         center=("4 in", "p1_off_y", "3 in"),
@@ -244,29 +244,29 @@ def run(context):
     params.add("l1_off_x", VI("h2_off_x + 4 in"), "in", "L1 X offset")
     chest_lock.define_params(params, prefix="lk", size="small")
 
-    occ5 = af.make_comp(root, "L1")
+    occ5 = sp.make_comp(root, "L1")
     comp5 = occ5.component
 
     # Front board
-    front_pl5 = af.off_plane(comp5, comp5.xZConstructionPlane,
+    front_pl5 = sp.off_plane(comp5, comp5.xZConstructionPlane,
                               "p1_off_y", "L1_FrontPl")
-    sk, pr = af.sketch_rect_model(comp5, front_pl5,
+    sk, pr = sp.sketch_rect_model(comp5, front_pl5,
         ("l1_off_x", "p1_off_y", "0 in"),
         {"x": "6 in", "z": "4 in"}, "L1_Front_Sk", ctx.ev)
-    l1_front = af.ext_new(comp5, pr, "0.5 in", "L1_Front").bodies.item(0)
+    l1_front = sp.ext_new(comp5, pr, "0.5 in", "L1_Front").bodies.item(0)
     l1_front.name = "L1_Front"
 
     # Lid
-    lid_pl5 = af.off_plane(comp5, comp5.xYConstructionPlane,
+    lid_pl5 = sp.off_plane(comp5, comp5.xYConstructionPlane,
                              "4 in", "L1_LidPl")
-    sk, pr = af.sketch_rect_model(comp5, lid_pl5,
+    sk, pr = sp.sketch_rect_model(comp5, lid_pl5,
         ("l1_off_x", "p1_off_y", "4 in"),
         {"x": "6 in", "y": "6 in"}, "L1_Lid_Sk", ctx.ev)
-    l1_lid = af.ext_new(comp5, pr, "0.5 in", "L1_Lid").bodies.item(0)
+    l1_lid = sp.ext_new(comp5, pr, "0.5 in", "L1_Lid").bodies.item(0)
     l1_lid.name = "L1_Lid"
 
     # Lock mortise on front inner face
-    inner_pl5 = af.off_plane(comp5, comp5.xZConstructionPlane,
+    inner_pl5 = sp.off_plane(comp5, comp5.xZConstructionPlane,
                               "p1_off_y + 0.5 in", "L1_InnerPl")
     chest_lock.lock_mortise(comp5, l1_front, inner_pl5,
         origin=("l1_off_x + 3 in - lk_w / 2", "p1_off_y + 0.5 in",

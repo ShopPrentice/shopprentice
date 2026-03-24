@@ -24,7 +24,7 @@ Usage:
 import adsk.core
 import adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -74,7 +74,7 @@ def single(comp, plane, center, diameter, depth,
         The dowel void body (BRepBody).
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     VI = adsk.core.ValueInput.createByString
     P3 = adsk.core.Point3D
@@ -97,7 +97,7 @@ def single(comp, plane, center, diameter, depth,
     prof = sk.profiles.item(0)
 
     # Extrude symmetrically (depth per side)
-    ext = af.ext_new_sym(comp, prof, depth, f"{name}")
+    ext = sp.ext_new_sym(comp, prof, depth, f"{name}")
     void_body = ext.bodies.item(0)
     void_body.name = name
 
@@ -121,8 +121,8 @@ def single(comp, plane, center, diameter, depth,
     sk.isVisible = False
 
     if cut:
-        af.combine(comp, body_a, void_body, CUT, True, f"{name}_CutA")
-        af.combine(comp, body_b, void_body, CUT, True, f"{name}_CutB")
+        sp.combine(comp, body_a, void_body, CUT, True, f"{name}_CutA")
+        sp.combine(comp, body_b, void_body, CUT, True, f"{name}_CutB")
 
     return void_body
 
@@ -152,7 +152,7 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
         List of dowel void bodies.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     # Create template dowel (no CUT yet — pattern first)
     template = single(comp, plane, start, diameter, depth,
@@ -168,14 +168,14 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
             "y": comp.yConstructionAxis,
             "z": comp.zConstructionAxis,
         }
-        pat = af.body_pattern(comp, template, axis_map[step_axis],
+        pat = sp.body_pattern(comp, template, axis_map[step_axis],
                                count_expr, step_expr, f"{name}_Pat")
         for i in range(pat.bodies.count):
             bodies.append(pat.bodies.item(i))
 
     # Bulk CUT all dowels into both bodies
     if cut and body_a is not None and body_b is not None:
-        af.combine(comp, body_a, bodies, CUT, True, f"{name}_CutA")
-        af.combine(comp, body_b, bodies, CUT, True, f"{name}_CutB")
+        sp.combine(comp, body_a, bodies, CUT, True, f"{name}_CutA")
+        sp.combine(comp, body_b, bodies, CUT, True, f"{name}_CutB")
 
     return bodies

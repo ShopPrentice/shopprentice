@@ -1,6 +1,6 @@
 """TV Console — dovetailed case, M&T frame, dovetailed drawers."""
 import adsk.core, adsk.fusion, math
-from helpers import af
+from helpers import sp
 from woodworking.templates import domino
 from woodworking.templates import dovetail
 from woodworking.templates import dovetailed_drawer
@@ -18,7 +18,7 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
     Point3D = adsk.core.Point3D
 
-    ctx = af.DesignContext()
+    ctx = sp.DesignContext()
 
     # ── Shared Parameters ──────────────────────────────────────────
     shared = [
@@ -121,56 +121,56 @@ def run(context):
         thick_expr="board_thick")
 
     # ── Midplanes ──────────────────────────────────────────────────
-    xmid = af.off_plane(root, root.yZConstructionPlane, "mid_x", "XMid")
-    ymid = af.off_plane(root, root.xZConstructionPlane, "mid_y", "YMid")
+    xmid = sp.off_plane(root, root.yZConstructionPlane, "mid_x", "XMid")
+    ymid = sp.off_plane(root, root.xZConstructionPlane, "mid_y", "YMid")
 
     # ── Case Component ─────────────────────────────────────────────
-    case_occ = af.make_comp(root, "Case")
+    case_occ = sp.make_comp(root, "Case")
     case_c = case_occ.component
 
     # Case midplanes (inside component)
-    xmid_case = af.off_plane(case_c, case_c.yZConstructionPlane,
+    xmid_case = sp.off_plane(case_c, case_c.yZConstructionPlane,
         "mid_x", "XMid_Case")
     # Z midplane for Bottom↔Top dovetail mirror (XY plane at mid height)
-    zmid_case = af.off_plane(case_c, case_c.xYConstructionPlane,
+    zmid_case = sp.off_plane(case_c, case_c.xYConstructionPlane,
         "case_z + board_thick + case_h / 2", "ZMid_Case")
 
     # ── Bottom board (pin board) — full width ──
-    bot_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+    bot_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
         "case_z", "Bot_Pl")
-    _, bot_pr = af.sketch_rect_model(case_c, bot_pl,
+    _, bot_pr = sp.sketch_rect_model(case_c, bot_pl,
         ("0 in", "0 in", "case_z"),
         {"x": "console_w", "y": "console_d"},
         "Bot_Sk", ev=ev)
-    bot_ext = af.ext_new(case_c, bot_pr, "board_thick", "BotBoard")
+    bot_ext = sp.ext_new(case_c, bot_pr, "board_thick", "BotBoard")
     bot_body = bot_ext.bodies.item(0)
     bot_body.name = "Bottom"
 
     # ── Top board (pin board) — full width ──
-    top_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+    top_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
         "case_z + board_thick + case_h", "Top_Pl")
-    _, top_pr = af.sketch_rect_model(case_c, top_pl,
+    _, top_pr = sp.sketch_rect_model(case_c, top_pl,
         ("0 in", "0 in", "case_z + board_thick + case_h"),
         {"x": "console_w", "y": "console_d"},
         "Top_Sk", ev=ev)
-    top_ext = af.ext_new(case_c, top_pr, "board_thick", "TopBoard")
+    top_ext = sp.ext_new(case_c, top_pr, "board_thick", "TopBoard")
     top_body = top_ext.bodies.item(0)
     top_body.name = "Top"
 
     # ── Left end board (tail board) — interior height only ──
     # Inset along Z: starts at leg_h + board_thick, spans case_h
     # Tails will JOIN into this board, extending it into Top/Bottom zones
-    left_pl = af.off_plane(case_c, case_c.yZConstructionPlane, "0 in", "Left_Pl")
-    _, left_pr = af.sketch_rect_model(case_c, left_pl,
+    left_pl = sp.off_plane(case_c, case_c.yZConstructionPlane, "0 in", "Left_Pl")
+    _, left_pr = sp.sketch_rect_model(case_c, left_pl,
         ("0 in", "0 in", "case_z + board_thick"),
         {"y": "console_d", "z": "case_h"},
         "Left_Sk", ev=ev)
-    left_ext = af.ext_new(case_c, left_pr, "board_thick", "LeftBoard")
+    left_ext = sp.ext_new(case_c, left_pr, "board_thick", "LeftBoard")
     left_body = left_ext.bodies.item(0)
     left_body.name = "Left"
 
     # Mirror Left → Right
-    right_mir = af.mirror_body(case_c, left_body, xmid_case, "RightMirror")
+    right_mir = sp.mirror_body(case_c, left_body, xmid_case, "RightMirror")
     right_body = right_mir.bodies.item(0)
     right_body.name = "Right"
 
@@ -202,13 +202,13 @@ def run(context):
 
     # ── Back Panel ─────────────────────────────────────────────────
     # Thin panel sits in rabbet at back of case
-    back_pl = af.off_plane(case_c, case_c.xZConstructionPlane,
+    back_pl = sp.off_plane(case_c, case_c.xZConstructionPlane,
         "console_d - back_thick", "Back_Pl")
-    _, back_pr = af.sketch_rect_model(case_c, back_pl,
+    _, back_pr = sp.sketch_rect_model(case_c, back_pl,
         ("board_thick", "console_d - back_thick", "case_z + board_thick"),
         {"x": "console_w - 2 * board_thick", "z": "case_h"},
         "Back_Sk", ev=ev)
-    back_ext = af.ext_new(case_c, back_pr, "back_thick", "BackPanel")
+    back_ext = sp.ext_new(case_c, back_pr, "back_thick", "BackPanel")
     back_body = back_ext.bodies.item(0)
     back_body.name = "Back"
 
@@ -216,36 +216,36 @@ def run(context):
     # Use the back panel as tool body to cut matching grooves
     for bname, bbody in [("Bot", bot_body), ("Top", top_body),
                           ("Left", left_body), ("Right", right_body)]:
-        af.combine(case_c, bbody, back_body, CUT, True,
+        sp.combine(case_c, bbody, back_body, CUT, True,
                    f"Rab_{bname}")
 
     # ── Dividers (2 vertical partitions) ───────────────────────────
     # Divider 1 at section boundary
-    div1_pl = af.off_plane(case_c, case_c.yZConstructionPlane,
+    div1_pl = sp.off_plane(case_c, case_c.yZConstructionPlane,
         "div1_x", "Div1_Pl")
-    _, div1_pr = af.sketch_rect_model(case_c, div1_pl,
+    _, div1_pr = sp.sketch_rect_model(case_c, div1_pl,
         ("div1_x", "0 in", "case_z + board_thick"),
         {"y": "console_d - back_thick", "z": "case_h"},
         "Div1_Sk", ev=ev)
-    div1_ext = af.ext_new(case_c, div1_pr, "divider_thick", "Div1Board")
+    div1_ext = sp.ext_new(case_c, div1_pr, "divider_thick", "Div1Board")
     div1_body = div1_ext.bodies.item(0)
     div1_body.name = "Divider1"
 
     # Divider 2 at second section boundary
-    div2_pl = af.off_plane(case_c, case_c.yZConstructionPlane,
+    div2_pl = sp.off_plane(case_c, case_c.yZConstructionPlane,
         "div2_x", "Div2_Pl")
-    _, div2_pr = af.sketch_rect_model(case_c, div2_pl,
+    _, div2_pr = sp.sketch_rect_model(case_c, div2_pl,
         ("div2_x", "0 in", "case_z + board_thick"),
         {"y": "console_d - back_thick", "z": "case_h"},
         "Div2_Sk", ev=ev)
-    div2_ext = af.ext_new(case_c, div2_pr, "divider_thick", "Div2Board")
+    div2_ext = sp.ext_new(case_c, div2_pr, "divider_thick", "Div2Board")
     div2_body = div2_ext.bodies.item(0)
     div2_body.name = "Divider2"
 
     # Dado CUTs — dividers CUT into Top and Bottom boards
-    af.combine(case_c, bot_body, [div1_body, div2_body], CUT, True,
+    sp.combine(case_c, bot_body, [div1_body, div2_body], CUT, True,
                "Dado_Bot")
-    af.combine(case_c, top_body, [div1_body, div2_body], CUT, True,
+    sp.combine(case_c, top_body, [div1_body, div2_body], CUT, True,
                "Dado_Top")
 
     # ── Dominos: Divider-to-Case Top & Bottom ─────────────────────
@@ -259,7 +259,7 @@ def run(context):
         (div2_body, "div2_x + divider_thick / 2", "DmDv2"),
     ]:
         # Bottom interface (Z = case_z + board_thick)
-        dm_bot_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+        dm_bot_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
             "case_z + board_thick", f"{div_name}_BotPl")
         dm_bot_pl.isLightBulbOn = False
         domino.grid(case_c, dm_bot_pl,
@@ -272,7 +272,7 @@ def run(context):
             name=f"{div_name}_Bot", ev=ev)
 
         # Top interface (Z = case_z + board_thick + case_h)
-        dm_top_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+        dm_top_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
             "case_z + board_thick + case_h", f"{div_name}_TopPl")
         dm_top_pl.isLightBulbOn = False
         domino.grid(case_c, dm_top_pl,
@@ -285,36 +285,36 @@ def run(context):
             name=f"{div_name}_Top", ev=ev)
 
     # ── Frame Component ────────────────────────────────────────────
-    frame_occ = af.make_comp(root, "Frame")
+    frame_occ = sp.make_comp(root, "Frame")
     frame_c = frame_occ.component
 
-    xmid_frame = af.off_plane(frame_c, frame_c.yZConstructionPlane,
+    xmid_frame = sp.off_plane(frame_c, frame_c.yZConstructionPlane,
         "mid_x", "XMid_Frame")
-    ymid_frame = af.off_plane(frame_c, frame_c.xZConstructionPlane,
+    ymid_frame = sp.off_plane(frame_c, frame_c.xZConstructionPlane,
         "mid_y", "YMid_Frame")
 
     # ── Legs ───────────────────────────────────────────────────────
     # Front-left leg at origin corner
-    _, leg_pr = af.sketch_rect_model(frame_c, frame_c.xYConstructionPlane,
+    _, leg_pr = sp.sketch_rect_model(frame_c, frame_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "leg_size", "y": "leg_size"},
         "LegFL_Sk", ev=ev)
-    leg_fl_ext = af.ext_new(frame_c, leg_pr, "leg_h", "LegFL")
+    leg_fl_ext = sp.ext_new(frame_c, leg_pr, "leg_h", "LegFL")
     leg_fl = leg_fl_ext.bodies.item(0)
     leg_fl.name = "Leg_FL"
 
     # Mirror FL → FR (across X mid)
-    leg_fr_mir = af.mirror_body(frame_c, leg_fl, xmid_frame, "LegFR_Mir")
+    leg_fr_mir = sp.mirror_body(frame_c, leg_fl, xmid_frame, "LegFR_Mir")
     leg_fr = leg_fr_mir.bodies.item(0)
     leg_fr.name = "Leg_FR"
 
     # Mirror FL → BL (across Y mid)
-    leg_bl_mir = af.mirror_body(frame_c, leg_fl, ymid_frame, "LegBL_Mir")
+    leg_bl_mir = sp.mirror_body(frame_c, leg_fl, ymid_frame, "LegBL_Mir")
     leg_bl = leg_bl_mir.bodies.item(0)
     leg_bl.name = "Leg_BL"
 
     # Mirror FR → BR (across Y mid)
-    leg_br_mir = af.mirror_body(frame_c, leg_fr, ymid_frame, "LegBR_Mir")
+    leg_br_mir = sp.mirror_body(frame_c, leg_fr, ymid_frame, "LegBR_Mir")
     leg_br = leg_br_mir.bodies.item(0)
     leg_br.name = "Leg_BR"
 
@@ -322,14 +322,14 @@ def run(context):
     # Rail spans between front legs, with tenons extending into each leg
     # Position: X = leg_size (after left leg), Y centered on leg front face
     # Z = leg_h - rail_w (rail at top of legs)
-    front_rail_pl = af.off_plane(frame_c, frame_c.xZConstructionPlane,
+    front_rail_pl = sp.off_plane(frame_c, frame_c.xZConstructionPlane,
         "leg_size / 2 - rail_thick / 2", "FRail_Pl")
-    _, frail_pr = af.sketch_rect_model(frame_c, front_rail_pl,
+    _, frail_pr = sp.sketch_rect_model(frame_c, front_rail_pl,
         ("leg_size - mt_td", "leg_size / 2 - rail_thick / 2",
          "leg_h - rail_w"),
         {"x": "console_w - 2 * leg_size + 2 * mt_td", "z": "rail_w"},
         "FRail_Sk", ev=ev)
-    frail_ext = af.ext_new(frame_c, frail_pr, "rail_thick", "FrontRail")
+    frail_ext = sp.ext_new(frame_c, frail_pr, "rail_thick", "FrontRail")
     frail_body = frail_ext.bodies.item(0)
     frail_body.name = "FrontRail"
 
@@ -350,7 +350,7 @@ def run(context):
     _cz = _rz + _rw / 2   # face center Z
 
     # Left shoulder
-    fr_lshoulder_face = af.find_face(frail_body, "x", -1)
+    fr_lshoulder_face = sp.find_face(frail_body, "x", -1)
     sk_fls = frame_c.sketches.add(fr_lshoulder_face)
     sk_fls.name = "FRail_LSh_Sk"
     m = sk_fls.modelToSketchSpace
@@ -362,7 +362,7 @@ def run(context):
     sk_fls.geometricConstraints.addHorizontal(rect_sh[2])
     sk_fls.geometricConstraints.addVertical(rect_sh[1])
     sk_fls.geometricConstraints.addVertical(rect_sh[3])
-    ha, va = af.probe_sketch_axes(sk_fls)
+    ha, va = sp.probe_sketch_axes(sk_fls)
     dim = sk_fls.sketchDimensions
     dim.addDistanceDimension(
         rect_sh[0].startSketchPoint, rect_sh[0].endSketchPoint,
@@ -381,11 +381,11 @@ def run(context):
         if a > best_area:
             best_area = a
             best_prof = p
-    af.ext_op(frame_c, best_prof, "mt_td", CUT, frail_body,
+    sp.ext_op(frame_c, best_prof, "mt_td", CUT, frail_body,
               "FRail_LSh", flip=True)
 
     # Right shoulder
-    fr_rshoulder_face = af.find_face(frail_body, "x", +1)
+    fr_rshoulder_face = sp.find_face(frail_body, "x", +1)
     sk_frs = frame_c.sketches.add(fr_rshoulder_face)
     sk_frs.name = "FRail_RSh_Sk"
     m2 = sk_frs.modelToSketchSpace
@@ -415,45 +415,45 @@ def run(context):
         if a > best_area2:
             best_area2 = a
             best_prof2 = p
-    af.ext_op(frame_c, best_prof2, "mt_td", CUT, frail_body,
+    sp.ext_op(frame_c, best_prof2, "mt_td", CUT, frail_body,
               "FRail_RSh", flip=True)
 
     # ── Front rail interlocking notches (middle half of each tenon) ──
     # Remove center mt_tw/2, keeping top + bottom mt_tw/4 each
-    frnotch_pl = af.off_plane(frame_c, frame_c.xZConstructionPlane,
+    frnotch_pl = sp.off_plane(frame_c, frame_c.xZConstructionPlane,
         "leg_size / 2 - mt_tt / 2", "FRNotch_Pl")
     # Left tenon — center notch
-    _, frn_lpr = af.sketch_rect_model(frame_c, frnotch_pl,
+    _, frn_lpr = sp.sketch_rect_model(frame_c, frnotch_pl,
         ("leg_size - mt_td",
          "leg_size / 2 - mt_tt / 2",
          "leg_h - rail_w / 2 - mt_tw / 4"),
         {"x": "notch_d", "z": "mt_tw / 2"},
         "FRail_LNotch_Sk", ev=ev)
-    af.ext_op(frame_c, frn_lpr, "mt_tt", CUT, frail_body, "FRail_LNotch")
+    sp.ext_op(frame_c, frn_lpr, "mt_tt", CUT, frail_body, "FRail_LNotch")
     # Right tenon — center notch
-    _, frn_rpr = af.sketch_rect_model(frame_c, frnotch_pl,
+    _, frn_rpr = sp.sketch_rect_model(frame_c, frnotch_pl,
         ("console_w - leg_size + mt_td - notch_d",
          "leg_size / 2 - mt_tt / 2",
          "leg_h - rail_w / 2 - mt_tw / 4"),
         {"x": "notch_d", "z": "mt_tw / 2"},
         "FRail_RNotch_Sk", ev=ev)
-    af.ext_op(frame_c, frn_rpr, "mt_tt", CUT, frail_body, "FRail_RNotch")
+    sp.ext_op(frame_c, frn_rpr, "mt_tt", CUT, frail_body, "FRail_RNotch")
 
     # Mirror front rail → back rail (notches included)
-    brail_mir = af.mirror_body(frame_c, frail_body, ymid_frame, "BackRail_Mir")
+    brail_mir = sp.mirror_body(frame_c, frail_body, ymid_frame, "BackRail_Mir")
     brail_body = brail_mir.bodies.item(0)
     brail_body.name = "BackRail"
 
     # ── Side Rails (M&T into side legs) ────────────────────────────
     # Left side rail: X centered on left leg, Y spans between legs
-    side_rail_pl = af.off_plane(frame_c, frame_c.yZConstructionPlane,
+    side_rail_pl = sp.off_plane(frame_c, frame_c.yZConstructionPlane,
         "leg_size / 2 - rail_thick / 2", "SRail_Pl")
-    _, srail_pr = af.sketch_rect_model(frame_c, side_rail_pl,
+    _, srail_pr = sp.sketch_rect_model(frame_c, side_rail_pl,
         ("leg_size / 2 - rail_thick / 2", "leg_size - mt_td",
          "leg_h - rail_w"),
         {"y": "console_d - 2 * leg_size + 2 * mt_td", "z": "rail_w"},
         "SRailL_Sk", ev=ev)
-    srail_ext = af.ext_new(frame_c, srail_pr, "rail_thick", "SideRailL")
+    srail_ext = sp.ext_new(frame_c, srail_pr, "rail_thick", "SideRailL")
     srail_body = srail_ext.bodies.item(0)
     srail_body.name = "SideRailL"
 
@@ -464,7 +464,7 @@ def run(context):
     _scx = _sx + _rt / 2   # face center X
     _scz = _sz + _rw / 2   # face center Z
 
-    sr_front_face = af.find_face(srail_body, "y", -1)
+    sr_front_face = sp.find_face(srail_body, "y", -1)
     sk_srf = frame_c.sketches.add(sr_front_face)
     sk_srf.name = "SRailL_FSh_Sk"
     ms = sk_srf.modelToSketchSpace
@@ -476,7 +476,7 @@ def run(context):
     sk_srf.geometricConstraints.addHorizontal(rect_sr[2])
     sk_srf.geometricConstraints.addVertical(rect_sr[1])
     sk_srf.geometricConstraints.addVertical(rect_sr[3])
-    has, vas = af.probe_sketch_axes(sk_srf)
+    has, vas = sp.probe_sketch_axes(sk_srf)
     dims = sk_srf.sketchDimensions
     dims.addDistanceDimension(
         rect_sr[0].startSketchPoint, rect_sr[0].endSketchPoint,
@@ -494,11 +494,11 @@ def run(context):
         if a > best_sra:
             best_sra = a
             best_sr = p
-    af.ext_op(frame_c, best_sr, "mt_td", CUT, srail_body,
+    sp.ext_op(frame_c, best_sr, "mt_td", CUT, srail_body,
               "SRailL_FSh", flip=True)
 
     # Back shoulder
-    sr_back_face = af.find_face(srail_body, "y", +1)
+    sr_back_face = sp.find_face(srail_body, "y", +1)
     sk_srb = frame_c.sketches.add(sr_back_face)
     sk_srb.name = "SRailL_BSh_Sk"
     ms2 = sk_srb.modelToSketchSpace
@@ -528,47 +528,47 @@ def run(context):
         if a > best_sra2:
             best_sra2 = a
             best_sr2 = p
-    af.ext_op(frame_c, best_sr2, "mt_td", CUT, srail_body,
+    sp.ext_op(frame_c, best_sr2, "mt_td", CUT, srail_body,
               "SRailL_BSh", flip=True)
 
     # ── Side rail interlocking notches (top + bottom of each tenon) ──
-    srnotch_pl = af.off_plane(frame_c, frame_c.yZConstructionPlane,
+    srnotch_pl = sp.off_plane(frame_c, frame_c.yZConstructionPlane,
         "leg_size / 2 - mt_tt / 2", "SRNotch_Pl")
     # Front tenon — top notch
-    _, srn_ft_pr = af.sketch_rect_model(frame_c, srnotch_pl,
+    _, srn_ft_pr = sp.sketch_rect_model(frame_c, srnotch_pl,
         ("leg_size / 2 - mt_tt / 2",
          "leg_size - mt_td",
          "leg_h - rail_w / 2 + mt_tw / 4"),
         {"y": "notch_d", "z": "mt_tw / 4"},
         "SRailL_FNotchT_Sk", ev=ev)
-    af.ext_op(frame_c, srn_ft_pr, "mt_tt", CUT, srail_body, "SRailL_FNotchT")
+    sp.ext_op(frame_c, srn_ft_pr, "mt_tt", CUT, srail_body, "SRailL_FNotchT")
     # Front tenon — bottom notch
-    _, srn_fb_pr = af.sketch_rect_model(frame_c, srnotch_pl,
+    _, srn_fb_pr = sp.sketch_rect_model(frame_c, srnotch_pl,
         ("leg_size / 2 - mt_tt / 2",
          "leg_size - mt_td",
          "leg_h - rail_w / 2 - mt_tw / 2"),
         {"y": "notch_d", "z": "mt_tw / 4"},
         "SRailL_FNotchB_Sk", ev=ev)
-    af.ext_op(frame_c, srn_fb_pr, "mt_tt", CUT, srail_body, "SRailL_FNotchB")
+    sp.ext_op(frame_c, srn_fb_pr, "mt_tt", CUT, srail_body, "SRailL_FNotchB")
     # Back tenon — top notch
-    _, srn_bt_pr = af.sketch_rect_model(frame_c, srnotch_pl,
+    _, srn_bt_pr = sp.sketch_rect_model(frame_c, srnotch_pl,
         ("leg_size / 2 - mt_tt / 2",
          "console_d - leg_size + mt_td - notch_d",
          "leg_h - rail_w / 2 + mt_tw / 4"),
         {"y": "notch_d", "z": "mt_tw / 4"},
         "SRailL_BNotchT_Sk", ev=ev)
-    af.ext_op(frame_c, srn_bt_pr, "mt_tt", CUT, srail_body, "SRailL_BNotchT")
+    sp.ext_op(frame_c, srn_bt_pr, "mt_tt", CUT, srail_body, "SRailL_BNotchT")
     # Back tenon — bottom notch
-    _, srn_bb_pr = af.sketch_rect_model(frame_c, srnotch_pl,
+    _, srn_bb_pr = sp.sketch_rect_model(frame_c, srnotch_pl,
         ("leg_size / 2 - mt_tt / 2",
          "console_d - leg_size + mt_td - notch_d",
          "leg_h - rail_w / 2 - mt_tw / 2"),
         {"y": "notch_d", "z": "mt_tw / 4"},
         "SRailL_BNotchB_Sk", ev=ev)
-    af.ext_op(frame_c, srn_bb_pr, "mt_tt", CUT, srail_body, "SRailL_BNotchB")
+    sp.ext_op(frame_c, srn_bb_pr, "mt_tt", CUT, srail_body, "SRailL_BNotchB")
 
     # Mirror left side rail → right (notches included)
-    srail_r_mir = af.mirror_body(frame_c, srail_body, xmid_frame, "SideRailR_Mir")
+    srail_r_mir = sp.mirror_body(frame_c, srail_body, xmid_frame, "SideRailR_Mir")
     srail_r_body = srail_r_mir.bodies.item(0)
     srail_r_body.name = "SideRailR"
 
@@ -583,21 +583,21 @@ def run(context):
     leg_bl_proxy = leg_bl.createForAssemblyContext(frame_occ)
     leg_br_proxy = leg_br.createForAssemblyContext(frame_occ)
 
-    af.combine(root, leg_fl_proxy,
+    sp.combine(root, leg_fl_proxy,
                [frail_proxy, srail_l_proxy],
                CUT, True, "Mortise_FL")
-    af.combine(root, leg_fr_proxy,
+    sp.combine(root, leg_fr_proxy,
                [frail_proxy, srail_r_proxy],
                CUT, True, "Mortise_FR")
-    af.combine(root, leg_bl_proxy,
+    sp.combine(root, leg_bl_proxy,
                [brail_proxy, srail_l_proxy],
                CUT, True, "Mortise_BL")
-    af.combine(root, leg_br_proxy,
+    sp.combine(root, leg_br_proxy,
                [brail_proxy, srail_r_proxy],
                CUT, True, "Mortise_BR")
 
     # ── Drawers Component ──────────────────────────────────────────
-    drawers_occ = af.make_comp(root, "Drawers")
+    drawers_occ = sp.make_comp(root, "Drawers")
     drawers_c = drawers_occ.component
 
     # Define drawer params via template
@@ -629,24 +629,24 @@ def run(context):
         "n_drawers", "drawer_pitch", ev=ev)
 
     # ── Doors Component ────────────────────────────────────────────
-    doors_occ = af.make_comp(root, "Doors")
+    doors_occ = sp.make_comp(root, "Doors")
     doors_c = doors_occ.component
 
     # Left door — inset in left section opening
     # Left section: X from board_thick to div1_x
-    _, ldoor_pr = af.sketch_rect_model(doors_c, doors_c.xZConstructionPlane,
+    _, ldoor_pr = sp.sketch_rect_model(doors_c, doors_c.xZConstructionPlane,
         ("board_thick + door_gap", "0 in",
          "case_z + board_thick + door_gap"),
         {"x": "door_w", "z": "door_h"},
         "LDoor_Sk", ev=ev)
-    ldoor_ext = af.ext_new(doors_c, ldoor_pr, "door_thick", "LeftDoor")
+    ldoor_ext = sp.ext_new(doors_c, ldoor_pr, "door_thick", "LeftDoor")
     ldoor_body = ldoor_ext.bodies.item(0)
     ldoor_body.name = "LeftDoor"
 
     # Right door — mirror of left across X midplane
-    xmid_doors = af.off_plane(doors_c, doors_c.yZConstructionPlane,
+    xmid_doors = sp.off_plane(doors_c, doors_c.yZConstructionPlane,
         "mid_x", "XMid_Doors")
-    rdoor_mir = af.mirror_body(doors_c, ldoor_body, xmid_doors, "RightDoor_Mir")
+    rdoor_mir = sp.mirror_body(doors_c, ldoor_body, xmid_doors, "RightDoor_Mir")
     rdoor_body = rdoor_mir.bodies.item(0)
     rdoor_body.name = "RightDoor"
 
@@ -654,10 +654,10 @@ def run(context):
     # 4 cleats under the case bottom, bridging the gap to the frame
     # Each cleat has through-tenons through front/back rails
     # Cleat top face = case bottom; cleat extends down into rail zone
-    cleats_occ = af.make_comp(root, "Cleats")
+    cleats_occ = sp.make_comp(root, "Cleats")
     cleats_c = cleats_occ.component
 
-    xmid_cleats = af.off_plane(cleats_c, cleats_c.yZConstructionPlane,
+    xmid_cleats = sp.off_plane(cleats_c, cleats_c.yZConstructionPlane,
         "mid_x", "XMid_Cleats")
 
     # Cleat Z: top at case_z (touching case bottom), extends down
@@ -674,57 +674,57 @@ def run(context):
 
     for cx_expr, cname in cleat_x_exprs:
         # Cleat body
-        cpl = af.off_plane(cleats_c, cleats_c.xYConstructionPlane,
+        cpl = sp.off_plane(cleats_c, cleats_c.xYConstructionPlane,
             cleat_z_expr, f"{cname}_Pl")
-        _, cpr = af.sketch_rect_model(cleats_c, cpl,
+        _, cpr = sp.sketch_rect_model(cleats_c, cpl,
             (cx_expr,
              "(leg_size + rail_thick) / 2",
              cleat_z_expr),
             {"x": "cleat_w",
              "y": "console_d - leg_size - rail_thick"},
             f"{cname}_Sk", ev=ev)
-        c_ext = af.ext_new(cleats_c, cpr, "cleat_thick", cname)
+        c_ext = sp.ext_new(cleats_c, cpr, "cleat_thick", cname)
         c_body = c_ext.bodies.item(0)
         c_body.name = cname
 
         # Front tenon — blind into front rail, overlaps cleat for JOIN
         # Plane at rail center (leg_size/2), extrude +Y through inner half
         # of rail + tt_shoulder into cleat body
-        tn_f_pl = af.off_plane(cleats_c, cleats_c.xZConstructionPlane,
+        tn_f_pl = sp.off_plane(cleats_c, cleats_c.xZConstructionPlane,
             "leg_size / 2", f"{cname}_TnF_Pl")
-        _, tn_f_pr = af.sketch_rect_model(cleats_c, tn_f_pl,
+        _, tn_f_pr = sp.sketch_rect_model(cleats_c, tn_f_pl,
             (f"{cx_expr} + tt_shoulder",
              "leg_size / 2",
              "leg_h - rail_w + tt_shoulder"),
             {"x": "cleat_w - 2 * tt_shoulder",
              "z": "rail_w - 2 * tt_shoulder"},
             f"{cname}_TnF_Sk", ev=ev)
-        tn_f_ext = af.ext_new(cleats_c, tn_f_pr,
+        tn_f_ext = sp.ext_new(cleats_c, tn_f_pr,
             "rail_thick / 2 + tt_shoulder", f"{cname}_TnF")
         tn_f_body = tn_f_ext.bodies.item(0)
 
         # Back tenon — blind into back rail, overlaps cleat for JOIN
         # Plane inside cleat near back rail inner face, extrude +Y into rail
-        tn_b_pl = af.off_plane(cleats_c, cleats_c.xZConstructionPlane,
+        tn_b_pl = sp.off_plane(cleats_c, cleats_c.xZConstructionPlane,
             "console_d - (leg_size + rail_thick) / 2 - tt_shoulder",
             f"{cname}_TnB_Pl")
-        _, tn_b_pr = af.sketch_rect_model(cleats_c, tn_b_pl,
+        _, tn_b_pr = sp.sketch_rect_model(cleats_c, tn_b_pl,
             (f"{cx_expr} + tt_shoulder",
              "console_d - (leg_size + rail_thick) / 2 - tt_shoulder",
              "leg_h - rail_w + tt_shoulder"),
             {"x": "cleat_w - 2 * tt_shoulder",
              "z": "rail_w - 2 * tt_shoulder"},
             f"{cname}_TnB_Sk", ev=ev)
-        tn_b_ext = af.ext_new(cleats_c, tn_b_pr,
+        tn_b_ext = sp.ext_new(cleats_c, tn_b_pr,
             "rail_thick / 2 + tt_shoulder", f"{cname}_TnB")
         tn_b_body = tn_b_ext.bodies.item(0)
 
         # JOIN both tenons into cleat
-        af.combine(cleats_c, c_body, [tn_f_body, tn_b_body],
+        sp.combine(cleats_c, c_body, [tn_f_body, tn_b_body],
                    JOIN, False, f"{cname}_TnJoin")
 
         # Mirror across XMid
-        c_mir = af.mirror_body(cleats_c, c_body, xmid_cleats,
+        c_mir = sp.mirror_body(cleats_c, c_body, xmid_cleats,
                                f"{cname}_Mir")
         c_mir_body = c_mir.bodies.item(0)
         c_mir_body.name = f"{cname}_R"
@@ -749,9 +749,9 @@ def run(context):
                      for b in cleat_bodies]
 
     # Cleats CUT mortises in front/back rails
-    af.combine(root, frail_px, cleat_proxies,
+    sp.combine(root, frail_px, cleat_proxies,
                CUT, True, "CleatMort_Front")
-    af.combine(root, brail_px, cleat_proxies,
+    sp.combine(root, brail_px, cleat_proxies,
                CUT, True, "CleatMort_Back")
 
     # Cleats CUT into case bottom (attachment dados)
@@ -762,14 +762,14 @@ def run(context):
             bot_ref = b
             break
     bot_px = bot_ref.createForAssemblyContext(case_occ)
-    af.combine(root, bot_px, cleat_proxies,
+    sp.combine(root, bot_px, cleat_proxies,
                CUT, True, "CleatDado_Bot")
 
     # ── Dominos: Cleat-to-Case Bottom ───────────────────────────────
     # Dominos at the cleat top / case bottom interface (Z = case_z).
     # long_axis = "y" (parallel to cleat grain/length).
     # Build in root with assembly proxies for cross-component CUT.
-    dm_plane = af.off_plane(root, root.xYConstructionPlane,
+    dm_plane = sp.off_plane(root, root.xYConstructionPlane,
         "case_z", "DM_CL_Pl")
 
     # Cleat center X expressions (left-side then mirrored right-side)
@@ -808,7 +808,7 @@ def run(context):
         if leg_ref is None:
             continue
         # Find bottom face (min Z)
-        bot_face = af.find_face(leg_ref, "z", -1)
+        bot_face = sp.find_face(leg_ref, "z", -1)
         if bot_face is None:
             continue
         # Collect bottom face edges
@@ -891,7 +891,7 @@ def run(context):
                  for i in range(c.bRepBodies.count)]
         print(f"{comp_name}: {len(names)} bodies -> {names}")
 
-    af.apply_appearance("walnut")
+    sp.apply_appearance("walnut")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

@@ -8,14 +8,14 @@ Apply realistic wood appearances to bodies with grain direction aligned to fiber
 
 ## How to Call (in scripts)
 
-Every model script must apply appearance before the fit-view epilogue. Use the `af.apply_appearance()` helper:
+Every model script must apply appearance before the fit-view epilogue. Use the `sp.apply_appearance()` helper:
 
 ```python
-from helpers import af
+from helpers import sp
 
 # ... build geometry ...
 
-af.apply_appearance("white oak")    # all bodies, auto grain
+sp.apply_appearance("white oak")    # all bodies, auto grain
 
 # Fit view epilogue
 cam = app.activeViewport.camera

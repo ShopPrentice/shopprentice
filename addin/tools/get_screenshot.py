@@ -53,8 +53,8 @@ def handler(view: str = "current", width: int = 1024, height: int = 1024) -> dic
         if view and view != "current":
             eye_dir = _VIEW_DIRECTIONS.get(view)
             if eye_dir:
-                from helpers import af
-                af.screenshot_cam(eye_dir=eye_dir, fill=0.80)
+                from helpers import sp
+                sp.screenshot_cam(eye_dir=eye_dir, fill=0.80)
                 adsk.doEvents()
             else:
                 # Fallback: just fit view

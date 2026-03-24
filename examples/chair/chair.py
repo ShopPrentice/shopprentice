@@ -11,7 +11,7 @@ Coordinate system:
 """
 import adsk.core, adsk.fusion, math
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import domino
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
@@ -92,11 +92,11 @@ def run(context):
     print(">>> Parameters done")
 
     # === COMPONENTS ===
-    leg_occ   = af.make_comp(root, "Legs")
-    apron_occ = af.make_comp(root, "Aprons")
-    str_occ   = af.make_comp(root, "Stretchers")
-    seat_occ  = af.make_comp(root, "Seat")
-    back_occ  = af.make_comp(root, "Back")
+    leg_occ   = sp.make_comp(root, "Legs")
+    apron_occ = sp.make_comp(root, "Aprons")
+    str_occ   = sp.make_comp(root, "Stretchers")
+    seat_occ  = sp.make_comp(root, "Seat")
+    back_occ  = sp.make_comp(root, "Back")
 
     leg_c   = leg_occ.component
     apron_c = apron_occ.component
@@ -105,14 +105,14 @@ def run(context):
     back_c  = back_occ.component
 
     # ==== FRONT LEGS ====
-    _, pr = af.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "leg_size", "y": "leg_size"}, "LegFL_Sk", ev)
-    fl_ext = af.ext_new(leg_c, pr, "front_leg_h", "LegFL")
+    fl_ext = sp.ext_new(leg_c, pr, "front_leg_h", "LegFL")
     leg_fl = fl_ext.bodies.item(0); leg_fl.name = "Leg_FL"
 
-    l_xmid = af.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
-    leg_fr = af.mirror_body(leg_c, leg_fl, l_xmid, "LegFR").bodies.item(0)
+    l_xmid = sp.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
+    leg_fr = sp.mirror_body(leg_c, leg_fl, l_xmid, "LegFR").bodies.item(0)
     leg_fr.name = "Leg_FR"
 
     # ==== BACK LEGS (single profiled extrude — clean bend on ALL faces) ====
@@ -157,7 +157,7 @@ def run(context):
     l5 = lines.addByTwoPoints(l4.endSketchPoint, l0.startSketchPoint)  # bottom cap
 
     # H/V constraints (YZ plane: model Y → sketch H, model Z → sketch V)
-    h_ax, v_ax = af.probe_sketch_axes(sk)
+    h_ax, v_ax = sp.probe_sketch_axes(sk)
     gc = sk.geometricConstraints
     if v_ax == "z":
         gc.addVertical(l0);  gc.addVertical(l4)   # vertical lines
@@ -198,68 +198,68 @@ def run(context):
         leg_c.features.filletFeatures.add(fil_inp).name = "LegBL_Bend_Fil"
         print(f">>> Bend fillet: {bend_edges.count} edges")
 
-    leg_br = af.mirror_body(leg_c, leg_bl, l_xmid, "LegBR").bodies.item(0)
+    leg_br = sp.mirror_body(leg_c, leg_bl, l_xmid, "LegBR").bodies.item(0)
     leg_br.name = "Leg_BR"
     print(">>> Legs: 4")
 
     # ==== APRONS ====
-    az_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "AZ_Pl")
+    az_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "AZ_Pl")
 
-    _, pr = af.sketch_rect_model(apron_c, az_pl,
+    _, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("leg_size", "0 in", "apron_z"),
         {"x": "short_apron_l", "y": "apron_thick"}, "FrontApron_Sk", ev)
-    fa_ext = af.ext_new(apron_c, pr, "apron_h", "FrontApron")
+    fa_ext = sp.ext_new(apron_c, pr, "apron_h", "FrontApron")
     front_apron = fa_ext.bodies.item(0); front_apron.name = "Apron_Front"
 
-    _, pr = af.sketch_rect_model(apron_c, az_pl,
+    _, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("leg_size", "seat_d - apron_thick", "apron_z"),
         {"x": "short_apron_l", "y": "apron_thick"}, "BackApron_Sk", ev)
-    ba_ext = af.ext_new(apron_c, pr, "apron_h", "BackApron")
+    ba_ext = sp.ext_new(apron_c, pr, "apron_h", "BackApron")
     back_apron = ba_ext.bodies.item(0); back_apron.name = "Apron_Back"
 
-    _, pr = af.sketch_rect_model(apron_c, az_pl,
+    _, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("0 in", "leg_size", "apron_z"),
         {"x": "apron_thick", "y": "long_apron_l"}, "LeftApron_Sk", ev)
-    la_ext = af.ext_new(apron_c, pr, "apron_h", "LeftApron")
+    la_ext = sp.ext_new(apron_c, pr, "apron_h", "LeftApron")
     left_apron = la_ext.bodies.item(0); left_apron.name = "Apron_Left"
 
-    a_xmid = af.off_plane(apron_c, apron_c.yZConstructionPlane, "mid_x", "AXMid")
-    ra_mir = af.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir")
+    a_xmid = sp.off_plane(apron_c, apron_c.yZConstructionPlane, "mid_x", "AXMid")
+    ra_mir = sp.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir")
     right_apron = ra_mir.bodies.item(0); right_apron.name = "Apron_Right"
     print(">>> Aprons: 4")
 
     # ==== STRETCHERS (centered on legs, thicker) ====
-    str_z_pl = af.off_plane(str_c, str_c.xYConstructionPlane, "str_z", "StrZ_Pl")
+    str_z_pl = sp.off_plane(str_c, str_c.xYConstructionPlane, "str_z", "StrZ_Pl")
 
-    _, pr = af.sketch_rect_model(str_c, str_z_pl,
+    _, pr = sp.sketch_rect_model(str_c, str_z_pl,
         ("leg_size", "leg_size / 2 - str_thick / 2", "str_z"),
         {"x": "front_str_l", "y": "str_thick"}, "FrontStr_Sk", ev)
-    fs_ext = af.ext_new(str_c, pr, "str_h", "FrontStr")
+    fs_ext = sp.ext_new(str_c, pr, "str_h", "FrontStr")
     str_front = fs_ext.bodies.item(0); str_front.name = "Str_Front"
 
-    _, pr = af.sketch_rect_model(str_c, str_z_pl,
+    _, pr = sp.sketch_rect_model(str_c, str_z_pl,
         ("leg_size", "seat_d - leg_size / 2 - str_thick / 2", "str_z"),
         {"x": "front_str_l", "y": "str_thick"}, "BackStr_Sk", ev)
-    bs_ext = af.ext_new(str_c, pr, "str_h", "BackStr")
+    bs_ext = sp.ext_new(str_c, pr, "str_h", "BackStr")
     str_back = bs_ext.bodies.item(0); str_back.name = "Str_Back"
 
-    _, pr = af.sketch_rect_model(str_c, str_z_pl,
+    _, pr = sp.sketch_rect_model(str_c, str_z_pl,
         ("leg_size / 2 - str_thick / 2", "leg_size", "str_z"),
         {"x": "str_thick", "y": "long_apron_l"}, "LeftStr_Sk", ev)
-    ls_ext = af.ext_new(str_c, pr, "str_h", "LeftStr")
+    ls_ext = sp.ext_new(str_c, pr, "str_h", "LeftStr")
     str_left = ls_ext.bodies.item(0); str_left.name = "Str_Left"
 
-    s_xmid = af.off_plane(str_c, str_c.yZConstructionPlane, "mid_x", "SXMid")
-    rs_mir = af.mirror_feats(str_c, [ls_ext], s_xmid, "RightStrMir")
+    s_xmid = sp.off_plane(str_c, str_c.yZConstructionPlane, "mid_x", "SXMid")
+    rs_mir = sp.mirror_feats(str_c, [ls_ext], s_xmid, "RightStrMir")
     str_right = rs_mir.bodies.item(0); str_right.name = "Str_Right"
     print(">>> Stretchers: 4 (centered on legs)")
 
     # ==== SEAT ====
-    seat_pl = af.off_plane(seat_c, seat_c.xYConstructionPlane, "front_leg_h", "SeatPl")
-    _, pr = af.sketch_rect_model(seat_c, seat_pl,
+    seat_pl = sp.off_plane(seat_c, seat_c.xYConstructionPlane, "front_leg_h", "SeatPl")
+    _, pr = sp.sketch_rect_model(seat_c, seat_pl,
         ("0 in", "0 in", "front_leg_h"),
         {"x": "seat_w", "y": "seat_d"}, "Seat_Sk", ev)
-    seat_ext = af.ext_new(seat_c, pr, "seat_thick", "SeatBoard")
+    seat_ext = sp.ext_new(seat_c, pr, "seat_thick", "SeatBoard")
     seat_body = seat_ext.bodies.item(0); seat_body.name = "Seat"
     print(">>> Seat: 1")
 
@@ -267,35 +267,35 @@ def run(context):
     # All built at non-raked positions, then rotated together.
     # Rails sit between posts (dominos connect them to posts).
     # Slats have stub tenons into both rails.
-    back_y_pl = af.off_plane(back_c, back_c.xZConstructionPlane,
+    back_y_pl = sp.off_plane(back_c, back_c.xZConstructionPlane,
                               "back_face_y", "BackY_Pl")
 
     # Top rail (between posts, offset down from top by top_rail_off)
-    _, pr = af.sketch_rect_model(back_c, back_y_pl,
+    _, pr = sp.sketch_rect_model(back_c, back_y_pl,
         ("leg_size", "back_face_y", "back_h - top_rail_off - top_rail_h"),
         {"x": "short_apron_l", "z": "top_rail_h"}, "TopRail_Sk", ev)
-    tr_ext = af.ext_new(back_c, pr, "rail_thick", "TopRail")
+    tr_ext = sp.ext_new(back_c, pr, "rail_thick", "TopRail")
     top_rail = tr_ext.bodies.item(0); top_rail.name = "TopRail"
 
     # Bottom rail (between posts, at bend_z)
-    _, pr = af.sketch_rect_model(back_c, back_y_pl,
+    _, pr = sp.sketch_rect_model(back_c, back_y_pl,
         ("leg_size", "back_face_y", "bend_z"),
         {"x": "short_apron_l", "z": "bot_rail_h"}, "BotRail_Sk", ev)
-    br_ext = af.ext_new(back_c, pr, "rail_thick", "BotRail")
+    br_ext = sp.ext_new(back_c, pr, "rail_thick", "BotRail")
     bot_rail = br_ext.bodies.item(0); bot_rail.name = "BotRail"
 
     # Vertical slats — extend slat_tenon into each rail for stub tenon
     slat_z_expr = "bend_z + bot_rail_h - slat_tenon"
-    _, pr = af.sketch_rect_model(back_c, back_y_pl,
+    _, pr = sp.sketch_rect_model(back_c, back_y_pl,
         ("slat_start_x - slat_w / 2", "back_face_y", slat_z_expr),
         {"x": "slat_w", "z": "slat_zone_h + 2 * slat_tenon"}, "VSlat_Sk", ev)
-    vs_ext = af.ext_new(back_c, pr, "slat_thick", "VSlat_1")
+    vs_ext = sp.ext_new(back_c, pr, "slat_thick", "VSlat_1")
     vslat_body = vs_ext.bodies.item(0); vslat_body.name = "VSlat_1"
 
     n_s = int(ev("n_slats"))
     vs_pat = None
     if n_s > 1:
-        vs_pat = af.body_pattern(back_c, vslat_body, back_c.xConstructionAxis,
+        vs_pat = sp.body_pattern(back_c, vslat_body, back_c.xConstructionAxis,
                                   "n_slats", "slat_pitch_x", "VSlatPat")
         for i in range(vs_pat.bodies.count):
             vs_pat.bodies.item(i).name = f"VSlat_{i+2}"
@@ -324,10 +324,10 @@ def run(context):
     print(f">>> Back: top rail + bottom rail + {n_s} vertical slats")
 
     # ==== DOMINO PLANES (shared by cross-component and domino sections) ====
-    dm_fl = af.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
-    dm_fr = af.off_plane(root, root.yZConstructionPlane, "seat_w - leg_size", "DM_FR")
-    dm_lf = af.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
-    dm_lb = af.off_plane(root, root.xZConstructionPlane, "seat_d - leg_size", "DM_LB")
+    dm_fl = sp.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
+    dm_fr = sp.off_plane(root, root.yZConstructionPlane, "seat_w - leg_size", "DM_FR")
+    dm_lf = sp.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
+    dm_lb = sp.off_plane(root, root.xZConstructionPlane, "seat_d - leg_size", "DM_LB")
 
     # ==== CROSS-COMPONENT: Seat notch, slat mortises into rails, rail dominos ====
     seat_p = seat_body.createForAssemblyContext(seat_occ)
@@ -337,7 +337,7 @@ def run(context):
     br_rail_p = bot_rail.createForAssemblyContext(back_occ)
 
     # Seat notch
-    af.combine(root, seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
+    sp.combine(root, seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
 
     # Slat stub-mortises into rails
     all_slat_bodies = [vslat_body]
@@ -347,8 +347,8 @@ def run(context):
 
     slat_proxies = [b.createForAssemblyContext(back_occ) for b in all_slat_bodies]
     for i, sp in enumerate(slat_proxies):
-        af.combine(root, tr_p, [sp], CUT, True, f"SlatMort_TR_{i}")
-        af.combine(root, br_rail_p, [sp], CUT, True, f"SlatMort_BR_{i}")
+        sp.combine(root, tr_p, [sp], CUT, True, f"SlatMort_TR_{i}")
+        sp.combine(root, br_rail_p, [sp], CUT, True, f"SlatMort_BR_{i}")
 
     # Rail-to-post TILTED dominos (aligned with backrest cross-section)
     # Build manually: sketch tilted rectangle on dm_fl/dm_fr, extrude in X
@@ -391,8 +391,8 @@ def run(context):
         ext = root.features.extrudeFeatures.add(ext_inp)
         ext.name = name
         dm_body = ext.bodies.item(0); dm_body.name = name
-        af.combine(root, rail_body, [dm_body], CUT, True, f"{name}_CutRail")
-        af.combine(root, leg_body, [dm_body], CUT, True, f"{name}_CutLeg")
+        sp.combine(root, rail_body, [dm_body], CUT, True, f"{name}_CutRail")
+        sp.combine(root, leg_body, [dm_body], CUT, True, f"{name}_CutLeg")
         sk.isVisible = False
         return dm_body
 
@@ -541,7 +541,7 @@ def run(context):
         print(f"{cn}: {len(names)} -> {names}")
     print(f"Root: {root.bRepBodies.count} voids")
 
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

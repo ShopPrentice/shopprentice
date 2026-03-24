@@ -25,9 +25,9 @@ def run(context):
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
 
-    from helpers import af, hardware
+    from helpers import sp, hardware
     hardware.clear_step_cache()
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
     results = {}
 
     # Shared board dimensions
@@ -41,22 +41,22 @@ def run(context):
     def make_door_case(tag, row):
         """Build a case side + door pair at Y = row * pitch."""
         params.add(f"{tag}_gap", VI(f"{tag}_gap_val"), "in", "")
-        occ = af.make_comp(root, tag)
+        occ = sp.make_comp(root, tag)
         comp = occ.component
         off_y = f"{row} * g_pitch"
         # Case side
-        sk, pr = af.sketch_rect_model(comp, comp.xYConstructionPlane,
+        sk, pr = sp.sketch_rect_model(comp, comp.xYConstructionPlane,
             ("0 in", off_y, "0 in"),
             {"x": "g_bt", "y": "g_depth"},
             f"{tag}_Side_Sk", ctx.ev)
-        side = af.ext_new(comp, pr, "g_h", f"{tag}_Side").bodies.item(0)
+        side = sp.ext_new(comp, pr, "g_h", f"{tag}_Side").bodies.item(0)
         side.name = f"{tag}_Side"
         # Door (offset by board_thick + gap)
-        sk, pr = af.sketch_rect_model(comp, comp.xYConstructionPlane,
+        sk, pr = sp.sketch_rect_model(comp, comp.xYConstructionPlane,
             (f"g_bt + {tag}_gap", off_y, "0 in"),
             {"x": "g_door_w", "y": "g_bt"},
             f"{tag}_Door_Sk", ctx.ev)
-        door = af.ext_new(comp, pr, "g_h", f"{tag}_Door").bodies.item(0)
+        door = sp.ext_new(comp, pr, "g_h", f"{tag}_Door").bodies.item(0)
         door.name = f"{tag}_Door"
         return comp, side, door
 

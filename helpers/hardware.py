@@ -586,16 +586,16 @@ def _sketch_rebate_pocket(comp, plane, origin_yz, size_yz, depth_cm,
         flip: True for CUT into -X, False for +X
         margin: Extra depth/size added for barrel clearance (cm)
     """
-    from helpers import af
+    from helpers import sp
     cuts = []
     y0, z0 = origin_yz
     yw, zh = size_yz
     # Oversized pocket: margin on all sides + depth
-    sk, pr = af.sketch_rect_model(comp, plane,
+    sk, pr = sp.sketch_rect_model(comp, plane,
         (0, y0 - margin, z0 - margin),  # X is ignored (on-plane)
         {"y": yw + 2 * margin, "z": zh + 2 * margin},
         f"{name}_Sk", ev)
-    feat = af.ext_op(comp, pr, f"{depth_cm + margin} cm", CUT, board,
+    feat = sp.ext_op(comp, pr, f"{depth_cm + margin} cm", CUT, board,
                      f"{name}", flip=flip)
     sk.isVisible = False
     if feat:
@@ -618,7 +618,7 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
     door_surface — body-CUT mortise (hinge visible, exact fit desired)
     door_flush   — sketch rebate based on gap logic
     """
-    from helpers import af
+    from helpers import sp
     cuts = []
 
     def _offset_expr(idx):
@@ -627,20 +627,20 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
 
     if style == "lid_surface":
         # Sketch rebates on back face plane (XZ at Y = pin_pos[1])
-        cut_pl = af.off_plane(comp, comp.xZConstructionPlane,
+        cut_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                               _offset_expr(1), f"{name}_CutPl")
         cut_pl.isLightBulbOn = False
 
         hinge_bb = _hinge_combined_bbox(occ, bodies, body_occ_map)
 
         for board, sfx, flip in [(board_a, "A", True), (board_b, "B", True)]:
-            sk, pr = af.sketch_rect_model(comp, cut_pl,
+            sk, pr = sp.sketch_rect_model(comp, cut_pl,
                 (hinge_bb.minPoint.x - 0.02, pos[1],
                  hinge_bb.minPoint.z - 0.02),
                 {"x": (hinge_bb.maxPoint.x - hinge_bb.minPoint.x) + 0.04,
                  "z": (hinge_bb.maxPoint.z - hinge_bb.minPoint.z) + 0.04},
                 f"{name}_Reb{sfx}_Sk", ev)
-            feat = af.ext_op(comp, pr, f"{plate_t_cm + 0.02} cm", CUT,
+            feat = sp.ext_op(comp, pr, f"{plate_t_cm + 0.02} cm", CUT,
                              board, f"{name}_Reb{sfx}", flip=flip)
             sk.isVisible = False
             if feat:
@@ -656,7 +656,7 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
 
     elif style == "lid_flush":
         # Seam plane at Z = joint_line
-        cut_pl = af.off_plane(comp, comp.xYConstructionPlane,
+        cut_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                               _offset_expr(2), f"{name}_CutPl")
         cut_pl.isLightBulbOn = False
 
@@ -665,13 +665,13 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
                        abs(hinge_bb.minPoint.z - pos[2]))
 
         for board, sfx, flip in [(board_a, "A", False), (board_b, "B", True)]:
-            sk, pr = af.sketch_rect_model(comp, cut_pl,
+            sk, pr = sp.sketch_rect_model(comp, cut_pl,
                 (hinge_bb.minPoint.x - 0.02,
                  hinge_bb.minPoint.y - 0.02, pos[2]),
                 {"x": (hinge_bb.maxPoint.x - hinge_bb.minPoint.x) + 0.04,
                  "y": (hinge_bb.maxPoint.y - hinge_bb.minPoint.y) + 0.04},
                 f"{name}_Reb{sfx}_Sk", ev)
-            feat = af.ext_op(comp, pr, f"{barrel_r + 0.02} cm", CUT,
+            feat = sp.ext_op(comp, pr, f"{barrel_r + 0.02} cm", CUT,
                              board, f"{name}_Reb{sfx}", flip=flip)
             sk.isVisible = False
             if feat:
@@ -683,7 +683,7 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
             proxy = _make_body_proxy(b, occ, body_occ_map) if occ else b
             for board in [board_b, board_a]:
                 try:
-                    c = af.combine(comp, board, [proxy], CUT, True,
+                    c = sp.combine(comp, board, [proxy], CUT, True,
                                    f"{name}_Cut_{board.name}_{b.name}")
                     if c:
                         cuts.append(c)
@@ -724,7 +724,7 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
 
         # Case side rebate (leaf_b → board_b)
         if depth_b > 0.001:
-            cut_pl = af.off_plane(comp, comp.yZConstructionPlane,
+            cut_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                                   _offset_expr(0), f"{name}_CutPl")
             cut_pl.isLightBulbOn = False
             py, pz, pyw, pzh = _open_mortise_yz(bb_b, board_b)
@@ -737,7 +737,7 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
         if depth_a > 0.001:
             gap_sign = 1 if door_at_plus_x else -1
             if gap_cm > 0.001:
-                door_pl = af.off_plane(comp, comp.yZConstructionPlane,
+                door_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                                        f"{pos[0] + gap_sign * gap_cm} cm",
                                        f"{name}_DoorPl")
                 door_pl.isLightBulbOn = False
@@ -851,7 +851,7 @@ def install_hinge_screws(hinge_result, comp, ev=None, name="Screw",
 
     Imports a screw STEP for each hole, positions it so the head is
     flush with the outer leaf surface, and CUTs a countersink pocket
-    into the leaf.
+    into the lesp.
 
     Args:
         hinge_result: Dict from install_butt_hinge().
@@ -860,7 +860,7 @@ def install_hinge_screws(hinge_result, comp, ev=None, name="Screw",
         name: Name prefix.
         leaf_boards: Dict {id(leaf) -> board_body} for screw direction.
     """
-    from helpers import af
+    from helpers import sp
 
     part = hinge_result["part"]
     screw_id = part.get("screw")
@@ -937,11 +937,11 @@ def install_hinge_screws(hinge_result, comp, ev=None, name="Screw",
             screw_occ.component.name = screw_name
 
             # CUT countersink into leaf
-            leaf_proxy = leaf.createForAssemblyContext(occ)
+            leaf_proxy = lesp.createForAssemblyContext(occ)
             for sb in screw_bodies:
                 screw_proxy = sb.createForAssemblyContext(screw_occ)
                 try:
-                    af.combine(comp, leaf_proxy, [screw_proxy], CUT, True,
+                    sp.combine(comp, leaf_proxy, [screw_proxy], CUT, True,
                                f"{screw_name}_CSink")
                 except Exception:
                     pass
@@ -1335,17 +1335,17 @@ def install(part_id, comp, position, board=None,
     _hardware_occurrences.append((occ, comp))
     cut_result = None
     if mortise and board is not None and bodies:
-        from helpers import af
+        from helpers import sp
         tool_proxies = [b.createForAssemblyContext(occ) for b in bodies]
         root = adsk.fusion.Design.cast(
             adsk.core.Application.get().activeProduct).rootComponent
         cut_name = f"{name}_Mort" if name else "HW_Mort"
-        cut_result = af.combine(root, board, tool_proxies, CUT,
+        cut_result = sp.combine(root, board, tool_proxies, CUT,
                                 keep_tool, cut_name)
     if appearance:
-        from helpers import af
+        from helpers import sp
         for b in bodies:
-            af.apply_appearance(b, appearance)
+            sp.apply_appearance(b, appearance)
     return {"occurrence": occ, "bodies": bodies, "cut": cut_result, "part": part}
 
 
@@ -1374,7 +1374,7 @@ def install_butt_hinge_pair(part_id, comp, pin_y, pin_z,
     all hinge/screw bodies across the midplane for the right hinge.
     Only 1 STEP import per part type (hinge + screw).
     """
-    from helpers import af
+    from helpers import sp
 
     if lid_length_cm is None and lid_length_expr and ev:
         lid_length_cm = ev(lid_length_expr)
@@ -1396,7 +1396,7 @@ def install_butt_hinge_pair(part_id, comp, pin_y, pin_z,
 
     # Create midplane for mirror (at half the lid length along pin axis)
     mid_offset = f"{lid_length_cm / 2} cm"
-    mid_plane = af.off_plane(comp, comp.yZConstructionPlane,
+    mid_plane = sp.off_plane(comp, comp.yZConstructionPlane,
                              mid_offset, f"{name}_MidPl")
     mid_plane.isLightBulbOn = False
 
@@ -1404,7 +1404,7 @@ def install_butt_hinge_pair(part_id, comp, pin_y, pin_z,
     hinge_occ = left["occurrence"]
     hinge_proxies = [b.createForAssemblyContext(hinge_occ)
                      for b in left["bodies"]]
-    hinge_mirror = af.mirror_bodies(comp, hinge_proxies, mid_plane,
+    hinge_mirror = sp.mirror_bodies(comp, hinge_proxies, mid_plane,
                                     f"{name}_R_Mirror")
 
     # Mirror screw bodies separately
@@ -1422,7 +1422,7 @@ def install_butt_hinge_pair(part_id, comp, pin_y, pin_z,
             # Move-copied bodies are already in comp space
             screw_bodies_to_mirror = list(screw["bodies"])
         if screw_bodies_to_mirror:
-            sm = af.mirror_bodies(comp, screw_bodies_to_mirror, mid_plane,
+            sm = sp.mirror_bodies(comp, screw_bodies_to_mirror, mid_plane,
                                   f"{name}_R_Sc{idx}_Mirror")
             screw_mirrors.append(sm)
 

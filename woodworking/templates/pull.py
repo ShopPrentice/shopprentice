@@ -20,7 +20,7 @@ Usage:
 import adsk.core
 import adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 NEW = adsk.fusion.FeatureOperations.NewBodyFeatureOperation
@@ -129,7 +129,7 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         Dict with "bolt_cuts", "post_bodies", "bar_body".
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
     p = prefix
     _idx = {"x": 0, "y": 1, "z": 2}
 
@@ -174,7 +174,7 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         ).parameter.expression = f"{p}_bolt_d"
 
         prof = sk.profiles.item(0)
-        cut = af.ext_op(comp, prof, board_thick_expr, CUT, body,
+        cut = sp.ext_op(comp, prof, board_thick_expr, CUT, body,
                         f"{name}_Bolt{i}", flip=flip)
         bolt_cuts.append(cut)
 
@@ -198,7 +198,7 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
 
         prof = sk.profiles.item(0)
         # Posts extend opposite to bolt holes (outward from surface)
-        post_ext = af.ext_op(comp, prof, f"{p}_standoff", NEW, None,
+        post_ext = sp.ext_op(comp, prof, f"{p}_standoff", NEW, None,
                              f"{name}_Post{i}", flip=not flip)
         pb = post_ext.bodies.item(0)
         pb.name = f"{name}_Post{i}"
@@ -243,14 +243,14 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         gc.addVertical(rect.item(1))
         gc.addVertical(rect.item(3))
 
-        prof = af.smallest_profile(sk)
-        bar_ext = af.ext_op(comp, prof, f"{p}_bar_d", NEW, None,
+        prof = sp.smallest_profile(sk)
+        bar_ext = sp.ext_op(comp, prof, f"{p}_bar_d", NEW, None,
                             f"{name}_Bar", flip=not flip)
         bar_body = bar_ext.bodies.item(0)
         bar_body.name = f"{name}_Bar"
 
         # JOIN bar + posts into one handle body
-        af.combine(comp, post_bodies[0], [post_bodies[1], bar_body],
+        sp.combine(comp, post_bodies[0], [post_bodies[1], bar_body],
                    JOIN, False, f"{name}_HandleJoin")
 
     return {

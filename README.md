@@ -65,7 +65,7 @@ Each folder under `examples/` contains a complete Fusion 360 project with screen
 
 <table>
 <tr>
-<td align="center"><a href="examples/roubo_workbench/"><img src="examples/roubo_workbench/screenshots/iso-top-right.png" width="200" /><br /><b>Roubo Workbench</b></a><br />Leg vise, dovetail tenons, deadman, dog holes</td>
+<td align="center"><a href="examples/roubo_workbench/"><img src="examples/roubo_workbench/screenshots/front.png" width="200" /><br /><b>Roubo Workbench</b></a><br />Leg vise, drawbore tenons, sliding deadman, dog holes</td>
 <td align="center"><a href="examples/tv-console/"><img src="examples/tv-console/screenshots/iso-top-left.png" width="200" /><br /><b>TV Console</b></a><br />Interlocking M&T, dovetails, dominos</td>
 <td align="center"><a href="examples/dresser/"><img src="examples/dresser/screenshots/iso-top-right.png" width="200" /><br /><b>Dresser</b></a><br />3-drawer, through dovetail case</td>
 </tr>
@@ -230,7 +230,7 @@ curl http://localhost:9100/tools           # lists all 16 tools
 ```
 shopprentice/
   addin/              Fusion 360 add-in (MCP server + tools)
-    helpers/           Runtime helpers (af.py — sketch, extrude, combine utilities)
+    helpers/           Runtime helpers (sp.py — sketch, extrude, combine utilities)
       templates/       Reusable joinery templates (domino, mortise_tenon, dovetail, etc.)
     server/            MCP server and action log
     tools/             MCP tool implementations

@@ -15,7 +15,7 @@ Components:
 """
 import adsk.core, adsk.fusion
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import dovetailed_drawer
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
@@ -78,10 +78,10 @@ def run(context):
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
-    leg_occ    = af.make_comp(root, "Legs")
-    apron_occ  = af.make_comp(root, "Aprons")
-    top_occ    = af.make_comp(root, "Top")
-    drawer_occ = af.make_comp(root, "Drawer")
+    leg_occ    = sp.make_comp(root, "Legs")
+    apron_occ  = sp.make_comp(root, "Aprons")
+    top_occ    = sp.make_comp(root, "Top")
+    drawer_occ = sp.make_comp(root, "Drawer")
 
     leg_c    = leg_occ.component
     apron_c  = apron_occ.component
@@ -91,21 +91,21 @@ def run(context):
     # ==============================================================
     #  1. LEGS
     # ==============================================================
-    _, pr = af.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "leg_size", "y": "leg_size"},
         "LegFL_Sk", ev)
-    fl_ext = af.ext_new(leg_c, pr, "leg_h", "LegFL")
+    fl_ext = sp.ext_new(leg_c, pr, "leg_h", "LegFL")
     leg_fl = fl_ext.bodies.item(0)
     leg_fl.name = "Leg_FL"
 
-    l_xmid = af.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
-    l_ymid = af.off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "LYMid")
+    l_xmid = sp.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
+    l_ymid = sp.off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "LYMid")
 
-    af.mirror_body(leg_c, leg_fl, l_xmid, "LegFR_Mir").bodies.item(0).name = "Leg_FR"
-    leg_bl = af.mirror_body(leg_c, leg_fl, l_ymid, "LegBL_Mir").bodies.item(0)
+    sp.mirror_body(leg_c, leg_fl, l_xmid, "LegFR_Mir").bodies.item(0).name = "Leg_FR"
+    leg_bl = sp.mirror_body(leg_c, leg_fl, l_ymid, "LegBL_Mir").bodies.item(0)
     leg_bl.name = "Leg_BL"
-    af.mirror_body(leg_c, leg_bl, l_xmid, "LegBR_Mir").bodies.item(0).name = "Leg_BR"
+    sp.mirror_body(leg_c, leg_bl, l_xmid, "LegBR_Mir").bodies.item(0).name = "Leg_BR"
 
     print(">>> Legs: 4 bodies")
 
@@ -119,37 +119,37 @@ def run(context):
     #     the front face of the table in the drawer area.
     # ==============================================================
     # Back apron
-    apron_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "ApronZ_Pl")
-    _, pr = af.sketch_rect_model(apron_c, apron_z_pl,
+    apron_z_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "ApronZ_Pl")
+    _, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
         ("leg_size", "table_w - leg_size - apron_thick", "apron_z"),
         {"x": "long_apron_l", "y": "apron_thick"},
         "BackApron_Sk", ev)
-    ba_ext = af.ext_new(apron_c, pr, "apron_h", "BackApron")
+    ba_ext = sp.ext_new(apron_c, pr, "apron_h", "BackApron")
     ba_ext.bodies.item(0).name = "Apron_Back"
 
     # Left side apron
-    _, pr = af.sketch_rect_model(apron_c, apron_z_pl,
+    _, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
         ("0 in", "leg_size", "apron_z"),
         {"x": "apron_thick", "y": "short_apron_l"},
         "LeftApron_Sk", ev)
-    la_ext = af.ext_new(apron_c, pr, "apron_h", "LeftApron")
+    la_ext = sp.ext_new(apron_c, pr, "apron_h", "LeftApron")
     la_ext.bodies.item(0).name = "Apron_Left"
 
     # Right side apron
-    a_xmid = af.off_plane(apron_c, apron_c.yZConstructionPlane, "mid_x", "AXMid")
-    af.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir").bodies.item(0).name = "Apron_Right"
+    a_xmid = sp.off_plane(apron_c, apron_c.yZConstructionPlane, "mid_x", "AXMid")
+    sp.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir").bodies.item(0).name = "Apron_Right"
 
     print(">>> Aprons: 3 bodies (no front apron — drawer front fills that space)")
 
     # ==============================================================
     #  3. TOP
     # ==============================================================
-    top_pl = af.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
-    _, pr = af.sketch_rect_model(top_c, top_pl,
+    top_pl = sp.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
+    _, pr = sp.sketch_rect_model(top_c, top_pl,
         ("0 in", "0 in", "leg_h"),
         {"x": "table_l", "y": "table_w"},
         "Top_Sk", ev)
-    af.ext_new(top_c, pr, "top_thick", "TopBoard").bodies.item(0).name = "Top"
+    sp.ext_new(top_c, pr, "top_thick", "TopBoard").bodies.item(0).name = "Top"
 
     print(">>> Top: 1 body")
 
@@ -173,7 +173,7 @@ def run(context):
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{comp_name}: {len(names)} bodies -> {names}")
 
-    af.apply_appearance("cherry")
+    sp.apply_appearance("cherry")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

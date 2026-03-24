@@ -31,7 +31,7 @@ def run(context):
 
 def _run(app):
     print(">>> Script starting")
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import dovetailed_drawer
 
     design = adsk.fusion.Design.cast(app.activeProduct)
@@ -736,12 +736,12 @@ def _run(app):
     dd_front = dd_result["front"]
 
     # Pull groove on front face (template doesn't include this)
-    pull_pl = af.off_plane(drawers_c, drawers_c.xYConstructionPlane,
+    pull_pl = sp.off_plane(drawers_c, drawers_c.xYConstructionPlane,
                            "dd_zo", "Pull_Pl")
-    _, pr = af.sketch_rect_model(drawers_c, pull_pl,
+    _, pr = sp.sketch_rect_model(drawers_c, pull_pl,
         ("dd_xo", "-pull_depth", "dd_zo"),
         {"x": "dd_w", "y": "pull_depth"}, "Pull_Sk", ev)
-    af.ext_op(drawers_c, pr, "pull_h", CUT, dd_front, "PullGroove")
+    sp.ext_op(drawers_c, pr, "pull_h", CUT, dd_front, "PullGroove")
 
     # Pattern drawers 2..n
     dovetailed_drawer.pattern(drawers_c, dd_result["all_bodies"],
@@ -909,7 +909,7 @@ def _run(app):
     # ==============================================================
     #  FIT VIEW
     # ==============================================================
-    af.apply_appearance("cherry")
+    sp.apply_appearance("cherry")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

@@ -22,7 +22,7 @@ Usage:
 import adsk.core
 import adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
@@ -91,7 +91,7 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         The bracket body (BRepBody).
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     params = comp.parentDesign.userParameters
     _define_params(params, prefix)
@@ -117,56 +117,56 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         # Vertical plate sits ON the apron inner face, extending inward
         # ext_new always goes +Y, so offset plane for face_dir=-1
         vp_y = cy if face_dir > 0 else cy - thick
-        vp_pl = af.off_plane(comp, comp.xZConstructionPlane,
+        vp_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                               cm(vp_y), f"{name}_VP_Pl")
-        _, vp_prof = af.sketch_rect_model(comp, vp_pl,
+        _, vp_prof = sp.sketch_rect_model(comp, vp_pl,
             (cm(cx - w/2), cm(vp_y), cm(cz - v_h)),
             {"x": f"{prefix}_w", "z": f"{prefix}_leg_h"},
             f"{name}_VP_Sk", ev)
-        vp_ext = af.ext_new(comp, vp_prof, f"{prefix}_thick", f"{name}_VP")
+        vp_ext = sp.ext_new(comp, vp_prof, f"{prefix}_thick", f"{name}_VP")
         vert_body = vp_ext.bodies.item(0)
         vert_body.name = f"{name}_V"
 
         # Horizontal plate at top, extending inward from apron face
-        hp_pl = af.off_plane(comp, comp.xYConstructionPlane,
+        hp_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                               cm(cz - thick), f"{name}_HP_Pl")
         hp_y0 = cy if face_dir > 0 else cy - h_w
-        _, hp_prof = af.sketch_rect_model(comp, hp_pl,
+        _, hp_prof = sp.sketch_rect_model(comp, hp_pl,
             (cm(cx - w/2), cm(hp_y0), cm(cz - thick)),
             {"x": f"{prefix}_w", "y": f"{prefix}_leg_w"},
             f"{name}_HP_Sk", ev)
-        hp_ext = af.ext_new(comp, hp_prof, f"{prefix}_thick", f"{name}_HP")
+        hp_ext = sp.ext_new(comp, hp_prof, f"{prefix}_thick", f"{name}_HP")
         horiz_body = hp_ext.bodies.item(0)
         horiz_body.name = f"{name}_H"
 
-        af.combine(comp, vert_body, horiz_body, JOIN, False, f"{name}_Join")
+        sp.combine(comp, vert_body, horiz_body, JOIN, False, f"{name}_Join")
         vert_body.name = name
 
     elif face_axis == "x":
         # Vertical plate sits ON apron inner face
         vp_x = cx if face_dir > 0 else cx - thick
-        vp_pl = af.off_plane(comp, comp.yZConstructionPlane,
+        vp_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                               cm(vp_x), f"{name}_VP_Pl")
-        _, vp_prof = af.sketch_rect_model(comp, vp_pl,
+        _, vp_prof = sp.sketch_rect_model(comp, vp_pl,
             (cm(vp_x), cm(cy - w/2), cm(cz - v_h)),
             {"y": f"{prefix}_w", "z": f"{prefix}_leg_h"},
             f"{name}_VP_Sk", ev)
-        vp_ext = af.ext_new(comp, vp_prof, f"{prefix}_thick", f"{name}_VP")
+        vp_ext = sp.ext_new(comp, vp_prof, f"{prefix}_thick", f"{name}_VP")
         vert_body = vp_ext.bodies.item(0)
         vert_body.name = f"{name}_V"
 
-        hp_pl = af.off_plane(comp, comp.xYConstructionPlane,
+        hp_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                               cm(cz - thick), f"{name}_HP_Pl")
         hp_x0 = cx if face_dir > 0 else cx - h_w
-        _, hp_prof = af.sketch_rect_model(comp, hp_pl,
+        _, hp_prof = sp.sketch_rect_model(comp, hp_pl,
             (cm(hp_x0), cm(cy - w/2), cm(cz - thick)),
             {"x": f"{prefix}_leg_w", "y": f"{prefix}_w"},
             f"{name}_HP_Sk", ev)
-        hp_ext = af.ext_new(comp, hp_prof, f"{prefix}_thick", f"{name}_HP")
+        hp_ext = sp.ext_new(comp, hp_prof, f"{prefix}_thick", f"{name}_HP")
         horiz_body = hp_ext.bodies.item(0)
         horiz_body.name = f"{name}_H"
 
-        af.combine(comp, vert_body, horiz_body, JOIN, False, f"{name}_Join")
+        sp.combine(comp, vert_body, horiz_body, JOIN, False, f"{name}_Join")
         vert_body.name = name
 
     # Apply steel appearance
@@ -196,7 +196,7 @@ def row(comp, face_axis, face_dir,
         List of bracket bodies.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     n = int(ev(count) if isinstance(count, str) else count)
     step = ev(step_expr) if isinstance(step_expr, str) else step_expr

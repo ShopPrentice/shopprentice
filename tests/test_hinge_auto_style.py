@@ -60,9 +60,9 @@ def run(context):
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
 
-    from helpers import af, hardware
+    from helpers import sp, hardware
     hardware.clear_step_cache()
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
     results = {}
 
     # ── Scenario A: Box with lid (hidden hinges) ────────────────────
@@ -72,16 +72,16 @@ def run(context):
     params.add("a_h", VI("5 in"), "in", "")
     params.add("a_bt", VI("0.5 in"), "in", "")
 
-    occ_a = af.make_comp(root, "A"); comp_a = occ_a.component
-    bp = af.off_plane(comp_a, comp_a.xZConstructionPlane, "a_w - a_bt", "A_BackPl")
-    sk, pr = af.sketch_rect_model(comp_a, bp,
+    occ_a = sp.make_comp(root, "A"); comp_a = occ_a.component
+    bp = sp.off_plane(comp_a, comp_a.xZConstructionPlane, "a_w - a_bt", "A_BackPl")
+    sk, pr = sp.sketch_rect_model(comp_a, bp,
         ("0 in", "a_w - a_bt", "0 in"), {"x": "a_l", "z": "a_h"}, "A_Back_Sk", ctx.ev)
-    a_back = af.ext_new(comp_a, pr, "a_bt", "A_Back").bodies.item(0)
+    a_back = sp.ext_new(comp_a, pr, "a_bt", "A_Back").bodies.item(0)
     a_back.name = "A_Back"
-    lp = af.off_plane(comp_a, comp_a.xYConstructionPlane, "a_h", "A_LidPl")
-    sk, pr = af.sketch_rect_model(comp_a, lp,
+    lp = sp.off_plane(comp_a, comp_a.xYConstructionPlane, "a_h", "A_LidPl")
+    sk, pr = sp.sketch_rect_model(comp_a, lp,
         ("0 in", "0 in", "a_h"), {"x": "a_l", "y": "a_w"}, "A_Lid_Sk", ctx.ev)
-    a_lid = af.ext_new(comp_a, pr, "a_bt", "A_Lid").bodies.item(0)
+    a_lid = sp.ext_new(comp_a, pr, "a_bt", "A_Lid").bodies.item(0)
     a_lid.name = "A_Lid"
 
     # Auto-detect style
@@ -110,16 +110,16 @@ def run(context):
     params.add("b_depth", VI("16 in"), "in", "")
     params.add("b_off_x", VI("a_l + 4 in"), "in", "")
 
-    occ_b = af.make_comp(root, "B"); comp_b = occ_b.component
+    occ_b = sp.make_comp(root, "B"); comp_b = occ_b.component
     # Case side: thin in X, deep in Y
-    sk, pr = af.sketch_rect_model(comp_b, comp_b.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp_b, comp_b.xYConstructionPlane,
         ("b_off_x", "0 in", "0 in"), {"x": "b_bt", "y": "b_depth"}, "B_Side_Sk", ctx.ev)
-    b_side = af.ext_new(comp_b, pr, "b_h", "B_Side").bodies.item(0)
+    b_side = sp.ext_new(comp_b, pr, "b_h", "B_Side").bodies.item(0)
     b_side.name = "B_Side"
     # Door: extends in +X from side, thin in Y
-    sk, pr = af.sketch_rect_model(comp_b, comp_b.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp_b, comp_b.xYConstructionPlane,
         ("b_off_x + b_bt", "0 in", "0 in"), {"x": "b_door_w", "y": "b_bt"}, "B_Door_Sk", ctx.ev)
-    b_door = af.ext_new(comp_b, pr, "b_h", "B_Door").bodies.item(0)
+    b_door = sp.ext_new(comp_b, pr, "b_h", "B_Door").bodies.item(0)
     b_door.name = "B_Door"
 
     jt = detect_joint_type(b_side, b_door)
@@ -147,16 +147,16 @@ def run(context):
     params.add("c_bt", VI("0.375 in"), "in", "")
     params.add("c_off_y", VI("a_w + 4 in"), "in", "")
 
-    occ_c = af.make_comp(root, "C"); comp_c = occ_c.component
-    bp = af.off_plane(comp_c, comp_c.xZConstructionPlane, "c_w + c_off_y - c_bt", "C_BackPl")
-    sk, pr = af.sketch_rect_model(comp_c, bp,
+    occ_c = sp.make_comp(root, "C"); comp_c = occ_c.component
+    bp = sp.off_plane(comp_c, comp_c.xZConstructionPlane, "c_w + c_off_y - c_bt", "C_BackPl")
+    sk, pr = sp.sketch_rect_model(comp_c, bp,
         ("0 in", "c_w + c_off_y - c_bt", "0 in"), {"x": "c_l", "z": "c_h"}, "C_Back_Sk", ctx.ev)
-    c_back = af.ext_new(comp_c, pr, "c_bt", "C_Back").bodies.item(0)
+    c_back = sp.ext_new(comp_c, pr, "c_bt", "C_Back").bodies.item(0)
     c_back.name = "C_Back"
-    lp = af.off_plane(comp_c, comp_c.xYConstructionPlane, "c_h", "C_LidPl")
-    sk, pr = af.sketch_rect_model(comp_c, lp,
+    lp = sp.off_plane(comp_c, comp_c.xYConstructionPlane, "c_h", "C_LidPl")
+    sk, pr = sp.sketch_rect_model(comp_c, lp,
         ("0 in", "c_off_y", "c_h"), {"x": "c_l", "y": "c_w"}, "C_Lid_Sk", ctx.ev)
-    c_lid = af.ext_new(comp_c, pr, "c_bt", "C_Lid").bodies.item(0)
+    c_lid = sp.ext_new(comp_c, pr, "c_bt", "C_Lid").bodies.item(0)
     c_lid.name = "C_Lid"
 
     jt = detect_joint_type(c_back, c_lid)

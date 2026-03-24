@@ -11,7 +11,7 @@ Coordinate system:
 """
 import adsk.core, adsk.fusion
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import domino
 from woodworking.templates import bed_rail_fastener as brf
 from helpers import hardware as hw_mgr
@@ -109,11 +109,11 @@ def run(context):
     print(">>> Parameters done")
 
     # === COMPONENTS ===
-    post_occ    = af.make_comp(root, "Posts")
-    rail_occ    = af.make_comp(root, "Rails")
-    hb_occ      = af.make_comp(root, "Headboard")
-    slat_occ    = af.make_comp(root, "Slats")
-    support_occ = af.make_comp(root, "Support")
+    post_occ    = sp.make_comp(root, "Posts")
+    rail_occ    = sp.make_comp(root, "Rails")
+    hb_occ      = sp.make_comp(root, "Headboard")
+    slat_occ    = sp.make_comp(root, "Slats")
+    support_occ = sp.make_comp(root, "Support")
 
     post_c    = post_occ.component
     rail_c    = rail_occ.component
@@ -124,23 +124,23 @@ def run(context):
     # ================================================================
     #  1. POSTS — 4 corner posts (front short, back tall for headboard)
     # ================================================================
-    _, pr = af.sketch_rect_model(post_c, post_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(post_c, post_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "post_size", "y": "post_size"}, "PostFL_Sk", ev)
-    fl_ext = af.ext_new(post_c, pr, "front_post_h", "PostFL")
+    fl_ext = sp.ext_new(post_c, pr, "front_post_h", "PostFL")
     post_fl = fl_ext.bodies.item(0); post_fl.name = "Post_FL"
 
-    p_xmid = af.off_plane(post_c, post_c.yZConstructionPlane, "mid_x", "PXMid")
-    post_fr = af.mirror_body(post_c, post_fl, p_xmid, "PostFR").bodies.item(0)
+    p_xmid = sp.off_plane(post_c, post_c.yZConstructionPlane, "mid_x", "PXMid")
+    post_fr = sp.mirror_body(post_c, post_fl, p_xmid, "PostFR").bodies.item(0)
     post_fr.name = "Post_FR"
 
-    _, pr = af.sketch_rect_model(post_c, post_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(post_c, post_c.xYConstructionPlane,
         ("0 in", "bed_l + post_size", "0 in"),
         {"x": "post_size", "y": "post_size"}, "PostBL_Sk", ev)
-    bl_ext = af.ext_new(post_c, pr, "headboard_h", "PostBL")
+    bl_ext = sp.ext_new(post_c, pr, "headboard_h", "PostBL")
     post_bl = bl_ext.bodies.item(0); post_bl.name = "Post_BL"
 
-    post_br = af.mirror_body(post_c, post_bl, p_xmid, "PostBR").bodies.item(0)
+    post_br = sp.mirror_body(post_c, post_bl, p_xmid, "PostBR").bodies.item(0)
     post_br.name = "Post_BR"
 
     print(">>> Posts: 4 (front posts, back headboard posts)")
@@ -149,46 +149,46 @@ def run(context):
     #  2. RAILS — side rails, foot rail, ledger strips
     # ================================================================
     # Side rails: between posts, centered on post cross-section
-    lr_pl = af.off_plane(rail_c, rail_c.yZConstructionPlane,
+    lr_pl = sp.off_plane(rail_c, rail_c.yZConstructionPlane,
                           "post_size / 2 - rail_thick / 2", "LR_Pl")
-    _, pr = af.sketch_rect_model(rail_c, lr_pl,
+    _, pr = sp.sketch_rect_model(rail_c, lr_pl,
         ("post_size / 2 - rail_thick / 2", "post_size", "rail_z"),
         {"y": "side_rail_l", "z": "rail_h - post_chamfer"}, "LeftRail_Sk", ev)
-    lr_ext = af.ext_new(rail_c, pr, "rail_thick", "LeftRail")
+    lr_ext = sp.ext_new(rail_c, pr, "rail_thick", "LeftRail")
     rail_left = lr_ext.bodies.item(0); rail_left.name = "Rail_Left"
 
-    r_xmid = af.off_plane(rail_c, rail_c.yZConstructionPlane, "mid_x", "RXMid")
-    rail_right = af.mirror_feats(rail_c, [lr_ext], r_xmid, "RightRailMir").bodies.item(0)
+    r_xmid = sp.off_plane(rail_c, rail_c.yZConstructionPlane, "mid_x", "RXMid")
+    rail_right = sp.mirror_feats(rail_c, [lr_ext], r_xmid, "RightRailMir").bodies.item(0)
     rail_right.name = "Rail_Right"
 
     # Foot rail: between front posts, centered on post
-    fr_pl = af.off_plane(rail_c, rail_c.xZConstructionPlane,
+    fr_pl = sp.off_plane(rail_c, rail_c.xZConstructionPlane,
                           "post_size / 2 - rail_thick / 2", "FR_Pl")
-    _, pr = af.sketch_rect_model(rail_c, fr_pl,
+    _, pr = sp.sketch_rect_model(rail_c, fr_pl,
         ("post_size", "post_size / 2 - rail_thick / 2", "rail_z"),
         {"x": "end_rail_l", "z": "rail_h - post_chamfer"}, "FootRail_Sk", ev)
-    fr_ext = af.ext_new(rail_c, pr, "rail_thick", "FootRail")
+    fr_ext = sp.ext_new(rail_c, pr, "rail_thick", "FootRail")
     rail_foot = fr_ext.bodies.item(0); rail_foot.name = "Rail_Foot"
 
     # Back rail: between back posts, narrower, forward of headboard
-    br_pl = af.off_plane(rail_c, rail_c.xZConstructionPlane,
+    br_pl = sp.off_plane(rail_c, rail_c.xZConstructionPlane,
                           "outer_l - post_size + post_size / 2 - rail_thick / 2", "BR_Pl")
-    _, pr = af.sketch_rect_model(rail_c, br_pl,
+    _, pr = sp.sketch_rect_model(rail_c, br_pl,
         ("post_size", "outer_l - post_size + post_size / 2 - rail_thick / 2", "rail_z"),
         {"x": "end_rail_l", "z": "back_rail_h"}, "BackRail_Sk", ev)
-    back_rail_ext = af.ext_new(rail_c, pr, "rail_thick", "BackRail")
+    back_rail_ext = sp.ext_new(rail_c, pr, "rail_thick", "BackRail")
     rail_back = back_rail_ext.bodies.item(0); rail_back.name = "Rail_Back"
 
     # Ledger strips: on inside face of side rails, supporting slats
-    ldg_pl = af.off_plane(rail_c, rail_c.yZConstructionPlane,
+    ldg_pl = sp.off_plane(rail_c, rail_c.yZConstructionPlane,
                            "post_size / 2 + rail_thick / 2", "LDG_Pl")
-    _, pr = af.sketch_rect_model(rail_c, ldg_pl,
+    _, pr = sp.sketch_rect_model(rail_c, ldg_pl,
         ("post_size / 2 + rail_thick / 2", "post_size", "ledger_z"),
         {"y": "side_rail_l", "z": "ledger_h"}, "LedgerL_Sk", ev)
-    ll_ext = af.ext_new(rail_c, pr, "ledger_thick", "LedgerLeft")
+    ll_ext = sp.ext_new(rail_c, pr, "ledger_thick", "LedgerLeft")
     ledger_left = ll_ext.bodies.item(0); ledger_left.name = "Ledger_Left"
 
-    af.mirror_feats(rail_c, [ll_ext], r_xmid, "LedgerRMir").bodies.item(0).name = "Ledger_Right"
+    sp.mirror_feats(rail_c, [ll_ext], r_xmid, "LedgerRMir").bodies.item(0).name = "Ledger_Right"
 
     print(">>> Rails: 4 rails + 2 ledgers")
 
@@ -196,34 +196,34 @@ def run(context):
     #  3. HEADBOARD — framed: top rail + bottom rail + vertical slats
     # ================================================================
     # Rails and slats centered on back post cross-section
-    hb_y_pl = af.off_plane(hb_c, hb_c.xZConstructionPlane, "hb_face_y", "HB_Y_Pl")
+    hb_y_pl = sp.off_plane(hb_c, hb_c.xZConstructionPlane, "hb_face_y", "HB_Y_Pl")
 
     # Top rail (between posts)
-    _, pr = af.sketch_rect_model(hb_c, hb_y_pl,
+    _, pr = sp.sketch_rect_model(hb_c, hb_y_pl,
         ("post_size", "hb_face_y", "headboard_h - hb_top_rail_h"),
         {"x": "end_rail_l", "z": "hb_top_rail_h"}, "HBTopRail_Sk", ev)
-    hb_tr_ext = af.ext_new(hb_c, pr, "hb_rail_thick", "HBTopRail")
+    hb_tr_ext = sp.ext_new(hb_c, pr, "hb_rail_thick", "HBTopRail")
     hb_top_rail = hb_tr_ext.bodies.item(0); hb_top_rail.name = "HB_TopRail"
 
     # Bottom rail (between posts, at side rail height)
-    _, pr = af.sketch_rect_model(hb_c, hb_y_pl,
+    _, pr = sp.sketch_rect_model(hb_c, hb_y_pl,
         ("post_size", "hb_face_y", "front_post_h"),
         {"x": "end_rail_l", "z": "hb_bot_rail_h"}, "HBBotRail_Sk", ev)
-    hb_br_ext = af.ext_new(hb_c, pr, "hb_rail_thick", "HBBotRail")
+    hb_br_ext = sp.ext_new(hb_c, pr, "hb_rail_thick", "HBBotRail")
     hb_bot_rail = hb_br_ext.bodies.item(0); hb_bot_rail.name = "HB_BotRail"
 
     # Vertical slats with stub tenons into rails
-    _, pr = af.sketch_rect_model(hb_c, hb_y_pl,
+    _, pr = sp.sketch_rect_model(hb_c, hb_y_pl,
         ("hb_slat_start - hb_slat_w / 2", "hb_face_y",
          "front_post_h + hb_bot_rail_h - hb_slat_tenon"),
         {"x": "hb_slat_w", "z": "hb_zone_h + 2 * hb_slat_tenon"}, "HBSlat_Sk", ev)
-    hb_slat_ext = af.ext_new(hb_c, pr, "hb_slat_thick", "HBSlat_1")
+    hb_slat_ext = sp.ext_new(hb_c, pr, "hb_slat_thick", "HBSlat_1")
     hb_slat = hb_slat_ext.bodies.item(0); hb_slat.name = "HBSlat_1"
 
     n_hbs = int(ev("n_hb_slats"))
     hb_pat = None
     if n_hbs > 1:
-        hb_pat = af.body_pattern(hb_c, hb_slat, hb_c.xConstructionAxis,
+        hb_pat = sp.body_pattern(hb_c, hb_slat, hb_c.xConstructionAxis,
                                   "n_hb_slats", "hb_slat_pitch", "HBSlatPat")
         for i in range(hb_pat.bodies.count):
             hb_pat.bodies.item(i).name = f"HBSlat_{i+2}"
@@ -233,15 +233,15 @@ def run(context):
     # ================================================================
     #  4. SLATS — mattress support, resting on ledger strips
     # ================================================================
-    slat_z_pl = af.off_plane(slat_c, slat_c.xYConstructionPlane, "slat_z", "SlatZ_Pl")
-    _, pr = af.sketch_rect_model(slat_c, slat_z_pl,
+    slat_z_pl = sp.off_plane(slat_c, slat_c.xYConstructionPlane, "slat_z", "SlatZ_Pl")
+    _, pr = sp.sketch_rect_model(slat_c, slat_z_pl,
         ("post_size / 2 + rail_thick / 2", "post_size", "slat_z"),
         {"x": "slat_l", "y": "slat_w"}, "Slat_Sk", ev)
-    slat_ext = af.ext_new(slat_c, pr, "slat_thick", "Slat_1")
+    slat_ext = sp.ext_new(slat_c, pr, "slat_thick", "Slat_1")
     slat_body = slat_ext.bodies.item(0); slat_body.name = "Slat_1"
 
     if int(ev("n_slats")) > 1:
-        pat = af.body_pattern(slat_c, slat_body, slat_c.yConstructionAxis,
+        pat = sp.body_pattern(slat_c, slat_body, slat_c.yConstructionAxis,
                                "n_slats", "slat_sp", "SlatPat")
         for i in range(pat.bodies.count):
             pat.bodies.item(i).name = f"Slat_{i+2}"
@@ -252,25 +252,25 @@ def run(context):
     #  5. CENTER SUPPORT — beam with 2 legs
     # ================================================================
     # Beam: runs lengthwise (Y) at mid_x, from post to post, up to ledger top
-    beam_pl = af.off_plane(support_c, support_c.yZConstructionPlane,
+    beam_pl = sp.off_plane(support_c, support_c.yZConstructionPlane,
                             "mid_x - beam_thick / 2", "Beam_Pl")
-    _, pr = af.sketch_rect_model(support_c, beam_pl,
+    _, pr = sp.sketch_rect_model(support_c, beam_pl,
         ("mid_x - beam_thick / 2", "post_size", "beam_h - beam_w"),
         {"y": "bed_l", "z": "beam_w"}, "Beam_Sk", ev)
-    beam_ext = af.ext_new(support_c, pr, "beam_thick", "CenterBeam")
+    beam_ext = sp.ext_new(support_c, pr, "beam_thick", "CenterBeam")
     beam = beam_ext.bodies.item(0); beam.name = "CenterBeam"
 
     # Two legs under the beam (at 1/3 and 2/3 along length)
-    _, pr = af.sketch_rect_model(support_c, support_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(support_c, support_c.xYConstructionPlane,
         ("mid_x - beam_leg_size / 2", "post_size + bed_l / 3 - beam_leg_size / 2", "0 in"),
         {"x": "beam_leg_size", "y": "beam_leg_size"}, "BeamLeg1_Sk", ev)
-    bl1_ext = af.ext_new(support_c, pr, "beam_h - beam_w", "BeamLeg1")
+    bl1_ext = sp.ext_new(support_c, pr, "beam_h - beam_w", "BeamLeg1")
     bl1_ext.bodies.item(0).name = "BeamLeg_1"
 
-    _, pr = af.sketch_rect_model(support_c, support_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(support_c, support_c.xYConstructionPlane,
         ("mid_x - beam_leg_size / 2", "post_size + 2 * bed_l / 3 - beam_leg_size / 2", "0 in"),
         {"x": "beam_leg_size", "y": "beam_leg_size"}, "BeamLeg2_Sk", ev)
-    bl2_ext = af.ext_new(support_c, pr, "beam_h - beam_w", "BeamLeg2")
+    bl2_ext = sp.ext_new(support_c, pr, "beam_h - beam_w", "BeamLeg2")
     bl2_ext.bodies.item(0).name = "BeamLeg_2"
 
     print(">>> Support: 1 beam + 2 legs")
@@ -289,8 +289,8 @@ def run(context):
 
     hb_slat_proxies = [b.createForAssemblyContext(hb_occ) for b in all_hb_slats]
     for i, sp in enumerate(hb_slat_proxies):
-        af.combine(root, hb_tr_p, [sp], CUT, True, f"HBSlatMort_TR_{i}")
-        af.combine(root, hb_br_p, [sp], CUT, True, f"HBSlatMort_BR_{i}")
+        sp.combine(root, hb_tr_p, [sp], CUT, True, f"HBSlatMort_TR_{i}")
+        sp.combine(root, hb_br_p, [sp], CUT, True, f"HBSlatMort_BR_{i}")
 
     print(">>> Headboard slat mortises done")
 
@@ -312,10 +312,10 @@ def run(context):
     hb_br_rp = hb_bot_rail.createForAssemblyContext(hb_occ)
 
     # Domino planes at post inner faces
-    dm_xl = af.off_plane(root, root.yZConstructionPlane, "post_size", "DM_XL")
-    dm_xr = af.off_plane(root, root.yZConstructionPlane, "outer_w - post_size", "DM_XR")
-    dm_yf = af.off_plane(root, root.xZConstructionPlane, "post_size", "DM_YF")
-    dm_yb = af.off_plane(root, root.xZConstructionPlane, "outer_l - post_size", "DM_YB")
+    dm_xl = sp.off_plane(root, root.yZConstructionPlane, "post_size", "DM_XL")
+    dm_xr = sp.off_plane(root, root.yZConstructionPlane, "outer_w - post_size", "DM_XR")
+    dm_yf = sp.off_plane(root, root.xZConstructionPlane, "post_size", "DM_YF")
+    dm_yb = sp.off_plane(root, root.xZConstructionPlane, "outer_l - post_size", "DM_YB")
 
     # --- Side rails → posts (bed rail fasteners — detachable) ---
     rail_center_z = ev("rail_z") + (ev("rail_top_z") - ev("rail_z")) / 2
@@ -395,7 +395,7 @@ def run(context):
     params.add("ledger_dm_z", VI("ledger_z + ledger_h / 2"), "in", "")
 
     # Left ledger → left rail (smaller dominos, flat — both grain in Y, cross at Z)
-    ledger_dm_pl_l = af.off_plane(root, root.yZConstructionPlane,
+    ledger_dm_pl_l = sp.off_plane(root, root.yZConstructionPlane,
         "post_size / 2 + rail_thick / 2", "LedgerDM_PlL")
     # Ledger (grain Y) → rail (grain Y): domino lays flat, wide face in YZ plane
     # long_axis="y" (parallel to grain, wide face in the board surface plane)
@@ -405,7 +405,7 @@ def run(context):
         ll_p, rl_p, "DM_LL", ev)
 
     # Right ledger → right rail
-    ledger_dm_pl_r = af.off_plane(root, root.yZConstructionPlane,
+    ledger_dm_pl_r = sp.off_plane(root, root.yZConstructionPlane,
         "outer_w - post_size / 2 - rail_thick / 2", "LedgerDM_PlR")
     lr_p = None
     for i in range(rail_c.bRepBodies.count):
@@ -497,7 +497,7 @@ def run(context):
         print(f"{cn}: {len(names)} -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
 
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

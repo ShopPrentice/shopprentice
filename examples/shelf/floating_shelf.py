@@ -13,7 +13,7 @@ Components:
 """
 import adsk.core, adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -52,8 +52,8 @@ def run(context):
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
-    shelf_occ = af.make_comp(root, "Shelf")
-    cleat_occ = af.make_comp(root, "Cleat")
+    shelf_occ = sp.make_comp(root, "Shelf")
+    cleat_occ = sp.make_comp(root, "Cleat")
     shelf_c = shelf_occ.component
     cleat_c = cleat_occ.component
 
@@ -61,37 +61,37 @@ def run(context):
     #  1. SHELF — hollow shell
     # ==============================================================
     # Bottom board: Z=0, full length × full depth
-    _, pr = af.sketch_rect_model(shelf_c, shelf_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(shelf_c, shelf_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "shelf_l", "y": "shelf_d"},
         "Bottom_Sk", ev)
-    bot_ext = af.ext_new(shelf_c, pr, "board_thick", "BottomBoard")
+    bot_ext = sp.ext_new(shelf_c, pr, "board_thick", "BottomBoard")
     bottom = bot_ext.bodies.item(0)
     bottom.name = "Bottom"
 
     # Top board: Z = shelf_thick - board_thick
-    top_pl = af.off_plane(shelf_c, shelf_c.xYConstructionPlane,
+    top_pl = sp.off_plane(shelf_c, shelf_c.xYConstructionPlane,
                            "shelf_thick - board_thick", "Top_Pl")
-    _, pr = af.sketch_rect_model(shelf_c, top_pl,
+    _, pr = sp.sketch_rect_model(shelf_c, top_pl,
         ("0 in", "0 in", "shelf_thick - board_thick"),
         {"x": "shelf_l", "y": "shelf_d"},
         "Top_Sk", ev)
-    top_ext = af.ext_new(shelf_c, pr, "board_thick", "TopBoard")
+    top_ext = sp.ext_new(shelf_c, pr, "board_thick", "TopBoard")
     top_body = top_ext.bodies.item(0)
     top_body.name = "Top"
 
     # Left end cap: X=0, full depth × full height
-    _, pr = af.sketch_rect_model(shelf_c, shelf_c.yZConstructionPlane,
+    _, pr = sp.sketch_rect_model(shelf_c, shelf_c.yZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"y": "shelf_d", "z": "shelf_thick"},
         "LeftCap_Sk", ev)
-    left_ext = af.ext_new(shelf_c, pr, "board_thick", "LeftCap")
+    left_ext = sp.ext_new(shelf_c, pr, "board_thick", "LeftCap")
     left_cap = left_ext.bodies.item(0)
     left_cap.name = "Cap_Left"
 
     # Right end cap: mirror across XMid
-    x_mid = af.off_plane(shelf_c, shelf_c.yZConstructionPlane, "mid_x", "XMid")
-    right_mir = af.mirror_feats(shelf_c, [left_ext], x_mid, "RightCapMir")
+    x_mid = sp.off_plane(shelf_c, shelf_c.yZConstructionPlane, "mid_x", "XMid")
+    right_mir = sp.mirror_feats(shelf_c, [left_ext], x_mid, "RightCapMir")
     right_cap = right_mir.bodies.item(0)
     right_cap.name = "Cap_Right"
 
@@ -102,13 +102,13 @@ def run(context):
     # ==============================================================
     # Cleat sits inside the shelf cavity, against the back wall (max Y)
     # Position: X = board_thick, Y = board_thick, Z = board_thick
-    cleat_pl = af.off_plane(cleat_c, cleat_c.xYConstructionPlane,
+    cleat_pl = sp.off_plane(cleat_c, cleat_c.xYConstructionPlane,
                              "board_thick", "Cleat_Pl")
-    _, pr = af.sketch_rect_model(cleat_c, cleat_pl,
+    _, pr = sp.sketch_rect_model(cleat_c, cleat_pl,
         ("board_thick", "board_thick", "board_thick"),
         {"x": "cleat_l", "y": "cleat_d"},
         "Cleat_Sk", ev)
-    cleat_ext = af.ext_new(cleat_c, pr, "cleat_h", "CleatBoard")
+    cleat_ext = sp.ext_new(cleat_c, pr, "cleat_h", "CleatBoard")
     cleat_body = cleat_ext.bodies.item(0)
     cleat_body.name = "Cleat"
 
@@ -133,7 +133,7 @@ def run(context):
                   for i in range(root.bRepBodies.count)]
     print(f"Root: {len(root_names)} bodies -> {root_names}")
 
-    af.apply_appearance("walnut")
+    sp.apply_appearance("walnut")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

@@ -8,10 +8,10 @@
 
 - **5" slab top** with through-tenon mortises, dog holes along the front edge, and a tongue groove on the underside for the sliding deadman
 - **Full-width dovetail + tenon paired joint** — each leg has a trapezoidal dovetail and a rectangular tenon, both full leg width, extruding through the top. Sketches reference the leg top face directly (no `leg_setback` dependency)
-- **Leg vise** on the front-left leg with wider chop (7"), chamfered top edge, screw, handle, and parallel guide. All vise geometry references the FL leg face via `LegFL_Left` construction plane — vise follows the leg automatically
+- **Leg vise** on the front-left leg with wider chop (7"), chamfered front edges (top + both sides), screw, handle, and parallel guide. All vise geometry references the FL leg face via `LegFL_Left` construction plane
 - **Sliding deadman** with tongue-and-groove: tongues on top/bottom edges slide in grooves cut into the front stretcher and bench top underside
-- **Through-tenon stretchers** — long and short stretchers have proper tenon shoulders (`st_tw x st_tt`) with the main body between legs at full cross-section
-- **Short stretchers** raised above the long stretchers to avoid mortise conflicts in the legs
+- **Drawbore through-tenon long stretchers** — tenon shoulders with 3/8" pins through each leg for mechanical lock
+- **Blind tenon short stretchers** — raised above the long stretchers, tenons stop inside the legs
 - **Fully parametric** — every dimension uses parameter expressions
 
 ## Views

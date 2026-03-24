@@ -40,10 +40,10 @@ def build_box(root, prefix, l_expr, w_expr, h_expr, t_expr,
     Returns:
         Dict with component, bodies, and body count.
     """
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import finger_joint
 
-    occ = af.make_comp(root, prefix)
+    occ = sp.make_comp(root, prefix)
     comp = occ.component
 
     ox = ev(x_off_expr) if x_off_expr != "0 in" else 0.0
@@ -72,7 +72,7 @@ def _build_standard(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
                     x_off_expr, y_off_expr, fj_prefix, ev, corners,
                     joint_axis, thick_axis, ox, oy):
     """Standard box: joint along Z, thick along Y."""
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import finger_joint
 
     front_y_expr = y_off_expr
@@ -85,24 +85,24 @@ def _build_standard(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
     if oy == 0.0:
         front_sk_pl = comp.xZConstructionPlane
     else:
-        front_sk_pl = af.off_plane(comp, comp.xZConstructionPlane,
+        front_sk_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                                     y_off_expr, f"{prefix}_FrontYPl")
 
-    sk, pr = af.sketch_rect_model(comp, front_sk_pl,
+    sk, pr = sp.sketch_rect_model(comp, front_sk_pl,
         (x_off_expr, front_y_expr, "0 in"),
         {"x": l_expr, "z": h_expr}, f"{prefix}_Front_Sk", ev)
-    front = af.ext_new(comp, pr, t_expr, f"{prefix}_Front").bodies.item(0)
+    front = sp.ext_new(comp, pr, t_expr, f"{prefix}_Front").bodies.item(0)
     front.name = f"{prefix}_Front"
 
     # Back (slot board, only for 4-corner)
     back = None
     if corners == 4:
-        back_pl = af.off_plane(comp, comp.xZConstructionPlane,
+        back_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                                back_y_expr, f"{prefix}_Back_Pl")
-        sk, pr = af.sketch_rect_model(comp, back_pl,
+        sk, pr = sp.sketch_rect_model(comp, back_pl,
             (x_off_expr, back_y_expr, "0 in"),
             {"x": l_expr, "z": h_expr}, f"{prefix}_Back_Sk", ev)
-        back = af.ext_new(comp, pr, t_expr, f"{prefix}_Back").bodies.item(0)
+        back = sp.ext_new(comp, pr, t_expr, f"{prefix}_Back").bodies.item(0)
         back.name = f"{prefix}_Back"
 
     # Midplanes
@@ -111,28 +111,28 @@ def _build_standard(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
     y_mid_expr = (f"{y_off_expr} + {w_expr} / 2"
                   if oy != 0.0 else f"{w_expr} / 2")
 
-    x_mid = af.off_plane(comp, comp.yZConstructionPlane,
+    x_mid = sp.off_plane(comp, comp.yZConstructionPlane,
                           x_mid_expr, f"{prefix}_XMid")
-    y_mid = af.off_plane(comp, comp.xZConstructionPlane,
+    y_mid = sp.off_plane(comp, comp.xZConstructionPlane,
                           y_mid_expr, f"{prefix}_YMid")
 
     # Left (finger board, narrower)
     if ox == 0.0:
         left_pl = comp.yZConstructionPlane
     else:
-        left_pl = af.off_plane(comp, comp.yZConstructionPlane,
+        left_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                                x_off_expr, f"{prefix}_Left_Pl")
 
-    sk, pr = af.sketch_rect_model(comp, left_pl,
+    sk, pr = sp.sketch_rect_model(comp, left_pl,
         (x_off_expr, tail_y_expr, "0 in"),
         {"y": tail_w_expr, "z": h_expr}, f"{prefix}_Left_Sk", ev)
-    left = af.ext_new(comp, pr, t_expr, f"{prefix}_Left").bodies.item(0)
+    left = sp.ext_new(comp, pr, t_expr, f"{prefix}_Left").bodies.item(0)
     left.name = f"{prefix}_Left"
 
     # Right (finger board via mirror, only for 2+ corners)
     right = None
     if corners >= 2:
-        right_mir = af.mirror_body(comp, left, x_mid, f"{prefix}_RightMir")
+        right_mir = sp.mirror_body(comp, left, x_mid, f"{prefix}_RightMir")
         right = right_mir.bodies.item(0)
         right.name = f"{prefix}_Right"
 
@@ -149,43 +149,43 @@ def _build_standard(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
 def _build_x_joint(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
                    x_off_expr, y_off_expr, fj_prefix, ev, corners, ox, oy):
     """Box with joint along X, thick along Z (lying flat)."""
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import finger_joint
 
     # Front/back: span X×Y, thin in Z
-    sk, pr = af.sketch_rect_model(comp, comp.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp, comp.xYConstructionPlane,
         (x_off_expr, y_off_expr, "0 in"),
         {"x": l_expr, "y": w_expr}, f"{prefix}_Front_Sk", ev)
-    front = af.ext_new(comp, pr, t_expr, f"{prefix}_Front").bodies.item(0)
+    front = sp.ext_new(comp, pr, t_expr, f"{prefix}_Front").bodies.item(0)
     front.name = f"{prefix}_Front"
 
-    back_pl = af.off_plane(comp, comp.xYConstructionPlane,
+    back_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                             f"{h_expr} - {t_expr}", f"{prefix}_Back_Pl")
-    sk, pr = af.sketch_rect_model(comp, back_pl,
+    sk, pr = sp.sketch_rect_model(comp, back_pl,
         (x_off_expr, y_off_expr, f"{h_expr} - {t_expr}"),
         {"x": l_expr, "y": w_expr}, f"{prefix}_Back_Sk", ev)
-    back = af.ext_new(comp, pr, t_expr, f"{prefix}_Back").bodies.item(0)
+    back = sp.ext_new(comp, pr, t_expr, f"{prefix}_Back").bodies.item(0)
     back.name = f"{prefix}_Back"
 
     # Left/right: span X×Z, thin in Y, narrower in Z
-    ext_mid = af.off_plane(comp, comp.xZConstructionPlane,
+    ext_mid = sp.off_plane(comp, comp.xZConstructionPlane,
                             f"{y_off_expr} + {w_expr} / 2"
                             if oy != 0.0 else f"{w_expr} / 2",
                             f"{prefix}_ExtMid")
-    thick_mid = af.off_plane(comp, comp.xYConstructionPlane,
+    thick_mid = sp.off_plane(comp, comp.xYConstructionPlane,
                               f"{h_expr} / 2", f"{prefix}_ThickMid")
 
-    left_pl = af.off_plane(comp, comp.xZConstructionPlane,
+    left_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                             y_off_expr if oy != 0.0 else "0 in",
                             f"{prefix}_Left_Pl")
-    sk, pr = af.sketch_rect_model(comp, left_pl,
+    sk, pr = sp.sketch_rect_model(comp, left_pl,
         (x_off_expr, y_off_expr, t_expr),
         {"x": l_expr, "z": f"{h_expr} - 2 * {t_expr}"},
         f"{prefix}_Left_Sk", ev)
-    left = af.ext_new(comp, pr, t_expr, f"{prefix}_Left").bodies.item(0)
+    left = sp.ext_new(comp, pr, t_expr, f"{prefix}_Left").bodies.item(0)
     left.name = f"{prefix}_Left"
 
-    right_mir = af.mirror_body(comp, left, ext_mid, f"{prefix}_RightMir")
+    right_mir = sp.mirror_body(comp, left, ext_mid, f"{prefix}_RightMir")
     right = right_mir.bodies.item(0)
     right.name = f"{prefix}_Right"
 
@@ -201,47 +201,47 @@ def _build_x_joint(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
 def _build_y_joint(comp, root, prefix, l_expr, w_expr, h_expr, t_expr,
                    x_off_expr, y_off_expr, fj_prefix, ev, corners, ox, oy):
     """Box with joint along Y, thick along X (on its side)."""
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import finger_joint
 
     # Front/back: span Y×Z, thin in X
-    front_pl = af.off_plane(comp, comp.yZConstructionPlane,
+    front_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                              x_off_expr, f"{prefix}_Front_Pl")
-    sk, pr = af.sketch_rect_model(comp, front_pl,
+    sk, pr = sp.sketch_rect_model(comp, front_pl,
         (x_off_expr, y_off_expr, "0 in"),
         {"y": w_expr, "z": h_expr}, f"{prefix}_Front_Sk", ev)
-    front = af.ext_new(comp, pr, t_expr, f"{prefix}_Front").bodies.item(0)
+    front = sp.ext_new(comp, pr, t_expr, f"{prefix}_Front").bodies.item(0)
     front.name = f"{prefix}_Front"
 
-    back_pl = af.off_plane(comp, comp.yZConstructionPlane,
+    back_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                             f"{x_off_expr} + {l_expr} - {t_expr}"
                             if ox != 0.0 else f"{l_expr} - {t_expr}",
                             f"{prefix}_Back_Pl")
-    sk, pr = af.sketch_rect_model(comp, back_pl,
+    sk, pr = sp.sketch_rect_model(comp, back_pl,
         (f"{x_off_expr} + {l_expr} - {t_expr}" if ox != 0.0
          else f"{l_expr} - {t_expr}",
          y_off_expr, "0 in"),
         {"y": w_expr, "z": h_expr}, f"{prefix}_Back_Sk", ev)
-    back = af.ext_new(comp, pr, t_expr, f"{prefix}_Back").bodies.item(0)
+    back = sp.ext_new(comp, pr, t_expr, f"{prefix}_Back").bodies.item(0)
     back.name = f"{prefix}_Back"
 
     # Left/right: span X×Y, thin in Z, narrower in X
-    z_mid = af.off_plane(comp, comp.xYConstructionPlane,
+    z_mid = sp.off_plane(comp, comp.xYConstructionPlane,
                           f"{h_expr} / 2", f"{prefix}_ZMid")
-    x_mid = af.off_plane(comp, comp.yZConstructionPlane,
+    x_mid = sp.off_plane(comp, comp.yZConstructionPlane,
                           f"{x_off_expr} + {l_expr} / 2"
                           if ox != 0.0 else f"{l_expr} / 2",
                           f"{prefix}_XMid")
 
-    sk, pr = af.sketch_rect_model(comp, comp.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(comp, comp.xYConstructionPlane,
         (f"{x_off_expr} + {t_expr}" if ox != 0.0 else t_expr,
          y_off_expr, "0 in"),
         {"x": f"{l_expr} - 2 * {t_expr}", "y": w_expr},
         f"{prefix}_Left_Sk", ev)
-    left = af.ext_new(comp, pr, t_expr, f"{prefix}_Left").bodies.item(0)
+    left = sp.ext_new(comp, pr, t_expr, f"{prefix}_Left").bodies.item(0)
     left.name = f"{prefix}_Left"
 
-    right_mir = af.mirror_body(comp, left, z_mid, f"{prefix}_RightMir")
+    right_mir = sp.mirror_body(comp, left, z_mid, f"{prefix}_RightMir")
     right = right_mir.bodies.item(0)
     right.name = f"{prefix}_Right"
 
@@ -266,10 +266,10 @@ def run(context):
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
 
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import finger_joint
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ================================================================
     # FIXTURE 1: 1-corner — 8x6x4, 0.5" thick, 0.375" fingers

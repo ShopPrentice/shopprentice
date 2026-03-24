@@ -32,7 +32,7 @@ import adsk.core
 import adsk.fusion
 import math
 
-from helpers import af
+from helpers import sp
 
 Point3D = adsk.core.Point3D
 H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
@@ -155,7 +155,7 @@ def box(comp, front, left,
         Dict with feature references.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     if fl_plane is None:
         fl_plane = comp.yZConstructionPlane
@@ -279,25 +279,25 @@ def box(comp, front, left,
         JD, Point3D.create(m4.x + 1, m4.y / 2, 0)
     ).parameter.expression = j_expr + f" + {p}_socket_depth * tan({p}_angle)"
 
-    prof = af.smallest_profile(sk)
+    prof = sp.smallest_profile(sk)
 
     # ext_op JOIN into tail boards
     tail_boards = [left, right] if right is not None else [left]
-    join_fl = af.ext_op(comp, prof, tail_thick_expr, JOIN, tail_boards,
+    join_fl = sp.ext_op(comp, prof, tail_thick_expr, JOIN, tail_boards,
                         f"{name}_JoinFL")
 
     # Mirrors (same strategy as through dovetails)
     feats = [join_fl]
     if right is not None and back is not None:
-        mir_bl = af.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
-        mir_fr = af.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
-        mir_br = af.mirror_feats(comp, [mir_fr], y_mid, f"{name}_MirBR")
+        mir_bl = sp.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
+        mir_fr = sp.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
+        mir_br = sp.mirror_feats(comp, [mir_fr], y_mid, f"{name}_MirBR")
         feats = [join_fl, mir_bl, mir_fr, mir_br]
     elif right is not None:
-        mir_fr = af.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
+        mir_fr = sp.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
         feats = [join_fl, mir_fr]
     elif back is not None:
-        mir_bl = af.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
+        mir_bl = sp.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
         feats = [join_fl, mir_bl]
 
     # Pattern along joint_axis
@@ -319,11 +319,11 @@ def box(comp, front, left,
     pat.name = f"{name}_Pat"
 
     # CUT pin boards using tail boards as tools
-    cut_front = af.combine(comp, front, tail_boards, CUT, True,
+    cut_front = sp.combine(comp, front, tail_boards, CUT, True,
                            f"{name}_CutFront")
     cut_back = None
     if back is not None:
-        cut_back = af.combine(comp, back, tail_boards, CUT, True,
+        cut_back = sp.combine(comp, back, tail_boards, CUT, True,
                               f"{name}_CutBack")
 
     return {

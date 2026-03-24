@@ -31,7 +31,7 @@ Usage:
 import adsk.core
 import adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 NEW = adsk.fusion.FeatureOperations.NewBodyFeatureOperation
@@ -154,19 +154,19 @@ def lock_mortise(comp, body, plane, origin, size_map,
         Dict with "lock_ext", "lock_body", "cut".
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
     p = prefix
 
     # Create lock body block
-    sk, prof = af.sketch_rect_model(comp, plane, origin, size_map,
+    sk, prof = sp.sketch_rect_model(comp, plane, origin, size_map,
                                     f"{name}_Sk", ev)
-    lock_ext = af.ext_op(comp, prof, f"{p}_d", NEW, None,
+    lock_ext = sp.ext_op(comp, prof, f"{p}_d", NEW, None,
                          f"{name}_Body", flip=flip)
     lock_body = lock_ext.bodies.item(0)
     lock_body.name = f"{name}_Body"
 
     # CUT mortise pocket
-    cut = af.combine(comp, body, lock_body, CUT, True, f"{name}_Mort")
+    cut = sp.combine(comp, body, lock_body, CUT, True, f"{name}_Mort")
 
     return {"lock_ext": lock_ext, "lock_body": lock_body, "cut": cut}
 
@@ -194,7 +194,7 @@ def keyhole(comp, body, plane, center,
         Dict with "hole_cut" and "slot_cut".
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
     p = prefix
 
     cx = ev(center[0])
@@ -215,7 +215,7 @@ def keyhole(comp, body, plane, center,
     ).parameter.expression = f"{p}_keyhole_d"
 
     prof = sk.profiles.item(0)
-    hole_cut = af.ext_op(comp, prof, board_thick_expr, CUT, body,
+    hole_cut = sp.ext_op(comp, prof, board_thick_expr, CUT, body,
                          f"{name}_KeyHole", flip=flip)
 
     # -- Key blade slot (rectangle below the circle) --
@@ -224,7 +224,7 @@ def keyhole(comp, body, plane, center,
 
     # Detect which sketch direction is "down" (away from keyhole center)
     # by probing the vertical model axis
-    h_ax, v_ax = af.probe_sketch_axes(sk)
+    h_ax, v_ax = sp.probe_sketch_axes(sk)
     # Slot extends in the -v direction from the circle center
 
     sk2 = comp.sketches.add(plane)
@@ -257,8 +257,8 @@ def keyhole(comp, body, plane, center,
     gc.addVertical(rect.item(1))
     gc.addVertical(rect.item(3))
 
-    prof2 = af.smallest_profile(sk2)
-    slot_cut = af.ext_op(comp, prof2, board_thick_expr, CUT, body,
+    prof2 = sp.smallest_profile(sk2)
+    slot_cut = sp.ext_op(comp, prof2, board_thick_expr, CUT, body,
                          f"{name}_KeySlot", flip=flip)
 
     return {"hole_cut": hole_cut, "slot_cut": slot_cut}
@@ -285,24 +285,24 @@ def strike(comp, body, plane, origin, size_map,
         Dict with "strike_ext", "strike_body", "cut".
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
     p = prefix
 
-    sk, prof = af.sketch_rect_model(comp, plane, origin, size_map,
+    sk, prof = sp.sketch_rect_model(comp, plane, origin, size_map,
                                     f"{name}_Sk", ev)
-    strike_ext = af.ext_op(comp, prof, f"{p}_strike_t", NEW, None,
+    strike_ext = sp.ext_op(comp, prof, f"{p}_strike_t", NEW, None,
                            f"{name}_Body", flip=flip)
     strike_body = strike_ext.bodies.item(0)
     strike_body.name = f"{name}_Body"
 
-    cut = af.combine(comp, body, strike_body, CUT, True, f"{name}_Mort")
+    cut = sp.combine(comp, body, strike_body, CUT, True, f"{name}_Mort")
 
     return {"strike_ext": strike_ext, "strike_body": strike_body, "cut": cut}
 
 
 def _probe_signs(sk):
     """Return (h_axis, v_axis, h_sign, v_sign) for a sketch."""
-    h_ax, v_ax = af.probe_sketch_axes(sk)
+    h_ax, v_ax = sp.probe_sketch_axes(sk)
     P = Point3D
     sc = sk.modelToSketchSpace(P.create(0, 0, 0))
     delta = {"x": P.create(1, 0, 0), "y": P.create(0, 1, 0),

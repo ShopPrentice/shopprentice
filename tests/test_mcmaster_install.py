@@ -20,10 +20,10 @@ def run(context):
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
 
-    from helpers import af
+    from helpers import sp
     from helpers import hardware
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ── Parameters ──
     params.add("box_l", VI("10 in"), "in", "Box length")
@@ -37,21 +37,21 @@ def run(context):
     print("  Reason: " + rec["reason"])
 
     # ── Build back board (XZ plane, at Y = box_w - bt) ──
-    back_pl = af.off_plane(root, root.xZConstructionPlane,
+    back_pl = sp.off_plane(root, root.xZConstructionPlane,
                             "box_w - bt", "BackPl")
-    sk, pr = af.sketch_rect_model(root, back_pl,
+    sk, pr = sp.sketch_rect_model(root, back_pl,
         ("0 in", "box_w - bt", "0 in"),
         {"x": "box_l", "z": "box_h"}, "Back_Sk", ctx.ev)
-    back = af.ext_new(root, pr, "bt", "BackBoard").bodies.item(0)
+    back = sp.ext_new(root, pr, "bt", "BackBoard").bodies.item(0)
     back.name = "Back"
 
     # ── Build lid (XY plane, at Z = box_h) ──
-    lid_pl = af.off_plane(root, root.xYConstructionPlane,
+    lid_pl = sp.off_plane(root, root.xYConstructionPlane,
                            "box_h", "LidPl")
-    sk, pr = af.sketch_rect_model(root, lid_pl,
+    sk, pr = sp.sketch_rect_model(root, lid_pl,
         ("0 in", "0 in", "box_h"),
         {"x": "box_l", "y": "box_w"}, "Lid_Sk", ctx.ev)
-    lid = af.ext_new(root, pr, "bt", "LidBoard").bodies.item(0)
+    lid = sp.ext_new(root, pr, "bt", "LidBoard").bodies.item(0)
     lid.name = "Lid"
 
     print("")
@@ -84,10 +84,10 @@ def run(context):
     box_h = ctx.ev("box_h")
 
     for leaf in result["leaves"]:
-        proxy = leaf.createForAssemblyContext(occ)
+        proxy = lesp.createForAssemblyContext(occ)
         bb = proxy.boundingBox
         y_min = bb.minPoint.y
-        print("  Leaf " + leaf.name + ": Y_min=" + str(round(y_min, 3))
+        print("  Leaf " + lesp.name + ": Y_min=" + str(round(y_min, 3))
               + " (back face=" + str(round(box_w, 3)) + ")")
         tol = 0.1  # leaf bbox includes barrel knuckles, not just flat plate
         assert abs(y_min - box_w) < tol, (

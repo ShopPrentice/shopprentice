@@ -36,7 +36,7 @@ def run(context):
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root = design.rootComponent
 
-    from helpers import af
+    from helpers import sp
 
     # Create a simple hinge leaf: thin rectangle + cylinder knuckle
     # Leaf plate: 3.175cm x 1.27cm x 0.127cm (1.25" x 0.5" x 0.050")
@@ -47,18 +47,18 @@ def run(context):
     params.add("th_t", VI("0.050 in"), "in", "Leaf thickness")
     params.add("th_bd", VI("0.1875 in"), "in", "Barrel diameter")
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # Leaf plate on XY plane at origin
-    sk, pr = af.sketch_rect_model(root, root.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(root, root.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "th_l", "y": "th_w"}, "Leaf_Sk", ctx.ev)
-    leaf_ext = af.ext_new(root, pr, "th_t", "LeafPlate")
+    leaf_ext = sp.ext_new(root, pr, "th_t", "LeafPlate")
     leaf_body = leaf_ext.bodies.item(0)
     leaf_body.name = "LeafPlate"
 
     # Knuckle cylinder at Y=0 edge, centered on X
-    knuckle_pl = af.off_plane(root, root.yZConstructionPlane,
+    knuckle_pl = sp.off_plane(root, root.yZConstructionPlane,
                                "th_l / 2", "KnucklePl")
     sk2 = root.sketches.add(knuckle_pl)
     sk2.name = "Knuckle_Sk"
@@ -73,7 +73,7 @@ def run(context):
     ).parameter.expression = "th_bd"
 
     prof = sk2.profiles.item(0)
-    knuckle_ext = af.ext_new_sym(root, prof, "th_l", "Knuckle")
+    knuckle_ext = sp.ext_new_sym(root, prof, "th_l", "Knuckle")
     knuckle_body = knuckle_ext.bodies.item(0)
     knuckle_body.name = "Knuckle"
 
@@ -146,13 +146,13 @@ def run(context):
     params2.add("board_w", VI("4 in"), "in", "Board width")
     params2.add("board_t", VI("0.5 in"), "in", "Board thickness")
 
-    ctx2 = af.DesignContext(design2)
+    ctx2 = sp.DesignContext(design2)
 
     # Board on XY plane
-    sk, pr = af.sketch_rect_model(root2, root2.xYConstructionPlane,
+    sk, pr = sp.sketch_rect_model(root2, root2.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "board_l", "y": "board_w"}, "Board_Sk", ctx2.ev)
-    board_ext = af.ext_new(root2, pr, "board_t", "Board")
+    board_ext = sp.ext_new(root2, pr, "board_t", "Board")
     board_body = board_ext.bodies.item(0)
     board_body.name = "Board"
 

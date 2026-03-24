@@ -281,15 +281,15 @@ def find_face(body, axis, direction):
 front_face = find_face(rail_body, "y", -1)
 sk = comp.sketches.add(front_face)
 ```
-Also available as `af.find_face(body, axis, direction)`.
+Also available as `sp.find_face(body, axis, direction)`.
 
-**Clean references before profile selection (MANDATORY):** Any sketch on a face or with `sketch.project()` calls has reference lines that split profiles into fragments. **Always call `af.refs_to_construction(sk)` after dimensioning but before selecting a profile.** This converts reference/projected lines to construction geometry — they keep their sketch points (valid for dimensions) but stop forming profile boundaries. Then `af.smallest_profile(sk)` returns the correct drawn profile. Omitting this step is the #1 cause of wrong-profile extrusions.
+**Clean references before profile selection (MANDATORY):** Any sketch on a face or with `sketch.project()` calls has reference lines that split profiles into fragments. **Always call `sp.refs_to_construction(sk)` after dimensioning but before selecting a profile.** This converts reference/projected lines to construction geometry — they keep their sketch points (valid for dimensions) but stop forming profile boundaries. Then `sp.smallest_profile(sk)` returns the correct drawn profile. Omitting this step is the #1 cause of wrong-profile extrusions.
 
 ```python
 # After all sketch geometry and dimensions are complete:
-af.refs_to_construction(sk)
-prof = af.smallest_profile(sk)
-ext = af.ext_new(comp, prof, "depth", "MyFeature")
+sp.refs_to_construction(sk)
+prof = sp.smallest_profile(sk)
+ext = sp.ext_new(comp, prof, "depth", "MyFeature")
 ```
 
 **Extrude direction on body faces:** The default (positive) extrude direction on a face sketch follows `face.evaluator.getNormalAtPoint()` — the true outward normal, pointing AWAY from the body. Use `flip=True` (NegativeExtentDirection) for CUT extrudes on body faces so the cut goes INTO the body.
@@ -315,13 +315,13 @@ def probe_sketch_axes(sk):
     v_axis = max(deltas, key=lambda a: abs(deltas[a][1]))
     return h_axis, v_axis
 ```
-Also available as `af.probe_sketch_axes(sk)`.
+Also available as `sp.probe_sketch_axes(sk)`.
 
 **CRITICAL: `probe_sketch_axes` returns axis names but NOT signs.** On non-XY construction planes, a model axis can map to the *negative* sketch direction. For example, on an XZ-offset plane, model +Z maps to sketch -Y. If you build dimension expressions assuming positive mapping, geometry lands at mirrored positions.
 
-**Fix — use `af.probe_sketch_signs(sk)`** which returns `(h_axis, v_axis, h_sign, v_sign)`. Use the sign when building offset expressions:
+**Fix — use `sp.probe_sketch_signs(sk)`** which returns `(h_axis, v_axis, h_sign, v_sign)`. Use the sign when building offset expressions:
 ```python
-h_axis, v_axis, h_sign, v_sign = af.probe_sketch_signs(sk)
+h_axis, v_axis, h_sign, v_sign = sp.probe_sketch_signs(sk)
 op = " - " if v_sign > 0 else " + "
 offset_expr = v_center_expr + op + "half_length"
 ```
@@ -436,56 +436,56 @@ Quick reference:
 
 These reusable helpers form the foundation of the model-coordinate workflow. The caller specifies everything in model coordinates using parameter expressions; the helpers handle all sketch-space complexity.
 
-### Helper Library (`from helpers import af`)
+### Helper Library (`from helpers import sp`)
 
-The `af` helper library provides these functions as importable utilities, eliminating per-script boilerplate. Scripts can `from helpers import af` and use them directly:
+The `af` helper library provides these functions as importable utilities, eliminating per-script boilerplate. Scripts can `from helpers import sp` and use them directly:
 
 ```python
-from helpers import af
+from helpers import sp
 
 def run(context):
-    ctx = af.DesignContext()          # app, design, root, params, units, ev()
+    ctx = sp.DesignContext()          # app, design, root, params, units, ev()
     depth = ctx.ev("shelf_depth")     # evaluate parameter or expression → cm
     shelf = ctx.find_body("shelf_top")  # recursive body search by name
     shelves = ctx.find_bodies("shelf_*")  # glob pattern match
 
     # Queries
-    top = af.find_face(shelf, "z", +1)   # outermost planar face along axis
-    at = af.find_face_at(shelf, "z", 3.0)  # face at specific coordinate
-    edges = af.find_edges(shelf, "z")    # linear edges aligned with axis
-    h, v = af.probe_sketch_axes(sk)      # model axis → sketch H/V
-    h, v, hs, vs = af.probe_sketch_signs(sk)  # + sign detection
-    p = af.smallest_profile(sk)          # smallest-area profile in sketch
+    top = sp.find_face(shelf, "z", +1)   # outermost planar face along axis
+    at = sp.find_face_at(shelf, "z", 3.0)  # face at specific coordinate
+    edges = sp.find_edges(shelf, "z")    # linear edges aligned with axis
+    h, v = sp.probe_sketch_axes(sk)      # model axis → sketch H/V
+    h, v, hs, vs = sp.probe_sketch_signs(sk)  # + sign detection
+    p = sp.smallest_profile(sk)          # smallest-area profile in sketch
 
     # Sketches — rectangles
-    sk, prof = af.sketch_rect(comp, plane, "0 cm", "0 cm", "w", "d",
+    sk, prof = sp.sketch_rect(comp, plane, "0 cm", "0 cm", "w", "d",
                                name="Sk", ev=ctx.ev)
-    sk2, prof2 = af.sketch_rect_model(comp, plane,
+    sk2, prof2 = sp.sketch_rect_model(comp, plane,
                                        ("x0", "y0", "z0"),
                                        {"x": "width", "z": "height"},
                                        name="Sk2", ev=ctx.ev)
 
     # Sketches — stadium shapes (domino mortises, slot joints)
-    sk3, prof3 = af.sketch_slot(comp, plane, "cx", "cy",
+    sk3, prof3 = sp.sketch_slot(comp, plane, "cx", "cy",
                                  "dm_l", "dm_w", vertical=True,
                                  name="DM_Sk", ev=ctx.ev)
-    sk4, prof4 = af.sketch_slot_model(comp, plane,
+    sk4, prof4 = sp.sketch_slot_model(comp, plane,
                                        ("cx", "cy", "cz"), "z",
                                        "dm_l", "dm_w",
                                        name="DM_Sk", ev=ctx.ev)
 
     # Feature builders
-    f = af.ext_new(comp, prof, "board_thick", "FrontBoard")
-    f = af.ext_new_sym(comp, prof, "board_thick / 2", "Rail")  # total = board_thick
-    f = af.ext_op(comp, prof, "groove_depth", CUT, body, "Groove", flip=True)
-    pl = af.off_plane(comp, base_plane, "box_width / 2", "YMid")
-    af.combine(comp, target, [tool1, tool2], CUT, True, "Mortise")
-    m = af.mirror_body(comp, body, mid_plane, "BackMirror")
-    m = af.mirror_bodies(comp, [b1, b2], mid_plane, "Mirror")
-    m = af.mirror_feats(comp, [ext_feat], mid_plane, "RabMirror")
-    occ = af.make_comp(root, "Shelves")
-    pat = af.feat_pattern(comp, feat, axis, "n_slats", "slat_pitch", "Pat")
-    pat = af.body_pattern(comp, body, axis, "n_shelves", "shelf_pitch", "Pat")
+    f = sp.ext_new(comp, prof, "board_thick", "FrontBoard")
+    f = sp.ext_new_sym(comp, prof, "board_thick / 2", "Rail")  # total = board_thick
+    f = sp.ext_op(comp, prof, "groove_depth", CUT, body, "Groove", flip=True)
+    pl = sp.off_plane(comp, base_plane, "box_width / 2", "YMid")
+    sp.combine(comp, target, [tool1, tool2], CUT, True, "Mortise")
+    m = sp.mirror_body(comp, body, mid_plane, "BackMirror")
+    m = sp.mirror_bodies(comp, [b1, b2], mid_plane, "Mirror")
+    m = sp.mirror_feats(comp, [ext_feat], mid_plane, "RabMirror")
+    occ = sp.make_comp(root, "Shelves")
+    pat = sp.feat_pattern(comp, feat, axis, "n_slats", "slat_pitch", "Pat")
+    pat = sp.body_pattern(comp, body, axis, "n_shelves", "shelf_pitch", "Pat")
 ```
 
 All helpers accept explicit objects (body, component, sketch) rather than relying on module globals, so they work in both normal and sandbox mode. The `ev` parameter falls back to creating one from the active design when omitted.
@@ -495,13 +495,13 @@ All helpers accept explicit objects (body, component, sketch) rather than relyin
 - `find_face` uses `pointOnFace` coordinate, not normal sign (handles both-direction normals correctly)
 - `DesignContext.find_body/find_bodies` walks all descendant components recursively
 
-**What's NOT in af.py** (write these inline when needed): project-specific face finders (e.g., `find_top_face`), `angled_tenon_end`, `splay_center`.
+**What's NOT in sp.py** (write these inline when needed): project-specific face finders (e.g., `find_top_face`), `angled_tenon_end`, `splay_center`.
 
 ### `ev()` — Dual-Mode Parameter Access
 
 Evaluates a parameter name or expression string → float in cm. Use for computing approximate sketch positions; actual parametric behavior comes from dimension expressions, not `ev()` values.
 
-**Preferred:** `ctx.ev("shelf_depth")` via `af.DesignContext`. **Inline fallback** (when not using af):
+**Preferred:** `ctx.ev("shelf_depth")` via `sp.DesignContext`. **Inline fallback** (when not using af):
 ```python
 def ev(e):
     p = params.itemByName(e)
@@ -510,12 +510,12 @@ def ev(e):
 
 ### `sketch_rect_model()` — Parametric Rectangle in Model Coordinates
 
-Available as `af.sketch_rect_model(comp, plane, model_origin, model_size, name, ev)`.
+Available as `sp.sketch_rect_model(comp, plane, model_origin, model_size, name, ev)`.
 
 Creates a fully parametric rectangle on ANY plane (including non-XY construction planes and BRepFaces). Internally uses `modelToSketchSpace` to convert model coordinates to sketch space, adds explicit H/V geometric constraints, and creates 4 parametric dimensions (width, height, x-offset, y-offset).
 
 ```python
-sk, prof = af.sketch_rect_model(comp, comp.xZConstructionPlane,
+sk, prof = sp.sketch_rect_model(comp, comp.xZConstructionPlane,
     ("0 in", "0 in", "0 in"),
     {"x": "box_length", "z": "box_height"},
     "Front_Sk", ev=ctx.ev)
@@ -539,9 +539,9 @@ rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
 # H/V constraints + width/height dimensions only — no position dimensions
 ```
 
-### Feature Builder Reference (`af.*`)
+### Feature Builder Reference (`sp.*`)
 
-All feature builders take `comp` as first arg. Available via `from helpers import af`.
+All feature builders take `comp` as first arg. Available via `from helpers import sp`.
 
 | Function | Signature | Returns | Notes |
 |----------|-----------|---------|-------|
@@ -640,13 +640,13 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 
 **Loose tenons (dominos):** Use `domino.single()`, `domino.grid()`, or `domino.four_corners()` from `woodworking/templates/domino.py`. `grid()` uses body_pattern internally for parametric count. Both CUTs must use `keepTool=True` or the body disappears. Cross-section is a STADIUM (rounded ends), never a rectangle. Pick a standard Festool size (4/5/6/8/10 mm cutter) based on board thickness ≈ 3× cutter diameter. Full reference: `woodworking/joinery/domino-joint.md`.
 
-**Bulk CUT for repeated elements (Tested — crib spindles).** When many identical bodies (spindles, slats, dowels) insert into a receiving board, do NOT create individual joints per element. Instead: (1) build all bodies with body_pattern, (2) collect all body proxies into a list, (3) CUT them ALL into the target in one `af.combine()` call. This replaces N×(sketch+extrude+CUT) with 1 Combine feature. The crib uses 8 bulk CUTs for 72 spindles into 8 rails — 140 individual dowel calls crashed Fusion, 8 bulk CUTs take seconds.
+**Bulk CUT for repeated elements (Tested — crib spindles).** When many identical bodies (spindles, slats, dowels) insert into a receiving board, do NOT create individual joints per element. Instead: (1) build all bodies with body_pattern, (2) collect all body proxies into a list, (3) CUT them ALL into the target in one `sp.combine()` call. This replaces N×(sketch+extrude+CUT) with 1 Combine feature. The crib uses 8 bulk CUTs for 72 spindles into 8 rails — 140 individual dowel calls crashed Fusion, 8 bulk CUTs take seconds.
 
 **Mortise wall thickness rule.** Any CUT that removes material (mortise, dowel hole, domino pocket) must leave enough surrounding material for structural integrity. The remaining wall on each side of the mortise must be ≥ 1/4 of the receiving board's thickness. If a 0.75" spindle CUTs into a 0.75" rail, it removes 100% of the width — the rail breaks into chunks. Fix: either reduce the CUT body diameter or increase the receiving board thickness. Example: 0.75" spindle in a 1.5" rail leaves 0.375" wall on each side (25%) ✓. Also: mortises should be **blind** (not through) — the CUT body extends only partway into the receiving board (e.g., `spindle_tenon = 0.5 in`), leaving material on the exit side.
 
 **Hardware (STEP imports):** When a design uses detachable or mechanical hardware (bed rail fasteners, hinges from STEP files), read `woodworking/hardware-installation.md` for import caching, positioning, direction detection, determinant validation, and component organization rules. Most furniture uses joinery templates instead — only load this topic when hardware is needed.
 
-**Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `woodworking/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`af.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `woodworking/joinery/mortise-tenon.md`.
+**Mortise-and-tenon:** Use `mt.blind()` or `mt.through()` from `woodworking/templates/mortise_tenon.py`. Sketch the tenon on the rail's end face (`sp.find_face(rail, axis, direction)`), extrude into the leg. Shoulders are implicit — size the tenon smaller than the rail face and the step forms naturally. For blind, the caller CUTs the leg with the rail afterwards. For through, `through()` CUTs internally to avoid coplanar face splitting. Full reference: `woodworking/joinery/mortise-tenon.md`.
 
 **Tenon collision at corners — interlock, don't shorten.** When two rails meet in the same leg from perpendicular directions, their tenons collide inside the mortise. The naive fix — shortening one tenon — sacrifices bonding surface and therefore joint strength (less side-grain glue area, less fiber interlock). Instead, notch both tenons so they weave past each other at full depth:
 
@@ -783,7 +783,7 @@ Name every feature and body for a readable timeline and easy debugging:
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
 | Body pattern creates extra bodies | `keepTool=True` CUTs in template history create ghost duplicates at each pattern instance | Ghost bodies are harmless — keep patterns for parametric counts. Filter ghost overlaps from `check_interference` by excluding void-on-void pairs. |
 | Mortise CUT destroys the receiving board | CUT body diameter ≥ board thickness (e.g., 0.75" spindle in 0.75" rail) | Mortise diameter must be < board thickness. Leave ≥ 1/4 wall on each side. Use blind mortises (stub tenon), not through. |
-| Fusion crashes / hangs on complex scripts | Too many individual features created in a loop (e.g., 140 dowels = 700+ timeline features). Each `dowel.single()` or `domino.single()` creates sketch + extrude + fillet + CUT. | **Use bulk CUT instead of per-element joints.** For repeated elements (spindles, slats) that insert into rails, build all bodies first (body_pattern), then CUT them ALL into the target in ONE `af.combine(comp, rail, [all_spindles], CUT, True)` call. 8 bulk CUTs replaced 140 individual dowels in the crib build. |
+| Fusion crashes / hangs on complex scripts | Too many individual features created in a loop (e.g., 140 dowels = 700+ timeline features). Each `dowel.single()` or `domino.single()` creates sketch + extrude + fillet + CUT. | **Use bulk CUT instead of per-element joints.** For repeated elements (spindles, slats) that insert into rails, build all bodies first (body_pattern), then CUT them ALL into the target in ONE `sp.combine(comp, rail, [all_spindles], CUT, True)` call. 8 bulk CUTs replaced 140 individual dowels in the crib build. |
 | Sketch geometry at mirrored/wrong position on non-XY plane | `probe_sketch_axes` gives axis name but not sign; model +Z → sketch -Y on XZ planes | Use `probe_sketch_signs` or `modelToSketchSpace` for approximate positions, flip offset operator based on sign |
 | Loose tenon (domino) bodies disappear | Second CUT used `keepTool=False`, consuming the body | Use `keepTool=True` on ALL CUTs for visible loose tenon joints |
 | Rectangle deforms when parameter changes | `addTwoPointRectangle` lacks explicit H/V geometric constraints | Add `addHorizontal`/`addVertical` on all 4 lines after creation. Apply same rule to any sketch line that should stay H or V. |
@@ -792,8 +792,8 @@ Name every feature and body for a readable timeline and easy debugging:
 | Fillet fails — radius too large | Fillet radius exceeds half the smallest adjacent face dimension | Reduce `fl_r`; keep it < half the shortest edge on any affected face |
 | Fillet/chamfer selects wrong edges | Edge coordinate filter matches unintended edges (e.g., groove interior edges) | Add `edge.body.name` check; filter by both coordinate AND body |
 | Fillet API rejects BRepFace | `addConstantRadiusEdgeSet` requires edges, not faces | Iterate `face.edges`, deduplicate via `tempId`, add individual edges |
-| `InternalValidationError: face` on sketch | CUT/JOIN modifies body topology, invalidating BRepFace references | Re-find face with `af.find_face()` after each CUT/JOIN before next sketch |
-| Face-sketch extrudes wrong profile | Auto-projected face edges and `sketch.project()` reference lines split profiles into fragments — `smallest_profile` picks a fragment instead of the drawn shape | **Always call `af.refs_to_construction(sk)` before profile selection.** This converts all reference/projected lines to construction geometry so they don't form profile boundaries. Then `af.smallest_profile(sk)` returns the correct drawn profile. This is mandatory for ANY sketch on a face or with projected references. |
+| `InternalValidationError: face` on sketch | CUT/JOIN modifies body topology, invalidating BRepFace references | Re-find face with `sp.find_face()` after each CUT/JOIN before next sketch |
+| Face-sketch extrudes wrong profile | Auto-projected face edges and `sketch.project()` reference lines split profiles into fragments — `smallest_profile` picks a fragment instead of the drawn shape | **Always call `sp.refs_to_construction(sk)` before profile selection.** This converts all reference/projected lines to construction geometry so they don't form profile boundaries. Then `sp.smallest_profile(sk)` returns the correct drawn profile. This is mandatory for ANY sketch on a face or with projected references. |
 | Symmetric extrude body 2× too thick | Passed full thickness to `ext_new_sym` — it applies `dist` to EACH side | Pass half-thickness: `ext_new_sym(comp, prof, "board_t / 2", ...)` |
 | `sketch_rect_model` places body on wrong side of origin | Position dimensions use absolute distance — negative coordinates reflect to positive | Use manual sketch with `modelToSketchSpace` + width/height dimensions only (no position dimensions) |
 | Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `woodworking/joinery/mortise-tenon.md`) |
@@ -917,10 +917,10 @@ names = [root.bRepBodies.item(i).name for i in range(root.bRepBodies.count)]
 print(f"Root: {len(names)} joinery voids")
 
 # 3. Apply wood appearance (grain-aligned texture on all bodies)
-af.apply_appearance("white oak")
+sp.apply_appearance("white oak")
 ```
 
-**Step 3 is required** — scripts without `af.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for species and grain details.
+**Step 3 is required** — scripts without `sp.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for species and grain details.
 
 After the script runs, call `get_product_shots` via MCP to capture presentation images. It handles camera positioning, artifact cleanup, and framing automatically — no fit-view or hide-sketch code needed in the script.
 
@@ -1041,7 +1041,7 @@ Use `execute_script` with `sandbox=true` to run a script in a throwaway document
 ### Important
 
 - Always generate complete, standalone parametric scripts. MCP is the delivery mechanism — the script must also work when pasted into Fusion 360's script editor.
-- Scripts using `from helpers import af` need the addin's `helpers/` directory on the Python path (automatic when run via `execute_script`). For standalone use outside MCP, copy `addin/helpers/` alongside the script.
+- Scripts using `from helpers import sp` need the addin's `helpers/` directory on the Python path (automatic when run via `execute_script`). For standalone use outside MCP, copy `addin/helpers/` alongside the script.
 - Never generate partial snippets that only work via MCP.
 - Scripts must NOT catch exceptions — let them propagate so Fusion 360 aborts the transaction and returns the full error to the agent.
 

@@ -39,7 +39,7 @@ Usage:
 import adsk.core
 import adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 Point3D = adsk.core.Point3D
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
@@ -155,19 +155,19 @@ def leaf(comp, body, plane, origin, size_map,
         Dict with "leaf_ext", "leaf_body", "cut", "screw_cuts", "knuckle_bodies".
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
     p = prefix
 
     # -- Flat plate --
-    sk, prof = af.sketch_rect_model(comp, plane, origin, size_map,
+    sk, prof = sp.sketch_rect_model(comp, plane, origin, size_map,
                                     f"{name}_Sk", ev)
-    leaf_ext = af.ext_op(comp, prof, f"{p}_leaf_t", NEW, None,
+    leaf_ext = sp.ext_op(comp, prof, f"{p}_leaf_t", NEW, None,
                          f"{name}_Leaf", flip=flip)
     leaf_body = leaf_ext.bodies.item(0)
     leaf_body.name = f"{name}_Leaf"
 
     # -- CUT mortise pocket --
-    cut = af.combine(comp, body, leaf_body, CUT, True, f"{name}_Mort")
+    cut = sp.combine(comp, body, leaf_body, CUT, True, f"{name}_Mort")
 
     # -- Screw holes --
     screw_cuts = _add_screw_holes(comp, body, leaf_body, plane,
@@ -180,9 +180,9 @@ def leaf(comp, body, plane, origin, size_map,
 
     # -- Brass appearance --
     if appearance:
-        af.apply_appearance(leaf_body, appearance)
+        sp.apply_appearance(leaf_body, appearance)
         for kb in knuckle_bodies:
-            af.apply_appearance(kb, appearance)
+            sp.apply_appearance(kb, appearance)
 
     return {
         "leaf_ext": leaf_ext, "leaf_body": leaf_body,
@@ -209,7 +209,7 @@ def pin(comp, barrel_center, barrel_axis,
         Dict with "pin_ext" and "pin_body".
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
     p = prefix
     axis_idx = _idx_for_axis(barrel_axis)
 
@@ -219,7 +219,7 @@ def pin(comp, barrel_center, barrel_axis,
         "y": comp.xZConstructionPlane,
         "z": comp.xYConstructionPlane,
     }
-    pin_pl = af.off_plane(comp, base_planes[barrel_axis],
+    pin_pl = sp.off_plane(comp, base_planes[barrel_axis],
                           barrel_center[axis_idx], f"{name}_PinPl")
 
     # Sketch circle at barrel center
@@ -240,7 +240,7 @@ def pin(comp, barrel_center, barrel_axis,
     ).parameter.expression = f"{p}_pin_d"
 
     # Parametric center position
-    h_ax, v_ax = af.probe_sketch_axes(sk)
+    h_ax, v_ax = sp.probe_sketch_axes(sk)
     d = sk.sketchDimensions
     d.addDistanceDimension(
         sk.originPoint, circle.centerSketchPoint,
@@ -254,12 +254,12 @@ def pin(comp, barrel_center, barrel_axis,
     ).parameter.expression = barrel_center[_idx_for_axis(v_ax)]
 
     prof = sk.profiles.item(0)
-    pin_ext = af.ext_new_sym(comp, prof, f"{p}_l", f"{name}_Pin")
+    pin_ext = sp.ext_new_sym(comp, prof, f"{p}_l", f"{name}_Pin")
     pin_body = pin_ext.bodies.item(0)
     pin_body.name = f"{name}_Pin"
 
     if appearance:
-        af.apply_appearance(pin_body, appearance)
+        sp.apply_appearance(pin_body, appearance)
 
     return {"pin_ext": pin_ext, "pin_body": pin_body}
 
@@ -281,10 +281,10 @@ def pair(comp,
 
     Args:
         comp: Component.
-        board_a/b: Board bodies for each leaf.
+        board_a/b: Board bodies for each lesp.
         plane_a/b: Sketch planes for each leaf plate.
         origin_a/b: (x, y, z) corner of each leaf plate.
-        size_a/b: {axis: expr} size mapping for each leaf.
+        size_a/b: {axis: expr} size mapping for each lesp.
         barrel_center: (x, y, z) pin center in model space.
         barrel_axis: "x", "y", or "z".
         prefix: Parameter prefix.
@@ -298,7 +298,7 @@ def pair(comp,
         Dict with "leaf_a", "leaf_b", "pin" results.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     n_knuckles = int(ev(f"{prefix}_knuckle_n"))
     indices_a = list(range(0, n_knuckles, 2))  # even: 0, 2, 4, ...
@@ -367,7 +367,7 @@ def _add_knuckles(comp, barrel_center, barrel_axis,
         # Offset plane at segment start along barrel axis
         seg_offset = (f"({bc_axis_expr}) - {p}_l / 2 + "
                       f"{i} * {p}_l / {p}_knuckle_n")
-        off_pl = af.off_plane(comp, base_plane, seg_offset,
+        off_pl = sp.off_plane(comp, base_plane, seg_offset,
                               f"{name}_K{i}_Pl")
 
         # Circle sketch at barrel center
@@ -383,7 +383,7 @@ def _add_knuckles(comp, barrel_center, barrel_axis,
         ).parameter.expression = f"{p}_barrel_d"
 
         # Parametric center position
-        h_ax, v_ax = af.probe_sketch_axes(sk)
+        h_ax, v_ax = sp.probe_sketch_axes(sk)
         d = sk.sketchDimensions
         d.addDistanceDimension(
             sk.originPoint, circle.centerSketchPoint,
@@ -399,7 +399,7 @@ def _add_knuckles(comp, barrel_center, barrel_axis,
         prof = sk.profiles.item(0)
 
         # Extrude knuckle segment (one segment length)
-        seg_ext = af.ext_new(comp, prof,
+        seg_ext = sp.ext_new(comp, prof,
                              f"{p}_l / {p}_knuckle_n",
                              f"{name}_K{i}")
         seg_body = seg_ext.bodies.item(0)
@@ -473,7 +473,7 @@ def _add_screw_holes(comp, board, leaf_body, plane,
         prof = sk.profiles.item(0)
 
         # CUT through leaf body + into board
-        cut = af.ext_op(comp, prof, screw_depth_expr, CUT,
+        cut = sp.ext_op(comp, prof, screw_depth_expr, CUT,
                         [leaf_body, board], f"{name}_Screw{i}", flip=flip)
         screw_cuts.append(cut)
 

@@ -36,7 +36,7 @@ for i in range(body.edges.count):
 
 **3. Edges of a face** — when the design intent is "fillet this face" (e.g., seat-to-leg transitions):
 ```python
-face = af.find_face(body, "z", +1)  # top face
+face = sp.find_face(body, "z", +1)  # top face
 edges = adsk.core.ObjectCollection.create()
 added = set()
 for i in range(face.edges.count):

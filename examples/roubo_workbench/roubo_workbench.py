@@ -13,7 +13,7 @@ Coordinate system:
 """
 import adsk.core, adsk.fusion, math
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
@@ -22,7 +22,7 @@ JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 def _refs_to_construction(sk):
     """Convert projected/reference lines to construction (no profile splits).
 
-    Inline fallback — use af.refs_to_construction() once addin is restarted.
+    Inline fallback — use sp.refs_to_construction() once addin is restarted.
     """
     for i in range(sk.sketchCurves.sketchLines.count):
         ln = sk.sketchCurves.sketchLines.item(i)
@@ -72,6 +72,10 @@ def run(context):
         # Through-tenon: long stretchers through legs
         ("st_tw",        "3 in",     "in", "Stretcher tenon width (Z)"),
         ("st_tt",        "1.5 in",   "in", "Stretcher tenon thickness (Y)"),
+        ("st_blind",     "1 in",     "in", "Blind tenon stop depth inside leg"),
+        # Drawbore pins
+        ("pin_dia",      "0.375 in", "in", "Drawbore pin diameter"),
+        ("pin_offset",   "0.5 in",   "in", "Pin offset from tenon shoulder"),
         # Deadman
         ("dm_thick",     "1.5 in",   "in", "Deadman panel thickness"),
         ("dm_w",         "4 in",     "in", "Deadman width (X)"),
@@ -132,35 +136,35 @@ def run(context):
     # ==============================================================
     #  MIDPLANES
     # ==============================================================
-    XMid = af.off_plane(root, root.yZConstructionPlane, "mid_x", "XMid")
-    YMid = af.off_plane(root, root.xZConstructionPlane, "mid_y", "YMid")
+    XMid = sp.off_plane(root, root.yZConstructionPlane, "mid_x", "XMid")
+    YMid = sp.off_plane(root, root.xZConstructionPlane, "mid_y", "YMid")
 
     # ==============================================================
     #  TOP
     # ==============================================================
-    top_occ = af.make_comp(root, "Top")
+    top_occ = sp.make_comp(root, "Top")
     top_c = top_occ.component
 
-    _, pr = af.sketch_rect_model(top_c, root.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(top_c, root.xZConstructionPlane,
         ("0 in", "0 in", "leg_h"),
         {"x": "bench_l", "z": "top_thick"},
         "Top_Sk", ev=ev)
-    top_ext = af.ext_new(top_c, pr, "bench_w", "TopSlab")
+    top_ext = sp.ext_new(top_c, pr, "bench_w", "TopSlab")
     top_body = top_ext.bodies.item(0)
     top_body.name = "Top"
 
     # ==============================================================
     #  LEGS (front flush Y=0, back flush Y=bench_w-leg_d)
     # ==============================================================
-    leg_occ = af.make_comp(root, "Legs")
+    leg_occ = sp.make_comp(root, "Legs")
     leg_c = leg_occ.component
 
     # FL leg: front-left corner
-    _, pr = af.sketch_rect_model(leg_c, root.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(leg_c, root.xYConstructionPlane,
         ("leg_setback", "0 in", "0 in"),
         {"x": "leg_w", "y": "leg_d"},
         "LegFL_Sk", ev=ev)
-    leg_fl_ext = af.ext_new(leg_c, pr, "leg_h", "LegFL")
+    leg_fl_ext = sp.ext_new(leg_c, pr, "leg_h", "LegFL")
     leg_fl = leg_fl_ext.bodies.item(0)
     leg_fl.name = "Leg_FL"
 
@@ -170,7 +174,7 @@ def run(context):
     # relative to the leg, not to the table origin.  Full-width tenons
     # cause sketch edges to coincide with auto-projected face edges,
     # creating fragment profiles — refs_to_construction clears them.
-    leg_top_face = af.find_face(leg_fl, "z", +1)
+    leg_top_face = sp.find_face(leg_fl, "z", +1)
 
     def _face_fl_pt(sketch):
         """Front-left corner sketch point of the projected face boundary."""
@@ -261,8 +265,8 @@ def run(context):
     ).parameter.expression = "0 in"
 
     _refs_to_construction(sk_dt)
-    dt_pr = af.smallest_profile(sk_dt)
-    dt_ext = af.ext_new(leg_c, dt_pr, "top_thick", "DT_FL")
+    dt_pr = sp.smallest_profile(sk_dt)
+    dt_ext = sp.ext_new(leg_c, dt_pr, "top_thick", "DT_FL")
     dt_body = dt_ext.bodies.item(0)
     dt_body.name = "DT_FL"
 
@@ -318,27 +322,27 @@ def run(context):
     ).parameter.expression = "dt_thick + jt_gap"
 
     _refs_to_construction(sk_mt)
-    mt_pr = af.smallest_profile(sk_mt)
-    mt_ext = af.ext_new(leg_c, mt_pr, "top_thick", "MT_FL")
+    mt_pr = sp.smallest_profile(sk_mt)
+    mt_ext = sp.ext_new(leg_c, mt_pr, "top_thick", "MT_FL")
     mt_body = mt_ext.bodies.item(0)
     mt_body.name = "MT_FL"
 
     # JOIN both tenons to FL leg
-    af.combine(leg_c, leg_fl, [dt_body, mt_body], JOIN, False, "LegJt_FL_Join")
+    sp.combine(leg_c, leg_fl, [dt_body, mt_body], JOIN, False, "LegJt_FL_Join")
 
     # Mirror across XMid → FR, then across YMid → BL, BR
-    mir_x = af.mirror_body(leg_c, leg_fl, XMid, "LegMirX")
+    mir_x = sp.mirror_body(leg_c, leg_fl, XMid, "LegMirX")
     leg_fr = mir_x.bodies.item(0)
     leg_fr.name = "Leg_FR"
 
-    mir_y = af.mirror_bodies(leg_c, [leg_fl, leg_fr], YMid, "LegMirY")
+    mir_y = sp.mirror_bodies(leg_c, [leg_fl, leg_fr], YMid, "LegMirY")
     mir_y.bodies.item(0).name = "Leg_BL"
     mir_y.bodies.item(1).name = "Leg_BR"
 
     # ==============================================================
     #  LONG STRETCHERS (front flush with front legs, through-tenon)
     # ==============================================================
-    ls_occ = af.make_comp(root, "LongStretchers")
+    ls_occ = sp.make_comp(root, "LongStretchers")
     ls_c = ls_occ.component
 
     # Through-tenon: full-length tenon body (st_tw × st_tt) + main body
@@ -347,128 +351,128 @@ def run(context):
     # so mortises are automatically tenon-sized.
 
     # Tenon body (full length, tenon cross-section, centered on stretcher)
-    ls_tenon_pl = af.off_plane(ls_c, root.xZConstructionPlane,
+    ls_tenon_pl = sp.off_plane(ls_c, root.xZConstructionPlane,
         "(leg_d - st_tt) / 2", "LSTenon_Pl")
-    _, pr = af.sketch_rect_model(ls_c, ls_tenon_pl,
+    _, pr = sp.sketch_rect_model(ls_c, ls_tenon_pl,
         ("leg_setback - ls_proud",
          "(leg_d - st_tt) / 2",
          "ls_z + (ls_w - st_tw) / 2"),
         {"x": "ls_len", "z": "st_tw"},
         "LSTenon_Sk", ev=ev)
-    ls_tenon_ext = af.ext_new(ls_c, pr, "st_tt", "LSTenon")
+    ls_tenon_ext = sp.ext_new(ls_c, pr, "st_tt", "LSTenon")
     ls_tenon = ls_tenon_ext.bodies.item(0)
     ls_tenon.name = "LS_Front_Tenon"
 
     # Main body (between inner leg faces, full stretcher cross-section)
-    ls_main_pl = af.off_plane(ls_c, root.xZConstructionPlane,
+    ls_main_pl = sp.off_plane(ls_c, root.xZConstructionPlane,
         "(leg_d - ls_t) / 2", "LSMain_Pl")
-    _, pr = af.sketch_rect_model(ls_c, ls_main_pl,
+    _, pr = sp.sketch_rect_model(ls_c, ls_main_pl,
         ("leg_setback + leg_w",
          "(leg_d - ls_t) / 2",
          "ls_z"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w", "z": "ls_w"},
         "LSMain_Sk", ev=ev)
-    ls_main_ext = af.ext_new(ls_c, pr, "ls_t", "LSMain")
+    ls_main_ext = sp.ext_new(ls_c, pr, "ls_t", "LSMain")
     ls_main = ls_main_ext.bodies.item(0)
     ls_main.name = "LS_Front_Main"
 
     # JOIN main to tenon → combined stretcher with shoulders
-    af.combine(ls_c, ls_tenon, [ls_main], JOIN, False, "LSFront_Join")
+    sp.combine(ls_c, ls_tenon, [ls_main], JOIN, False, "LSFront_Join")
     ls_front = ls_tenon
     ls_front.name = "LS_Front"
 
     # Mirror across YMid → LS_Back
-    mir_ls = af.mirror_body(ls_c, ls_front, YMid, "LSMirY")
+    mir_ls = sp.mirror_body(ls_c, ls_front, YMid, "LSMirY")
     ls_back = mir_ls.bodies.item(0)
     ls_back.name = "LS_Back"
 
     # ==============================================================
-    #  SHORT STRETCHERS (through legs, raised above LS, through-tenon)
+    #  SHORT STRETCHERS (blind tenon into legs)
     # ==============================================================
-    ss_occ = af.make_comp(root, "ShortStretchers")
+    ss_occ = sp.make_comp(root, "ShortStretchers")
     ss_c = ss_occ.component
 
-    # Tenon body (full bench width, tenon cross-section)
-    ss_tenon_pl = af.off_plane(ss_c, root.yZConstructionPlane,
+    # Tenon body (blind — stops inside front/back legs)
+    ss_tenon_pl = sp.off_plane(ss_c, root.yZConstructionPlane,
         "leg_setback + leg_w / 2", "SSTenon_Pl")
-    _, pr = af.sketch_rect_model(ss_c, ss_tenon_pl,
+    _, pr = sp.sketch_rect_model(ss_c, ss_tenon_pl,
         ("0 in",
-         "0 in",
+         "st_blind",
          "ls_z + ls_w + (ss_w - st_tw) / 2"),
-        {"y": "bench_w", "z": "st_tw"},
+        {"y": "bench_w - 2 * st_blind", "z": "st_tw"},
         "SSTenon_Sk", ev=ev)
-    ss_tenon_ext = af.ext_new_sym(ss_c, pr, "st_tt / 2", "SSTenon")
+    ss_tenon_ext = sp.ext_new_sym(ss_c, pr, "st_tt / 2", "SSTenon")
     ss_tenon = ss_tenon_ext.bodies.item(0)
     ss_tenon.name = "SS_Left_Tenon"
 
     # Main body (between front/back inner leg faces, full cross-section)
-    ss_main_pl = af.off_plane(ss_c, root.yZConstructionPlane,
+    ss_main_pl = sp.off_plane(ss_c, root.yZConstructionPlane,
         "leg_setback + leg_w / 2", "SSMain_Pl")
-    _, pr = af.sketch_rect_model(ss_c, ss_main_pl,
+    _, pr = sp.sketch_rect_model(ss_c, ss_main_pl,
         ("0 in",
          "leg_d",
          "ls_z + ls_w"),
         {"y": "bench_w - 2 * leg_d", "z": "ss_w"},
         "SSMain_Sk", ev=ev)
-    ss_main_ext = af.ext_new_sym(ss_c, pr, "ss_t / 2", "SSMain")
+    ss_main_ext = sp.ext_new_sym(ss_c, pr, "ss_t / 2", "SSMain")
     ss_main = ss_main_ext.bodies.item(0)
     ss_main.name = "SS_Left_Main"
 
     # JOIN main to tenon
-    af.combine(ss_c, ss_tenon, [ss_main], JOIN, False, "SSLeft_Join")
+    sp.combine(ss_c, ss_tenon, [ss_main], JOIN, False, "SSLeft_Join")
     ss_left = ss_tenon
     ss_left.name = "SS_Left"
 
     # Mirror across XMid → SS_Right
-    mir_ss = af.mirror_body(ss_c, ss_left, XMid, "SSMirX")
+    mir_ss = sp.mirror_body(ss_c, ss_left, XMid, "SSMirX")
     ss_right = mir_ss.bodies.item(0)
     ss_right.name = "SS_Right"
 
     # ==============================================================
     #  DEADMAN (panel on front stretcher, between front legs)
     # ==============================================================
-    dm_occ = af.make_comp(root, "Deadman")
+    dm_occ = sp.make_comp(root, "Deadman")
     dm_c = dm_occ.component
 
     # Deadman: centered at bench midpoint (X), flush with front LS front face
     # Y: front LS front face = (leg_d - ls_t) / 2
     # Z: raised by dm_gap above LS top, with gap at top too
-    dm_pl = af.off_plane(dm_c, root.yZConstructionPlane,
+    dm_pl = sp.off_plane(dm_c, root.yZConstructionPlane,
         "mid_x", "DM_Pl")
-    _, pr = af.sketch_rect_model(dm_c, dm_pl,
+    _, pr = sp.sketch_rect_model(dm_c, dm_pl,
         ("0 in", "(leg_d - ls_t) / 2", "ls_z + ls_w + dm_gap"),
         {"y": "dm_thick", "z": "dm_h"},
         "DM_Sk", ev=ev)
-    dm_ext = af.ext_new_sym(dm_c, pr, "dm_w / 2", "DMPanel")
+    dm_ext = sp.ext_new_sym(dm_c, pr, "dm_w / 2", "DMPanel")
     dm_body = dm_ext.bodies.item(0)
     dm_body.name = "Deadman"
 
     # Bottom tongue — extends down from panel into LS groove
-    _, pr = af.sketch_rect_model(dm_c, dm_pl,
+    _, pr = sp.sketch_rect_model(dm_c, dm_pl,
         ("0 in",
          "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2",
          "ls_z + ls_w + dm_gap - dm_tongue_h"),
         {"y": "dm_tongue_t", "z": "dm_tongue_h"},
         "DMTongueBot_Sk", ev=ev)
-    dm_tbot_ext = af.ext_new_sym(dm_c, pr, "dm_w / 2", "DMTongueBot")
+    dm_tbot_ext = sp.ext_new_sym(dm_c, pr, "dm_w / 2", "DMTongueBot")
     dm_tbot = dm_tbot_ext.bodies.item(0)
     dm_tbot.name = "DM_Tongue_Bot"
-    af.combine(dm_c, dm_body, [dm_tbot], JOIN, False, "DMTongueBot_Join")
+    sp.combine(dm_c, dm_body, [dm_tbot], JOIN, False, "DMTongueBot_Join")
 
     # Top tongue — extends up from panel into top groove
-    _, pr = af.sketch_rect_model(dm_c, dm_pl,
+    _, pr = sp.sketch_rect_model(dm_c, dm_pl,
         ("0 in",
          "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2",
          "leg_h - dm_gap"),
         {"y": "dm_tongue_t", "z": "dm_tongue_h"},
         "DMTongueTop_Sk", ev=ev)
-    dm_ttop_ext = af.ext_new_sym(dm_c, pr, "dm_w / 2", "DMTongueTop")
+    dm_ttop_ext = sp.ext_new_sym(dm_c, pr, "dm_w / 2", "DMTongueTop")
     dm_ttop = dm_ttop_ext.bodies.item(0)
     dm_ttop.name = "DM_Tongue_Top"
-    af.combine(dm_c, dm_body, [dm_ttop], JOIN, False, "DMTongueTop_Join")
+    sp.combine(dm_c, dm_body, [dm_ttop], JOIN, False, "DMTongueTop_Join")
 
     # Deadman dog holes — vertical column on front face
-    dm_front_face = af.find_face(dm_body, "y", -1)
+    dm_front_face = sp.find_face(dm_body, "y", -1)
     dm_sk = dm_c.sketches.add(dm_front_face)
     dm_sk.name = "DMDog_Sk"
     dm_m2s = dm_sk.modelToSketchSpace
@@ -485,25 +489,25 @@ def run(context):
         dm_circle, P.create(dm_ctr.x + dm_r + 1, dm_ctr.y, 0)
     ).parameter.expression = "dog_dia / 2"
 
-    dm_dog_prof = af.smallest_profile(dm_sk)
-    dm_dog_ext = af.ext_op(dm_c, dm_dog_prof, "dm_thick", CUT,
+    dm_dog_prof = sp.smallest_profile(dm_sk)
+    dm_dog_ext = sp.ext_op(dm_c, dm_dog_prof, "dm_thick", CUT,
                            dm_body, "DMDogHole", flip=True)
 
     # Pattern vertically
     dm_dc = int(ev("dm_dog_count"))
     if dm_dc > 1:
-        af.feat_pattern(dm_c, dm_dog_ext, dm_c.zConstructionAxis,
+        sp.feat_pattern(dm_c, dm_dog_ext, dm_c.zConstructionAxis,
                         "dm_dog_count", "dog_sp", "DMDog_Pat")
 
     # ==============================================================
     #  LEG VISE (on front-left leg)
     # ==============================================================
-    vise_occ = af.make_comp(root, "LegVise")
+    vise_occ = sp.make_comp(root, "LegVise")
     vise_c = vise_occ.component
 
     # Reference FL leg's left face — vise X positioning follows the leg
-    leg_fl_left = af.find_face(leg_fl, "x", -1).createForAssemblyContext(leg_occ)
-    LegFL_Left = af.off_plane(vise_c, leg_fl_left, "0 in", "LegFL_Left")
+    leg_fl_left = sp.find_face(leg_fl, "x", -1).createForAssemblyContext(leg_occ)
+    LegFL_Left = sp.off_plane(vise_c, leg_fl_left, "0 in", "LegFL_Left")
 
     P = adsk.core.Point3D
     H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
@@ -514,7 +518,7 @@ def run(context):
     _vise_cx = ev("leg_setback + leg_w / 2")
 
     # Chop — full-height slab in front of FL leg (Y < 0)
-    vise_chop_pl = af.off_plane(vise_c, root.xZConstructionPlane,
+    vise_chop_pl = sp.off_plane(vise_c, root.xZConstructionPlane,
         "-vise_distance - vise_chop_t", "ViseChop_Pl")
     chop_sk = vise_c.sketches.add(vise_chop_pl)
     chop_sk.name = "ViseChop_Sk"
@@ -570,20 +574,34 @@ def run(context):
     ).parameter.expression = "vise_bottom_gap"
 
     _refs_to_construction(chop_sk)
-    chop_ext = af.ext_new(vise_c, af.smallest_profile(chop_sk),
+    chop_ext = sp.ext_new(vise_c, sp.smallest_profile(chop_sk),
         "vise_chop_t", "ViseChop")
     chop_body = chop_ext.bodies.item(0)
     chop_body.name = "Vise_Chop"
 
-    # Chamfer on outer top edge of chop (front face, Z=max)
+    # Chamfer on chop outer front edges: top edge + two vertical side edges
     _chop_max_z = ev("bench_h")
     _chop_min_y = ev("-vise_distance - vise_chop_t")
+    _chop_lx = ev("leg_setback") - (ev("vise_chop_w") - ev("leg_w")) / 2
+    _chop_rx = _chop_lx + ev("vise_chop_w")
     chop_edges = adsk.core.ObjectCollection.create()
     for j in range(chop_body.edges.count):
         e = chop_body.edges.item(j)
         sv, ev2 = e.startVertex.geometry, e.endVertex.geometry
-        if (abs(sv.z - _chop_max_z) < 0.01 and abs(ev2.z - _chop_max_z) < 0.01
-                and abs(sv.y - _chop_min_y) < 0.01 and abs(ev2.y - _chop_min_y) < 0.01):
+        on_front = (abs(sv.y - _chop_min_y) < 0.01
+                    and abs(ev2.y - _chop_min_y) < 0.01)
+        if not on_front:
+            continue
+        # Top front edge (horizontal, Z=max)
+        is_top = (abs(sv.z - _chop_max_z) < 0.01
+                  and abs(ev2.z - _chop_max_z) < 0.01)
+        # Left front edge (vertical, X=min)
+        is_left = (abs(sv.x - _chop_lx) < 0.01
+                   and abs(ev2.x - _chop_lx) < 0.01)
+        # Right front edge (vertical, X=max)
+        is_right = (abs(sv.x - _chop_rx) < 0.01
+                    and abs(ev2.x - _chop_rx) < 0.01)
+        if is_top or is_left or is_right:
             chop_edges.add(e)
     if chop_edges.count > 0:
         ch_inp = vise_c.features.chamferFeatures.createInput2()
@@ -593,7 +611,7 @@ def run(context):
         ch.name = "ViseChop_Ch"
 
     # Screw — cylinder along Y through chop and leg
-    vise_screw_pl = af.off_plane(vise_c, root.xZConstructionPlane,
+    vise_screw_pl = sp.off_plane(vise_c, root.xZConstructionPlane,
         "-vise_distance - vise_chop_t - vise_handle_gap", "ViseScrew_Pl")
     screw_sk = vise_c.sketches.add(vise_screw_pl)
     screw_sk.name = "ViseScrew_Sk"
@@ -624,14 +642,14 @@ def run(context):
         V, P.create(screw_ctr.x - 2, screw_ctr.y / 2, 0)
     ).parameter.expression = "vise_screw_z"
 
-    screw_prof = af.smallest_profile(screw_sk)
-    screw_ext = af.ext_new(vise_c, screw_prof,
+    screw_prof = sp.smallest_profile(screw_sk)
+    screw_ext = sp.ext_new(vise_c, screw_prof,
         "vise_chop_t + leg_d + vise_handle_gap + vise_distance", "ViseScrew")
     screw_body = screw_ext.bodies.item(0)
     screw_body.name = "Vise_Screw"
 
     # Handle — cylinder along X, centered on leg
-    vise_handle_pl = af.off_plane(vise_c, LegFL_Left,
+    vise_handle_pl = sp.off_plane(vise_c, LegFL_Left,
         "-leg_w / 2", "ViseHandle_Pl")
     handle_sk = vise_c.sketches.add(vise_handle_pl)
     handle_sk.name = "ViseHandle_Sk"
@@ -668,14 +686,14 @@ def run(context):
         _h_z_orient, P.create(handle_ctr.x - 2, handle_ctr.y / 2, 0)
     ).parameter.expression = "vise_screw_z"
 
-    handle_prof = af.smallest_profile(handle_sk)
-    handle_ext = af.ext_new_sym(vise_c, handle_prof,
+    handle_prof = sp.smallest_profile(handle_sk)
+    handle_ext = sp.ext_new_sym(vise_c, handle_prof,
         "vise_handle_l / 2", "ViseHandle")
     handle_body = handle_ext.bodies.item(0)
     handle_body.name = "Vise_Handle"
 
     # Parallel guide — rectangular board along Y through leg
-    vise_guide_pl = af.off_plane(vise_c, root.xZConstructionPlane,
+    vise_guide_pl = sp.off_plane(vise_c, root.xZConstructionPlane,
         "-vise_distance - vise_chop_t", "ViseGuide_Pl")
     guide_sk = vise_c.sketches.add(vise_guide_pl)
     guide_sk.name = "ViseGuide_Sk"
@@ -731,7 +749,7 @@ def run(context):
     ).parameter.expression = "vise_guide_z - vise_guide_h / 2"
 
     _refs_to_construction(guide_sk)
-    guide_ext = af.ext_new(vise_c, af.smallest_profile(guide_sk),
+    guide_ext = sp.ext_new(vise_c, sp.smallest_profile(guide_sk),
         "vise_chop_t + vise_distance + leg_d", "ViseGuide")
     guide_body = guide_ext.bodies.item(0)
     guide_body.name = "Vise_Guide"
@@ -744,7 +762,7 @@ def run(context):
     dog_z = ev("leg_h")
     dog_r = ev("dog_dia") / 2
 
-    top_top_face = af.find_face(top_c.bRepBodies.item(0), "z", +1)
+    top_top_face = sp.find_face(top_c.bRepBodies.item(0), "z", +1)
     sk = top_c.sketches.add(top_top_face)
     sk.name = "DogHole_Sk"
     m2s = sk.modelToSketchSpace
@@ -757,13 +775,13 @@ def run(context):
         circle, P.create(center_sk.x + dog_r + 1, center_sk.y, 0)
     ).parameter.expression = "dog_dia / 2"
 
-    dog_prof = af.smallest_profile(sk)
-    dog_ext = af.ext_op(top_c, dog_prof, "top_thick", CUT,
+    dog_prof = sp.smallest_profile(sk)
+    dog_ext = sp.ext_op(top_c, dog_prof, "top_thick", CUT,
                         top_c.bRepBodies.item(0), "DogHole", flip=True)
 
     dog_count = int(ev("dog_count"))
     if dog_count > 1:
-        af.feat_pattern(top_c, dog_ext, top_c.xConstructionAxis,
+        sp.feat_pattern(top_c, dog_ext, top_c.xConstructionAxis,
                         "dog_count", "dog_sp", "DogHole_Pat")
 
     # ==============================================================
@@ -777,58 +795,97 @@ def run(context):
     # CUT top with all 4 leg proxies (through-tenon mortises)
     top_proxy = top_c.bRepBodies.item(0).createForAssemblyContext(top_occ)
     leg_proxies = get_proxies(leg_occ)
-    af.combine(root, top_proxy, leg_proxies, CUT, True, "LegMortise_Cut")
+    sp.combine(root, top_proxy, leg_proxies, CUT, True, "LegMortise_Cut")
 
     # CUT legs with long stretcher proxies (through-mortises)
     ls_proxies = get_proxies(ls_occ)
     for i in range(leg_c.bRepBodies.count):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-        af.combine(root, lp, ls_proxies, CUT, True, f"LSMort_Leg{i}")
+        sp.combine(root, lp, ls_proxies, CUT, True, f"LSMort_Leg{i}")
+
+    # Drawbore pins — through each leg at the LS tenon, offset from shoulder
+    # Pins are cylindrical dowels in Y direction, centered on tenon Z
+    pin_occ = sp.make_comp(root, "DrawborePins")
+    pin_c = pin_occ.component
+    _pin_r = ev("pin_dia") / 2
+    _pin_off = ev("pin_offset")
+    _st_z_ctr = ev("ls_z + ls_w / 2")
+    _leg_d_val = ev("leg_d")
+
+    for i, (lx, ly) in enumerate([
+        (ev("leg_setback + pin_offset"), 0),                          # FL
+        (ev("bench_l - leg_setback - pin_offset"), 0),                # FR
+        (ev("leg_setback + pin_offset"), ev("bench_w - leg_d")),      # BL
+        (ev("bench_l - leg_setback - pin_offset"), ev("bench_w - leg_d")),  # BR
+    ]):
+        pin_pl = sp.off_plane(pin_c, root.xZConstructionPlane,
+            f"{ly} cm", f"Pin{i}_Pl")
+        pin_sk = pin_c.sketches.add(pin_pl)
+        pin_sk.name = f"Pin{i}_Sk"
+        pin_m2s = pin_sk.modelToSketchSpace
+        P = adsk.core.Point3D
+        ctr = pin_m2s(P.create(lx, ly, _st_z_ctr))
+        pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
+            P.create(ctr.x, ctr.y, 0), _pin_r)
+        circle = pin_sk.sketchCurves.sketchCircles.item(0)
+        pin_sk.sketchDimensions.addRadialDimension(
+            circle, P.create(ctr.x + _pin_r + 0.5, ctr.y, 0)
+        ).parameter.expression = "pin_dia / 2"
+        _refs_to_construction(pin_sk)
+        pin_prof = sp.smallest_profile(pin_sk)
+        pin_ext = sp.ext_new(pin_c, pin_prof, "leg_d", f"Pin{i}")
+        pin_ext.bodies.item(0).name = f"Pin_{i}"
+
+    # CUT pin holes into legs
+    pin_proxies = get_proxies(pin_occ)
+    for i in range(leg_c.bRepBodies.count):
+        lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
+        sp.combine(root, lp, pin_proxies, CUT, True, f"PinHole_Leg{i}")
 
     # CUT FL leg with vise screw bore and guide slot (not chop/handle)
     vise_screw_p = vise_c.bRepBodies.itemByName("Vise_Screw").createForAssemblyContext(vise_occ)
     vise_guide_p = vise_c.bRepBodies.itemByName("Vise_Guide").createForAssemblyContext(vise_occ)
     fl_proxy = leg_c.bRepBodies.item(0).createForAssemblyContext(leg_occ)
-    af.combine(root, fl_proxy, [vise_screw_p, vise_guide_p], CUT, True, "ViseMort_FL")
+    sp.combine(root, fl_proxy, [vise_screw_p, vise_guide_p], CUT, True, "ViseMort_FL")
 
     # CUT chop with screw bore
     chop_proxy = vise_c.bRepBodies.itemByName("Vise_Chop").createForAssemblyContext(vise_occ)
     screw_proxy = vise_c.bRepBodies.itemByName("Vise_Screw").createForAssemblyContext(vise_occ)
-    af.combine(root, chop_proxy, [screw_proxy], CUT, True, "ViseScrew_ChopCut")
+    sp.combine(root, chop_proxy, [screw_proxy], CUT, True, "ViseScrew_ChopCut")
 
     # CUT legs with short stretcher proxies (SS passes through legs)
     ss_proxies = get_proxies(ss_occ)
     for i in range(leg_c.bRepBodies.count):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-        af.combine(root, lp, ss_proxies, CUT, True, f"SSMort_Leg{i}")
+        sp.combine(root, lp, ss_proxies, CUT, True, f"SSMort_Leg{i}")
 
     # Deadman tongue grooves — built in target components (local combine).
     # Groove depth into material = dm_tongue_h - dm_gap.
 
     # Bottom groove in front LS (top face, runs between inner leg faces)
-    groove_ls_pl = af.off_plane(ls_c, root.xZConstructionPlane,
+    groove_ls_pl = sp.off_plane(ls_c, root.xZConstructionPlane,
         "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2", "GrooveBot_Pl")
-    _, pr = af.sketch_rect_model(ls_c, groove_ls_pl,
+    _, pr = sp.sketch_rect_model(ls_c, groove_ls_pl,
         ("leg_setback + leg_w",
          "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2",
          "ls_z + ls_w - (dm_tongue_h - dm_gap)"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w",
          "z": "dm_tongue_h - dm_gap"},
         "GrooveBot_Sk", ev=ev)
-    groove_bot_ext = af.ext_op(ls_c, pr, "dm_tongue_t", CUT,
+    groove_bot_ext = sp.ext_op(ls_c, pr, "dm_tongue_t", CUT,
         ls_c.bRepBodies.itemByName("LS_Front"), "DMGroove_LS")
 
     # Top groove in bench top underside (runs between inner leg faces)
-    groove_top_pl = af.off_plane(top_c, root.xZConstructionPlane,
+    groove_top_pl = sp.off_plane(top_c, root.xZConstructionPlane,
         "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2", "GrooveTop_Pl")
-    _, pr = af.sketch_rect_model(top_c, groove_top_pl,
+    _, pr = sp.sketch_rect_model(top_c, groove_top_pl,
         ("leg_setback + leg_w",
          "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2",
          "leg_h"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w",
          "z": "dm_tongue_h - dm_gap"},
         "GrooveTop_Sk", ev=ev)
-    groove_top_ext = af.ext_op(top_c, pr, "dm_tongue_t", CUT,
+    groove_top_ext = sp.ext_op(top_c, pr, "dm_tongue_t", CUT,
         top_c.bRepBodies.item(0), "DMGroove_Top")
 
     # ==============================================================

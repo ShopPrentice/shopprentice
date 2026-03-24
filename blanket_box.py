@@ -1,9 +1,9 @@
 import adsk.core, adsk.fusion, math
-from helpers import af
+from helpers import sp
 from woodworking.templates import dovetail
 
 def run(context):
-    ctx = af.DesignContext()
+    ctx = sp.DesignContext()
     app, design, root = ctx.app, ctx.design, ctx.root
     params = design.userParameters
     P = adsk.core.Point3D.create
@@ -75,54 +75,54 @@ def run(context):
     # MIDPLANES
     # ======================================================================
 
-    xmid = af.off_plane(root, root.yZConstructionPlane, "case_l / 2", "XMid")
-    ymid = af.off_plane(root, root.xZConstructionPlane, "case_w / 2", "YMid")
+    xmid = sp.off_plane(root, root.yZConstructionPlane, "case_l / 2", "XMid")
+    ymid = sp.off_plane(root, root.xZConstructionPlane, "case_w / 2", "YMid")
 
     # ======================================================================
     # CASE COMPONENT
     # ======================================================================
 
-    case_occ = af.make_comp(root, "Case")
+    case_occ = sp.make_comp(root, "Case")
     case_comp = case_occ.component
 
     # Front board (pin board): full case_l x case_h at Y=0
-    sk_f, prof_f = af.sketch_rect_model(case_comp, case_comp.xZConstructionPlane,
+    sk_f, prof_f = sp.sketch_rect_model(case_comp, case_comp.xZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "case_l", "z": "case_h"},
         "Front_Sk", ev=ctx.ev)
-    f_front = af.ext_new(case_comp, prof_f, "board_t", "FrontBoard")
+    f_front = sp.ext_new(case_comp, prof_f, "board_t", "FrontBoard")
     front = f_front.bodies.item(0)
     front.name = "Front"
 
     # Back board (pin board): at Y = case_w - board_t
-    back_pl = af.off_plane(case_comp, case_comp.xZConstructionPlane,
+    back_pl = sp.off_plane(case_comp, case_comp.xZConstructionPlane,
                            "case_w - board_t", "Back_Pl")
-    sk_b, prof_b = af.sketch_rect_model(case_comp, back_pl,
+    sk_b, prof_b = sp.sketch_rect_model(case_comp, back_pl,
         ("0 in", "case_w - board_t", "0 in"),
         {"x": "case_l", "z": "case_h"},
         "Back_Sk", ev=ctx.ev)
-    f_back = af.ext_new(case_comp, prof_b, "board_t", "BackBoard")
+    f_back = sp.ext_new(case_comp, prof_b, "board_t", "BackBoard")
     back = f_back.bodies.item(0)
     back.name = "Back"
 
     # Left end board (tail board): INTERIOR width only (board_t to case_w-board_t)
     # Tails will protrude into pin boards when joined by dovetail template
-    sk_l, prof_l = af.sketch_rect_model(case_comp, case_comp.yZConstructionPlane,
+    sk_l, prof_l = sp.sketch_rect_model(case_comp, case_comp.yZConstructionPlane,
         ("0 in", "board_t", "0 in"),
         {"y": "case_w - 2 * board_t", "z": "case_h"},
         "Left_Sk", ev=ctx.ev)
-    f_left = af.ext_new(case_comp, prof_l, "board_t", "LeftBoard")
+    f_left = sp.ext_new(case_comp, prof_l, "board_t", "LeftBoard")
     left = f_left.bodies.item(0)
     left.name = "Left"
 
     # Right end board (tail board): interior width, at X = case_l - board_t
-    right_pl = af.off_plane(case_comp, case_comp.yZConstructionPlane,
+    right_pl = sp.off_plane(case_comp, case_comp.yZConstructionPlane,
                             "case_l - board_t", "Right_Pl")
-    sk_r, prof_r = af.sketch_rect_model(case_comp, right_pl,
+    sk_r, prof_r = sp.sketch_rect_model(case_comp, right_pl,
         ("case_l - board_t", "board_t", "0 in"),
         {"y": "case_w - 2 * board_t", "z": "case_h"},
         "Right_Sk", ev=ctx.ev)
-    f_right = af.ext_new(case_comp, prof_r, "board_t", "RightBoard")
+    f_right = sp.ext_new(case_comp, prof_r, "board_t", "RightBoard")
     right = f_right.bodies.item(0)
     right.name = "Right"
 
@@ -130,18 +130,18 @@ def run(context):
     # BOTTOM COMPONENT
     # ======================================================================
 
-    bot_occ = af.make_comp(root, "Bottom")
+    bot_occ = sp.make_comp(root, "Bottom")
     bot_comp = bot_occ.component
 
     # Bottom panel: edges protrude dado_depth into case boards
-    bot_pl = af.off_plane(bot_comp, bot_comp.xYConstructionPlane,
+    bot_pl = sp.off_plane(bot_comp, bot_comp.xYConstructionPlane,
                           "drawer_h - bottom_t", "Bottom_Pl")
-    sk_bot, prof_bot = af.sketch_rect_model(bot_comp, bot_pl,
+    sk_bot, prof_bot = sp.sketch_rect_model(bot_comp, bot_pl,
         ("board_t - dado_depth", "board_t - dado_depth", "drawer_h - bottom_t"),
         {"x": "case_l - 2 * board_t + 2 * dado_depth",
          "y": "case_w - 2 * board_t + 2 * dado_depth"},
         "Bottom_Sk", ev=ctx.ev)
-    f_bottom = af.ext_new(bot_comp, prof_bot, "bottom_t", "BottomBoard")
+    f_bottom = sp.ext_new(bot_comp, prof_bot, "bottom_t", "BottomBoard")
     bottom = f_bottom.bodies.item(0)
     bottom.name = "Bottom"
 
@@ -149,17 +149,17 @@ def run(context):
     # LID COMPONENT
     # ======================================================================
 
-    lid_occ = af.make_comp(root, "Lid")
+    lid_occ = sp.make_comp(root, "Lid")
     lid_comp = lid_occ.component
 
     # Lid sits ON TOP of case: Z = case_h to case_h + lid_t
-    lid_pl = af.off_plane(lid_comp, lid_comp.xYConstructionPlane,
+    lid_pl = sp.off_plane(lid_comp, lid_comp.xYConstructionPlane,
                           "case_h", "Lid_Pl")
-    sk_lid, prof_lid = af.sketch_rect_model(lid_comp, lid_pl,
+    sk_lid, prof_lid = sp.sketch_rect_model(lid_comp, lid_pl,
         ("-lid_overhang", "-lid_overhang", "case_h"),
         {"x": "case_l + 2 * lid_overhang", "y": "case_w + 2 * lid_overhang"},
         "Lid_Sk", ev=ctx.ev)
-    f_lid = af.ext_new(lid_comp, prof_lid, "lid_t", "LidBoard")
+    f_lid = sp.ext_new(lid_comp, prof_lid, "lid_t", "LidBoard")
     lid = f_lid.bodies.item(0)
     lid.name = "Lid"
 
@@ -167,59 +167,59 @@ def run(context):
     # BASE COMPONENT (Legs + Rails)
     # ======================================================================
 
-    base_occ = af.make_comp(root, "Base")
+    base_occ = sp.make_comp(root, "Base")
     base_comp = base_occ.component
 
     # Front-left leg: sketch at Z=-leg_h, extrude UP
-    leg_pl = af.off_plane(base_comp, base_comp.xYConstructionPlane,
+    leg_pl = sp.off_plane(base_comp, base_comp.xYConstructionPlane,
                           "-leg_h", "Leg_Pl")
-    sk_leg, prof_leg = af.sketch_rect_model(base_comp, leg_pl,
+    sk_leg, prof_leg = sp.sketch_rect_model(base_comp, leg_pl,
         ("board_t", "board_t", "-leg_h"),
         {"x": "leg_size", "y": "leg_size"},
         "Leg_Sk", ev=ctx.ev)
-    f_leg = af.ext_new(base_comp, prof_leg, "leg_h", "LegFL")
+    f_leg = sp.ext_new(base_comp, prof_leg, "leg_h", "LegFL")
     leg_fl = f_leg.bodies.item(0)
     leg_fl.name = "Leg_FL"
 
     # Mirror legs to all 4 corners
-    base_xmid = af.off_plane(base_comp, base_comp.yZConstructionPlane,
+    base_xmid = sp.off_plane(base_comp, base_comp.yZConstructionPlane,
                              "case_l / 2", "Base_XMid")
-    base_ymid = af.off_plane(base_comp, base_comp.xZConstructionPlane,
+    base_ymid = sp.off_plane(base_comp, base_comp.xZConstructionPlane,
                              "case_w / 2", "Base_YMid")
 
-    m_lr = af.mirror_body(base_comp, leg_fl, base_xmid, "LegFR_Mirror")
+    m_lr = sp.mirror_body(base_comp, leg_fl, base_xmid, "LegFR_Mirror")
     leg_fr = m_lr.bodies.item(0)
     leg_fr.name = "Leg_FR"
 
-    m_fb = af.mirror_bodies(base_comp, [leg_fl, leg_fr], base_ymid, "LegsBack_Mirror")
+    m_fb = sp.mirror_bodies(base_comp, [leg_fl, leg_fr], base_ymid, "LegsBack_Mirror")
     leg_bl = m_fb.bodies.item(0)
     leg_bl.name = "Leg_BL"
     leg_br = m_fb.bodies.item(1)
     leg_br.name = "Leg_BR"
 
     # Front rail: sketch on leg_pl (Z=-leg_h), extrude UP by base_rail_h
-    sk_rf, prof_rf = af.sketch_rect_model(base_comp, leg_pl,
+    sk_rf, prof_rf = sp.sketch_rect_model(base_comp, leg_pl,
         ("board_t + leg_size", "board_t", "-leg_h"),
         {"x": "rail_int_l", "y": "base_rail_t"},
         "RailFront_Sk", ev=ctx.ev)
-    f_rf = af.ext_new(base_comp, prof_rf, "base_rail_h", "RailFrontBoard")
+    f_rf = sp.ext_new(base_comp, prof_rf, "base_rail_h", "RailFrontBoard")
     rail_front = f_rf.bodies.item(0)
     rail_front.name = "Rail_Front"
 
-    m_rail_fb = af.mirror_body(base_comp, rail_front, base_ymid, "RailBack_Mirror")
+    m_rail_fb = sp.mirror_body(base_comp, rail_front, base_ymid, "RailBack_Mirror")
     rail_back = m_rail_fb.bodies.item(0)
     rail_back.name = "Rail_Back"
 
     # Left side rail
-    sk_rl, prof_rl = af.sketch_rect_model(base_comp, leg_pl,
+    sk_rl, prof_rl = sp.sketch_rect_model(base_comp, leg_pl,
         ("board_t", "board_t + leg_size", "-leg_h"),
         {"x": "base_rail_t", "y": "rail_int_w"},
         "RailLeft_Sk", ev=ctx.ev)
-    f_rl = af.ext_new(base_comp, prof_rl, "base_rail_h", "RailLeftBoard")
+    f_rl = sp.ext_new(base_comp, prof_rl, "base_rail_h", "RailLeftBoard")
     rail_left = f_rl.bodies.item(0)
     rail_left.name = "Rail_Left"
 
-    m_rail_lr = af.mirror_body(base_comp, rail_left, base_xmid, "RailRight_Mirror")
+    m_rail_lr = sp.mirror_body(base_comp, rail_left, base_xmid, "RailRight_Mirror")
     rail_right = m_rail_lr.bodies.item(0)
     rail_right.name = "Rail_Right"
 
@@ -227,60 +227,60 @@ def run(context):
     # DRAWER COMPONENT
     # ======================================================================
 
-    drw_occ = af.make_comp(root, "Drawer")
+    drw_occ = sp.make_comp(root, "Drawer")
     drw_comp = drw_occ.component
 
     # Drawer front: fills opening, flush with case front
-    sk_df, prof_df = af.sketch_rect_model(drw_comp, drw_comp.xZConstructionPlane,
+    sk_df, prof_df = sp.sketch_rect_model(drw_comp, drw_comp.xZConstructionPlane,
         ("board_t + drawer_gap", "0 in", "drawer_gap"),
         {"x": "case_l - 2 * board_t - 2 * drawer_gap", "z": "drw_box_h"},
         "DrwFront_Sk", ev=ctx.ev)
-    f_df = af.ext_new(drw_comp, prof_df, "drawer_front_t", "DrwFrontBoard")
+    f_df = sp.ext_new(drw_comp, prof_df, "drawer_front_t", "DrwFrontBoard")
     drw_front = f_df.bodies.item(0)
     drw_front.name = "Drw_Front"
 
     # Drawer back
-    drw_back_pl = af.off_plane(drw_comp, drw_comp.xZConstructionPlane,
+    drw_back_pl = sp.off_plane(drw_comp, drw_comp.xZConstructionPlane,
         "case_w - board_t - drawer_side_t", "DrwBack_Pl")
-    sk_db, prof_db = af.sketch_rect_model(drw_comp, drw_back_pl,
+    sk_db, prof_db = sp.sketch_rect_model(drw_comp, drw_back_pl,
         ("board_t + drawer_gap + drawer_side_t",
          "case_w - board_t - drawer_side_t",
          "drawer_gap + drawer_bottom_t"),
         {"x": "case_l - 2 * board_t - 2 * drawer_gap - 2 * drawer_side_t",
          "z": "drw_box_h - drawer_bottom_t"},
         "DrwBack_Sk", ev=ctx.ev)
-    f_db = af.ext_new(drw_comp, prof_db, "drawer_side_t", "DrwBackBoard")
+    f_db = sp.ext_new(drw_comp, prof_db, "drawer_side_t", "DrwBackBoard")
     drw_back = f_db.bodies.item(0)
     drw_back.name = "Drw_Back"
 
     # Drawer left side
-    drw_left_pl = af.off_plane(drw_comp, drw_comp.yZConstructionPlane,
+    drw_left_pl = sp.off_plane(drw_comp, drw_comp.yZConstructionPlane,
         "board_t + drawer_gap", "DrwLeft_Pl")
-    sk_dls, prof_dls = af.sketch_rect_model(drw_comp, drw_left_pl,
+    sk_dls, prof_dls = sp.sketch_rect_model(drw_comp, drw_left_pl,
         ("board_t + drawer_gap", "drawer_front_t", "drawer_gap + drawer_bottom_t"),
         {"y": "case_w - 2 * board_t - drawer_front_t - drawer_side_t",
          "z": "drw_box_h - drawer_bottom_t"},
         "DrwLeft_Sk", ev=ctx.ev)
-    f_dls = af.ext_new(drw_comp, prof_dls, "drawer_side_t", "DrwLeftBoard")
+    f_dls = sp.ext_new(drw_comp, prof_dls, "drawer_side_t", "DrwLeftBoard")
     drw_left = f_dls.bodies.item(0)
     drw_left.name = "Drw_Left"
 
     # Drawer right side — mirror
-    drw_xmid = af.off_plane(drw_comp, drw_comp.yZConstructionPlane,
+    drw_xmid = sp.off_plane(drw_comp, drw_comp.yZConstructionPlane,
         "case_l / 2", "Drw_XMid")
-    m_drw_r = af.mirror_body(drw_comp, drw_left, drw_xmid, "DrwRight_Mirror")
+    m_drw_r = sp.mirror_body(drw_comp, drw_left, drw_xmid, "DrwRight_Mirror")
     drw_right = m_drw_r.bodies.item(0)
     drw_right.name = "Drw_Right"
 
     # Drawer bottom
-    drw_bot_pl = af.off_plane(drw_comp, drw_comp.xYConstructionPlane,
+    drw_bot_pl = sp.off_plane(drw_comp, drw_comp.xYConstructionPlane,
         "drawer_gap", "DrwBot_Pl")
-    sk_dbot, prof_dbot = af.sketch_rect_model(drw_comp, drw_bot_pl,
+    sk_dbot, prof_dbot = sp.sketch_rect_model(drw_comp, drw_bot_pl,
         ("board_t + drawer_gap + drawer_side_t", "drawer_front_t", "drawer_gap"),
         {"x": "case_l - 2 * board_t - 2 * drawer_gap - 2 * drawer_side_t",
          "y": "case_w - 2 * board_t - drawer_front_t - drawer_side_t"},
         "DrwBot_Sk", ev=ctx.ev)
-    f_dbot = af.ext_new(drw_comp, prof_dbot, "drawer_bottom_t", "DrwBotBoard")
+    f_dbot = sp.ext_new(drw_comp, prof_dbot, "drawer_bottom_t", "DrwBotBoard")
     drw_bottom = f_dbot.bodies.item(0)
     drw_bottom.name = "Drw_Bottom"
 
@@ -289,7 +289,7 @@ def run(context):
     # ======================================================================
     # CUT front case board with drawer front body (rule 6)
     drw_front_proxy = drw_front.createForAssemblyContext(drw_occ)
-    af.combine(case_comp, front, [drw_front_proxy], CUT, True, "DrawerOpen_Cut")
+    sp.combine(case_comp, front, [drw_front_proxy], CUT, True, "DrawerOpen_Cut")
 
     # ======================================================================
     # CROSS-COMPONENT: DOVETAILS (via template)
@@ -302,9 +302,9 @@ def run(context):
     #   - CUTs front/back pin boards using tail boards as tools
 
     # Component-local midplanes for dovetail mirrors
-    case_xmid = af.off_plane(case_comp, case_comp.yZConstructionPlane,
+    case_xmid = sp.off_plane(case_comp, case_comp.yZConstructionPlane,
                              "case_l / 2", "Case_XMid")
-    case_ymid = af.off_plane(case_comp, case_comp.xZConstructionPlane,
+    case_ymid = sp.off_plane(case_comp, case_comp.xZConstructionPlane,
                              "case_w / 2", "Case_YMid")
 
     dt_result = dovetail.box(
@@ -323,17 +323,17 @@ def run(context):
     # CROSS-COMPONENT: BOTTOM DADOS
     # ======================================================================
     bot_proxy = bottom.createForAssemblyContext(bot_occ)
-    af.combine(case_comp, front, [bot_proxy], CUT, True, "BottomDado_Front")
-    af.combine(case_comp, back, [bot_proxy], CUT, True, "BottomDado_Back")
-    af.combine(case_comp, left, [bot_proxy], CUT, True, "BottomDado_Left")
-    af.combine(case_comp, right, [bot_proxy], CUT, True, "BottomDado_Right")
+    sp.combine(case_comp, front, [bot_proxy], CUT, True, "BottomDado_Front")
+    sp.combine(case_comp, back, [bot_proxy], CUT, True, "BottomDado_Back")
+    sp.combine(case_comp, left, [bot_proxy], CUT, True, "BottomDado_Left")
+    sp.combine(case_comp, right, [bot_proxy], CUT, True, "BottomDado_Right")
 
     # ======================================================================
     # DETAILS: ARCH CUTOUTS ON BASE RAILS
     # ======================================================================
 
     # Front rail arch
-    arch_face = af.find_face(rail_front, "y", -1)
+    arch_face = sp.find_face(rail_front, "y", -1)
     sk_arch = base_comp.sketches.add(arch_face)
     sk_arch.name = "Arch_Front_Sk"
     m2s = sk_arch.modelToSketchSpace
@@ -354,12 +354,12 @@ def run(context):
     sk_arch.sketchCurves.sketchArcs.addByThreePoints(
         arch_line.startSketchPoint, P(sm.x, sm.y, 0), arch_line.endSketchPoint)
 
-    arch_prof = af.smallest_profile(sk_arch)
-    af.ext_op(base_comp, arch_prof, "base_rail_t", CUT, rail_front,
+    arch_prof = sp.smallest_profile(sk_arch)
+    sp.ext_op(base_comp, arch_prof, "base_rail_t", CUT, rail_front,
               "Arch_Front_Cut", flip=True)
 
     # Back rail arch
-    arch_face_b = af.find_face(rail_back, "y", +1)
+    arch_face_b = sp.find_face(rail_back, "y", +1)
     sk_arch_b = base_comp.sketches.add(arch_face_b)
     sk_arch_b.name = "Arch_Back_Sk"
     m2s_b = sk_arch_b.modelToSketchSpace
@@ -374,12 +374,12 @@ def run(context):
     sk_arch_b.sketchCurves.sketchArcs.addByThreePoints(
         arch_line_b.startSketchPoint, P(sm_b.x, sm_b.y, 0), arch_line_b.endSketchPoint)
 
-    arch_prof_b = af.smallest_profile(sk_arch_b)
-    af.ext_op(base_comp, arch_prof_b, "base_rail_t", CUT, rail_back,
+    arch_prof_b = sp.smallest_profile(sk_arch_b)
+    sp.ext_op(base_comp, arch_prof_b, "base_rail_t", CUT, rail_back,
               "Arch_Back_Cut", flip=True)
 
     # Left side rail arch
-    arch_face_l = af.find_face(rail_left, "x", -1)
+    arch_face_l = sp.find_face(rail_left, "x", -1)
     sk_arch_l = base_comp.sketches.add(arch_face_l)
     sk_arch_l.name = "Arch_Left_Sk"
     m2s_l = sk_arch_l.modelToSketchSpace
@@ -398,12 +398,12 @@ def run(context):
     sk_arch_l.sketchCurves.sketchArcs.addByThreePoints(
         arch_line_l.startSketchPoint, P(sm_l.x, sm_l.y, 0), arch_line_l.endSketchPoint)
 
-    arch_prof_l = af.smallest_profile(sk_arch_l)
-    af.ext_op(base_comp, arch_prof_l, "base_rail_t", CUT, rail_left,
+    arch_prof_l = sp.smallest_profile(sk_arch_l)
+    sp.ext_op(base_comp, arch_prof_l, "base_rail_t", CUT, rail_left,
               "Arch_Left_Cut", flip=True)
 
     # Right side rail arch
-    arch_face_r = af.find_face(rail_right, "x", +1)
+    arch_face_r = sp.find_face(rail_right, "x", +1)
     sk_arch_r = base_comp.sketches.add(arch_face_r)
     sk_arch_r.name = "Arch_Right_Sk"
     m2s_r = sk_arch_r.modelToSketchSpace
@@ -418,15 +418,15 @@ def run(context):
     sk_arch_r.sketchCurves.sketchArcs.addByThreePoints(
         arch_line_r.startSketchPoint, P(sm_r.x, sm_r.y, 0), arch_line_r.endSketchPoint)
 
-    arch_prof_r = af.smallest_profile(sk_arch_r)
-    af.ext_op(base_comp, arch_prof_r, "base_rail_t", CUT, rail_right,
+    arch_prof_r = sp.smallest_profile(sk_arch_r)
+    sp.ext_op(base_comp, arch_prof_r, "base_rail_t", CUT, rail_right,
               "Arch_Right_Cut", flip=True)
 
     # ======================================================================
     # DETAILS: LID CHAMFER
     # ======================================================================
 
-    lid_bottom_face = af.find_face(lid, "z", -1)
+    lid_bottom_face = sp.find_face(lid, "z", -1)
     lid_edges = []
     seen = set()
     for i in range(lid_bottom_face.edges.count):

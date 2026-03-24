@@ -12,7 +12,7 @@ Coordinate system:
 """
 import adsk.core, adsk.fusion
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import dovetailed_drawer
 from woodworking.templates import domino
 from woodworking.templates import tabletop_bracket
@@ -102,11 +102,11 @@ def run(context):
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
-    leg_occ    = af.make_comp(root, "Legs")
-    apron_occ  = af.make_comp(root, "Aprons")
-    top_occ    = af.make_comp(root, "Top")
-    drawer_l_occ = af.make_comp(root, "DrawerLeft")
-    drawer_r_occ = af.make_comp(root, "DrawerRight")
+    leg_occ    = sp.make_comp(root, "Legs")
+    apron_occ  = sp.make_comp(root, "Aprons")
+    top_occ    = sp.make_comp(root, "Top")
+    drawer_l_occ = sp.make_comp(root, "DrawerLeft")
+    drawer_r_occ = sp.make_comp(root, "DrawerRight")
 
     leg_c    = leg_occ.component
     apron_c  = apron_occ.component
@@ -117,10 +117,10 @@ def run(context):
     # ==============================================================
     #  1. LEGS — tapered on inner faces below the apron
     # ==============================================================
-    _, pr = af.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(leg_c, leg_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "leg_size", "y": "leg_size"}, "LegFL_Sk", ev)
-    fl_ext = af.ext_new(leg_c, pr, "leg_h", "LegFL")
+    fl_ext = sp.ext_new(leg_c, pr, "leg_h", "LegFL")
     leg_fl = fl_ext.bodies.item(0); leg_fl.name = "Leg_FL"
 
     # Taper — CUT triangular wedges from inner faces below the apron
@@ -136,7 +136,7 @@ def run(context):
     l2 = lines.addByTwoPoints(l1.endSketchPoint, P3.create(pt3.x, pt3.y, 0))
     lines.addByTwoPoints(l2.endSketchPoint, l1.startSketchPoint)
     taper_prof = sk_tx.profiles.item(0)
-    af.ext_op(leg_c, taper_prof, "leg_size", CUT, leg_fl, "TaperX_Cut")
+    sp.ext_op(leg_c, taper_prof, "leg_size", CUT, leg_fl, "TaperX_Cut")
 
     # Y-direction taper: sketch on YZ plane, extrude through leg in X
     sk_ty = leg_c.sketches.add(leg_c.yZConstructionPlane)
@@ -150,92 +150,92 @@ def run(context):
     l2 = lines.addByTwoPoints(l1.endSketchPoint, P3.create(pt3.x, pt3.y, 0))
     lines.addByTwoPoints(l2.endSketchPoint, l1.startSketchPoint)
     taper_prof = sk_ty.profiles.item(0)
-    af.ext_op(leg_c, taper_prof, "leg_size", CUT, leg_fl, "TaperY_Cut")
+    sp.ext_op(leg_c, taper_prof, "leg_size", CUT, leg_fl, "TaperY_Cut")
 
     # Mirror to all 4 corners
-    l_xmid = af.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
-    l_ymid = af.off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "LYMid")
-    af.mirror_body(leg_c, leg_fl, l_xmid, "LegFR").bodies.item(0).name = "Leg_FR"
-    leg_bl = af.mirror_body(leg_c, leg_fl, l_ymid, "LegBL").bodies.item(0)
+    l_xmid = sp.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
+    l_ymid = sp.off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "LYMid")
+    sp.mirror_body(leg_c, leg_fl, l_xmid, "LegFR").bodies.item(0).name = "Leg_FR"
+    leg_bl = sp.mirror_body(leg_c, leg_fl, l_ymid, "LegBL").bodies.item(0)
     leg_bl.name = "Leg_BL"
-    af.mirror_body(leg_c, leg_bl, l_xmid, "LegBR").bodies.item(0).name = "Leg_BR"
+    sp.mirror_body(leg_c, leg_bl, l_xmid, "LegBR").bodies.item(0).name = "Leg_BR"
     print(">>> Legs: 4 (tapered)")
 
     # ==============================================================
     #  2. APRONS — back + 2 sides + front rail above drawer
     # ==============================================================
-    az_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "AZ_Pl")
+    az_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "AZ_Pl")
 
     # Back apron (full height)
-    _, pr = af.sketch_rect_model(apron_c, az_pl,
+    _, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("leg_size", "desk_w - leg_size - apron_thick", "apron_z"),
         {"x": "long_apron_l", "y": "apron_thick"}, "BackApron_Sk", ev)
-    af.ext_new(apron_c, pr, "apron_h", "BackApron").bodies.item(0).name = "Apron_Back"
+    sp.ext_new(apron_c, pr, "apron_h", "BackApron").bodies.item(0).name = "Apron_Back"
 
     # Left side apron (full height)
-    _, pr = af.sketch_rect_model(apron_c, az_pl,
+    _, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("0 in", "leg_size", "apron_z"),
         {"x": "apron_thick", "y": "short_apron_l"}, "LeftApron_Sk", ev)
-    la_ext = af.ext_new(apron_c, pr, "apron_h", "LeftApron")
+    la_ext = sp.ext_new(apron_c, pr, "apron_h", "LeftApron")
     la_ext.bodies.item(0).name = "Apron_Left"
 
-    a_xmid = af.off_plane(apron_c, apron_c.yZConstructionPlane, "mid_x", "AXMid")
-    af.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir").bodies.item(0).name = "Apron_Right"
+    a_xmid = sp.off_plane(apron_c, apron_c.yZConstructionPlane, "mid_x", "AXMid")
+    sp.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir").bodies.item(0).name = "Apron_Right"
 
     # Front stretcher (below drawers, at bottom of apron zone)
-    _, pr = af.sketch_rect_model(apron_c, az_pl,
+    _, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("leg_size", "0 in", "apron_z"),
         {"x": "long_apron_l", "y": "apron_thick"}, "FrontStretcher_Sk", ev)
-    af.ext_new(apron_c, pr, "stretcher_h", "FrontStretcher").bodies.item(0).name = "Apron_FrontStretcher"
+    sp.ext_new(apron_c, pr, "stretcher_h", "FrontStretcher").bodies.item(0).name = "Apron_FrontStretcher"
 
     # Center divider — runs between front rail back face and back apron front face
-    _, pr = af.sketch_rect_model(apron_c, az_pl,
+    _, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("mid_x - divider_thick / 2", "apron_thick", "apron_z"),
         {"x": "divider_thick", "y": "desk_w - leg_size - 2 * apron_thick"}, "Divider_Sk", ev)
-    div_ext = af.ext_new(apron_c, pr, "apron_h", "Divider")
+    div_ext = sp.ext_new(apron_c, pr, "apron_h", "Divider")
     div_body = div_ext.bodies.item(0); div_body.name = "Divider"
 
     # Divider front extension — fills gap between drawer fronts above stretcher
-    div_front_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane,
+    div_front_z_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane,
                                    "apron_z + stretcher_h", "DivFrontZ_Pl")
-    _, pr = af.sketch_rect_model(apron_c, div_front_z_pl,
+    _, pr = sp.sketch_rect_model(apron_c, div_front_z_pl,
         ("mid_x - divider_thick / 2", "0 in", "apron_z + stretcher_h"),
         {"x": "divider_thick", "y": "apron_thick"}, "DivFront_Sk", ev)
-    af.ext_new(apron_c, pr, "drawer_opening", "DivFront").bodies.item(0).name = "Divider_Front"
+    sp.ext_new(apron_c, pr, "drawer_opening", "DivFront").bodies.item(0).name = "Divider_Front"
 
     # Drawer runners — 2 on side aprons only (divider sides have no runners
     # to avoid blocking drawer slide path)
     runner_z = "apron_z + stretcher_h + drawer_gap"
-    runner_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, runner_z, "RunnerZ_Pl")
+    runner_z_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, runner_z, "RunnerZ_Pl")
 
     # Left apron runner
-    _, pr = af.sketch_rect_model(apron_c, runner_z_pl,
+    _, pr = sp.sketch_rect_model(apron_c, runner_z_pl,
         ("apron_thick", "leg_size", runner_z),
         {"x": "runner_w", "y": "short_apron_l"}, "RunnerL_Sk", ev)
-    lr_ext = af.ext_new(apron_c, pr, "runner_h", "RunnerL")
+    lr_ext = sp.ext_new(apron_c, pr, "runner_h", "RunnerL")
     lr_ext.bodies.item(0).name = "Runner_L"
 
     # Right apron runner (mirror)
-    af.mirror_feats(apron_c, [lr_ext], a_xmid, "RunnerRMir").bodies.item(0).name = "Runner_R"
+    sp.mirror_feats(apron_c, [lr_ext], a_xmid, "RunnerRMir").bodies.item(0).name = "Runner_R"
 
     # Drawer stops — 2 blocks at back of each runner
     stop_z = "apron_z + stretcher_h + drawer_gap + runner_h"
-    stop_z_pl = af.off_plane(apron_c, apron_c.xYConstructionPlane, stop_z, "StopZ_Pl")
-    _, pr = af.sketch_rect_model(apron_c, stop_z_pl,
+    stop_z_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, stop_z, "StopZ_Pl")
+    _, pr = sp.sketch_rect_model(apron_c, stop_z_pl,
         ("apron_thick", "desk_w - leg_size - apron_thick - stop_l", stop_z),
         {"x": "runner_w", "y": "stop_l"}, "StopL_Sk", ev)
-    sl_ext = af.ext_new(apron_c, pr, "drawer_h_inner / 2", "StopL")
+    sl_ext = sp.ext_new(apron_c, pr, "drawer_h_inner / 2", "StopL")
     sl_ext.bodies.item(0).name = "Stop_L"
-    af.mirror_feats(apron_c, [sl_ext], a_xmid, "StopRMir").bodies.item(0).name = "Stop_R"
+    sp.mirror_feats(apron_c, [sl_ext], a_xmid, "StopRMir").bodies.item(0).name = "Stop_R"
 
     print(">>> Aprons: 4 + divider + 2 runners + 2 stops")
 
     # ==============================================================
     #  3. TOP — with cable grommet
     # ==============================================================
-    top_pl = af.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
+    top_pl = sp.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
     # Use a YZ offset plane at -overhang so the sketch starts in negative X
-    top_x_pl = af.off_plane(top_c, top_c.yZConstructionPlane,
+    top_x_pl = sp.off_plane(top_c, top_c.yZConstructionPlane,
                              "0 in - top_overhang", "TopX_Pl")
     sk_top = top_c.sketches.add(top_pl)
     sk_top.name = "Top_Sk"
@@ -250,11 +250,11 @@ def run(context):
     sk_top.geometricConstraints.addVertical(rect[1])
     sk_top.geometricConstraints.addVertical(rect[3])
     pr = sk_top.profiles.item(0)
-    top_ext = af.ext_new(top_c, pr, "top_thick", "TopBoard")
+    top_ext = sp.ext_new(top_c, pr, "top_thick", "TopBoard")
     top_body = top_ext.bodies.item(0); top_body.name = "Top"
 
     # Cable grommet — circular CUT at back-right corner
-    grommet_pl = af.off_plane(top_c, top_c.xYConstructionPlane,
+    grommet_pl = sp.off_plane(top_c, top_c.xYConstructionPlane,
                                "leg_h", "Grommet_Pl")
     sk_g = top_c.sketches.add(grommet_pl)
     sk_g.name = "Grommet_Sk"
@@ -263,7 +263,7 @@ def run(context):
     sk_g.sketchCurves.sketchCircles.addByCenterRadius(
         P3.create(gx, gy, 0), ev("grommet_dia") / 2)
     grommet_prof = sk_g.profiles.item(0)
-    af.ext_op(top_c, grommet_prof, "top_thick", CUT, top_body, "GrommetCut")
+    sp.ext_op(top_c, grommet_prof, "top_thick", CUT, top_body, "GrommetCut")
 
     print(">>> Top: 1 (with grommet)")
 
@@ -311,10 +311,10 @@ def run(context):
     fr_p_body = fr_body.createForAssemblyContext(apron_occ)
     div_p = div_body.createForAssemblyContext(apron_occ)
 
-    dm_fl = af.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
-    dm_fr = af.off_plane(root, root.yZConstructionPlane, "desk_l - leg_size", "DM_FR")
-    dm_lf = af.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
-    dm_lb = af.off_plane(root, root.xZConstructionPlane, "desk_w - leg_size", "DM_LB")
+    dm_fl = sp.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
+    dm_fr = sp.off_plane(root, root.yZConstructionPlane, "desk_l - leg_size", "DM_FR")
+    dm_lf = sp.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
+    dm_lb = sp.off_plane(root, root.xZConstructionPlane, "desk_w - leg_size", "DM_LB")
 
     # Back apron → BL, BR legs
     domino.grid(root, dm_fl, ("leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
@@ -345,8 +345,8 @@ def run(context):
     # domino.between() finds where the bodies overlap and places dominos there.
     # Short depth so dominos fit within the thin apron/divider.
     params.add("div_dm_d", VI("apron_thick / 2"), "in", "")
-    dm_div_f = af.off_plane(root, root.xZConstructionPlane, "apron_thick", "DM_DivF")
-    dm_div_b = af.off_plane(root, root.xZConstructionPlane,
+    dm_div_f = sp.off_plane(root, root.xZConstructionPlane, "apron_thick", "DM_DivF")
+    dm_div_b = sp.off_plane(root, root.xZConstructionPlane,
                              "desk_w - leg_size - apron_thick", "DM_DivB")
     # Divider dominos — between() auto-orients: long_axis=Z (longer
     # mating dimension), step along X. Standard dm_w/dm_t fit.
@@ -359,7 +359,7 @@ def run(context):
 
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
     # Vertical leg against apron inner face, horizontal leg under top
-    bracket_occ = af.make_comp(root, "Brackets")
+    bracket_occ = sp.make_comp(root, "Brackets")
     bracket_c = bracket_occ.component
     tabletop_bracket._define_params(params)
     top_z = ev("leg_h")  # top underside Z
@@ -501,7 +501,7 @@ def run(context):
         print(f"{cn}: {len(names)} bodies -> {names}")
     print(f"Root: {root.bRepBodies.count} domino voids")
 
-    af.apply_appearance("maple")
+    sp.apply_appearance("maple")
     # Note: Fusion's "3D Maple" uses a procedural 3D texture — grain direction
     # is controlled by the procedural algorithm, not the texture map transform.
     # The ProjectedTextureMapControl.transform has no visible effect on 3D textures.

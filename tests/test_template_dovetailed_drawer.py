@@ -38,27 +38,27 @@ def build_case(comp, prefix, ev):
     """Build 4-board case via mirror at component origin."""
     p = prefix
 
-    x_mid = af.off_plane(comp, comp.yZConstructionPlane,
+    x_mid = sp.off_plane(comp, comp.yZConstructionPlane,
                          f"{p}_cw / 2", f"{p}_XMid")
-    z_mid = af.off_plane(comp, comp.xYConstructionPlane,
+    z_mid = sp.off_plane(comp, comp.xYConstructionPlane,
                          f"{p}_ch / 2", f"{p}_ZMid")
 
     # Left side → mirror → right
-    _, pr = af.sketch_rect_model(comp, comp.yZConstructionPlane,
+    _, pr = sp.sketch_rect_model(comp, comp.yZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"y": f"{p}_cd", "z": f"{p}_ch"}, f"{p}_CL_Sk", ev)
-    cl = af.ext_new(comp, pr, f"{p}_ct", f"{p}_CL").bodies.item(0)
+    cl = sp.ext_new(comp, pr, f"{p}_ct", f"{p}_CL").bodies.item(0)
     cl.name = f"{p}_Case_Left"
-    cr = af.mirror_body(comp, cl, x_mid, f"{p}_CR_Mir").bodies.item(0)
+    cr = sp.mirror_body(comp, cl, x_mid, f"{p}_CR_Mir").bodies.item(0)
     cr.name = f"{p}_Case_Right"
 
     # Bottom → mirror → top
-    _, pr = af.sketch_rect_model(comp, comp.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(comp, comp.xYConstructionPlane,
         (f"{p}_ct", "0 in", "0 in"),
         {"x": f"{p}_cw - 2 * {p}_ct", "y": f"{p}_cd"}, f"{p}_CB_Sk", ev)
-    cb = af.ext_new(comp, pr, f"{p}_ct", f"{p}_CB").bodies.item(0)
+    cb = sp.ext_new(comp, pr, f"{p}_ct", f"{p}_CB").bodies.item(0)
     cb.name = f"{p}_Case_Bot"
-    ct = af.mirror_body(comp, cb, z_mid, f"{p}_CT_Mir").bodies.item(0)
+    ct = sp.mirror_body(comp, cb, z_mid, f"{p}_CT_Mir").bodies.item(0)
     ct.name = f"{p}_Case_Top"
 
     return [cl, cr, cb, ct]
@@ -119,10 +119,10 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
 
     global af, dovetailed_drawer
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import dovetailed_drawer
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     params.add("dr_gap", VI("0.0625 in"), "in", "Drawer-to-case gap")
     params.add("case_thick", VI("0.75 in"), "in", "Case board thickness")

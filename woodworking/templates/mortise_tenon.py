@@ -15,7 +15,7 @@ Usage:
         tenon_w="2 in", tenon_thick="0.375 in", tenon_depth="1 in")
 
     # Blind tenon (rail into leg)
-    face = af.find_face(rail, "x", -1)
+    face = sp.find_face(rail, "x", -1)
     mt.blind(comp, face,
              origin=("leg_w", "(leg_w - mt_tt) / 2",
                      "rail_z + (rail_w - mt_tw) / 2"),
@@ -37,7 +37,7 @@ Usage:
 import adsk.core
 import adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
@@ -147,33 +147,33 @@ def blind(comp, plane, origin, size, depth_expr,
         Dict with 'tenon_ext', 'join', 'mirror' (if mirror_plane).
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     # Validate mating surfaces before building the joint
-    af.validate_joint_contact(tenon_body, mortise_body)
+    sp.validate_joint_contact(tenon_body, mortise_body)
 
-    sk, _prof = af.sketch_rect_model(comp, plane, origin, size,
+    sk, _prof = sp.sketch_rect_model(comp, plane, origin, size,
                                       name=f"{name}_Sk", ev=ev)
     # On body-face sketches the face boundary creates multiple profiles.
     # smallest_profile picks the drawn rectangle, not the surrounding region.
-    prof = af.smallest_profile(sk)
-    tenon_ext = af.ext_new(comp, prof, depth_expr, f"{name}_Tenon")
+    prof = sp.smallest_profile(sk)
+    tenon_ext = sp.ext_new(comp, prof, depth_expr, f"{name}_Tenon")
     tenon_b = tenon_ext.bodies.item(0)
     tenon_b.name = f"{name}_Tenon"
 
     result = {"tenon_ext": tenon_ext}
 
     if mirror_plane:
-        mir = af.mirror_feats(comp, [tenon_ext], mirror_plane,
+        mir = sp.mirror_feats(comp, [tenon_ext], mirror_plane,
                               f"{name}_Mirror")
         mir_body = mir.bodies.item(0)
 
         # JOIN both into tenon_body
-        join = af.combine(comp, tenon_body, [tenon_b, mir_body],
+        join = sp.combine(comp, tenon_body, [tenon_b, mir_body],
                           JOIN, False, f"{name}_Join")
         result["mirror"] = mir
     else:
-        join = af.combine(comp, tenon_body, tenon_b, JOIN, False,
+        join = sp.combine(comp, tenon_body, tenon_b, JOIN, False,
                           f"{name}_Join")
 
     result["join"] = join
@@ -199,15 +199,15 @@ def through(comp, plane, origin, size, depth_expr,
         'mirror' (if mirror_plane).
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     # Validate mating surfaces before building the joint
-    af.validate_joint_contact(tenon_body, mortise_body)
+    sp.validate_joint_contact(tenon_body, mortise_body)
 
-    sk, _prof = af.sketch_rect_model(comp, plane, origin, size,
+    sk, _prof = sp.sketch_rect_model(comp, plane, origin, size,
                                       name=f"{name}_Sk", ev=ev)
-    prof = af.smallest_profile(sk)
-    tenon_ext = af.ext_new(comp, prof, depth_expr, f"{name}_Tenon")
+    prof = sp.smallest_profile(sk)
+    tenon_ext = sp.ext_new(comp, prof, depth_expr, f"{name}_Tenon")
     tenon_b = tenon_ext.bodies.item(0)
     tenon_b.name = f"{name}_Tenon"
 
@@ -215,21 +215,21 @@ def through(comp, plane, origin, size, depth_expr,
 
     # CUT mortise with tenon body BEFORE joining to rail.
     # This avoids coplanar face splitting (rail end face flush with leg).
-    mort_cut = af.combine(comp, mortise_body, [tenon_b], CUT, True,
+    mort_cut = sp.combine(comp, mortise_body, [tenon_b], CUT, True,
                           f"{name}_Mort")
     result["mortise_cut"] = mort_cut
 
     if mirror_plane:
-        mir = af.mirror_feats(comp, [tenon_ext], mirror_plane,
+        mir = sp.mirror_feats(comp, [tenon_ext], mirror_plane,
                               f"{name}_Mirror")
         mir_body = mir.bodies.item(0)
 
         # JOIN both into tenon_body
-        join = af.combine(comp, tenon_body, [tenon_b, mir_body],
+        join = sp.combine(comp, tenon_body, [tenon_b, mir_body],
                           JOIN, False, f"{name}_Join")
         result["mirror"] = mir
     else:
-        join = af.combine(comp, tenon_body, [tenon_b], JOIN, False,
+        join = sp.combine(comp, tenon_body, [tenon_b], JOIN, False,
                           f"{name}_Join")
 
     result["join"] = join
@@ -253,5 +253,5 @@ def bulk_cut_mortises(root_comp, mortise_body_proxy, tool_body_proxies,
     Returns:
         CombineFeature.
     """
-    return af.combine(root_comp, mortise_body_proxy, tool_body_proxies,
+    return sp.combine(root_comp, mortise_body_proxy, tool_body_proxies,
                       CUT, True, name)

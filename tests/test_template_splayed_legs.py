@@ -19,10 +19,10 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
     Point3D = adsk.core.Point3D
 
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import splayed_legs
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ── Parameters ──
     params.add("seat_l", VI("14 in"), "in", "Seat length")
@@ -38,21 +38,21 @@ def run(context):
         inset_x="3 in", inset_y="2.5 in")
 
     # ── Build seat ──
-    seat_pl = af.off_plane(root, root.xYConstructionPlane,
+    seat_pl = sp.off_plane(root, root.xYConstructionPlane,
                            "seat_h - seat_t", "Seat_Pl")
-    sk, pr = af.sketch_rect(root, seat_pl,
+    sk, pr = sp.sketch_rect(root, seat_pl,
                              "0 in", "0 in", "seat_l", "seat_w",
                              "Seat_Sk", ctx.ev)
-    seat_ext = af.ext_new(root, pr, "seat_t", "Seat")
+    seat_ext = sp.ext_new(root, pr, "seat_t", "Seat")
     seat = seat_ext.bodies.item(0)
     seat.name = "Seat"
 
     print(f"Seat built at Z={ctx.ev('seat_h - seat_t'):.2f} cm")
 
     # ── Midplanes ──
-    XMid = af.off_plane(root, root.yZConstructionPlane,
+    XMid = sp.off_plane(root, root.yZConstructionPlane,
                         "seat_l / 2", "XMid")
-    YMid = af.off_plane(root, root.xZConstructionPlane,
+    YMid = sp.off_plane(root, root.xZConstructionPlane,
                         "seat_w / 2", "YMid")
 
     # ── Build 4 splayed legs via template ──

@@ -23,7 +23,7 @@ import adsk.core
 import adsk.fusion
 import math
 
-from helpers import af
+from helpers import sp
 
 Point3D = adsk.core.Point3D
 H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
@@ -192,7 +192,7 @@ def corner(comp, plane, x_model, y_wide, y_narrow,
             f"Currently supported: 'through'")
 
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     p = prefix
     bt = ev(thick_expr)
@@ -294,24 +294,24 @@ def corner(comp, plane, x_model, y_wide, y_narrow,
     ).parameter.expression = z_dim_expr + f" + {thick_expr} * tan({p}_angle)"
 
     # Select the tail profile
-    prof = af.smallest_profile(sk)
+    prof = sp.smallest_profile(sk)
 
     # Extrude CUT into pin board
-    cut_feat = af.ext_op(comp, prof, dist_expr, CUT, pin_body,
+    cut_feat = sp.ext_op(comp, prof, dist_expr, CUT, pin_body,
                          f"{name}_Cut")
 
     # Extrude JOIN into tail board
-    join_feat = af.ext_op(comp, prof, dist_expr, JOIN, tail_body,
+    join_feat = sp.ext_op(comp, prof, dist_expr, JOIN, tail_body,
                           f"{name}_Join")
 
     # Pattern both features along the joint axis (always Z for box dovetails)
     if pattern_axis is None:
         pattern_axis = comp.zConstructionAxis
 
-    cut_pat = af.feat_pattern(comp, cut_feat, pattern_axis,
+    cut_pat = sp.feat_pattern(comp, cut_feat, pattern_axis,
                               f"{p}_tail_count", f"{p}_pitch",
                               f"{name}_PatCut")
-    join_pat = af.feat_pattern(comp, join_feat, pattern_axis,
+    join_pat = sp.feat_pattern(comp, join_feat, pattern_axis,
                                f"{p}_tail_count", f"{p}_pitch",
                                f"{name}_PatJoin")
 
@@ -319,7 +319,7 @@ def corner(comp, plane, x_model, y_wide, y_narrow,
     # The pin board (with tail sockets already cut) is the perfect tool —
     # its remaining material IS the pins. This carves matching sockets in
     # the tail board's end, so pins and tails interlock with zero overlap.
-    pin_cut = af.combine(comp, tail_body, pin_body, CUT, True,
+    pin_cut = sp.combine(comp, tail_body, pin_body, CUT, True,
                          f"{name}_PinCut")
 
     return {
@@ -385,7 +385,7 @@ def box(comp, front, left,
         Dict with feature references.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     if fl_plane is None:
         fl_plane = comp.yZConstructionPlane
@@ -495,30 +495,30 @@ def box(comp, front, left,
         JD, Point3D.create(m4.x + 1, m4.y / 2, 0)
     ).parameter.expression = j_expr + f" + {thick_expr} * tan({p}_angle)"
 
-    prof = af.smallest_profile(sk)
+    prof = sp.smallest_profile(sk)
 
     # ── ext_op JOIN with participantBodies ──
     # At FL position the extrude touches left → merges into left.
     # When right is provided, mirrors across x_mid auto-target the right board.
     tail_boards = [left, right] if right is not None else [left]
-    join_fl = af.ext_op(comp, prof, thick_expr, JOIN, tail_boards,
+    join_fl = sp.ext_op(comp, prof, thick_expr, JOIN, tail_boards,
                         f"{name}_JoinFL")
 
     # ── Mirrors ──
     feats = [join_fl]
     if right is not None and back is not None:
         # 4-corner: 3 mirrors (FL→BL, FL→FR, FR→BR)
-        mir_bl = af.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
-        mir_fr = af.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
-        mir_br = af.mirror_feats(comp, [mir_fr], y_mid, f"{name}_MirBR")
+        mir_bl = sp.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
+        mir_fr = sp.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
+        mir_br = sp.mirror_feats(comp, [mir_fr], y_mid, f"{name}_MirBR")
         feats = [join_fl, mir_bl, mir_fr, mir_br]
     elif right is not None:
         # 2-corner: 1 mirror (FL→FR)
-        mir_fr = af.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
+        mir_fr = sp.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
         feats = [join_fl, mir_fr]
     elif back is not None:
         # 2-corner: 1 mirror (FL→BL)
-        mir_bl = af.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
+        mir_bl = sp.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
         feats = [join_fl, mir_bl]
     # else: 1-corner, no mirrors needed
 
@@ -541,11 +541,11 @@ def box(comp, front, left,
     pat.name = f"{name}_Pat"
 
     # ── CUT pin boards using tail boards as tools ──
-    cut_front = af.combine(comp, front, tail_boards, CUT, True,
+    cut_front = sp.combine(comp, front, tail_boards, CUT, True,
                            f"{name}_CutFront")
     cut_back = None
     if back is not None:
-        cut_back = af.combine(comp, back, tail_boards, CUT, True,
+        cut_back = sp.combine(comp, back, tail_boards, CUT, True,
                               f"{name}_CutBack")
 
     return {
@@ -572,7 +572,7 @@ def corner_cross_component(comp, plane, x_model, y_wide, y_narrow,
         Dict with keys: 'tail_bodies', 'cut_combine', 'join_combine'.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     p = prefix
     bt = ev(thick_expr)
@@ -651,10 +651,10 @@ def corner_cross_component(comp, plane, x_model, y_wide, y_narrow,
         JOINT_DIM, Point3D.create(m4.x + 1, m4.y / 2, 0)
     ).parameter.expression = z_dim_expr + f" + {thick_expr} * tan({p}_angle)"
 
-    prof = af.smallest_profile(sk)
+    prof = sp.smallest_profile(sk)
 
     # Create standalone tail body
-    tail_ext = af.ext_new(comp, prof, dist_expr, f"{name}_Tail")
+    tail_ext = sp.ext_new(comp, prof, dist_expr, f"{name}_Tail")
     tail_body_obj = tail_ext.bodies.item(0)
     tail_body_obj.name = f"{name}_Tail"
 
@@ -662,7 +662,7 @@ def corner_cross_component(comp, plane, x_model, y_wide, y_narrow,
     if pattern_axis is None:
         pattern_axis = comp.zConstructionAxis
 
-    pat = af.body_pattern(comp, tail_body_obj, pattern_axis,
+    pat = sp.body_pattern(comp, tail_body_obj, pattern_axis,
                           f"{p}_tail_count", f"{p}_pitch",
                           f"{name}_Pat")
 
@@ -672,13 +672,13 @@ def corner_cross_component(comp, plane, x_model, y_wide, y_narrow,
         all_tails.append(pat.bodies.item(i))
 
     # Bulk CUT into pin board, then JOIN into tail board
-    cut_comb = af.combine(comp, pin_body, all_tails, CUT, True,
+    cut_comb = sp.combine(comp, pin_body, all_tails, CUT, True,
                           f"{name}_CutPin")
-    join_comb = af.combine(comp, tail_body, all_tails, JOIN, False,
+    join_comb = sp.combine(comp, tail_body, all_tails, JOIN, False,
                            f"{name}_JoinTail")
 
     # CUT pin board into tail board to create pin sockets
-    pin_cut = af.combine(comp, tail_body, pin_body, CUT, True,
+    pin_cut = sp.combine(comp, tail_body, pin_body, CUT, True,
                          f"{name}_PinCut")
 
     return {

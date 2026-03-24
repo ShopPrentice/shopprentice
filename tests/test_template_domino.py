@@ -32,10 +32,10 @@ def run(context):
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
 
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import domino
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ═══════════════════════════════════════════════════════════════════
     # F1: M&T Replacement — seat + 4 posts, four_corners domino
@@ -54,19 +54,19 @@ def run(context):
     f1 = make_comp_at(root, "MT_Replacement").component
 
     # Seat — sits on top of legs at Z = post_h
-    seat_pl = af.off_plane(f1, f1.xYConstructionPlane, "post_h", "f1_Seat_Pl")
-    _, pr = af.sketch_rect_model(f1, seat_pl,
+    seat_pl = sp.off_plane(f1, f1.xYConstructionPlane, "post_h", "f1_Seat_Pl")
+    _, pr = sp.sketch_rect_model(f1, seat_pl,
         ("0 in", "0 in", "post_h"),
         {"x": "seat_w", "y": "seat_d"}, "f1_Seat_Sk", ctx.ev)
-    seat = af.ext_new(f1, pr, "seat_t", "f1_Seat").bodies.item(0)
+    seat = sp.ext_new(f1, pr, "seat_t", "f1_Seat").bodies.item(0)
     seat.name = "f1_Seat"
 
     # 4 posts
     def make_post(comp, x_expr, y_expr, name):
-        _, pr = af.sketch_rect_model(comp, comp.xYConstructionPlane,
+        _, pr = sp.sketch_rect_model(comp, comp.xYConstructionPlane,
             (x_expr, y_expr, "0 in"),
             {"x": "post_w", "y": "post_w"}, f"{name}_Sk", ctx.ev)
-        b = af.ext_new(comp, pr, "post_h", name).bodies.item(0)
+        b = sp.ext_new(comp, pr, "post_h", name).bodies.item(0)
         b.name = name
         return b
 
@@ -79,8 +79,8 @@ def run(context):
     post_fr = make_post(f1, "seat_w - post_inset - post_w / 2",
                         "seat_d - post_inset - post_w / 2", "f1_Post_FR")
 
-    XMid = af.off_plane(f1, f1.yZConstructionPlane, "seat_w / 2", "f1_XMid")
-    YMid = af.off_plane(f1, f1.xZConstructionPlane, "seat_d / 2", "f1_YMid")
+    XMid = sp.off_plane(f1, f1.yZConstructionPlane, "seat_w / 2", "f1_XMid")
+    YMid = sp.off_plane(f1, f1.xZConstructionPlane, "seat_d / 2", "f1_YMid")
 
     domino.four_corners(f1, seat_pl,
         center=("post_inset", "post_inset", "post_h"),
@@ -113,21 +113,21 @@ def run(context):
     f2 = make_comp_at(root, "Edge_Joint", ctx.ev("f2_x")).component
 
     # Left board
-    _, pr = af.sketch_rect_model(f2, f2.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(f2, f2.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "ej_board_w", "y": "ej_board_d"}, "f2_Left_Sk", ctx.ev)
-    left = af.ext_new(f2, pr, "ej_board_t", "f2_Left").bodies.item(0)
+    left = sp.ext_new(f2, pr, "ej_board_t", "f2_Left").bodies.item(0)
     left.name = "f2_Left"
 
     # Right board (adjacent along Y)
-    _, pr = af.sketch_rect_model(f2, f2.xYConstructionPlane,
+    _, pr = sp.sketch_rect_model(f2, f2.xYConstructionPlane,
         ("0 in", "ej_board_d", "0 in"),
         {"x": "ej_board_w", "y": "ej_board_d"}, "f2_Right_Sk", ctx.ev)
-    right = af.ext_new(f2, pr, "ej_board_t", "f2_Right").bodies.item(0)
+    right = sp.ext_new(f2, pr, "ej_board_t", "f2_Right").bodies.item(0)
     right.name = "f2_Right"
 
     # Joint plane at Y = ej_board_d
-    joint_pl = af.off_plane(f2, f2.xZConstructionPlane,
+    joint_pl = sp.off_plane(f2, f2.xZConstructionPlane,
                              "ej_board_d", "f2_Joint_Pl")
 
     # Grid of dominos — long_axis="x" so wide face is parallel to
@@ -166,25 +166,25 @@ def run(context):
     f3 = make_comp_at(root, "Case_Joint", ctx.ev("f3_x")).component
 
     # Left side board (XZ face, extruded along Y for full depth)
-    _, pr = af.sketch_rect_model(f3, f3.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(f3, f3.xZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "side_t", "z": "case_h"}, "f3_Side_Sk", ctx.ev)
-    side = af.ext_new(f3, pr, "case_d", "f3_Side").bodies.item(0)
+    side = sp.ext_new(f3, pr, "case_d", "f3_Side").bodies.item(0)
     side.name = "f3_Side"
 
     # Back board — sits between the sides, touching at X = side_t.
     # No overlap: back starts at X = side_t, side ends at X = side_t.
-    back_pl = af.off_plane(f3, f3.yZConstructionPlane, "side_t", "f3_Back_Pl")
-    _, pr = af.sketch_rect_model(f3, back_pl,
+    back_pl = sp.off_plane(f3, f3.yZConstructionPlane, "side_t", "f3_Back_Pl")
+    _, pr = sp.sketch_rect_model(f3, back_pl,
         ("side_t", "case_d - back_t", "0 in"),
         {"y": "back_t", "z": "case_h"}, "f3_Back_Sk", ctx.ev)
-    back = af.ext_new(f3, pr, "case_w - 2 * side_t", "f3_Back").bodies.item(0)
+    back = sp.ext_new(f3, pr, "case_w - 2 * side_t", "f3_Back").bodies.item(0)
     back.name = "f3_Back"
 
     # Joint plane at X = side_t (mating surface between side and back).
     # Dominos bridge side (penetrate toward -X) and back (toward +X).
     # Long axis = Z (parallel to both board surfaces at the joint).
-    case_joint_pl = af.off_plane(f3, f3.yZConstructionPlane,
+    case_joint_pl = sp.off_plane(f3, f3.yZConstructionPlane,
                                   "side_t", "f3_CaseJoint_Pl")
 
     # Domino center at Y = case_d - back_t / 2 (centered in back thickness).

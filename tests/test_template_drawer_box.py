@@ -18,10 +18,10 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
     Point3D = adsk.core.Point3D
 
-    from helpers import af
+    from helpers import sp
     from woodworking.templates import drawer_box
 
-    ctx = af.DesignContext(design)
+    ctx = sp.DesignContext(design)
 
     # ── Case parameters ──
     params.add("case_w", VI("24 in"), "in", "Case width")
@@ -44,47 +44,47 @@ def run(context):
           f"d={ctx.ev('drawer_d')/2.54:.2f}in")
 
     # ── Build simple case (4 boards — no joinery, just context) ──
-    case_occ = af.make_comp(root, "Case")
+    case_occ = sp.make_comp(root, "Case")
     case_c = case_occ.component
 
     # Left side — spans Y×Z, sketch on YZ plane
-    sk, pr = af.sketch_rect_model(case_c, case_c.yZConstructionPlane,
+    sk, pr = sp.sketch_rect_model(case_c, case_c.yZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"y": "case_d", "z": "case_h"}, "CaseLeft_Sk", ctx.ev)
-    cl = af.ext_new(case_c, pr, "board_thick", "CaseLeft").bodies.item(0)
+    cl = sp.ext_new(case_c, pr, "board_thick", "CaseLeft").bodies.item(0)
     cl.name = "Case_Left"
 
     # Right side
-    right_pl = af.off_plane(case_c, case_c.yZConstructionPlane,
+    right_pl = sp.off_plane(case_c, case_c.yZConstructionPlane,
                             "case_w - board_thick", "CaseRight_Pl")
-    sk, pr = af.sketch_rect_model(case_c, right_pl,
+    sk, pr = sp.sketch_rect_model(case_c, right_pl,
         ("case_w - board_thick", "0 in", "0 in"),
         {"y": "case_d", "z": "case_h"}, "CaseRight_Sk", ctx.ev)
-    cr = af.ext_new(case_c, pr, "board_thick", "CaseRight").bodies.item(0)
+    cr = sp.ext_new(case_c, pr, "board_thick", "CaseRight").bodies.item(0)
     cr.name = "Case_Right"
 
     # Bottom
-    bot_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+    bot_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
                           "kick_h", "CaseBot_Pl")
-    sk, pr = af.sketch_rect_model(case_c, bot_pl,
+    sk, pr = sp.sketch_rect_model(case_c, bot_pl,
         ("board_thick", "0 in", "kick_h"),
         {"x": "case_w - 2 * board_thick", "y": "case_d"}, "CaseBot_Sk", ctx.ev)
-    cb = af.ext_new(case_c, pr, "bot_thick", "CaseBot").bodies.item(0)
+    cb = sp.ext_new(case_c, pr, "bot_thick", "CaseBot").bodies.item(0)
     cb.name = "Case_Bot"
 
     # Top
-    top_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+    top_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
                           "case_h - top_thick", "CaseTop_Pl")
-    sk, pr = af.sketch_rect_model(case_c, top_pl,
+    sk, pr = sp.sketch_rect_model(case_c, top_pl,
         ("board_thick", "0 in", "case_h - top_thick"),
         {"x": "case_w - 2 * board_thick", "y": "case_d"}, "CaseTop_Sk", ctx.ev)
-    ct = af.ext_new(case_c, pr, "top_thick", "CaseTop").bodies.item(0)
+    ct = sp.ext_new(case_c, pr, "top_thick", "CaseTop").bodies.item(0)
     ct.name = "Case_Top"
 
     print("Case built: 4 boards")
 
     # ── Build drawer template ──
-    drawers_occ = af.make_comp(root, "Drawers")
+    drawers_occ = sp.make_comp(root, "Drawers")
     drawers_c = drawers_occ.component
 
     result = drawer_box.build(drawers_c, ev=ctx.ev)

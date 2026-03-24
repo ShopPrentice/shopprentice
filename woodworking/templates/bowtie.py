@@ -29,7 +29,7 @@ import adsk.core
 import adsk.fusion
 import math
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -144,7 +144,7 @@ def single(comp, plane, center, long_axis, length, end_w, waist_w,
     bt_body.name = name
 
     if cut and slab_body:
-        af.combine(comp, slab_body, [bt_body], CUT, True, f"{name}_Cut")
+        sp.combine(comp, slab_body, [bt_body], CUT, True, f"{name}_Cut")
 
     sk.isVisible = False
     return bt_body

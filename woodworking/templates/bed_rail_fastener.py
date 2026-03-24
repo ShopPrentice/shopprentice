@@ -14,7 +14,7 @@ import adsk.core
 import adsk.fusion
 import os
 
-from helpers import af
+from helpers import sp
 from helpers import hardware as hw_mgr
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
@@ -204,10 +204,10 @@ def install(comp, post_body, rail_body,
     # CUT recess pockets
     # ================================================================
     sp_proxy = strike_plate.createForAssemblyContext(strike_occ)
-    af.combine(root, post_body, [sp_proxy], CUT, True, f"{name}_StrikeRecess")
+    sp.combine(root, post_body, [sp_proxy], CUT, True, f"{name}_StrikeRecess")
 
     hp_proxy = hook_plate.createForAssemblyContext(hook_occ)
-    af.combine(root, rail_body, [hp_proxy], CUT, True, f"{name}_HookRecess")
+    sp.combine(root, rail_body, [hp_proxy], CUT, True, f"{name}_HookRecess")
 
     # ================================================================
     # Move into parent components' "Hardwares" sub-folder

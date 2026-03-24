@@ -21,7 +21,7 @@ Usage:
 import adsk.core
 import adsk.fusion
 
-from helpers import af
+from helpers import sp
 from woodworking.templates import dovetail
 from woodworking.templates import half_blind_dovetail
 
@@ -148,7 +148,7 @@ def build(comp, prefix="dd", ev=None):
         Dict with body references and feature info.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     p = prefix
 
@@ -157,44 +157,44 @@ def build(comp, prefix="dd", ev=None):
     zo = f"{p}_zo"
 
     # ── Construction planes ──
-    bg_pl = af.off_plane(comp, comp.xYConstructionPlane,
+    bg_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                           f"{zo} + {p}_bgu", f"{p}_BG_Pl")
 
     # Offset YZ plane for left side and dovetail sketches
-    left_pl = af.off_plane(comp, comp.yZConstructionPlane,
+    left_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                             xo, f"{p}_LeftPl")
 
     # ── Front board (thicker, possibly taller) ──
-    _, pr = af.sketch_rect_model(comp, comp.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(comp, comp.xZConstructionPlane,
         (xo, "0 in", zo),
         {"x": f"{p}_w", "z": f"{p}_fh"}, f"{p}_Front_Sk", ev)
-    front = af.ext_new(comp, pr, f"{p}_ft", f"{p}_Front").bodies.item(0)
+    front = sp.ext_new(comp, pr, f"{p}_ft", f"{p}_Front").bodies.item(0)
     front.name = f"{p}_Front"
 
     # ── Back board ──
-    back_pl = af.off_plane(comp, comp.xZConstructionPlane,
+    back_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                             f"{p}_d - {p}_st", f"{p}_Back_Pl")
-    _, pr = af.sketch_rect_model(comp, back_pl,
+    _, pr = sp.sketch_rect_model(comp, back_pl,
         (xo, f"{p}_d - {p}_st", zo),
         {"x": f"{p}_w", "z": f"{p}_h"}, f"{p}_Back_Sk", ev)
-    back = af.ext_new(comp, pr, f"{p}_st", f"{p}_Back").bodies.item(0)
+    back = sp.ext_new(comp, pr, f"{p}_st", f"{p}_Back").bodies.item(0)
     back.name = f"{p}_Back"
 
     # ── Midplanes ──
-    x_mid = af.off_plane(comp, comp.yZConstructionPlane,
+    x_mid = sp.off_plane(comp, comp.yZConstructionPlane,
                           f"{xo} + {p}_w / 2", f"{p}_XMid")
-    y_mid = af.off_plane(comp, comp.xZConstructionPlane,
+    y_mid = sp.off_plane(comp, comp.xZConstructionPlane,
                           f"{p}_d / 2", f"{p}_YMid")
 
     # ── Left side (thinner, narrower in Y) ──
-    _, pr = af.sketch_rect_model(comp, left_pl,
+    _, pr = sp.sketch_rect_model(comp, left_pl,
         (xo, f"{p}_ft", zo),
         {"y": f"{p}_sd", "z": f"{p}_h"}, f"{p}_Left_Sk", ev)
-    left = af.ext_new(comp, pr, f"{p}_st", f"{p}_Left").bodies.item(0)
+    left = sp.ext_new(comp, pr, f"{p}_st", f"{p}_Left").bodies.item(0)
     left.name = f"{p}_Left"
 
     # ── Right side (mirror of left) ──
-    right_mir = af.mirror_body(comp, left, x_mid, f"{p}_RightMir")
+    right_mir = sp.mirror_body(comp, left, x_mid, f"{p}_RightMir")
     right = right_mir.bodies.item(0)
     right.name = f"{p}_Right"
 
@@ -205,21 +205,21 @@ def build(comp, prefix="dd", ev=None):
     # ── Bottom panel ──
     # Panel extends bgd into all 4 boards (front, back, left, right),
     # creating grooves via CUT — "if it fits, it cuts."
-    _, pr = af.sketch_rect_model(comp, bg_pl,
+    _, pr = sp.sketch_rect_model(comp, bg_pl,
         (f"{xo} + {p}_st - {p}_bgd",
          f"{p}_ft - {p}_bgd",
          f"{zo} + {p}_bgu"),
         {"x": f"{p}_w - 2 * {p}_st + 2 * {p}_bgd",
          "y": f"{p}_d - {p}_ft - {p}_st + 2 * {p}_bgd"},
         f"{p}_Bottom_Sk", ev)
-    bottom = af.ext_new(comp, pr, f"{p}_bt", f"{p}_Bottom").bodies.item(0)
+    bottom = sp.ext_new(comp, pr, f"{p}_bt", f"{p}_Bottom").bodies.item(0)
     bottom.name = f"{p}_Bottom"
 
     # ── Bottom grooves — CUT all 4 boards with bottom panel as tool ──
-    af.combine(comp, front, [bottom], CUT, True, f"{p}_BGF")
-    af.combine(comp, back, [bottom], CUT, True, f"{p}_BGB")
-    af.combine(comp, left, [bottom], CUT, True, f"{p}_BGL")
-    af.combine(comp, right, [bottom], CUT, True, f"{p}_BGR")
+    sp.combine(comp, front, [bottom], CUT, True, f"{p}_BGF")
+    sp.combine(comp, back, [bottom], CUT, True, f"{p}_BGB")
+    sp.combine(comp, left, [bottom], CUT, True, f"{p}_BGL")
+    sp.combine(comp, right, [bottom], CUT, True, f"{p}_BGR")
 
     print(f"  Bottom panel + grooves done")
 
@@ -278,7 +278,7 @@ def pattern(comp, bodies, count_expr, pitch_expr, ev=None):
         RectangularPatternFeature or None if count <= 1.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     n = int(ev(count_expr))
     if n <= 1:

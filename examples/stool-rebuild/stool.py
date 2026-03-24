@@ -396,7 +396,7 @@ def run(context):
     for _bi in range(root.bRepBodies.count):
         _bn = root.bRepBodies.item(_bi).name
         import re as _re
-        from helpers import af
+        from helpers import sp
         if _re.sub(r"(\s*\(\d+\))+\s*$", "", _bn) == "Leg_NL": _got += 1
     if _got < 3:
         # Try each construction plane as supplementary split tool
@@ -544,7 +544,7 @@ def run(context):
     fillet_feat.name = "Fillet1"
 
     # ── FIT VIEW ──────────────────────────────────────────────────
-    af.apply_appearance("white oak")
+    sp.apply_appearance("white oak")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

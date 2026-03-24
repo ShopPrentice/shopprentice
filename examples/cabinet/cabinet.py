@@ -10,7 +10,7 @@ Coordinate system:
 """
 import adsk.core, adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -59,10 +59,10 @@ def run(context):
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
-    case_occ  = af.make_comp(root, "Case")
-    door_occ  = af.make_comp(root, "Doors")
-    shelf_occ = af.make_comp(root, "Shelf")
-    back_occ  = af.make_comp(root, "Back")
+    case_occ  = sp.make_comp(root, "Case")
+    door_occ  = sp.make_comp(root, "Doors")
+    shelf_occ = sp.make_comp(root, "Shelf")
+    back_occ  = sp.make_comp(root, "Back")
 
     case_c  = case_occ.component
     door_c  = door_occ.component
@@ -73,28 +73,28 @@ def run(context):
     #  1. CASE — left, right sides + top, bottom
     # ==============================================================
     # Left side: X=0, Y=0..case_d, Z=0..case_h
-    _, pr = af.sketch_rect_model(case_c, case_c.yZConstructionPlane,
+    _, pr = sp.sketch_rect_model(case_c, case_c.yZConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"y": "case_d", "z": "case_h"}, "LeftSide_Sk", ev)
-    ls_ext = af.ext_new(case_c, pr, "board_thick", "LeftSide")
+    ls_ext = sp.ext_new(case_c, pr, "board_thick", "LeftSide")
     left = ls_ext.bodies.item(0); left.name = "Side_Left"
 
     # Right side: mirror
-    x_mid = af.off_plane(case_c, case_c.yZConstructionPlane, "mid_x", "XMid")
-    af.mirror_feats(case_c, [ls_ext], x_mid, "RightMir").bodies.item(0).name = "Side_Right"
+    x_mid = sp.off_plane(case_c, case_c.yZConstructionPlane, "mid_x", "XMid")
+    sp.mirror_feats(case_c, [ls_ext], x_mid, "RightMir").bodies.item(0).name = "Side_Right"
 
     # Top board: X=board_thick..case_w-board_thick (between sides with dado)
-    top_pl = af.off_plane(case_c, case_c.xYConstructionPlane,
+    top_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
                            "case_h - board_thick", "Top_Pl")
-    _, pr = af.sketch_rect_model(case_c, top_pl,
+    _, pr = sp.sketch_rect_model(case_c, top_pl,
         ("board_thick - dado_d", "0 in", "case_h - board_thick"),
         {"x": "inner_w + 2 * dado_d", "y": "case_d"}, "Top_Sk", ev)
-    top_ext = af.ext_new(case_c, pr, "board_thick", "TopBoard")
+    top_ext = sp.ext_new(case_c, pr, "board_thick", "TopBoard")
     top_body = top_ext.bodies.item(0); top_body.name = "Top"
 
     # Bottom board: mirror top across ZMid
-    z_mid = af.off_plane(case_c, case_c.xYConstructionPlane, "mid_z", "ZMid")
-    bot_mir = af.mirror_feats(case_c, [top_ext], z_mid, "BotMir")
+    z_mid = sp.off_plane(case_c, case_c.xYConstructionPlane, "mid_z", "ZMid")
+    bot_mir = sp.mirror_feats(case_c, [top_ext], z_mid, "BotMir")
     bot_body = bot_mir.bodies.item(0); bot_body.name = "Bottom"
 
     # Dado CUTs — top/bottom extend into sides by dado_d
@@ -112,8 +112,8 @@ def run(context):
             right = b; break
     right_proxy = right.createForAssemblyContext(case_occ)
 
-    af.combine(root, left_proxy, [top_proxy, bot_proxy], CUT, True, "DadoLeft")
-    af.combine(root, right_proxy, [top_proxy, bot_proxy], CUT, True, "DadoRight")
+    sp.combine(root, left_proxy, [top_proxy, bot_proxy], CUT, True, "DadoLeft")
+    sp.combine(root, right_proxy, [top_proxy, bot_proxy], CUT, True, "DadoRight")
 
     print(">>> Case: 4 bodies + dados done")
 
@@ -122,44 +122,44 @@ def run(context):
     # ==============================================================
     # Left door: inset inside case opening
     door_z_offset = "board_thick + door_gap"
-    _, pr = af.sketch_rect_model(door_c, door_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(door_c, door_c.xZConstructionPlane,
         ("board_thick + door_gap", "0 in", door_z_offset),
         {"x": "door_w", "z": "door_h"}, "LeftDoor_Sk", ev)
-    ld_ext = af.ext_new(door_c, pr, "door_thick", "LeftDoor")
+    ld_ext = sp.ext_new(door_c, pr, "door_thick", "LeftDoor")
     ld_ext.bodies.item(0).name = "Door_Left"
 
     # Right door: mirror across XMid
-    d_xmid = af.off_plane(door_c, door_c.yZConstructionPlane, "mid_x", "DXMid")
-    af.mirror_feats(door_c, [ld_ext], d_xmid, "RightDoorMir").bodies.item(0).name = "Door_Right"
+    d_xmid = sp.off_plane(door_c, door_c.yZConstructionPlane, "mid_x", "DXMid")
+    sp.mirror_feats(door_c, [ld_ext], d_xmid, "RightDoorMir").bodies.item(0).name = "Door_Right"
 
     print(">>> Doors: 2 bodies")
 
     # ==============================================================
     #  3. SHELF — adjustable (just positioned, no dados)
     # ==============================================================
-    shelf_z_pl = af.off_plane(shelf_c, shelf_c.xYConstructionPlane, "mid_z", "ShelfZ_Pl")
-    _, pr = af.sketch_rect_model(shelf_c, shelf_z_pl,
+    shelf_z_pl = sp.off_plane(shelf_c, shelf_c.xYConstructionPlane, "mid_z", "ShelfZ_Pl")
+    _, pr = sp.sketch_rect_model(shelf_c, shelf_z_pl,
         ("board_thick", "0 in", "mid_z"),
         {"x": "shelf_w", "y": "shelf_d"}, "Shelf_Sk", ev)
-    af.ext_new(shelf_c, pr, "shelf_thick", "ShelfBoard").bodies.item(0).name = "Shelf"
+    sp.ext_new(shelf_c, pr, "shelf_thick", "ShelfBoard").bodies.item(0).name = "Shelf"
 
     print(">>> Shelf: 1 body")
 
     # ==============================================================
     #  4. BACK PANEL
     # ==============================================================
-    _, pr = af.sketch_rect_model(back_c, back_c.xZConstructionPlane,
+    _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
         ("board_thick", "case_d - back_thick", "board_thick"),
         {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev)
-    af.ext_new(back_c, pr, "back_thick", "BackPanel").bodies.item(0).name = "BackPanel"
+    sp.ext_new(back_c, pr, "back_thick", "BackPanel").bodies.item(0).name = "BackPanel"
 
     # Rabbet for back panel in sides
     bp = None
     for i in range(back_c.bRepBodies.count):
         bp = back_c.bRepBodies.item(i); break
     bp_proxy = bp.createForAssemblyContext(back_occ)
-    af.combine(root, left_proxy, [bp_proxy], CUT, True, "RabLeft")
-    af.combine(root, right_proxy, [bp_proxy], CUT, True, "RabRight")
+    sp.combine(root, left_proxy, [bp_proxy], CUT, True, "RabLeft")
+    sp.combine(root, right_proxy, [bp_proxy], CUT, True, "RabRight")
 
     print(">>> Back panel + rabbets done")
 
@@ -177,7 +177,7 @@ def run(context):
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cn}: {len(names)} bodies -> {names}")
 
-    af.apply_appearance("cherry")
+    sp.apply_appearance("cherry")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

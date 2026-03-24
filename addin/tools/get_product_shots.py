@@ -128,7 +128,7 @@ def handler(views: list = None, width: int = 2048, height: int = 2048,
     """Capture product-quality screenshots with artifact cleanup."""
 
     try:
-        from helpers import af
+        from helpers import sp
 
         design = adsk.fusion.Design.cast(app.activeProduct)
         if not design:
@@ -182,7 +182,7 @@ def handler(views: list = None, width: int = 2048, height: int = 2048,
         results = []
         for view_name in view_list:
             eye_dir = _VIEW_DIRECTIONS[view_name]
-            af.screenshot_cam(eye_dir=eye_dir, bodies=target_bodies, fill=fill)
+            sp.screenshot_cam(eye_dir=eye_dir, bodies=target_bodies, fill=fill)
             # Let Fusion fully update the viewport before capturing
             import time
             adsk.doEvents()
@@ -234,7 +234,7 @@ TOOL_DESCRIPTION = \
 
 Automatically:
 1. Hides construction artifacts (sketches, planes, axes)
-2. Positions camera with FOV-aware framing (af.screenshot_cam)
+2. Positions camera with FOV-aware framing (sp.screenshot_cam)
 3. Captures multiple views in one call
 4. Restores all visibility state after capture
 

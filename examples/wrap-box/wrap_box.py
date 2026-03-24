@@ -53,7 +53,7 @@ Build order:
     19. Film gap CUT
 """
 import adsk.core, adsk.fusion, math
-from helpers import af
+from helpers import sp
 
 
 def run(context):
@@ -625,7 +625,7 @@ def run(context):
     # ==============================================================
     #  FIT VIEW
     # ==============================================================
-    af.apply_appearance("cherry")
+    sp.apply_appearance("cherry")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

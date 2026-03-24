@@ -25,19 +25,19 @@ get_product_shots(views=["iso-top-right"], style="transparent")
 get_product_shots(views=["iso-top-right"], bodies=["Post_FL", "Rail_FrontBot"], fill=0.90)
 ```
 
-## Internals: `af.screenshot_cam()` — Dynamic Camera Positioning
+## Internals: `sp.screenshot_cam()` — Dynamic Camera Positioning
 
 The `screenshot_cam` helper computes camera distance automatically using the actual Fusion FOV and projected bounding box geometry. No manual multiplier tuning needed.
 
 ```python
-from helpers import af
+from helpers import sp
 
 # Overview: frame all visible bodies
-af.screenshot_cam(eye_dir=(1, -1, 0.7))
+sp.screenshot_cam(eye_dir=(1, -1, 0.7))
 
 # Detail: frame only the dovetail tails at one corner
 tails = [b for b in all_bodies if b.name.startswith("DT_FL")]
-af.screenshot_cam(eye_dir=(1, -1, 0.7), bodies=tails, fill=0.85)
+sp.screenshot_cam(eye_dir=(1, -1, 0.7), bodies=tails, fill=0.85)
 ```
 
 ### How It Works
@@ -101,7 +101,7 @@ Pass only the bodies directly involved in the joint. The camera zooms to their c
 ### Finding Bodies for Detail Shots
 
 ```python
-ctx = af.DesignContext()
+ctx = sp.DesignContext()
 
 # By exact name
 leg = ctx.find_body("Leg_FL")
@@ -156,7 +156,7 @@ Use `get_product_shots` — one MCP call captures all views:
 get_product_shots(views=["iso-top-right", "front", "right"])
 ```
 
-Internally this calls `af.screenshot_cam()` for each view, hides artifacts, and restores state.
+Internally this calls `sp.screenshot_cam()` for each view, hides artifacts, and restores state.
 
 ## Transparent / Detail Views
 
@@ -167,7 +167,7 @@ For joinery documentation, **isolate the relevant bodies** — hide everything u
 For each joinery detail, show only the 2-3 bodies directly involved in the joint, then use `screenshot_cam(bodies=...)` to frame them:
 
 ```python
-from helpers import af
+from helpers import sp
 
 # 1. Hide everything
 for i in range(root.occurrences.count):
@@ -176,7 +176,7 @@ for i in range(root.bRepBodies.count):
     root.bRepBodies.item(i).isVisible = False
 
 # 2. Show only the relevant bodies
-ctx = af.DesignContext()
+ctx = sp.DesignContext()
 detail_bodies = []
 for name in ["Leg_FL", "FrontRail", "SideRailL"]:
     b = ctx.find_body(name)
@@ -185,7 +185,7 @@ for name in ["Leg_FL", "FrontRail", "SideRailL"]:
     detail_bodies.append(b)
 
 # 3. Frame the detail bodies (not the whole model)
-af.screenshot_cam(eye_dir=(1, -1, 0.7), bodies=detail_bodies, fill=0.85)
+sp.screenshot_cam(eye_dir=(1, -1, 0.7), bodies=detail_bodies, fill=0.85)
 # → get_screenshot(width=2048, height=2048)
 ```
 
@@ -205,7 +205,7 @@ for i in range(root.allOccurrences.count):
     for j in range(occ.component.bRepBodies.count):
         occ.component.bRepBodies.item(j).opacity = 0.15
 
-af.screenshot_cam(eye_dir=(-1, -1, 0.7), fill=0.70)
+sp.screenshot_cam(eye_dir=(-1, -1, 0.7), fill=0.70)
 ```
 
 ### Restoring After Detail Shots

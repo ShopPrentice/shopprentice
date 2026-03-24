@@ -46,7 +46,7 @@ Complete furniture projects with scripts and screenshots. See `examples/` for th
 
 ### 6. Add a joinery template
 
-Python templates that encapsulate complex joinery into single function calls. These live in `addin/helpers/templates/`. See existing templates for the pattern — they use `af.py` helpers and follow the combine-based approach (build shape, CUT receiver, JOIN to owner).
+Python templates that encapsulate complex joinery into single function calls. These live in `addin/helpers/templates/`. See existing templates for the pattern — they use `sp.py` helpers and follow the combine-based approach (build shape, CUT receiver, JOIN to owner).
 
 ### 7. Bug fixes and tool improvements
 

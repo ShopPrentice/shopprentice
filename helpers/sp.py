@@ -2,7 +2,7 @@
 ShopPrentice Runtime Helpers
 
 Shared utilities for Fusion 360 scripts executed via execute_script.
-Import with: from helpers import af
+Import with: from helpers import sp
 
 All functions accept explicit objects (body, sketch, component) rather than
 relying on module-level globals, so they work in both normal and sandbox mode.
@@ -23,7 +23,7 @@ class DesignContext:
     """Replaces the 5-line boilerplate at the top of every script.
 
     Usage:
-        ctx = af.DesignContext()
+        ctx = sp.DesignContext()
         depth = ctx.ev("shelf_depth")
         shelf = ctx.find_body("shelf_top")
     """
@@ -1146,9 +1146,9 @@ def apply_appearance(species="white oak", bodies=None):
                 bodies. Use for multi-species designs.
 
     Usage:
-        af.apply_appearance("walnut")                          # all bodies
-        af.apply_appearance("white oak", bodies=["Seat"])      # specific bodies
-        af.apply_appearance("teak", bodies=["Leg_FL","Leg_FR"]) # accent species
+        sp.apply_appearance("walnut")                          # all bodies
+        sp.apply_appearance("white oak", bodies=["Seat"])      # specific bodies
+        sp.apply_appearance("teak", bodies=["Leg_FL","Leg_FR"]) # accent species
     """
     app = adsk.core.Application.get()
     design = adsk.fusion.Design.cast(app.activeProduct)

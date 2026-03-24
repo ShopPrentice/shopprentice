@@ -27,7 +27,7 @@ Usage:
 import adsk.core
 import adsk.fusion
 
-from helpers import af
+from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
@@ -139,99 +139,99 @@ def build(comp, z_base_expr="kick_h + bot_thick + drawer_gap",
         Dict with body references and construction planes.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     # ── Construction planes ──
-    d_pl = af.off_plane(comp, comp.xYConstructionPlane,
+    d_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                         z_base_expr, "Dr_Pl")
-    bg_pl = af.off_plane(comp, comp.xYConstructionPlane,
+    bg_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                          f"{z_base_expr} + bg_up", "DrBG_Pl")
 
     # ── Front board ──
-    _, pr = af.sketch_rect(comp, d_pl,
+    _, pr = sp.sketch_rect(comp, d_pl,
                            x_origin_expr, "0 in",
                            "drawer_w", "drawer_front_thick",
                            "DrFront_Sk", ev=ev)
-    front = af.ext_new(comp, pr, "drawer_h", "DrFront").bodies.item(0)
+    front = sp.ext_new(comp, pr, "drawer_h", "DrFront").bodies.item(0)
     front.name = "Dr_Front"
 
     # ── Back board ──
-    _, pr = af.sketch_rect(comp, d_pl,
+    _, pr = sp.sketch_rect(comp, d_pl,
                            x_origin_expr, "drawer_d - drawer_side_thick",
                            "drawer_w", "drawer_side_thick",
                            "DrBack_Sk", ev=ev)
-    back = af.ext_new(comp, pr, "drawer_h", "DrBack").bodies.item(0)
+    back = sp.ext_new(comp, pr, "drawer_h", "DrBack").bodies.item(0)
     back.name = "Dr_Back"
 
     # ── Left side ──
-    _, pr = af.sketch_rect(comp, d_pl,
+    _, pr = sp.sketch_rect(comp, d_pl,
                            x_origin_expr, "0 in",
                            "drawer_side_thick", "drawer_d",
                            "DrLeft_Sk", ev=ev)
-    left = af.ext_new(comp, pr, "drawer_h", "DrLeft").bodies.item(0)
+    left = sp.ext_new(comp, pr, "drawer_h", "DrLeft").bodies.item(0)
     left.name = "Dr_Left"
 
     # ── Right side ──
-    _, pr = af.sketch_rect(comp, d_pl,
+    _, pr = sp.sketch_rect(comp, d_pl,
                            f"{x_origin_expr} + drawer_w - drawer_side_thick",
                            "0 in",
                            "drawer_side_thick", "drawer_d",
                            "DrRight_Sk", ev=ev)
-    right = af.ext_new(comp, pr, "drawer_h", "DrRight").bodies.item(0)
+    right = sp.ext_new(comp, pr, "drawer_h", "DrRight").bodies.item(0)
     right.name = "Dr_Right"
 
     # ── Bottom panel ──
     zbg = f"{z_base_expr} + bg_up"
-    _, pr = af.sketch_rect_model(comp, bg_pl,
+    _, pr = sp.sketch_rect_model(comp, bg_pl,
         (f"{x_origin_expr} + drawer_side_thick - bg_depth",
          "drawer_front_thick - bg_depth",
          zbg),
         {"x": "drawer_w - 2 * drawer_side_thick + 2 * bg_depth",
          "y": "drawer_d - drawer_front_thick - drawer_side_thick + 2 * bg_depth"},
         "DrBottom_Sk", ev=ev)
-    bottom = af.ext_new(comp, pr, "drawer_bottom_thick", "DrBottom").bodies.item(0)
+    bottom = sp.ext_new(comp, pr, "drawer_bottom_thick", "DrBottom").bodies.item(0)
     bottom.name = "Dr_Bottom"
 
     # ── Bottom grooves (CUT into all 4 boards) ──
     # Front groove
-    _, pr = af.sketch_rect_model(comp, bg_pl,
+    _, pr = sp.sketch_rect_model(comp, bg_pl,
         (x_origin_expr, "drawer_front_thick - bg_depth", zbg),
         {"x": "drawer_w", "y": "bg_depth"},
         "DrBGF_Sk", ev=ev)
-    af.ext_op(comp, pr, "drawer_bottom_thick", CUT, front, "DrBGF")
+    sp.ext_op(comp, pr, "drawer_bottom_thick", CUT, front, "DrBGF")
 
     # Back groove
-    _, pr = af.sketch_rect_model(comp, bg_pl,
+    _, pr = sp.sketch_rect_model(comp, bg_pl,
         (x_origin_expr, "drawer_d - drawer_side_thick", zbg),
         {"x": "drawer_w", "y": "bg_depth"},
         "DrBGB_Sk", ev=ev)
-    af.ext_op(comp, pr, "drawer_bottom_thick", CUT, back, "DrBGB")
+    sp.ext_op(comp, pr, "drawer_bottom_thick", CUT, back, "DrBGB")
 
     # Left groove
-    _, pr = af.sketch_rect_model(comp, bg_pl,
+    _, pr = sp.sketch_rect_model(comp, bg_pl,
         (f"{x_origin_expr} + drawer_side_thick - bg_depth",
          "drawer_front_thick", zbg),
         {"x": "bg_depth",
          "y": "drawer_d - drawer_front_thick - drawer_side_thick"},
         "DrBGL_Sk", ev=ev)
-    af.ext_op(comp, pr, "drawer_bottom_thick", CUT, left, "DrBGL")
+    sp.ext_op(comp, pr, "drawer_bottom_thick", CUT, left, "DrBGL")
 
     # Right groove
-    _, pr = af.sketch_rect_model(comp, bg_pl,
+    _, pr = sp.sketch_rect_model(comp, bg_pl,
         (f"{x_origin_expr} + drawer_w - drawer_side_thick",
          "drawer_front_thick", zbg),
         {"x": "bg_depth",
          "y": "drawer_d - drawer_front_thick - drawer_side_thick"},
         "DrBGR_Sk", ev=ev)
-    af.ext_op(comp, pr, "drawer_bottom_thick", CUT, right, "DrBGR")
+    sp.ext_op(comp, pr, "drawer_bottom_thick", CUT, right, "DrBGR")
 
     # ── Pull groove (optional) ──
     if include_pull:
-        _, pr = af.sketch_rect_model(comp, d_pl,
+        _, pr = sp.sketch_rect_model(comp, d_pl,
             (x_origin_expr, "-pull_depth", z_base_expr),
             {"x": "drawer_w", "y": "pull_depth"},
             "Pull_Sk", ev=ev)
-        af.ext_op(comp, pr, "pull_h", CUT, front, "PullGroove")
+        sp.ext_op(comp, pr, "pull_h", CUT, front, "PullGroove")
 
     all_bodies = [front, back, left, right, bottom]
 
@@ -264,7 +264,7 @@ def pattern(comp, bodies, count_expr="n_drawers", pitch_expr="drawer_pitch",
         RectangularPatternFeature or None if count <= 1.
     """
     if ev is None:
-        ev = af._make_ev()
+        ev = sp._make_ev()
 
     n = int(ev(count_expr))
     if n <= 1:

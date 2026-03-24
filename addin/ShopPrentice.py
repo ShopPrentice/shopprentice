@@ -41,7 +41,7 @@ def _reload_modules():
     corrupted module state by partially flushing sys.modules.
     """
     # Flush tools, primitives, server (children first, then parents)
-    prefixes = ('tools', 'primitives', 'server')
+    prefixes = ('tools', 'primitives', 'server', 'helpers')
     to_remove = sorted(
         [k for k in sys.modules
          if any(k == p or k.startswith(p + '.') for p in prefixes)],
