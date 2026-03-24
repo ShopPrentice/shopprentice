@@ -1114,6 +1114,29 @@ def run(context):
         _chamfer_boundary_edges(leg_c, leg_c.bRepBodies.item(i),
                                 "ch_leg", f"LegBot_Ch{i}", z_filter='bottom')
 
+    # LS through-tenon proud faces — chamfer exposed end grain
+    for body_name in ["LS_Front", "LS_Back"]:
+        ls_body = ls_c.bRepBodies.itemByName(body_name)
+        if not ls_body:
+            continue
+        proud_edges = adsk.core.ObjectCollection.create()
+        bb = ls_body.boundingBox
+        for j in range(ls_body.faces.count):
+            f = ls_body.faces.item(j)
+            # Proud faces are at X extremes (outside the legs)
+            pt = f.pointOnFace
+            at_left = abs(pt.x - bb.minPoint.x) < 0.5
+            at_right = abs(pt.x - bb.maxPoint.x) < 0.5
+            if (at_left or at_right) and f.area < 50:  # small face = tenon end
+                for k in range(f.edges.count):
+                    proud_edges.add(f.edges.item(k))
+        if proud_edges.count > 0:
+            ch_inp = ls_c.features.chamferFeatures.createInput2()
+            ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                proud_edges, VI("ch_top"), True)
+            ch = ls_c.features.chamferFeatures.add(ch_inp)
+            ch.name = f"{body_name}_ProudCh"
+
     # ==============================================================
     #  EPILOGUE
     # ==============================================================
@@ -1134,12 +1157,6 @@ def run(context):
         for i in range(c.bRepBodies.count):
             names.append(f"{occ.name}/{c.bRepBodies.item(i).name}")
     print(f"Bodies: {len(names)} -> {names}")
-
-    # Apply white oak appearance to all bodies
-    for occ in root.occurrences:
-        c = occ.component
-        for i in range(c.bRepBodies.count):
-            sp.apply_appearance(c.bRepBodies.item(i), "3D Oak - Semigloss")
 
     # Show edge lines
     app.activeViewport.visualStyle = \
