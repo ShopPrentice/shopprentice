@@ -283,6 +283,15 @@ sk = comp.sketches.add(front_face)
 ```
 Also available as `af.find_face(body, axis, direction)`.
 
+**Clean references before profile selection (MANDATORY):** Any sketch on a face or with `sketch.project()` calls has reference lines that split profiles into fragments. **Always call `af.refs_to_construction(sk)` after dimensioning but before selecting a profile.** This converts reference/projected lines to construction geometry — they keep their sketch points (valid for dimensions) but stop forming profile boundaries. Then `af.smallest_profile(sk)` returns the correct drawn profile. Omitting this step is the #1 cause of wrong-profile extrusions.
+
+```python
+# After all sketch geometry and dimensions are complete:
+af.refs_to_construction(sk)
+prof = af.smallest_profile(sk)
+ext = af.ext_new(comp, prof, "depth", "MyFeature")
+```
+
 **Extrude direction on body faces:** The default (positive) extrude direction on a face sketch follows `face.evaluator.getNormalAtPoint()` — the true outward normal, pointing AWAY from the body. Use `flip=True` (NegativeExtentDirection) for CUT extrudes on body faces so the cut goes INTO the body.
 
 **Coincident geometry on body-face sketches:** When sketch lines fully coincide with face boundary edges (e.g., an arch baseline at the face corner), Fusion merges them and fails to create separate profiles. Fix: project the face edge via `sk.project(edge)`, then draw the arc from the projected line's sketch points. The projected edge + arc properly split the face. Position dimensions become unnecessary since the projection is already parametric.
@@ -784,7 +793,7 @@ Name every feature and body for a readable timeline and easy debugging:
 | Fillet/chamfer selects wrong edges | Edge coordinate filter matches unintended edges (e.g., groove interior edges) | Add `edge.body.name` check; filter by both coordinate AND body |
 | Fillet API rejects BRepFace | `addConstantRadiusEdgeSet` requires edges, not faces | Iterate `face.edges`, deduplicate via `tempId`, add individual edges |
 | `InternalValidationError: face` on sketch | CUT/JOIN modifies body topology, invalidating BRepFace references | Re-find face with `af.find_face()` after each CUT/JOIN before next sketch |
-| Face-sketch extrudes wrong profile | `profiles.item(0)` is the outer region on face sketches (face minus rectangle) | Use `af.smallest_profile(sk)` to get the inner drawn rectangle |
+| Face-sketch extrudes wrong profile | Auto-projected face edges and `sketch.project()` reference lines split profiles into fragments — `smallest_profile` picks a fragment instead of the drawn shape | **Always call `af.refs_to_construction(sk)` before profile selection.** This converts all reference/projected lines to construction geometry so they don't form profile boundaries. Then `af.smallest_profile(sk)` returns the correct drawn profile. This is mandatory for ANY sketch on a face or with projected references. |
 | Symmetric extrude body 2× too thick | Passed full thickness to `ext_new_sym` — it applies `dist` to EACH side | Pass half-thickness: `ext_new_sym(comp, prof, "board_t / 2", ...)` |
 | `sketch_rect_model` places body on wrong side of origin | Position dimensions use absolute distance — negative coordinates reflect to positive | Use manual sketch with `modelToSketchSpace` + width/height dimensions only (no position dimensions) |
 | Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `woodworking/joinery/mortise-tenon.md`) |
