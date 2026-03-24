@@ -312,37 +312,22 @@ ext = sp.ext_new(comp, prof, "depth", "MyFeature")
 
 **Coincident geometry on body-face sketches:** When sketch lines fully coincide with face boundary edges (e.g., an arch baseline at the face corner), Fusion merges them and fails to create separate profiles. Fix: project the face edge via `sk.project(edge)`, then draw the arc from the projected line's sketch points. The projected edge + arc properly split the face. Position dimensions become unnecessary since the projection is already parametric.
 
-**Approach B: Construction planes + `probe_sketch_axes`.** Construction planes can have flipped sketch axes, but this is fully solved by probing. Use `modelToSketchSpace` to discover the real axis mapping at runtime, then assign H/V dimensions accordingly. This approach is simpler when the design is planned in model coordinates — no face-finding or vertex-projection needed. See `sketch_rect_model` in Standard Helpers below for the complete implementation.
+**Axis mapping on non-XY planes (MANDATORY):** On construction planes and body faces, sketch H and V map to different model axes than expected. **Always use `sp.probe_orientations()` to get the correct `DimensionOrientation` for each model axis.** Never hardcode H/V assumptions.
 
 ```python
-def probe_sketch_axes(sk):
-    """Which model axis maps to sketch-X (h) and sketch-Y (v)."""
-    Point3D = adsk.core.Point3D
-    o  = sk.modelToSketchSpace(Point3D.create(0, 0, 0))
-    ux = sk.modelToSketchSpace(Point3D.create(1, 0, 0))
-    uy = sk.modelToSketchSpace(Point3D.create(0, 1, 0))
-    uz = sk.modelToSketchSpace(Point3D.create(0, 0, 1))
-    deltas = {
-        "x": (ux.x - o.x, ux.y - o.y),
-        "y": (uy.x - o.x, uy.y - o.y),
-        "z": (uz.x - o.x, uz.y - o.y),
-    }
-    h_axis = max(deltas, key=lambda a: abs(deltas[a][0]))
-    v_axis = max(deltas, key=lambda a: abs(deltas[a][1]))
-    return h_axis, v_axis
-```
-Also available as `sp.probe_sketch_axes(sk)`.
+# One-liner: returns {'x': H_or_V, 'y': H_or_V, 'z': H_or_V}
+orient = sp.probe_orientations(sk, ev("cx"), ev("cy"), ev("cz"))
 
-**CRITICAL: `probe_sketch_axes` returns axis names but NOT signs.** On non-XY construction planes, a model axis can map to the *negative* sketch direction. For example, on an XZ-offset plane, model +Z maps to sketch -Y. If you build dimension expressions assuming positive mapping, geometry lands at mirrored positions.
-
-**Fix — use `sp.probe_sketch_signs(sk)`** which returns `(h_axis, v_axis, h_sign, v_sign)`. Use the sign when building offset expressions:
-```python
-h_axis, v_axis, h_sign, v_sign = sp.probe_sketch_signs(sk)
-op = " - " if v_sign > 0 else " + "
-offset_expr = v_center_expr + op + "half_length"
+# Use the dict to assign the correct orientation per model axis:
+d.addDistanceDimension(origin, pt, orient['z'], placement
+).parameter.expression = "ls_z + ls_w / 2"
+d.addDistanceDimension(origin, pt, orient['y'], placement
+).parameter.expression = "leg_d / 2"
 ```
 
-`sketch_rect_model` and `sketch_slot_model` handle signs internally. You only need explicit sign detection for custom sketch geometry where you build offset expressions manually.
+This replaces `probe_sketch_axes` and `probe_sketch_signs` — it returns the orientation enum directly, which is what `addDistanceDimension` needs. No manual axis detection code required.
+
+`sketch_rect_model` and `sketch_slot_model` handle axis mapping internally. Use `probe_orientations` only for custom sketch geometry (circles, manual rectangles) where you add dimensions yourself.
 
 **Sketch plane preference (follow this order):**
 
@@ -803,7 +788,7 @@ Name every feature and body for a readable timeline and easy debugging:
 | Sketch geometry at mirrored/wrong position on non-XY plane | `probe_sketch_axes` gives axis name but not sign; model +Z → sketch -Y on XZ planes | Use `probe_sketch_signs` or `modelToSketchSpace` for approximate positions, flip offset operator based on sign |
 | Loose tenon (domino) bodies disappear | Second CUT used `keepTool=False`, consuming the body | Use `keepTool=True` on ALL CUTs for visible loose tenon joints |
 | Rectangle deforms when parameter changes | `addTwoPointRectangle` lacks explicit H/V geometric constraints | Add `addHorizontal`/`addVertical` on all 4 lines after creation. Apply same rule to any sketch line that should stay H or V. |
-| H/V constraint distorts triangle on YZ plane | On YZ planes, model-Y maps to sketch-V and model-Z to sketch-H — opposite of XZ planes. Using `addHorizontal` on a model-horizontal (same-Z) line that's sketch-vertical destroys the profile. | Always check sketch axis mapping via `modelToSketchSpace` before assigning H/V constraints. Swap H↔V for YZ planes. |
+| H/V constraint distorts triangle on YZ plane | On YZ planes, model-Y maps to sketch-V and model-Z to sketch-H — opposite of XZ planes. Using `addHorizontal` on a model-horizontal (same-Z) line that's sketch-vertical destroys the profile. | **Use `sp.probe_orientations(sk)`** to get correct H/V per model axis. Never hardcode H/V on non-XY planes. |
 | Chamfer fails with `createInput()` | Chamfer API requires `createInput2()`, not `createInput()` | Always use `chamferFeatures.createInput2()` and the nested `.chamferEdgeSets` collection |
 | Fillet fails — radius too large | Fillet radius exceeds half the smallest adjacent face dimension | Reduce `fl_r`; keep it < half the shortest edge on any affected face |
 | Fillet/chamfer selects wrong edges | Edge coordinate filter matches unintended edges (e.g., groove interior edges) | Add `edge.body.name` check; filter by both coordinate AND body |

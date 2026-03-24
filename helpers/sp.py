@@ -295,6 +295,43 @@ def refs_to_construction(sk):
             ln.isConstruction = True
 
 
+def probe_orientations(sk, x=0, y=0, z=0):
+    """Detect which sketch H/V orientation corresponds to each model axis.
+
+    On non-XY planes, sketch H and V map to different model axes.
+    This function probes the mapping and returns a dict you can index
+    by model axis name to get the correct DimensionOrientation.
+
+    Args:
+        sk: Sketch object.
+        x, y, z: A model-space point near the sketch (for the probe origin).
+            Use ev() values. Defaults to origin — works for most planes.
+
+    Returns:
+        Dict {'x': H_or_V, 'y': H_or_V, 'z': H_or_V} where values are
+        DimensionOrientations.HorizontalDimensionOrientation or
+        VerticalDimensionOrientation.
+
+    Usage:
+        orient = sp.probe_orientations(sk, ev("cx"), ev("cy"), ev("cz"))
+        d.addDistanceDimension(p1, p2, orient['z'], placement_pt
+        ).parameter.expression = "ls_z + ls_w / 2"
+        d.addDistanceDimension(p1, p2, orient['y'], placement_pt
+        ).parameter.expression = "leg_d / 2"
+    """
+    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    P = adsk.core.Point3D
+
+    m = sk.modelToSketchSpace
+    o = m(P.create(x, y, z))
+    result = {}
+    for axis, dx, dy, dz in [('x', 1, 0, 0), ('y', 0, 1, 0), ('z', 0, 0, 1)]:
+        t = m(P.create(x + dx, y + dy, z + dz))
+        result[axis] = H if abs(t.x - o.x) > abs(t.y - o.y) else V
+    return result
+
+
 def smallest_profile(sk):
     """Smallest-area profile in a sketch.
 
