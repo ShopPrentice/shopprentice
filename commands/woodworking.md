@@ -74,6 +74,7 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | Joint | When to Read | Status | File |
 |-------|-------------|--------|------|
 | **Mortise & Tenon** | Leg-to-rail, stretcher-to-leg, frame-and-panel, table aprons, any rail-into-post connection | Tested (counter stool — blind, through & angled variants) | Inline in skill + `mortise_tenon` template |
+| **Drawbore M&T** | Stretcher-to-leg with offset pins for permanent tightness — workbenches, trestle tables, timber frames | Tested (Roubo workbench — through & blind variants) | `woodworking/joinery/drawbore.md` + `drawbore` template |
 | **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `woodworking/joinery/domino-joint.md` |
 | **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `woodworking/joinery/dovetail.md` |
 | **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `woodworking/joinery/box-joint.md` |

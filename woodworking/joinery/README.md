@@ -8,7 +8,8 @@ Reusable Python templates in `addin/helpers/templates/` encapsulate complex join
 
 | Template | Import | Key Functions | Best For |
 |----------|--------|---------------|----------|
-| `mortise_tenon` | `from helpers.templates import mortise_tenon` | `define_params()`, `blind()`, `through()`, `bulk_cut_mortises()` | Rail-to-leg, shelf-to-side |
+| `mortise_tenon` | `from woodworking.templates import mortise_tenon` | `define_params()`, `blind()`, `through()`, `bulk_cut_mortises()` | Rail-to-leg, shelf-to-side |
+| `drawbore` | `from woodworking.templates import drawbore` | `define_params()`, `through()`, `blind()` | Drawbore M&T with offset pins for stretchers, workbenches |
 | `domino` | `from helpers.templates import domino` | `single()`, `grid()`, `four_corners()` | M&T replacement, edge jointing, case T-joints |
 | `finger_joint` | `from helpers.templates import finger_joint` | `define_params()`, `box()` | Boxes, drawers, decorative corners |
 | `dovetail` | `from helpers.templates import dovetail` | `define_params()`, `corner()`, `box()` | Box corners, drawer fronts |
@@ -37,6 +38,7 @@ Dado/rabbet joints (2-3 features) and tongue & groove (inline in skill) are simp
 | Pocket Hole | [pocket-hole.md](pocket-hole.md) | — | Medium | Face frames, quick assemblies, tabletops |
 | Domino Joint | [domino-joint.md](domino-joint.md) | `domino` | High | Hidden structural connections, kick boards, shelf-to-back |
 | Mortise & Tenon | Inline in skill | `mortise_tenon` | Very High | Shelves, rails, stretchers |
+| Drawbore M&T | [drawbore.md](drawbore.md) | `drawbore` | Very High | Stretchers, workbenches, timber frames |
 
 ## Also in woodworking.md
 
@@ -67,6 +69,7 @@ All joinery files and templates follow these conventions:
 | `ph_` | Pocket Hole |
 | `dm_` | Domino Joint |
 | `mt_` | Mortise & Tenon |
+| `db_` | Drawbore M&T |
 
 ## How Claude Uses These Files
 
