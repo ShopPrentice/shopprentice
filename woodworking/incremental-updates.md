@@ -1,6 +1,42 @@
-# Incremental Updates
+# Incremental Updates & Interactive Editing
 
-Rules for modifying existing designs. Read this topic when the user asks to change, add, or remove features from an already-built model.
+Rules for modifying existing designs, and the interactive editing workflow where the user makes changes in the Fusion UI and the agent incorporates them into the script.
+
+## Interactive Editing Mode
+
+When working on an existing design, the agent and user collaborate through a detect-interpret-implement loop:
+
+### Automatic Detection
+
+**At conversation start** (when a tracked design is open):
+1. Call `get_document_status` — is this a tracked script build?
+2. Call `get_changes` — has anything changed since the last script execution?
+3. If changes detected, report them to the user before proceeding.
+
+**During the conversation** — check for changes:
+- Before every `execute_script` on an existing design
+- When the user's message implies they edited something ("I adjusted...", "I added...", "take a look...")
+- When the user asks to rebuild/update the script
+
+### UI Edits Are Design Intent, Not Literal Specs
+
+When the user edits the model in the Fusion UI, their edit is a **signal of what they want**, not necessarily the correct implementation. The agent must:
+
+1. **Capture** — call `sync_script` or `capture_design` to see what changed
+2. **Interpret** — what is the user trying to achieve? A chamfer on a tenon face means "I want chamfers on exposed tenon ends." It does NOT mean "add this exact chamfer feature at this exact timeline position."
+3. **Plan** — how to implement the intent correctly following skill rules. Run the decision framework below. The implementation may differ from the user's UI edit:
+   - User adds a chamfer manually on 4 edges → agent implements it as a loop over stretcher bodies with an edge selection strategy
+   - User moves a pin by dragging → agent recalculates the parametric expression for pin position
+   - User adds a new body in the root → agent rebuilds it in the correct component
+4. **Confirm** — if the implementation differs significantly from the UI edit, explain why and confirm with the user
+5. **Execute** — rebuild the affected script section
+
+### What NOT to Do
+
+- Don't blindly replicate the user's UI edit into the script
+- Don't add features at the end of the script that should be in a specific build-order position
+- Don't create new components for geometry that belongs in an existing one
+- Don't skip the decision framework because "the user already did it in the UI"
 
 ## The Core Problem
 
@@ -16,7 +52,7 @@ Ask these questions in order before making any change:
 
 If yes: **rebuild the joint using its template.** Never add geometry to a joint piecemeal.
 
-- Adding pins to a tenon? Use the drawbore template's full workflow (body → tenon → pins → mirror → JOIN/CUT).
+- Adding pins to a tenon? Use the drawbore template's full workflow (body -> tenon -> pins -> mirror -> JOIN/CUT).
 - Changing a tenon from blind to through? Rebuild the stretcher section, don't just extend the existing extrude.
 - Adding a new joint type? Check if a template exists. If so, use it. If not, follow the combine-based joinery workflow (rule 6 in the skill).
 
@@ -40,8 +76,8 @@ New geometry belongs in the component it's structurally part of:
 
 Every new sketch must be face-relative or use parametric dimensions:
 
-- **Sketch on a face** → dimension from face corner (`_face_fl_pt`) or projected reference
-- **Sketch on a construction plane** → dimension from origin with parametric expressions
+- **Sketch on a face** -> dimension from face corner (`_face_fl_pt`) or projected reference
+- **Sketch on a construction plane** -> dimension from origin with parametric expressions, use `sp.probe_orientations()` for H/V
 - **Never** place geometry with `ev()` alone — always add `addDistanceDimension` with parameter expressions
 
 **Check:** "If the user changes `leg_setback` or `bench_w`, does this new geometry still land in the right place?"
@@ -76,8 +112,8 @@ If the new sketch is on a face or has projected references:
 
 | Change | Patch OK? | Rebuild? |
 |--------|-----------|----------|
-| Change a parameter value | Patch: `modify_parameters` | — |
-| Add a chamfer to existing edges | Patch: new chamfer feature | — |
+| Change a parameter value | Patch: `modify_parameters` | -- |
+| Add a chamfer to existing edges | Patch: new chamfer feature | -- |
 | Move a feature (e.g., pins closer to shoulder) | **Rebuild** the joint section | Don't edit `ev()` values |
 | Add a new joint type to an existing body | **Rebuild** the body's section with the new joint integrated | Don't add bodies in root |
 | Change blind tenon to through | **Rebuild** the stretcher section | Don't just extend the extrude |
@@ -97,10 +133,11 @@ If you find yourself doing any of these, stop and redesign:
 
 ## Workflow for Any Change
 
-1. **Read the request.** Identify what's changing.
-2. **Locate the affected section** in the script. Identify the component, the build order position (before/after mirrors, before/after cross-component cuts).
-3. **Run the decision framework** (6 questions above).
-4. **If rebuild needed:** replace the entire section with the correct workflow. Don't patch around old code.
-5. **If patch OK:** add the feature in the correct position (before mirrors if applicable), with parametric dimensions, in the correct component.
-6. **Test with `capture_design`** to verify body count, positions, and volumes.
-7. **Test parametric robustness** by imagining: "What if the user changes `leg_setback`? `bench_w`? `ls_w`? Does everything still work?"
+1. **Detect changes.** Call `get_changes` or `sync_script`. If no changes, proceed with the user's verbal request.
+2. **Interpret intent.** The UI edit shows WHAT the user wants. The agent decides HOW to implement it correctly.
+3. **Locate the affected section** in the script. Identify the component, the build order position (before/after mirrors, before/after cross-component cuts).
+4. **Run the decision framework** (6 questions above).
+5. **If rebuild needed:** replace the entire section with the correct workflow. Don't patch around old code.
+6. **If patch OK:** add the feature in the correct position (before mirrors if applicable), with parametric dimensions, in the correct component.
+7. **Test with `capture_design`** to verify body count, positions, and volumes.
+8. **Test parametric robustness** by imagining: "What if the user changes `leg_setback`? `bench_w`? `ls_w`? Does everything still work?"

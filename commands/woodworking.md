@@ -64,7 +64,7 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 | **Hardware Installation** | Importing STEP hardware (bed rail fasteners, hinges), positioning, caching, direction detection, component organization | Tested (queen + twin beds) | `woodworking/hardware-installation.md` |
 | **Joinery Rules** | Combine-based joinery, tooling bodies, edge rabbets, cross-component CUT patterns | Tested | `woodworking/joinery.md` |
 | **Screenshots** | Camera positioning, standard shots, transparent views, detail framing | Tested | `woodworking/screenshots.md` |
-| **Incremental Updates** | Adding/changing features on an existing model — when to patch vs rebuild, component ownership, mirror timing, parametric checks | Tested (Roubo workbench) | `woodworking/incremental-updates.md` |
+| **Incremental Updates & Interactive Editing** | Adding/changing features, detecting UI edits, interpreting user intent vs literal edit, when to rebuild vs patch, component ownership, mirror timing | Tested (Roubo workbench) | `woodworking/incremental-updates.md` |
 
 ### Joinery Reference Files
 
@@ -861,7 +861,7 @@ Details: fillets → bounded context → done
 8. **Details are the last cycle.** Fillets and chamfers require all geometry to exist first.
 9. **Show final result.** After the last cycle, call `apply_appearance` then `get_product_shots` to capture presentation-quality images and present to the user.
 10. **Replace, don't patch.** When an approach doesn't work and you rewrite it, **replace the old code block entirely** — don't add new code below while partially cleaning up the old (e.g., calling `deleteMe()` on an old sketch but leaving its extrude). Partial cleanup creates orphan bodies invisible in code review but visible in the model. The old code is always recoverable from git or undo, so replacing is safe.
-11. **Step back before incremental changes.** When the user asks to add or change a feature on an existing model, **read `woodworking/incremental-updates.md` first.** Run the 6-question decision framework before writing code. The default is to rebuild the affected section properly, not to patch. Adding a tenon to a stretcher means rebuilding the stretcher section with the joint template — not appending a separate body in root.
+11. **Detect UI changes automatically.** When working on an existing design, call `get_changes` at conversation start and before any `execute_script`. If changes are detected, capture them with `sync_script`, interpret the user's intent (UI edits are design signals, not literal specs), then implement correctly following the decision framework in `woodworking/incremental-updates.md`. The default is to rebuild the affected section properly, not to replicate the UI edit verbatim.
 
 ### What Goes Where
 
