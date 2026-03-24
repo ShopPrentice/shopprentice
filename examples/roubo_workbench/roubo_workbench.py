@@ -340,205 +340,217 @@ def run(context):
     mir_y.bodies.item(1).name = "Leg_BR"
 
     # ==============================================================
-    #  LONG STRETCHERS (front flush with front legs, through-tenon)
+    #  LONG STRETCHERS — proper combine-based joinery workflow:
+    #  1. Stretcher body (full cross-section, spans between legs)
+    #  2. Sketch tenon on end face → extrude through leg + proud
+    #  3. Sketch drawbore pins → extrude through leg
+    #  4. Mirror tenon + pins to other end
+    #  5. JOIN tenons to stretcher, CUT tenon with pins
+    #  6. Mirror everything across YMid for back stretcher
     # ==============================================================
     ls_occ = sp.make_comp(root, "LongStretchers")
     ls_c = ls_occ.component
+    P = adsk.core.Point3D
 
-    # Through-tenon: full-length tenon body (st_tw × st_tt) + main body
-    # between inner leg faces (ls_w × ls_t).  CUT against legs uses the
-    # combined body — only the tenon cross-section intersects the leg,
-    # so mortises are automatically tenon-sized.
-
-    # Tenon body (full length, tenon cross-section, centered on stretcher)
-    ls_tenon_pl = sp.off_plane(ls_c, root.xZConstructionPlane,
-        "(leg_d - st_tt) / 2", "LSTenon_Pl")
-    _, pr = sp.sketch_rect_model(ls_c, ls_tenon_pl,
-        ("leg_setback - ls_proud",
-         "(leg_d - st_tt) / 2",
-         "ls_z"),
-        {"x": "ls_len", "z": "ls_w"},
-        "LSTenon_Sk", ev=ev)
-    ls_tenon_ext = sp.ext_new(ls_c, pr, "st_tt", "LSTenon")
-    ls_tenon = ls_tenon_ext.bodies.item(0)
-    ls_tenon.name = "LS_Front_Tenon"
-
-    # Main body (between inner leg faces, full stretcher cross-section)
-    ls_main_pl = sp.off_plane(ls_c, root.xZConstructionPlane,
-        "(leg_d - ls_t) / 2", "LSMain_Pl")
-    _, pr = sp.sketch_rect_model(ls_c, ls_main_pl,
+    # 1. Stretcher body — full cross-section, between inner leg faces
+    ls_body_pl = sp.off_plane(ls_c, root.xZConstructionPlane,
+        "(leg_d - ls_t) / 2", "LSBody_Pl")
+    _, pr = sp.sketch_rect_model(ls_c, ls_body_pl,
         ("leg_setback + leg_w",
          "(leg_d - ls_t) / 2",
          "ls_z"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w", "z": "ls_w"},
-        "LSMain_Sk", ev=ev)
-    ls_main_ext = sp.ext_new(ls_c, pr, "ls_t", "LSMain")
-    ls_main = ls_main_ext.bodies.item(0)
-    ls_main.name = "LS_Front_Main"
-
-    # JOIN main to tenon → combined stretcher with shoulders
-    sp.combine(ls_c, ls_tenon, [ls_main], JOIN, False, "LSFront_Join")
-    ls_front = ls_tenon
+        "LSBody_Sk", ev=ev)
+    ls_body_ext = sp.ext_new(ls_c, pr, "ls_t", "LSBody")
+    ls_front = ls_body_ext.bodies.item(0)
     ls_front.name = "LS_Front"
 
-    # Drawbore pins at each end of LS_Front (2 per leg = 4 total)
-    # Pin X = 1/3 of leg_w from the shoulder (inner leg face)
-    for side, x_expr in [("L", "leg_setback + 2 * leg_w / 3"),
-                          ("R", "bench_l - leg_setback - 2 * leg_w / 3")]:
-        pin_pl = sp.off_plane(ls_c, root.yZConstructionPlane,
-            x_expr, f"LSPin{side}_Pl")
-        pin_sk = ls_c.sketches.add(pin_pl)
-        pin_sk.name = f"LSPin{side}_Sk"
-        m = pin_sk.modelToSketchSpace
-        P = adsk.core.Point3D
-        _y_val = ev("(leg_d - st_tt) / 2 + st_tt / 2")
-        # Detect axis mapping for Z dimension
-        _o = m(P.create(ev(x_expr), _y_val, 0))
-        _tz = m(P.create(ev(x_expr), _y_val, 1))
-        z_is_H = abs(_tz.x - _o.x) > abs(_tz.y - _o.y)
-        z_orient = H if z_is_H else V
-        y_orient = V if z_is_H else H
+    # 2. Left tenon — plane at outer end (proud face), extrude inward
+    #    through leg to stretcher end. Default direction is +X = inward. ✓
+    ls_tenon_pl = sp.off_plane(ls_c, root.yZConstructionPlane,
+        "leg_setback - ls_proud", "LSTenon_Pl")
+    _, pr = sp.sketch_rect_model(ls_c, ls_tenon_pl,
+        ("leg_setback - ls_proud",
+         "(leg_d - st_tt) / 2",
+         "ls_z"),
+        {"y": "st_tt", "z": "ls_w"},
+        "LSTenon_L_Sk", ev=ev)
+    ls_tenon_l = sp.ext_new(ls_c, pr, "leg_w + ls_proud", "LSTenon_L")
+    ls_tenon_l_body = ls_tenon_l.bodies.item(0)
+    ls_tenon_l_body.name = "LS_Tenon_L"
 
-        # Place both circles
-        for k, z_expr in enumerate(["ls_z + ls_w / 2 - pin_sp / 2",
-                                     "ls_z + ls_w / 2 + pin_sp / 2"]):
-            ctr = m(P.create(ev(x_expr), _y_val, ev(z_expr)))
-            pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
-                P.create(ctr.x, ctr.y, 0), ev("pin_dia") / 2)
+    # 3. Drawbore pins — sketch on XZ plane, 2 circles at 1/3 into leg from shoulder
+    #    Pins go in Y direction (through leg cheek, perpendicular to tenon)
+    ls_pin_sk = ls_c.sketches.add(root.xZConstructionPlane)
+    ls_pin_sk.name = "LSPinL_Sk"
+    m = ls_pin_sk.modelToSketchSpace
+    for z_expr in ["ls_z + ls_w / 2 - pin_sp / 2",
+                    "ls_z + ls_w / 2 + pin_sp / 2"]:
+        ctr = m(P.create(ev("leg_setback + 2 * leg_w / 3"), 0, ev(z_expr)))
+        ls_pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
+            P.create(ctr.x, ctr.y, 0), ev("pin_dia") / 2)
+    d = ls_pin_sk.sketchDimensions
+    c0 = ls_pin_sk.sketchCurves.sketchCircles.item(0)
+    c1 = ls_pin_sk.sketchCurves.sketchCircles.item(1)
+    g0 = c0.centerSketchPoint.geometry
+    g1 = c1.centerSketchPoint.geometry
+    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    d.addRadialDimension(c0, P.create(g0.x + 0.5, g0.y, 0)
+    ).parameter.expression = "pin_dia / 2"
+    d.addRadialDimension(c1, P.create(g1.x + 0.5, g1.y, 0)
+    ).parameter.expression = "pin_dia / 2"
+    d.addDistanceDimension(ls_pin_sk.originPoint, c0.centerSketchPoint,
+        H, P.create(g0.x / 2, g0.y - 1, 0)
+    ).parameter.expression = "leg_setback + 2 * leg_w / 3"
+    d.addDistanceDimension(ls_pin_sk.originPoint, c0.centerSketchPoint,
+        V, P.create(g0.x - 1, g0.y / 2, 0)
+    ).parameter.expression = "ls_z + ls_w / 2 - pin_sp / 2"
+    d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
+        V, P.create(g0.x - 1, (g0.y + g1.y) / 2, 0)
+    ).parameter.expression = "pin_sp"
+    _refs_to_construction(ls_pin_sk)
+    ls_pin_bodies = []
+    for j in range(ls_pin_sk.profiles.count):
+        p = ls_pin_sk.profiles.item(j)
+        if p.areaProperties().area < 1.0:
+            ext = sp.ext_new(ls_c, p, "leg_d", f"LSPinL_{j}")
+            ext.bodies.item(0).name = f"LSPinL_{j}"
+            ls_pin_bodies.append(ext.bodies.item(0))
 
-        d = pin_sk.sketchDimensions
-        c0 = pin_sk.sketchCurves.sketchCircles.item(0)
-        c1 = pin_sk.sketchCurves.sketchCircles.item(1)
-        # Radial dims
-        ctr0 = c0.centerSketchPoint.geometry
-        ctr1 = c1.centerSketchPoint.geometry
-        d.addRadialDimension(c0, P.create(ctr0.x + 1, ctr0.y, 0)
-        ).parameter.expression = "pin_dia / 2"
-        d.addRadialDimension(c1, P.create(ctr1.x + 1, ctr1.y, 0)
-        ).parameter.expression = "pin_dia / 2"
-        # First circle: position from origin
-        d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
-            z_orient, P.create(ctr0.x - 1, ctr0.y - 1, 0)
-        ).parameter.expression = "ls_z + ls_w / 2 - pin_sp / 2"
-        d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
-            y_orient, P.create(ctr0.x + 1, ctr0.y + 1, 0)
-        ).parameter.expression = "(leg_d - st_tt) / 2 + st_tt / 2"
-        # Second circle: spacing from first (Z direction only)
-        d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
-            z_orient, P.create((ctr0.x + ctr1.x) / 2, ctr0.y - 1, 0)
-        ).parameter.expression = "pin_sp"
-        _refs_to_construction(pin_sk)
-        for j in range(pin_sk.profiles.count):
-            p = pin_sk.profiles.item(j)
-            if p.areaProperties().area < 1.0:
-                ext = sp.ext_new(ls_c, p, "leg_d", f"LSPin{side}_{j}")
-                ext.bodies.item(0).name = f"LSPin_{side}_{j}"
+    # 4. Mirror tenon + pins to right end across XMid
+    mir_tenon = sp.mirror_bodies(ls_c,
+        [ls_tenon_l_body] + ls_pin_bodies, XMid, "LSMirTenon")
 
-    # Mirror ALL bodies across YMid → LS_Back + back pins
+    # 5. JOIN all tenons to stretcher, CUT tenons with pins
+    all_tenons = []
+    all_pins = []
+    for i in range(ls_c.bRepBodies.count):
+        b = ls_c.bRepBodies.item(i)
+        if "Tenon" in b.name:
+            all_tenons.append(b)
+        elif "Pin" in b.name:
+            all_pins.append(b)
+    if all_tenons:
+        sp.combine(ls_c, ls_front, all_tenons, JOIN, False, "LSTenonJoin")
+    if all_pins:
+        sp.combine(ls_c, ls_front, all_pins, CUT, True, "LSPinCut")
+
+    # 6. Mirror everything across YMid → LS_Back
     _ls_bodies = [ls_c.bRepBodies.item(i) for i in range(ls_c.bRepBodies.count)]
     mir_ls = sp.mirror_bodies(ls_c, _ls_bodies, YMid, "LSMirY")
-    # Name the mirrored stretcher (first mirrored body)
     for i in range(mir_ls.bodies.count):
         b = mir_ls.bodies.item(i)
-        if "LS_Front" in b.name or b.name == "LS_Front":
+        if b.volume > 100:  # stretcher, not pin
             b.name = "LS_Back"
             break
 
     # ==============================================================
-    #  SHORT STRETCHERS (blind tenon into legs)
+    #  SHORT STRETCHERS — same workflow, blind tenon variant:
+    #  Tenon extrudes into leg (not through), pin extrudes through leg
     # ==============================================================
     ss_occ = sp.make_comp(root, "ShortStretchers")
     ss_c = ss_occ.component
 
-    # Tenon body (blind — stops inside front/back legs)
-    ss_tenon_pl = sp.off_plane(ss_c, root.yZConstructionPlane,
-        "leg_setback + leg_w / 2", "SSTenon_Pl")
-    _, pr = sp.sketch_rect_model(ss_c, ss_tenon_pl,
-        ("0 in",
-         "st_blind",
-         "ls_z + ls_w"),
-        {"y": "bench_w - 2 * st_blind", "z": "ss_w"},
-        "SSTenon_Sk", ev=ev)
-    ss_tenon_ext = sp.ext_new_sym(ss_c, pr, "st_tt / 2", "SSTenon")
-    ss_tenon = ss_tenon_ext.bodies.item(0)
-    ss_tenon.name = "SS_Left_Tenon"
-
-    # Main body (between front/back inner leg faces, full cross-section)
-    ss_main_pl = sp.off_plane(ss_c, root.yZConstructionPlane,
-        "leg_setback + leg_w / 2", "SSMain_Pl")
-    _, pr = sp.sketch_rect_model(ss_c, ss_main_pl,
+    # 1. Stretcher body — full cross-section, between inner leg faces
+    ss_body_pl = sp.off_plane(ss_c, root.yZConstructionPlane,
+        "leg_setback + leg_w / 2", "SSBody_Pl")
+    _, pr = sp.sketch_rect_model(ss_c, ss_body_pl,
         ("0 in",
          "leg_d",
          "ls_z + ls_w"),
         {"y": "bench_w - 2 * leg_d", "z": "ss_w"},
-        "SSMain_Sk", ev=ev)
-    ss_main_ext = sp.ext_new_sym(ss_c, pr, "ss_t / 2", "SSMain")
-    ss_main = ss_main_ext.bodies.item(0)
-    ss_main.name = "SS_Left_Main"
-
-    # JOIN main to tenon
-    sp.combine(ss_c, ss_tenon, [ss_main], JOIN, False, "SSLeft_Join")
-    ss_left = ss_tenon
+        "SSBody_Sk", ev=ev)
+    ss_body_ext = sp.ext_new_sym(ss_c, pr, "ss_t / 2", "SSBody")
+    ss_left = ss_body_ext.bodies.item(0)
     ss_left.name = "SS_Left"
 
-    # Drawbore pins at each end of SS_Left (2 per leg = 4 total)
-    # Pin Y = 1/3 of (leg_d - st_blind) from the shoulder (inner leg face)
-    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
-    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
-    for side, y_expr in [("F", "leg_d - (leg_d - st_blind) / 3"),
-                          ("B", "bench_w - leg_d + (leg_d - st_blind) / 3")]:
-        pin_pl = sp.off_plane(ss_c, root.xZConstructionPlane,
-            y_expr, f"SSPin{side}_Pl")
-        pin_sk = ss_c.sketches.add(pin_pl)
-        pin_sk.name = f"SSPin{side}_Sk"
-        m = pin_sk.modelToSketchSpace
-        P = adsk.core.Point3D
-        _x_val = ev("leg_setback + leg_w / 2")
-        _o = m(P.create(_x_val, ev(y_expr), 0))
-        _tz = m(P.create(_x_val, ev(y_expr), 1))
-        z_is_H = abs(_tz.x - _o.x) > abs(_tz.y - _o.y)
-        z_orient = H if z_is_H else V
-        x_orient = V if z_is_H else H
+    # 2. Front tenon — plane at blind stop point (Y = st_blind),
+    #    extrude in +Y to stretcher front end (Y = leg_d). ✓
+    ss_tenon_pl = sp.off_plane(ss_c, root.xZConstructionPlane,
+        "st_blind", "SSTenon_Pl")
+    _, pr = sp.sketch_rect_model(ss_c, ss_tenon_pl,
+        ("leg_setback + (leg_w - st_tt) / 2",
+         "st_blind",
+         "ls_z + ls_w"),
+        {"x": "st_tt", "z": "ss_w"},
+        "SSTenon_F_Sk", ev=ev)
+    ss_tenon_f = sp.ext_new(ss_c, pr, "leg_d - st_blind", "SSTenon_F")
+    ss_tenon_f_body = ss_tenon_f.bodies.item(0)
+    ss_tenon_f_body.name = "SS_Tenon_F"
 
-        for k, z_expr in enumerate(["ls_z + ls_w + ss_w / 2 - pin_sp / 2",
-                                     "ls_z + ls_w + ss_w / 2 + pin_sp / 2"]):
-            ctr = m(P.create(_x_val, ev(y_expr), ev(z_expr)))
-            pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
-                P.create(ctr.x, ctr.y, 0), ev("pin_dia") / 2)
+    # 3. Drawbore pins — sketch on YZ plane (normal=X) so pin goes through
+    #    leg side, perpendicular to tenon which goes in Y
+    ss_pin_pl = sp.off_plane(ss_c, root.yZConstructionPlane,
+        "leg_setback + leg_w / 2", "SSPinF_Pl")
+    ss_pin_sk = ss_c.sketches.add(ss_pin_pl)
+    ss_pin_sk.name = "SSPinF_Sk"
+    m = ss_pin_sk.modelToSketchSpace
+    # Detect axis mapping on YZ plane
+    _ss_o = m(P.create(ev("leg_setback + leg_w / 2"), 0, 0))
+    _ss_ty = m(P.create(ev("leg_setback + leg_w / 2"), 1, 0))
+    _ss_tz = m(P.create(ev("leg_setback + leg_w / 2"), 0, 1))
+    y_is_H = abs(_ss_ty.x - _ss_o.x) > abs(_ss_ty.y - _ss_o.y)
+    y_orient = H if y_is_H else V
+    z_orient = V if y_is_H else H
 
-        d = pin_sk.sketchDimensions
-        c0 = pin_sk.sketchCurves.sketchCircles.item(0)
-        c1 = pin_sk.sketchCurves.sketchCircles.item(1)
-        ctr0 = c0.centerSketchPoint.geometry
-        ctr1 = c1.centerSketchPoint.geometry
-        d.addRadialDimension(c0, P.create(ctr0.x + 1, ctr0.y, 0)
-        ).parameter.expression = "pin_dia / 2"
-        d.addRadialDimension(c1, P.create(ctr1.x + 1, ctr1.y, 0)
-        ).parameter.expression = "pin_dia / 2"
-        # First circle from origin
-        d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
-            z_orient, P.create(ctr0.x - 1, ctr0.y - 1, 0)
-        ).parameter.expression = "ls_z + ls_w + ss_w / 2 - pin_sp / 2"
-        d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
-            x_orient, P.create(ctr0.x + 1, ctr0.y + 1, 0)
-        ).parameter.expression = "leg_setback + leg_w / 2"
-        # Second circle: spacing from first (Z direction only)
-        d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
-            z_orient, P.create((ctr0.x + ctr1.x) / 2, ctr0.y - 1, 0)
-        ).parameter.expression = "pin_sp"
-        _refs_to_construction(pin_sk)
-        for j in range(pin_sk.profiles.count):
-            p = pin_sk.profiles.item(j)
-            if p.areaProperties().area < 1.0:
-                ext = sp.ext_new(ss_c, p, "leg_w", f"SSPin{side}_{j}")
-                ext.bodies.item(0).name = f"SSPin_{side}_{j}"
+    _pin_y = ev("leg_d - (leg_d - st_blind) / 3")
+    for z_expr in ["ls_z + ls_w + ss_w / 2 - pin_sp / 2",
+                    "ls_z + ls_w + ss_w / 2 + pin_sp / 2"]:
+        ctr = m(P.create(ev("leg_setback + leg_w / 2"), _pin_y, ev(z_expr)))
+        ss_pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
+            P.create(ctr.x, ctr.y, 0), ev("pin_dia") / 2)
+    d = ss_pin_sk.sketchDimensions
+    c0 = ss_pin_sk.sketchCurves.sketchCircles.item(0)
+    c1 = ss_pin_sk.sketchCurves.sketchCircles.item(1)
+    g0 = c0.centerSketchPoint.geometry
+    g1 = c1.centerSketchPoint.geometry
+    d.addRadialDimension(c0, P.create(g0.x + 0.5, g0.y, 0)
+    ).parameter.expression = "pin_dia / 2"
+    d.addRadialDimension(c1, P.create(g1.x + 0.5, g1.y, 0)
+    ).parameter.expression = "pin_dia / 2"
+    d.addDistanceDimension(ss_pin_sk.originPoint, c0.centerSketchPoint,
+        y_orient, P.create(g0.x / 2, g0.y - 1, 0)
+    ).parameter.expression = "leg_d - (leg_d - st_blind) / 3"
+    d.addDistanceDimension(ss_pin_sk.originPoint, c0.centerSketchPoint,
+        z_orient, P.create(g0.x - 1, g0.y / 2, 0)
+    ).parameter.expression = "ls_z + ls_w + ss_w / 2 - pin_sp / 2"
+    d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
+        z_orient, P.create(g0.x - 1, (g0.y + g1.y) / 2, 0)
+    ).parameter.expression = "pin_sp"
+    _refs_to_construction(ss_pin_sk)
+    ss_pin_bodies = []
+    for j in range(ss_pin_sk.profiles.count):
+        p = ss_pin_sk.profiles.item(j)
+        if p.areaProperties().area < 1.0:
+            ext = sp.ext_new_sym(ss_c, p, "leg_w / 2", f"SSPinF_{j}")
+            ext.bodies.item(0).name = f"SSPinF_{j}"
+            ss_pin_bodies.append(ext.bodies.item(0))
 
-    # Mirror ALL bodies across XMid → SS_Right + right pins
+    # 4. Mirror tenon + pins to back end across YMid
+    mir_ss_tenon = sp.mirror_bodies(ss_c,
+        [ss_tenon_f_body] + ss_pin_bodies, YMid, "SSMirTenon")
+
+    # 5. JOIN all tenons to stretcher, CUT tenons with pins
+    all_tenons = []
+    all_pins = []
+    for i in range(ss_c.bRepBodies.count):
+        b = ss_c.bRepBodies.item(i)
+        if "Tenon" in b.name:
+            all_tenons.append(b)
+        elif "Pin" in b.name:
+            all_pins.append(b)
+    if all_tenons:
+        sp.combine(ss_c, ss_left, all_tenons, JOIN, False, "SSTenonJoin")
+    if all_pins:
+        sp.combine(ss_c, ss_left, all_pins, CUT, True, "SSPinCut")
+
+    # 6. Mirror everything across XMid → SS_Right
     _ss_bodies = [ss_c.bRepBodies.item(i) for i in range(ss_c.bRepBodies.count)]
     mir_ss = sp.mirror_bodies(ss_c, _ss_bodies, XMid, "SSMirX")
     for i in range(mir_ss.bodies.count):
         b = mir_ss.bodies.item(i)
-        if "SS_Left" in b.name or b.name == "SS_Left":
+        if b.volume > 100:
             b.name = "SS_Right"
             break
 
@@ -943,23 +955,16 @@ def run(context):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
         sp.combine(root, lp, ls_proxies, CUT, True, f"LSMort_Leg{i}")
 
-    # CUT legs with LS pin proxies (pin holes from stretcher component)
-    ls_pin_proxies = [ls_c.bRepBodies.item(i).createForAssemblyContext(ls_occ)
-                      for i in range(ls_c.bRepBodies.count)
-                      if "Pin" in ls_c.bRepBodies.item(i).name]
-    if ls_pin_proxies:
-        for i in range(leg_c.bRepBodies.count):
-            lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-            sp.combine(root, lp, ls_pin_proxies, CUT, True, f"LSPinHole_Leg{i}")
-
-    # CUT legs with SS pin proxies
-    ss_pin_proxies = [ss_c.bRepBodies.item(i).createForAssemblyContext(ss_occ)
-                      for i in range(ss_c.bRepBodies.count)
-                      if "Pin" in ss_c.bRepBodies.item(i).name]
-    if ss_pin_proxies:
-        for i in range(leg_c.bRepBodies.count):
-            lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-            sp.combine(root, lp, ss_pin_proxies, CUT, True, f"SSPinHole_Leg{i}")
+    # Pin holes in legs — pins are in stretcher components, CUT via proxies
+    for prefix, s_c, s_occ in [("LS", ls_c, ls_occ), ("SS", ss_c, ss_occ)]:
+        pin_proxies = [s_c.bRepBodies.item(i).createForAssemblyContext(s_occ)
+                       for i in range(s_c.bRepBodies.count)
+                       if "Pin" in s_c.bRepBodies.item(i).name]
+        if pin_proxies:
+            for i in range(leg_c.bRepBodies.count):
+                lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
+                sp.combine(root, lp, pin_proxies, CUT, True,
+                           f"{prefix}PinHole_Leg{i}")
 
     # CUT FL leg with vise screw bore and guide slot (not chop/handle)
     vise_screw_p = vise_c.bRepBodies.itemByName("Vise_Screw").createForAssemblyContext(vise_occ)
