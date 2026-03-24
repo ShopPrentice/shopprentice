@@ -966,15 +966,25 @@ def run(context):
             ch = comp.features.chamferFeatures.add(ch_inp)
             ch.name = name
 
-    # Top slab — chamfer all edges on the top face (Z=bench_h):
-    # outer perimeter + dog holes + mortise openings
+    # Top slab — chamfer top face perimeter + end edges (verticals + bottom
+    # at X=0 and X=max).  Avoids the long bottom edges which have the
+    # tongue groove cut (non-manifold).
     _top_body = top_c.bRepBodies.item(0)
-    _bench_h = ev("bench_h")
+    _top_bb = _top_body.boundingBox
     _top_edges = adsk.core.ObjectCollection.create()
+    tol = 0.05
     for j in range(_top_body.edges.count):
         e = _top_body.edges.item(j)
         sv, ev2 = e.startVertex.geometry, e.endVertex.geometry
-        if abs(sv.z - _bench_h) < 0.05 and abs(ev2.z - _bench_h) < 0.05:
+        # Top face perimeter: both vertices at Z=max
+        at_top = (abs(sv.z - _top_bb.maxPoint.z) < tol
+                  and abs(ev2.z - _top_bb.maxPoint.z) < tol)
+        # End edges: both vertices at X=min or X=max (safe from grooves)
+        at_left_end = (abs(sv.x - _top_bb.minPoint.x) < tol
+                       and abs(ev2.x - _top_bb.minPoint.x) < tol)
+        at_right_end = (abs(sv.x - _top_bb.maxPoint.x) < tol
+                        and abs(ev2.x - _top_bb.maxPoint.x) < tol)
+        if at_top or at_left_end or at_right_end:
             _top_edges.add(e)
     if _top_edges.count > 0:
         ch_inp = top_c.features.chamferFeatures.createInput2()
@@ -983,12 +993,10 @@ def run(context):
         ch = top_c.features.chamferFeatures.add(ch_inp)
         ch.name = "TopFace_Ch"
 
-    # Legs — chamfer top and bottom boundary edges
+    # Legs — chamfer bottom edges only (top meets the slab joint)
     for i in range(leg_c.bRepBodies.count):
         _chamfer_boundary_edges(leg_c, leg_c.bRepBodies.item(i),
                                 "ch_leg", f"LegBot_Ch{i}", z_filter='bottom')
-        _chamfer_boundary_edges(leg_c, leg_c.bRepBodies.item(i),
-                                "ch_leg", f"LegTop_Ch{i}", z_filter='top')
 
     # ==============================================================
     #  EPILOGUE
