@@ -966,7 +966,8 @@ def run(context):
             ch = comp.features.chamferFeatures.add(ch_inp)
             ch.name = name
 
-    # Top slab — chamfer only the 4 perimeter edges at Z=bench_h (safe from joints)
+    # Top slab — chamfer all edges on the top face (Z=bench_h):
+    # outer perimeter + dog holes + mortise openings
     _top_body = top_c.bRepBodies.item(0)
     _bench_h = ev("bench_h")
     _top_edges = adsk.core.ObjectCollection.create()
@@ -974,29 +975,20 @@ def run(context):
         e = _top_body.edges.item(j)
         sv, ev2 = e.startVertex.geometry, e.endVertex.geometry
         if abs(sv.z - _bench_h) < 0.05 and abs(ev2.z - _bench_h) < 0.05:
-            # Only outer perimeter edges (both vertices on BB boundary in X or Y)
-            bb = _top_body.boundingBox
-            on_x_edge = ((abs(sv.x - bb.minPoint.x) < 0.05
-                          and abs(ev2.x - bb.minPoint.x) < 0.05)
-                         or (abs(sv.x - bb.maxPoint.x) < 0.05
-                             and abs(ev2.x - bb.maxPoint.x) < 0.05))
-            on_y_edge = ((abs(sv.y - bb.minPoint.y) < 0.05
-                          and abs(ev2.y - bb.minPoint.y) < 0.05)
-                         or (abs(sv.y - bb.maxPoint.y) < 0.05
-                             and abs(ev2.y - bb.maxPoint.y) < 0.05))
-            if on_x_edge or on_y_edge:
-                _top_edges.add(e)
+            _top_edges.add(e)
     if _top_edges.count > 0:
         ch_inp = top_c.features.chamferFeatures.createInput2()
         ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
             _top_edges, VI("ch_top"), True)
         ch = top_c.features.chamferFeatures.add(ch_inp)
-        ch.name = "TopEdge_Ch"
+        ch.name = "TopFace_Ch"
 
-    # Leg bottoms — chamfer Z=0 edges
+    # Legs — chamfer top and bottom boundary edges
     for i in range(leg_c.bRepBodies.count):
         _chamfer_boundary_edges(leg_c, leg_c.bRepBodies.item(i),
                                 "ch_leg", f"LegBot_Ch{i}", z_filter='bottom')
+        _chamfer_boundary_edges(leg_c, leg_c.bRepBodies.item(i),
+                                "ch_leg", f"LegTop_Ch{i}", z_filter='top')
 
     # ==============================================================
     #  EPILOGUE
