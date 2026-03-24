@@ -1158,6 +1158,9 @@ def run(context):
             names.append(f"{occ.name}/{c.bRepBodies.item(i).name}")
     print(f"Bodies: {len(names)} -> {names}")
 
+    # Apply white oak appearance
+    sp.apply_appearance("white oak")
+
     # Show edge lines
     app.activeViewport.visualStyle = \
         adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
