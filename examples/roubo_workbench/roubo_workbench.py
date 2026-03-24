@@ -75,7 +75,8 @@ def run(context):
         ("st_blind",     "1 in",     "in", "Blind tenon stop depth inside leg"),
         # Drawbore pins
         ("pin_dia",      "0.375 in", "in", "Drawbore pin diameter"),
-        ("pin_offset",   "0.5 in",   "in", "Pin offset from tenon shoulder"),
+        ("pin_offset",   "0.375 in", "in", "Pin offset from tenon shoulder"),
+        ("pin_sp",       "2 in",     "in", "Vertical spacing between 2 pins"),
         # Deadman
         ("dm_thick",     "1.5 in",   "in", "Deadman panel thickness"),
         ("dm_w",         "4 in",     "in", "Deadman width (X)"),
@@ -356,8 +357,8 @@ def run(context):
     _, pr = sp.sketch_rect_model(ls_c, ls_tenon_pl,
         ("leg_setback - ls_proud",
          "(leg_d - st_tt) / 2",
-         "ls_z + (ls_w - st_tw) / 2"),
-        {"x": "ls_len", "z": "st_tw"},
+         "ls_z"),
+        {"x": "ls_len", "z": "ls_w"},
         "LSTenon_Sk", ev=ev)
     ls_tenon_ext = sp.ext_new(ls_c, pr, "st_tt", "LSTenon")
     ls_tenon = ls_tenon_ext.bodies.item(0)
@@ -398,8 +399,8 @@ def run(context):
     _, pr = sp.sketch_rect_model(ss_c, ss_tenon_pl,
         ("0 in",
          "st_blind",
-         "ls_z + ls_w + (ss_w - st_tw) / 2"),
-        {"y": "bench_w - 2 * st_blind", "z": "st_tw"},
+         "ls_z + ls_w"),
+        {"y": "bench_w - 2 * st_blind", "z": "ss_w"},
         "SSTenon_Sk", ev=ev)
     ss_tenon_ext = sp.ext_new_sym(ss_c, pr, "st_tt / 2", "SSTenon")
     ss_tenon = ss_tenon_ext.bodies.item(0)
@@ -803,40 +804,73 @@ def run(context):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
         sp.combine(root, lp, ls_proxies, CUT, True, f"LSMort_Leg{i}")
 
-    # Drawbore pins — through each leg at the LS tenon, offset from shoulder
-    # Pins are cylindrical dowels in Y direction, centered on tenon Z
+    # Drawbore pins — 2 per tenon through each leg, for both LS and SS
     pin_occ = sp.make_comp(root, "DrawborePins")
     pin_c = pin_occ.component
     _pin_r = ev("pin_dia") / 2
-    _pin_off = ev("pin_offset")
-    _st_z_ctr = ev("ls_z + ls_w / 2")
-    _leg_d_val = ev("leg_d")
+    _pin_half_sp = ev("pin_sp") / 2
+    P = adsk.core.Point3D
 
-    for i, (lx, ly) in enumerate([
+    # LS pins (Y direction, through leg front-to-back)
+    # 4 legs × 2 pins = 8 pin bodies
+    _ls_z_ctr = ev("ls_z + ls_w / 2")
+    _ls_pin_z = [_ls_z_ctr - _pin_half_sp, _ls_z_ctr + _pin_half_sp]
+    _ls_legs = [
         (ev("leg_setback + pin_offset"), 0),                          # FL
         (ev("bench_l - leg_setback - pin_offset"), 0),                # FR
         (ev("leg_setback + pin_offset"), ev("bench_w - leg_d")),      # BL
         (ev("bench_l - leg_setback - pin_offset"), ev("bench_w - leg_d")),  # BR
-    ]):
+    ]
+    pin_idx = 0
+    for lx, ly in _ls_legs:
         pin_pl = sp.off_plane(pin_c, root.xZConstructionPlane,
-            f"{ly} cm", f"Pin{i}_Pl")
+            f"{ly} cm", f"LSPin{pin_idx}_Pl")
         pin_sk = pin_c.sketches.add(pin_pl)
-        pin_sk.name = f"Pin{i}_Sk"
-        pin_m2s = pin_sk.modelToSketchSpace
-        P = adsk.core.Point3D
-        ctr = pin_m2s(P.create(lx, ly, _st_z_ctr))
-        pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
-            P.create(ctr.x, ctr.y, 0), _pin_r)
-        circle = pin_sk.sketchCurves.sketchCircles.item(0)
-        pin_sk.sketchDimensions.addRadialDimension(
-            circle, P.create(ctr.x + _pin_r + 0.5, ctr.y, 0)
-        ).parameter.expression = "pin_dia / 2"
+        pin_sk.name = f"LSPin{pin_idx}_Sk"
+        m = pin_sk.modelToSketchSpace
+        for pz in _ls_pin_z:
+            ctr = m(P.create(lx, ly, pz))
+            pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
+                P.create(ctr.x, ctr.y, 0), _pin_r)
         _refs_to_construction(pin_sk)
-        pin_prof = sp.smallest_profile(pin_sk)
-        pin_ext = sp.ext_new(pin_c, pin_prof, "leg_d", f"Pin{i}")
-        pin_ext.bodies.item(0).name = f"Pin_{i}"
+        # Extrude all circles together
+        for j in range(pin_sk.profiles.count):
+            p = pin_sk.profiles.item(j)
+            if p.areaProperties().area < 1.0:  # small = circle
+                ext = sp.ext_new(pin_c, p, "leg_d", f"LSPin{pin_idx}_{j}")
+                ext.bodies.item(0).name = f"LSPin_{pin_idx}_{j}"
+        pin_idx += 1
 
-    # CUT pin holes into legs
+    # SS pins (X direction, through leg side-to-side)
+    # 4 legs × 2 pins = 8 pin bodies
+    _ss_z_ctr = ev("ls_z + ls_w + ss_w / 2")
+    _ss_pin_z = [_ss_z_ctr - _pin_half_sp, _ss_z_ctr + _pin_half_sp]
+    _ss_legs = [
+        (ev("leg_setback"), ev("pin_offset")),                          # FL
+        (ev("bench_l - leg_setback - leg_w"), ev("pin_offset")),        # FR
+        (ev("leg_setback"), ev("bench_w - leg_d + pin_offset")),        # BL
+        (ev("bench_l - leg_setback - leg_w"), ev("bench_w - leg_d + pin_offset")),  # BR
+    ]
+    pin_idx = 0
+    for lx, ly in _ss_legs:
+        pin_pl = sp.off_plane(pin_c, root.yZConstructionPlane,
+            f"{lx} cm", f"SSPin{pin_idx}_Pl")
+        pin_sk = pin_c.sketches.add(pin_pl)
+        pin_sk.name = f"SSPin{pin_idx}_Sk"
+        m = pin_sk.modelToSketchSpace
+        for pz in _ss_pin_z:
+            ctr = m(P.create(lx, ly, pz))
+            pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
+                P.create(ctr.x, ctr.y, 0), _pin_r)
+        _refs_to_construction(pin_sk)
+        for j in range(pin_sk.profiles.count):
+            p = pin_sk.profiles.item(j)
+            if p.areaProperties().area < 1.0:
+                ext = sp.ext_new(pin_c, p, "leg_w", f"SSPin{pin_idx}_{j}")
+                ext.bodies.item(0).name = f"SSPin_{pin_idx}_{j}"
+        pin_idx += 1
+
+    # CUT pin holes into all legs
     pin_proxies = get_proxies(pin_occ)
     for i in range(leg_c.bRepBodies.count):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
