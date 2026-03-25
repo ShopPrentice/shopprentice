@@ -126,7 +126,7 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 
 12 joint types with parametric modeling guides and reusable Python templates for complex joints. The AI checks for a template first, then reads the reference file for orientation rules and sizing constraints.
 
-**Templates** (`addin/helpers/templates/`) encapsulate complex joinery into single function calls — handling sketch geometry, CUT/JOIN operations, mirror/pattern replication, and parameter setup:
+**Templates** (`woodworking/templates/`) encapsulate complex joinery into single function calls — handling sketch geometry, CUT/JOIN operations, mirror/pattern replication, and parameter setup:
 
 | Template | Best For |
 |----------|----------|
@@ -138,6 +138,7 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 | `splayed_legs` | Compound-splayed legs with floor trim |
 | `dowel` | Spindle-to-rail, panel alignment, edge joining |
 | `bowtie` | Live edge slab inlays (Nakashima style) |
+| `drawbore` | Drawbore M&T with offset pins for stretchers, workbenches |
 | `tabletop_bracket` | L-bracket with slotted holes for cross-grain top attachment |
 | `bed_rail_fastener` | STEP hardware for rail-to-post connections |
 | `dovetailed_drawer` | Complete drawer box |
@@ -158,6 +159,7 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 | Dovetail | [joinery/dovetail.md](joinery/dovetail.md) | `dovetail` | Drawer fronts, premium boxes |
 | Pocket Hole | [joinery/pocket-hole.md](joinery/pocket-hole.md) | — | Face frames, quick assembly |
 | Domino Joint | [joinery/domino-joint.md](joinery/domino-joint.md) | `domino` | Hidden structural connections |
+| Drawbore M&T | [joinery/drawbore.md](joinery/drawbore.md) | `drawbore` | Stretchers, workbenches, timber frames |
 
 All joinery uses the **combine-based** approach: build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), then JOIN to the owner. One shape, perfect fit.
 
@@ -229,16 +231,16 @@ curl http://localhost:9100/tools           # lists all 16 tools
 
 ```
 shopprentice/
-  addin/              Fusion 360 add-in (MCP server + tools)
-    helpers/           Runtime helpers (sp.py — sketch, extrude, combine utilities)
-      templates/       Reusable joinery templates (domino, mortise_tenon, dovetail, etc.)
+  helpers/             Standalone script library (sp.py — sketch, extrude, combine utilities)
+  addin/               Fusion 360 add-in (MCP server + tools)
     server/            MCP server and action log
     tools/             MCP tool implementations
       _script_generator/  Search-based script generation engine
   commands/            Claude Code skill definitions
   woodworking/         Skill topic files (joinery, angled construction, details)
-  joinery/             12 joint type reference guides
-  examples/            10 complete furniture projects with scripts + screenshots
+    templates/         Reusable joinery templates (drawbore, mortise_tenon, domino, etc.)
+    joinery/           13 joint type reference guides
+  examples/            Complete furniture projects with scripts + screenshots
   tools/               Utility scripts (search_build, generate, simulate)
   tests/               Round-trip test suite (22 fixtures, 38+ tests)
   mcp/                 MCP setup and configuration
@@ -259,6 +261,55 @@ This pulls the latest skill and joinery references.
 ```
 
 Removes all shopprentice-installed files: `~/.shopprentice/`, the Claude Code skill, and MCP configurations.
+
+## Roadmap
+
+Planned features and improvements — contributions welcome:
+
+### Modeling
+- **Live edge slabs** — generate organic live edge profiles from reference photos, with bark contours and natural curvature
+- **Curved and organic forms** — bent laminations, Windsor chair spindles, cabriole legs, steam-bent backs
+- **Panel construction** — frame-and-panel doors, raised panels, floating panels with proper cross-grain allowance
+- **Drawer systems** — undermount slides, side-mount hardware, graduated drawer sizing
+- **Turned parts** — lathe-turned legs, spindles, finials via revolution features
+
+### Joinery
+- **Castle joint** — CNC-cut interlocking joint for knockdown furniture
+- **Scarf joint** — long-grain splicing for extending lumber
+- **Sliding dovetail** — shelves and dividers in casework
+- **Wedged tenon** — through-tenon with wedge slot for mechanical tightening
+- **Butterfly/bowtie keys** — decorative crack repair and live edge stabilization (template exists, needs refinement)
+- **Japanese joinery** — spliced and interlocking joints (kawai tsugite, etc.)
+
+### Materials & Appearance
+- **More wood species** — current: white oak, walnut. Need: cherry, maple, ash, mahogany, pine, cedar, sapele, wenge, etc.
+- **Grain direction visualization** — show grain direction arrows on bodies for proper orientation planning
+- **Finish simulation** — oil, lacquer, paint effects on appearance
+- **Metal hardware** — hinges, slides, knobs, pulls with parametric STEP models
+
+### Output & Integration
+- **Cut list generation** — BOM with board feet, rough dimensions, and waste calculation
+- **CNC toolpath hints** — export sketches/faces tagged for CNC operations
+- **Shop drawing export** — dimensioned 2D drawings for hand-tool builders
+- **FreeCAD support** — port the parametric modeling approach beyond Fusion 360
+- **Shapr3D / Onshape** — alternative CAD platform support
+
+### AI & Workflow
+- **Image-to-model improvements** — better dimension extraction, style recognition, proportional reasoning from photos
+- **Interactive editing mode** — seamless detect-interpret-implement loop when user edits in Fusion UI (partially implemented, see `woodworking/incremental-updates.md`)
+- **Multi-agent collaboration** — separate agents for design, joinery selection, and validation
+- **Design critique** — structural analysis, wood movement warnings, grain orientation checks
+
+## Current Limitations
+
+- **Fusion 360 only** — requires Autodesk Fusion 360 with the ShopPrentice add-in running. No support for other CAD platforms yet.
+- **Rectilinear geometry** — best at straight-line furniture (tables, shelves, benches, cabinets). Curved forms (Windsor chairs, cabriole legs, bent laminations) are not yet supported.
+- **Limited wood species** — appearance system supports a few species. Grain-aligned texture mapping works but species selection is minimal.
+- **No hardware catalog** — hinges, slides, knobs, and pulls must be modeled manually or imported as STEP files. Bed rail fasteners are the only hardware template.
+- **No CNC/cut list output** — generates parametric models but not toolpaths, cut lists, or shop drawings.
+- **Sketch on non-XY planes requires probing** — axis mapping must be detected with `sp.probe_orientations()` for correct dimension assignment. This is automated for helper functions but manual for custom sketches.
+- **Appearance resets on rebuild** — each `clean=true` execution creates a fresh document. Appearance must be reapplied (now embedded in scripts via `sp.apply_appearance()`).
+- **Single document workflow** — designs are built in a single Fusion document. Multi-document assemblies (e.g., separate files per component) are not supported.
 
 ## License
 
