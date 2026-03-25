@@ -4,6 +4,18 @@ Parametric furniture modeling for Fusion 360, driven by AI agents via MCP.
 
 Describe a piece of furniture in natural language — or show the AI a photo — and ShopPrentice generates a fully parametric Fusion 360 Python script with proper feature timelines, mirror/pattern replication, and joinery. Connect to a running Fusion 360 instance via the built-in MCP server for live execution, validation, and iterative refinement.
 
+## Model Support
+
+ShopPrentice is developed and tested with **Claude Code** powered by **Claude Opus and Sonnet** models from Anthropic. The woodworking skill, joinery templates, and MCP tools are tuned for Claude's capabilities — particularly long-context reasoning, parametric code generation, and iterative debugging.
+
+**Results may vary with other LLM models.** The skill relies on:
+- Following multi-step build workflows (body → tenon → pins → mirror → JOIN/CUT)
+- Generating syntactically correct Fusion 360 Python API calls
+- Maintaining parametric relationships across 50+ parameters
+- Interpreting user intent from UI edits and natural language
+
+Other models may work for simple builds but are not tested for complex joinery or the interactive editing workflow.
+
 ## How It Works
 
 ```
@@ -40,6 +52,16 @@ curl ... | bash -s -- --all             # skill + MCP
 
 # No flags = auto-detect + MCP
 ```
+
+### OpenClaw
+
+If you're using [OpenClaw](https://openclaw.ai), install with:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install-openclaw.sh | bash
+```
+
+This configures the ShopPrentice skill and MCP tools for the OpenClaw platform automatically.
 
 ### Local install (from a clone)
 
@@ -305,7 +327,7 @@ Planned features and improvements — contributions welcome:
 - **Fusion 360 only** — requires Autodesk Fusion 360 with the ShopPrentice add-in running. No support for other CAD platforms yet.
 - **Rectilinear geometry** — best at straight-line furniture (tables, shelves, benches, cabinets). Curved forms (Windsor chairs, cabriole legs, bent laminations) are not yet supported.
 - **Limited wood species** — appearance system supports a few species. Grain-aligned texture mapping works but species selection is minimal.
-- **No hardware catalog** — hinges, slides, knobs, and pulls must be modeled manually or imported as STEP files. Bed rail fasteners are the only hardware template.
+- **Growing hardware catalog** — bed rail fasteners, hinges, and chest locks are supported. Drawer slides, knobs, and pulls are in progress.
 - **No CNC/cut list output** — generates parametric models but not toolpaths, cut lists, or shop drawings.
 - **Sketch on non-XY planes requires probing** — axis mapping must be detected with `sp.probe_orientations()` for correct dimension assignment. This is automated for helper functions but manual for custom sketches.
 - **Appearance resets on rebuild** — each `clean=true` execution creates a fresh document. Appearance must be reapplied (now embedded in scripts via `sp.apply_appearance()`).
