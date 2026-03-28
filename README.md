@@ -187,6 +187,18 @@ All joinery uses the **combine-based** approach: build the tenon/tail as a body,
 
 See [joinery/README.md](joinery/README.md) for the full selection guide, template usage, and conventions.
 
+### Wood Appearance & Custom Species
+
+Every model gets realistic wood grain automatically — `sp.apply_appearance("white oak")` applies photo-based textures with grain direction aligned to each body's longest axis and separate end grain on cross-cut faces.
+
+**20+ built-in species** from Fusion 360's material library: cherry, walnut, oak, white oak, red oak, maple, ash, birch, pine, cedar, mahogany, beech, poplar, hickory, ebony, rosewood, sapele, bamboo, douglas fir.
+
+**5 custom high-res species** with photo-based textures: teak, brazilian rosewood, cocobolo, ziricote, spalted maple. These use large source photos (1300-1700px wide) cropped from real wood veneer product shots with calibrated physical scales. No Fusion installation needed — textures are swapped at runtime via bitmap path injection.
+
+Multi-species designs are supported — ask for "walnut case with ziricote drawer fronts" and each body gets the right appearance.
+
+See [woodgrain/README.md](woodgrain/README.md) for texture specs and [woodworking/appearance.md](woodworking/appearance.md) for grain direction rules.
+
 ### Angled Construction
 
 Splayed legs, compound angles, and connecting parts at non-orthogonal positions. The skill covers:
@@ -262,6 +274,7 @@ shopprentice/
   woodworking/         Skill topic files (joinery, angled construction, details)
     templates/         Reusable joinery templates (drawbore, mortise_tenon, domino, etc.)
     joinery/           13 joint type reference guides
+  woodgrain/           Custom wood textures: source images, scales, documentation
   examples/            Complete furniture projects with scripts + screenshots
   tools/               Utility scripts (search_build, generate, simulate)
   tests/               Round-trip test suite (22 fixtures, 38+ tests)
@@ -304,7 +317,7 @@ Planned features and improvements — contributions welcome:
 - **Japanese joinery** — spliced and interlocking joints (kawai tsugite, etc.)
 
 ### Materials & Appearance
-- **More wood species** — current: white oak, walnut. Need: cherry, maple, ash, mahogany, pine, cedar, sapele, wenge, etc.
+- **More custom wood species** — 5 custom high-res species added (teak, brazilian rosewood, cocobolo, ziricote, spalted maple). Need: purpleheart, wenge, padauk, bubinga, and larger end grain textures.
 - **Grain direction visualization** — show grain direction arrows on bodies for proper orientation planning
 - **Finish simulation** — oil, lacquer, paint effects on appearance
 - **Metal hardware** — hinges, slides, knobs, pulls with parametric STEP models
@@ -326,7 +339,7 @@ Planned features and improvements — contributions welcome:
 
 - **Fusion 360 only** — requires Autodesk Fusion 360 with the ShopPrentice add-in running. No support for other CAD platforms yet.
 - **Rectilinear geometry** — best at straight-line furniture (tables, shelves, benches, cabinets). Curved forms (Windsor chairs, cabriole legs, bent laminations) are not yet supported.
-- **Limited wood species** — appearance system supports a few species. Grain-aligned texture mapping works but species selection is minimal.
+- **Growing wood species catalog** — 20+ built-in species from Fusion's library plus 5 custom high-res exotic species (teak, brazilian rosewood, cocobolo, ziricote, spalted maple). More custom species can be added by dropping photos in `textures/wood/`.
 - **Growing hardware catalog** — bed rail fasteners, hinges, and chest locks are supported. Drawer slides, knobs, and pulls are in progress.
 - **No CNC/cut list output** — generates parametric models but not toolpaths, cut lists, or shop drawings.
 - **Sketch on non-XY planes requires probing** — axis mapping must be detected with `sp.probe_orientations()` for correct dimension assignment. This is automated for helper functions but manual for custom sketches.

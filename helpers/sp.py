@@ -1147,6 +1147,130 @@ _SPECIES_MAP = {
     "douglas fir": ["Douglas Fir", "Pine"],
 }
 
+# Custom texture overrides — species with their own grain photo.
+# "texture" is a filename in textures/wood/ (resolved relative to repo root).
+# "base" is the Fusion appearance to copy (provides bump map, reflectance model).
+# "scale_x/y" in cm controls texture repeat size.
+# "reflectance" overrides opaque_f0 (higher = shinier).
+#
+# To add a new species: drop a .jpg in textures/wood/ and add an entry here.
+_SPECIES_TEXTURE = {
+    "teak":              {"base": "Mahogany", "texture": "teak.jpg",
+                          "scale_x": 9.9, "scale_y": 20.1, "reflectance": 0.035,
+                          "endgrain": "teak_endgrain.jpg",
+                          "eg_scale_x": 5.9, "eg_scale_y": 1.8},
+    "brazilian rosewood": {"base": "Walnut",  "texture": "brazilian_rosewood.jpg",
+                          "scale_x": 8.1, "scale_y": 19.8, "reflectance": 0.06,
+                          "endgrain": "brazilian_rosewood_endgrain.jpg",
+                          "eg_scale_x": 6.0, "eg_scale_y": 1.9},
+    "cocobolo":          {"base": "Walnut",   "texture": "cocobolo.jpg",
+                          "scale_x": 9.8, "scale_y": 20.8, "reflectance": 0.07,
+                          "endgrain": "cocobolo_endgrain.jpg",
+                          "eg_scale_x": 6.0, "eg_scale_y": 1.3},
+    "ziricote":          {"base": "Walnut",   "texture": "ziricote.jpg",
+                          "scale_x": 9.0, "scale_y": 23.9, "reflectance": 0.05,
+                          "endgrain": "ziricote_endgrain.jpg",
+                          "eg_scale_x": 6.0, "eg_scale_y": 2.1},
+    "spalted maple":     {"base": "Pine",     "texture": "spalted_maple.jpg",
+                          "scale_x": 9.1, "scale_y": 17.8, "reflectance": 0.025,
+                          "endgrain": "spalted_maple_endgrain.jpg",
+                          "eg_scale_x": 6.7, "eg_scale_y": 5.2},
+}
+
+# Resolve textures/wood/ directory path
+import os as _os
+_TEXTURE_DIR = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+    "textures", "wood"
+)
+
+
+def _apply_custom_texture(local_appearance, species_key):
+    """Swap texture bitmap and tune properties for a custom species.
+
+    Args:
+        local_appearance: Design-local copy of a Fusion appearance.
+        species_key: Key into _SPECIES_TEXTURE.
+
+    Returns:
+        True if texture was applied, False if texture file not found.
+    """
+    cfg = _SPECIES_TEXTURE[species_key]
+    tex_path = _os.path.join(_TEXTURE_DIR, cfg["texture"])
+    if not _os.path.isfile(tex_path):
+        return False
+
+    props = local_appearance.appearanceProperties
+    cp = adsk.core.ColorProperty.cast(props.itemById("opaque_albedo"))
+    if not cp or not cp.hasConnectedTexture:
+        return False
+
+    tex = cp.connectedTexture
+
+    # Swap the bitmap
+    bmp = tex.properties.itemById("unifiedbitmap_Bitmap")
+    if bmp:
+        fp = adsk.core.FilenameProperty.cast(bmp)
+        if fp and not fp.isReadOnly:
+            fp.value = tex_path
+
+    # Set texture scale
+    sx_prop = tex.properties.itemById("texture_RealWorldScaleX")
+    sy_prop = tex.properties.itemById("texture_RealWorldScaleY")
+    if sx_prop and cfg.get("scale_x"):
+        adsk.core.FloatProperty.cast(sx_prop).value = cfg["scale_x"]
+    if sy_prop and cfg.get("scale_y"):
+        adsk.core.FloatProperty.cast(sy_prop).value = cfg["scale_y"]
+
+    # Set reflectance
+    if cfg.get("reflectance"):
+        f0 = props.itemById("opaque_f0")
+        if f0:
+            adsk.core.FloatProperty.cast(f0).value = cfg["reflectance"]
+
+    return True
+
+
+def _apply_endgrain_texture(local_appearance, species_key):
+    """Swap texture bitmap for an end grain appearance.
+
+    Same as _apply_custom_texture but uses endgrain file + eg_scale.
+    """
+    cfg = _SPECIES_TEXTURE[species_key]
+    eg_file = cfg.get("endgrain")
+    if not eg_file:
+        return False
+    tex_path = _os.path.join(_TEXTURE_DIR, eg_file)
+    if not _os.path.isfile(tex_path):
+        return False
+
+    props = local_appearance.appearanceProperties
+    cp = adsk.core.ColorProperty.cast(props.itemById("opaque_albedo"))
+    if not cp or not cp.hasConnectedTexture:
+        return False
+
+    tex = cp.connectedTexture
+
+    bmp = tex.properties.itemById("unifiedbitmap_Bitmap")
+    if bmp:
+        fp = adsk.core.FilenameProperty.cast(bmp)
+        if fp and not fp.isReadOnly:
+            fp.value = tex_path
+
+    sx_prop = tex.properties.itemById("texture_RealWorldScaleX")
+    sy_prop = tex.properties.itemById("texture_RealWorldScaleY")
+    if sx_prop and cfg.get("eg_scale_x"):
+        adsk.core.FloatProperty.cast(sx_prop).value = cfg["eg_scale_x"]
+    if sy_prop and cfg.get("eg_scale_y"):
+        adsk.core.FloatProperty.cast(sy_prop).value = cfg["eg_scale_y"]
+
+    if cfg.get("reflectance"):
+        f0 = props.itemById("opaque_f0")
+        if f0:
+            adsk.core.FloatProperty.cast(f0).value = cfg["reflectance"]
+
+    return True
+
 
 def _grain_axis(body):
     """Grain direction = longest bounding box axis."""
@@ -1157,6 +1281,19 @@ def _grain_axis(body):
         "z": abs(bb.maxPoint.z - bb.minPoint.z),
     }
     return max(dims, key=dims.get)
+
+
+def _find_endgrain_faces(body, grain_axis):
+    """Find faces whose normals are parallel to the grain axis (end grain)."""
+    endgrain_faces = []
+    for i in range(body.faces.count):
+        face = body.faces.item(i)
+        geom = face.geometry
+        if isinstance(geom, adsk.core.Plane):
+            n = geom.normal
+            if abs(getattr(n, grain_axis)) > 0.9:
+                endgrain_faces.append(face)
+    return endgrain_faces
 
 
 def _grain_transform(grain_dir):
@@ -1191,48 +1328,78 @@ def apply_appearance(species="white oak", bodies=None):
     design = adsk.fusion.Design.cast(app.activeProduct)
     root = design.rootComponent
     species_lower = species.lower().strip()
-    search_terms = _SPECIES_MAP.get(species_lower, [species])
 
-    # Find appearance in libraries
-    appearance = None
-    for term in search_terms:
-        # Check design local appearances first (skip 3D procedural)
-        for i in range(design.appearances.count):
-            a = design.appearances.item(i)
-            if term.lower() in a.name.lower() and not a.name.startswith("3D "):
-                appearance = a
+    # ── Custom texture path: copy base appearance + swap bitmap ──
+    custom_tex = species_lower in _SPECIES_TEXTURE
+    if custom_tex:
+        cfg = _SPECIES_TEXTURE[species_lower]
+        base_name = cfg["base"]
+        local_name = f"SP_{species_lower}"
+        # Re-use existing or create new, always refresh texture from disk
+        local = design.appearances.itemByName(local_name)
+        if not local:
+            # Find base appearance in libraries
+            base_app = None
+            libs = app.materialLibraries
+            for li in range(libs.count):
+                lib = libs.item(li)
+                for ai in range(lib.appearances.count):
+                    a = lib.appearances.item(ai)
+                    if a.name == base_name and not a.name.startswith("3D "):
+                        if "appearance" in lib.name.lower():
+                            base_app = a
+                            break
+                        if base_app is None:
+                            base_app = a
+                if base_app and "appearance" in lib.name.lower():
+                    break
+            if base_app is None:
+                print(f"WARNING: Base appearance '{base_name}' not found "
+                      f"for custom species '{species}'")
+                return
+            local = design.appearances.addByCopy(base_app, local_name)
+        # Always re-apply texture (picks up file changes on disk)
+        if not _apply_custom_texture(local, species_lower):
+            print(f"WARNING: Texture file not found for '{species}' "
+                  f"— using base {base_name}. "
+                  f"Place {cfg['texture']} in textures/wood/")
+    else:
+        # ── Standard path: find appearance by species map ──
+        search_terms = _SPECIES_MAP.get(species_lower, [species])
+        appearance = None
+        for term in search_terms:
+            for i in range(design.appearances.count):
+                a = design.appearances.item(i)
+                if term.lower() in a.name.lower() and not a.name.startswith("3D "):
+                    appearance = a
+                    break
+            if appearance:
                 break
-        if appearance:
-            break
-        # Search material libraries (prefer Appearance library)
-        libs = app.materialLibraries
-        for li in range(libs.count):
-            lib = libs.item(li)
-            for ai in range(lib.appearances.count):
-                a = lib.appearances.item(ai)
-                if term.lower() in a.name.lower():
-                    # Skip "3D" procedural textures — they ignore
-                    # the grain transform (texture rotation has no effect)
-                    if a.name.startswith("3D "):
-                        continue
-                    if "appearance" in lib.name.lower():
-                        appearance = a
-                        break
-                    if appearance is None:
-                        appearance = a
-            if appearance and "appearance" in lib.name.lower():
+            libs = app.materialLibraries
+            for li in range(libs.count):
+                lib = libs.item(li)
+                for ai in range(lib.appearances.count):
+                    a = lib.appearances.item(ai)
+                    if term.lower() in a.name.lower():
+                        if a.name.startswith("3D "):
+                            continue
+                        if "appearance" in lib.name.lower():
+                            appearance = a
+                            break
+                        if appearance is None:
+                            appearance = a
+                if appearance and "appearance" in lib.name.lower():
+                    break
+            if appearance:
                 break
-        if appearance:
-            break
 
-    if appearance is None:
-        print(f"WARNING: No appearance found for '{species}'")
-        return
+        if appearance is None:
+            print(f"WARNING: No appearance found for '{species}'")
+            return
 
-    # Copy to design if from library
-    local = design.appearances.itemByName(appearance.name)
-    if not local:
-        local = design.appearances.addByCopy(appearance, appearance.name)
+        local = design.appearances.itemByName(appearance.name)
+        if not local:
+            local = design.appearances.addByCopy(appearance, appearance.name)
 
     # Collect target bodies
     def all_bodies_recursive(comp):
@@ -1248,8 +1415,36 @@ def apply_appearance(species="white oak", bodies=None):
         name_set = set(bodies)
         target_bodies = [b for b in target_bodies if b.name in name_set]
 
+    # Create end grain appearance if available
+    eg_local = None
+    if custom_tex and _SPECIES_TEXTURE[species_lower].get("endgrain"):
+        eg_name = f"SP_{species_lower}_endgrain"
+        eg_local = design.appearances.itemByName(eg_name)
+        if not eg_local:
+            base_app = None
+            libs = app.materialLibraries
+            cfg = _SPECIES_TEXTURE[species_lower]
+            for li in range(libs.count):
+                lib = libs.item(li)
+                for ai in range(lib.appearances.count):
+                    a = lib.appearances.item(ai)
+                    if a.name == cfg["base"] and not a.name.startswith("3D "):
+                        if "appearance" in lib.name.lower():
+                            base_app = a
+                            break
+                        if base_app is None:
+                            base_app = a
+                if base_app and "appearance" in lib.name.lower():
+                    break
+            if base_app:
+                eg_local = design.appearances.addByCopy(base_app, eg_name)
+        # Always refresh texture from disk
+        if eg_local:
+            _apply_endgrain_texture(eg_local, species_lower)
+
     # Apply to each body with grain orientation
     count = 0
+    eg_count = 0
     for body in target_bodies:
         try:
             body.appearance = local
@@ -1264,7 +1459,16 @@ def apply_appearance(species="white oak", bodies=None):
                         .BoxTextureMapProjection)
                     ptmc.transform = _grain_transform(grain)
             count += 1
+
+            # Apply end grain to faces perpendicular to grain axis
+            if eg_local:
+                for face in _find_endgrain_faces(body, grain):
+                    face.appearance = eg_local
+                    eg_count += 1
         except Exception:
             pass
 
-    print(f"Applied {local.name} to {count} bodies")
+    msg = f"Applied {local.name} to {count} bodies"
+    if eg_count:
+        msg += f" ({eg_count} end grain faces)"
+    print(msg)

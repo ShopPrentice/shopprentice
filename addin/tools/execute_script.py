@@ -191,6 +191,12 @@ def handler(script: str, sandbox: bool = False, clean: bool = False) -> dict:
     transacted_doc = None
     original_script = script  # preserve before appending run(None)
     try:
+        # Invalidate cached helper modules so scripts pick up file changes
+        import sys as _sys
+        for _k in list(_sys.modules):
+            if _k.startswith('helpers'):
+                del _sys.modules[_k]
+
         script += "\nrun(None)"
 
         with tempfile.NamedTemporaryFile(mode='w', prefix='script', suffix='.py', delete=False, encoding='utf-8') as f:

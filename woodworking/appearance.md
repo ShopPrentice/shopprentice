@@ -69,7 +69,15 @@ This is rare — the two-rule system handles most furniture correctly.
 
 ## Supported Species
 
-cherry, walnut, oak, white oak, red oak, maple, ash, birch, pine, cedar, mahogany, teak, beech, poplar, hickory, ebony, rosewood, sapele, bamboo, douglas fir.
+### Built-in (from Fusion 360 material library)
+
+cherry, walnut, oak, white oak, red oak, maple, ash, birch, pine, cedar, mahogany, beech, poplar, hickory, ebony, rosewood, sapele, bamboo, douglas fir.
+
+### Custom (high-res textures with end grain)
+
+teak, brazilian rosewood, cocobolo, ziricote, spalted maple.
+
+Custom species use photo-based textures stored in `textures/wood/`. No Fusion installation needed — `sp.apply_appearance()` clones a base appearance and swaps the bitmap at runtime. See `woodgrain/README.md` for image specs and scale calibration.
 
 ## Multi-Species Designs
 
