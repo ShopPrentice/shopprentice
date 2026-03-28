@@ -556,7 +556,7 @@ def run(context):
     # ==============================================================
     #  FIT VIEW
     # ==============================================================
-    sp.apply_appearance("cherry")
+    sp.apply_appearance("brazilian rosewood")
 
     cam = app.activeViewport.camera
     cam.isFitView = True

@@ -23,8 +23,8 @@ rabbeted tongues that fit into the grooves.
 
 ### Appearance
 
-```
-apply_appearance(species="cherry")
+```python
+sp.apply_appearance("brazilian rosewood")
 ```
 
 ---
