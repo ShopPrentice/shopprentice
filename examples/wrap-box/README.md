@@ -23,8 +23,8 @@ slot in front wall for film exit, and a raised cutter lip with groove on the bac
 
 ### Appearance
 
-```
-apply_appearance(species="cherry")
+```python
+sp.apply_appearance("teak")
 ```
 
 ---
