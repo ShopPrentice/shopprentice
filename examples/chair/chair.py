@@ -60,6 +60,11 @@ def run(context):
         # Details
         ("leg_chamfer",  "0.125 in", "in"),
         ("seat_fillet",  "0.125 in", "in"),
+        # Seat scoop
+        ("scoop_depth",   "0.25 in",  "in"),   # max depth of scoop
+        ("scoop_start_y", "2 in",     "in"),    # distance from back edge where scoop begins
+        ("scoop_trans_r", "4 in",     "in"),    # transition arc radius (smooth entry curve)
+        ("scoop_end_y",   "3 in",     "in"),    # distance from front edge where scoop ends
     ]:
         params.add(pname, VI(expr), unit, "")
 
@@ -86,6 +91,9 @@ def run(context):
         # Stretcher
         ("front_str_l",   "seat_w - 2 * leg_size",           "in"),
         ("str_dm_z",      "str_z + str_h / 2",               "in"),
+        # Scoop path positions (Y from origin, Z from seat top)
+        ("scoop_back_y",  "seat_d - scoop_start_y",           "in"),
+        ("scoop_front_y", "scoop_end_y",                      "in"),
     ]:
         params.add(pname, VI(expr), unit, "")
 
@@ -146,14 +154,14 @@ def run(context):
         P3.create(0, yo, bz),              # 4: outer bend
         P3.create(0, yo, 0),               # 5: outer bottom
     ]
-    sp = [m2s(p) for p in mp]
+    spts = [m2s(p) for p in mp]
 
     # Draw closed profile with shared sketch points
-    l0 = lines.addByTwoPoints(sp[0], sp[1])          # inner vertical
-    l1 = lines.addByTwoPoints(l0.endSketchPoint, sp[2])   # inner angled
-    l2 = lines.addByTwoPoints(l1.endSketchPoint, sp[3])   # top cap
-    l3 = lines.addByTwoPoints(l2.endSketchPoint, sp[4])   # outer angled
-    l4 = lines.addByTwoPoints(l3.endSketchPoint, sp[5])   # outer vertical
+    l0 = lines.addByTwoPoints(spts[0], spts[1])          # inner vertical
+    l1 = lines.addByTwoPoints(l0.endSketchPoint, spts[2])   # inner angled
+    l2 = lines.addByTwoPoints(l1.endSketchPoint, spts[3])   # top cap
+    l3 = lines.addByTwoPoints(l2.endSketchPoint, spts[4])   # outer angled
+    l4 = lines.addByTwoPoints(l3.endSketchPoint, spts[5])   # outer vertical
     l5 = lines.addByTwoPoints(l4.endSketchPoint, l0.startSketchPoint)  # bottom cap
 
     # H/V constraints (YZ plane: model Y → sketch H, model Z → sketch V)
@@ -263,6 +271,137 @@ def run(context):
     seat_body = seat_ext.bodies.item(0); seat_body.name = "Seat"
     print(">>> Seat: 1")
 
+    # ==== SEAT SCOOP (sweep CUT with curved path) ====
+    # Profile: rectangle spanning between legs, height = scoop_depth
+    # Path: starts above seat surface near back, arcs smoothly down to surface
+    #       level, then a level line forward. The profile bottom aligns with
+    #       the path, so as the path descends from above into the seat the CUT
+    #       progressively deepens — no hard step.
+    P3 = adsk.core.Point3D
+    seat_top_z = ev("seat_h")
+
+    # -- Profile sketch on XZ plane at scoop_back_y --
+    scoop_prof_pl = sp.off_plane(seat_c, seat_c.xZConstructionPlane,
+                                  "scoop_back_y", "ScoopProf_Pl")
+    scoop_sk = seat_c.sketches.add(scoop_prof_pl)
+    scoop_sk.name = "ScoopProf_Sk"
+    m2s_sc = scoop_sk.modelToSketchSpace
+
+    # Rectangle: X from leg_size to seat_w-leg_size, Z from seat_top to seat_top+scoop_depth
+    sc_p0 = m2s_sc(P3.create(ev("leg_size"), ev("scoop_back_y"), seat_top_z))
+    sc_p1 = m2s_sc(P3.create(ev("seat_w - leg_size"), ev("scoop_back_y"),
+                               seat_top_z + ev("scoop_depth")))
+    rect = scoop_sk.sketchCurves.sketchLines.addTwoPointRectangle(
+        P3.create(sc_p0.x, sc_p0.y, 0), P3.create(sc_p1.x, sc_p1.y, 0))
+
+    gc_sc = scoop_sk.geometricConstraints
+    gc_sc.addHorizontal(rect[0]); gc_sc.addHorizontal(rect[2])
+    gc_sc.addVertical(rect[1]);   gc_sc.addVertical(rect[3])
+
+    sc_dims = scoop_sk.sketchDimensions
+    sc_dims.addDistanceDimension(
+        rect[0].startSketchPoint, rect[0].endSketchPoint,
+        adsk.fusion.DimensionOrientations.AlignedDimensionOrientation,
+        P3.create((sc_p0.x + sc_p1.x) / 2, sc_p0.y - 1, 0)
+    ).parameter.expression = "seat_w - 2 * leg_size"
+    sc_dims.addDistanceDimension(
+        rect[1].startSketchPoint, rect[1].endSketchPoint,
+        adsk.fusion.DimensionOrientations.AlignedDimensionOrientation,
+        P3.create(sc_p1.x + 1, (sc_p0.y + sc_p1.y) / 2, 0)
+    ).parameter.expression = "scoop_depth"
+
+    sp.refs_to_construction(scoop_sk)
+    scoop_prof = sp.smallest_profile(scoop_sk)
+
+    # -- Path sketch on YZ midplane --
+    # Arc tangent to horizontal level line at Z = seat_top.
+    # Arc starts above surface at (back_y, seat_top + scoop_depth).
+    # For tangent-to-horizontal at the end, center must be directly above the
+    # tangent point: center = (cy, seat_top + R) where R = scoop_trans_r.
+    # Constraint: distance from center to start = R:
+    #   (back_y - cy)^2 + (scoop_depth - R)^2 = R^2
+    #   h_span = sqrt(2*R*d - d^2)     cy = back_y - h_span
+    path_sk = seat_c.sketches.add(seat_c.yZConstructionPlane)
+    path_sk.name = "ScoopPath_Sk"
+    m2s_pa = path_sk.modelToSketchSpace
+
+    back_y_v  = ev("scoop_back_y")
+    front_y_v = ev("scoop_front_y")
+    R_v       = ev("scoop_trans_r")
+    d_v       = ev("scoop_depth")
+
+    h_span = math.sqrt(max(2 * R_v * d_v - d_v * d_v, 0.001))
+    cy = back_y_v - h_span
+    cz = seat_top_z + R_v
+
+    # Arc: three points — start, midpoint on arc, end (tangent point)
+    arc_start_y = back_y_v;            arc_start_z = seat_top_z + d_v
+    arc_end_y   = cy;                  arc_end_z   = seat_top_z
+    # Midpoint: compute from center at mid-angle between start and end vectors
+    ang_start = math.atan2(arc_start_z - cz, arc_start_y - cy)
+    ang_end   = math.atan2(arc_end_z - cz, arc_end_y - cy)  # = -pi/2 (directly below)
+    # Ensure we sweep in the correct direction (clockwise: decreasing angle)
+    if ang_start < ang_end:
+        ang_start += 2 * math.pi
+    ang_mid = (ang_start + ang_end) / 2
+    mid_y = cy + R_v * math.cos(ang_mid)
+    mid_z = cz + R_v * math.sin(ang_mid)
+
+    ps_start = m2s_pa(P3.create(0, arc_start_y, arc_start_z))
+    ps_mid   = m2s_pa(P3.create(0, mid_y, mid_z))
+    ps_end   = m2s_pa(P3.create(0, arc_end_y, arc_end_z))
+    ps_front = m2s_pa(P3.create(0, front_y_v, seat_top_z))
+
+    arc = path_sk.sketchCurves.sketchArcs.addByThreePoints(
+        P3.create(ps_start.x, ps_start.y, 0),
+        P3.create(ps_mid.x, ps_mid.y, 0),
+        P3.create(ps_end.x, ps_end.y, 0))
+
+    # Level line from arc end tangent point forward
+    level_line = path_sk.sketchCurves.sketchLines.addByTwoPoints(
+        arc.endSketchPoint,
+        P3.create(ps_front.x, ps_front.y, 0))
+
+    # Parametric dimensions on path
+    path_dims = path_sk.sketchDimensions
+    path_dims.addRadialDimension(
+        arc, P3.create(ps_mid.x + 0.5, ps_mid.y + 0.5, 0)
+    ).parameter.expression = "scoop_trans_r"
+
+    orient_pa = sp.probe_orientations(path_sk, 0, ev("mid_y"), seat_top_z)
+    origin_pa = path_sk.originPoint
+
+    path_dims.addDistanceDimension(
+        origin_pa, arc.startSketchPoint, orient_pa['z'],
+        P3.create(ps_start.x - 2, ps_start.y, 0)
+    ).parameter.expression = "seat_h + scoop_depth"
+    path_dims.addDistanceDimension(
+        origin_pa, arc.startSketchPoint, orient_pa['y'],
+        P3.create(ps_start.x, ps_start.y + 2, 0)
+    ).parameter.expression = "scoop_back_y"
+    path_dims.addDistanceDimension(
+        origin_pa, level_line.endSketchPoint, orient_pa['y'],
+        P3.create(ps_front.x, ps_front.y + 2, 0)
+    ).parameter.expression = "scoop_front_y"
+    path_dims.addDistanceDimension(
+        origin_pa, level_line.endSketchPoint, orient_pa['z'],
+        P3.create(ps_front.x - 2, ps_front.y, 0)
+    ).parameter.expression = "seat_h"
+
+    # Create chained path from arc (picks up connected level_line)
+    sweep_path = seat_c.features.createPath(arc, True)
+
+    # Sweep CUT — one direction from profile
+    sweep_feats = seat_c.features.sweepFeatures
+    sweep_inp = sweep_feats.createInput(scoop_prof, sweep_path,
+        adsk.fusion.FeatureOperations.CutFeatureOperation)
+    sweep_inp.orientation = adsk.fusion.SweepOrientationTypes.PerpendicularOrientationType
+    sweep_inp.participantBodies = [seat_body]
+    scoop_feat = sweep_feats.add(sweep_inp)
+    scoop_feat.name = "SeatScoop"
+
+    print(">>> Seat scoop: sweep CUT with arc+level path")
+
     # ==== BACK: Top rail + Bottom rail + 3 vertical slats ====
     # All built at non-raked positions, then rotated together.
     # Rails sit between posts (dominos connect them to posts).
@@ -346,9 +485,9 @@ def run(context):
             all_slat_bodies.append(vs_pat.bodies.item(i))
 
     slat_proxies = [b.createForAssemblyContext(back_occ) for b in all_slat_bodies]
-    for i, sp in enumerate(slat_proxies):
-        sp.combine(root, tr_p, [sp], CUT, True, f"SlatMort_TR_{i}")
-        sp.combine(root, br_rail_p, [sp], CUT, True, f"SlatMort_BR_{i}")
+    for i, slat_p in enumerate(slat_proxies):
+        sp.combine(root, tr_p, [slat_p], CUT, True, f"SlatMort_TR_{i}")
+        sp.combine(root, br_rail_p, [slat_p], CUT, True, f"SlatMort_BR_{i}")
 
     # Rail-to-post TILTED dominos (aligned with backrest cross-section)
     # Build manually: sketch tilted rectangle on dm_fl/dm_fr, extrude in X
@@ -378,11 +517,11 @@ def run(context):
         sk = root.sketches.add(plane)
         sk.name = f"{name}_Sk"
         m2s = sk.modelToSketchSpace
-        sp = [m2s(p) for p in corners]
+        cpts = [m2s(p) for p in corners]
         lines = sk.sketchCurves.sketchLines
-        l0 = lines.addByTwoPoints(sp[0], sp[1])
-        l1 = lines.addByTwoPoints(l0.endSketchPoint, sp[2])
-        l2 = lines.addByTwoPoints(l1.endSketchPoint, sp[3])
+        l0 = lines.addByTwoPoints(cpts[0], cpts[1])
+        l1 = lines.addByTwoPoints(l0.endSketchPoint, cpts[2])
+        l2 = lines.addByTwoPoints(l1.endSketchPoint, cpts[3])
         l3 = lines.addByTwoPoints(l2.endSketchPoint, l0.startSketchPoint)
         prof = sk.profiles.item(0)
         ext_inp = root.features.extrudeFeatures.createInput(
