@@ -891,7 +891,8 @@ def run(context):
                  for i in range(c.bRepBodies.count)]
         print(f"{comp_name}: {len(names)} bodies -> {names}")
 
-    sp.apply_appearance("walnut")
+    sp.apply_appearance("white oak")
+    sp.apply_appearance("ziricote", bodies=["dd_Front", "dd_Front (1)", "dd_Front (2)"])
 
     cam = app.activeViewport.camera
     cam.isFitView = True

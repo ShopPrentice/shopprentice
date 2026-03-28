@@ -68,8 +68,11 @@ rails and Festool Domino joints into the case bottom. All joinery fully parametr
 
 ### Appearance
 
-```
-apply_appearance(species="walnut")
+Multi-species: white oak case and frame with ziricote drawer fronts.
+
+```python
+sp.apply_appearance("white oak")
+sp.apply_appearance("ziricote", bodies=["dd_Front", "dd_Front (1)", "dd_Front (2)"])
 ```
 
 ---
