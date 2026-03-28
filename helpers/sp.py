@@ -1273,7 +1273,7 @@ def _apply_endgrain_texture(local_appearance, species_key):
 
 
 def _grain_axis(body):
-    """Grain direction = longest bounding box axis."""
+    """Grain direction = longest bounding box axis (name string)."""
     bb = body.boundingBox
     dims = {
         "x": abs(bb.maxPoint.x - bb.minPoint.x),
@@ -1283,28 +1283,117 @@ def _grain_axis(body):
     return max(dims, key=dims.get)
 
 
-def _find_endgrain_faces(body, grain_axis):
-    """Find faces whose normals are parallel to the grain axis (end grain)."""
+def _grain_vector(body):
+    """Compute actual grain direction as a unit vector.
+
+    For axis-aligned bodies, returns (0,0,1) etc.  For angled bodies
+    (splayed legs), returns the true elongation direction by averaging
+    the longest linear edges.
+    """
+    import adsk.core
+    # Collect linear edge vectors
+    edges = []
+    for i in range(body.edges.count):
+        e = body.edges.item(i)
+        if isinstance(e.geometry, adsk.core.Line3D):
+            sv = e.startVertex.geometry
+            ev = e.endVertex.geometry
+            dx, dy, dz = ev.x - sv.x, ev.y - sv.y, ev.z - sv.z
+            length = (dx*dx + dy*dy + dz*dz) ** 0.5
+            if length > 0.001:
+                edges.append((length, dx/length, dy/length, dz/length))
+
+    if not edges:
+        # Fallback to bounding box axis
+        axis = _grain_axis(body)
+        v = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}[axis]
+        return adsk.core.Vector3D.create(*v)
+
+    # Find the longest edge length
+    max_len = max(e[0] for e in edges)
+    # Average direction of edges within 20% of the longest (the "grain" edges)
+    threshold = max_len * 0.8
+    sx, sy, sz, n = 0, 0, 0, 0
+    for length, dx, dy, dz in edges:
+        if length >= threshold:
+            # Ensure consistent sign (flip if pointing "negative" in dominant axis)
+            if sx * dx + sy * dy + sz * dz < 0:
+                dx, dy, dz = -dx, -dy, -dz
+            sx += dx; sy += dy; sz += dz; n += 1
+
+    if n == 0:
+        axis = _grain_axis(body)
+        v = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}[axis]
+        return adsk.core.Vector3D.create(*v)
+
+    # Normalize
+    sx /= n; sy /= n; sz /= n
+    mag = (sx*sx + sy*sy + sz*sz) ** 0.5
+    if mag < 0.001:
+        axis = _grain_axis(body)
+        v = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}[axis]
+        return adsk.core.Vector3D.create(*v)
+    vx, vy, vz = sx/mag, sy/mag, sz/mag
+    # Ensure dominant component is positive so rotation angle stays small
+    comps = [("x", abs(vx)), ("y", abs(vy)), ("z", abs(vz))]
+    dominant = max(comps, key=lambda c: c[1])[0]
+    if (dominant == "x" and vx < 0) or \
+       (dominant == "y" and vy < 0) or \
+       (dominant == "z" and vz < 0):
+        vx, vy, vz = -vx, -vy, -vz
+    return adsk.core.Vector3D.create(vx, vy, vz)
+
+
+def _find_endgrain_faces(body, grain_vec):
+    """Find faces whose normals are parallel to the grain direction (end grain).
+
+    grain_vec: Vector3D or axis name string (backward compat).
+    """
+    import adsk.core
+    if isinstance(grain_vec, str):
+        # Legacy axis name
+        gv = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}[grain_vec]
+        grain_vec = adsk.core.Vector3D.create(*gv)
     endgrain_faces = []
     for i in range(body.faces.count):
         face = body.faces.item(i)
         geom = face.geometry
         if isinstance(geom, adsk.core.Plane):
             n = geom.normal
-            if abs(getattr(n, grain_axis)) > 0.9:
+            dot = abs(n.x * grain_vec.x + n.y * grain_vec.y + n.z * grain_vec.z)
+            if dot > 0.85:  # ~30° tolerance for splayed faces
                 endgrain_faces.append(face)
     return endgrain_faces
 
 
 def _grain_transform(grain_dir):
-    """Rotate texture so grain (texture Z) aligns with model axis."""
+    """Rotate texture so grain (texture Y) aligns with grain direction.
+
+    grain_dir: axis name string ("x"/"y"/"z") or Vector3D for arbitrary angles.
+    """
+    import adsk.core
     m = adsk.core.Matrix3D.create()
-    if grain_dir == "x":
-        m.setToRotation(math.pi / 2, adsk.core.Vector3D.create(0, 1, 0),
-                        Point3D.create(0, 0, 0))
-    elif grain_dir == "y":
-        m.setToRotation(-math.pi / 2, adsk.core.Vector3D.create(1, 0, 0),
-                        Point3D.create(0, 0, 0))
+    if isinstance(grain_dir, str):
+        if grain_dir == "x":
+            m.setToRotation(math.pi / 2, adsk.core.Vector3D.create(0, 1, 0),
+                            Point3D.create(0, 0, 0))
+        elif grain_dir == "y":
+            m.setToRotation(-math.pi / 2, adsk.core.Vector3D.create(1, 0, 0),
+                            Point3D.create(0, 0, 0))
+        # "z" = identity (default texture direction)
+    else:
+        # Arbitrary vector — rotate texture Z to align with grain_dir
+        z_axis = adsk.core.Vector3D.create(0, 0, 1)
+        angle = z_axis.angleTo(grain_dir)
+        if angle > 0.001 and angle < math.pi - 0.001:
+            cross = z_axis.crossProduct(grain_dir)
+            if cross.length > 0.001:
+                cross.normalize()
+                m.setToRotation(angle, cross, Point3D.create(0, 0, 0))
+        elif angle >= math.pi - 0.001:
+            # ~180° — rotate around any perpendicular axis
+            m.setToRotation(math.pi, adsk.core.Vector3D.create(0, 1, 0),
+                            Point3D.create(0, 0, 0))
     return m
 
 
@@ -1448,7 +1537,7 @@ def apply_appearance(species="white oak", bodies=None):
     for body in target_bodies:
         try:
             body.appearance = local
-            grain = _grain_axis(body)
+            grain_vec = _grain_vector(body)
             adsk.doEvents()
             tmc = body.textureMapControl
             if tmc:
@@ -1457,12 +1546,12 @@ def apply_appearance(species="white oak", bodies=None):
                     ptmc.projectedTextureMapType = (
                         adsk.core.ProjectedTextureMapTypes
                         .BoxTextureMapProjection)
-                    ptmc.transform = _grain_transform(grain)
+                    ptmc.transform = _grain_transform(grain_vec)
             count += 1
 
             # Apply end grain to faces perpendicular to grain axis
             if eg_local:
-                for face in _find_endgrain_faces(body, grain):
+                for face in _find_endgrain_faces(body, grain_vec):
                     face.appearance = eg_local
                     eg_count += 1
         except Exception:

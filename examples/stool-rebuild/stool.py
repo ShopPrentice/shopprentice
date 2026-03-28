@@ -545,6 +545,7 @@ def run(context):
 
     # ── FIT VIEW ──────────────────────────────────────────────────
     sp.apply_appearance("white oak")
+    sp.apply_appearance("teak", bodies=["Leg_NL (1)", "Leg_NR", "Leg_FR", "Leg_FL"])
 
     cam = app.activeViewport.camera
     cam.isFitView = True

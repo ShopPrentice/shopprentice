@@ -36,8 +36,11 @@ The capture-and-rebuild pipeline reads the design's parameters, component tree, 
 
 ### Appearance
 
-```
-apply_appearance(species="white oak")
+Multi-species: white oak seat with teak legs. Grain direction auto-detected per body — follows compound splay angles on the legs.
+
+```python
+sp.apply_appearance("white oak")
+sp.apply_appearance("teak", bodies=["Leg_NL (1)", "Leg_NR", "Leg_FR", "Leg_FL"])
 ```
 
 ---
@@ -90,11 +93,11 @@ All exposed as User Parameters (Modify > Change Parameters):
 
 | Body | Description |
 |------|-------------|
-| **Seat** | Beveled rectangular seat with 4 mortise pockets |
-| **Leg_FL** | Front-left leg with compound splay |
-| **Leg_FR** | Front-right leg (mirrored) |
-| **Leg_NL** | Near-left leg (mirrored) |
-| **Leg_NR** | Near-right leg (mirrored) |
+| **Seat** | Beveled rectangular seat with 4 mortise pockets (white oak) |
+| **Leg_FL** | Front-left leg with compound splay (teak) |
+| **Leg_FR** | Front-right leg, mirrored (teak) |
+| **Leg_NL** | Near-left leg, mirrored (teak) |
+| **Leg_NR** | Near-right leg, mirrored (teak) |
 
 ### Key Techniques
 
