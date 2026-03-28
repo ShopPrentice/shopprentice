@@ -398,25 +398,67 @@ def run(context):
         ax_line = ax_sk.sketchCurves.sketchLines.addByTwoPoints(
             P(tc.x, tc.y, 0), P(bc.x, bc.y, 0))
 
-        # Dimension top point from origin (seat joint position)
-        orient = _sp.probe_orientations(ax_sk, top_x_val, top_y_val, top_z)
+        # Dimension top point from projected seat edges (face-relative, not origin)
+        # Find the front edge (arc) and left side edge (line) from projected seat
+        # Front edge: closest arc to the front of the seat (small Y)
+        # Left side edge: closest line to the left side (small X, angled)
+        front_edge = None; side_edge = None
+        front_ref_pt = m2s_ax(P(ev("mid_x"), 0, top_z))  # front center
+        side_ref_pt = m2s_ax(P(0, ev("mid_y"), top_z))    # left mid
+
+        best_front_d = 1e10; best_side_d = 1e10
+        for ci in range(ax_sk.sketchCurves.count):
+            c = ax_sk.sketchCurves.item(ci)
+            if not c.isConstruction: continue
+            sg = c.startSketchPoint.geometry; eg = c.endSketchPoint.geometry
+            mid_x = (sg.x + eg.x) / 2; mid_y_c = (sg.y + eg.y) / 2
+
+            if c.objectType.endswith('SketchArc'):
+                # Arc — could be front or back edge
+                d = _ml.sqrt((mid_x - front_ref_pt.x)**2 + (mid_y_c - front_ref_pt.y)**2)
+                if d < best_front_d:
+                    best_front_d = d; front_edge = c
+            elif c.objectType.endswith('SketchLine'):
+                # Line — could be left or right side edge
+                dx = abs(eg.x - sg.x); dy = abs(eg.y - sg.y)
+                if dy > dx * 0.5:  # angled line (not horizontal)
+                    d = _ml.sqrt((mid_x - side_ref_pt.x)**2 + (mid_y_c - side_ref_pt.y)**2)
+                    if d < best_side_d:
+                        best_side_d = d; side_edge = c
+
         ax_dims = ax_sk.sketchDimensions
-        ax_dims.addDistanceDimension(
-            ax_sk.originPoint, ax_line.startSketchPoint, orient["x"],
-            P(tc.x / 2, tc.y + 1, 0)
-        ).parameter.expression = top_x_expr
-        ax_dims.addDistanceDimension(
-            ax_sk.originPoint, ax_line.startSketchPoint, orient["y"],
-            P(tc.x + 1, tc.y / 2, 0)
-        ).parameter.expression = top_y_expr
+        _orient = _sp.probe_orientations(ax_sk, top_x_val, top_y_val, top_z)
+        # Perpendicular distance from left side edge (line) to top point = leg_inset
+        if side_edge:
+            ax_dims.addOffsetDimension(
+                side_edge, ax_line.startSketchPoint,
+                P(tc.x - 1, tc.y, 0)
+            ).parameter.expression = "leg_inset"
+            print(name + " side edge dim: leg_inset from side edge")
+
+        # Distance from front edge (arc) to top point = leg_inset
+        # For arc-to-point, use addDistanceDimension between arc center and point,
+        # then set expression = arc_radius + leg_inset... but that's complex.
+        # Simpler: drop a perpendicular from top point to a horizontal line at the front,
+        # or just use the Y component dimension from the front edge endpoint.
+        if front_edge:
+            # Use the nearest point on the front edge to dimension from
+            # The front arc's startSketchPoint or endSketchPoint is at the corner
+            # Dimension from the arc's nearest endpoint Y to the top point Y
+            front_corner = front_edge.startSketchPoint  # front-left corner of seat
+            ax_dims.addDistanceDimension(
+                front_corner, ax_line.startSketchPoint, _orient["y"],
+                P(tc.x, tc.y - 1, 0)
+            ).parameter.expression = "leg_inset"
+            print(name + " front edge dim: leg_inset from front corner Y")
 
         # Dimension foot offset FROM top point (always positive splay_off/rake_off)
         ax_dims.addDistanceDimension(
-            ax_line.startSketchPoint, ax_line.endSketchPoint, orient["x"],
+            ax_line.startSketchPoint, ax_line.endSketchPoint, _orient["x"],
             P((tc.x + bc.x) / 2, tc.y - 1, 0)
         ).parameter.expression = "splay_off"
         ax_dims.addDistanceDimension(
-            ax_line.startSketchPoint, ax_line.endSketchPoint, orient["y"],
+            ax_line.startSketchPoint, ax_line.endSketchPoint, _orient["y"],
             P(tc.x - 1, (tc.y + bc.y) / 2, 0)
         ).parameter.expression = "rake_off"
 
@@ -476,16 +518,15 @@ def run(context):
         seat_ref = m2s_prof(P(start_model.x, start_model.y, ev("seat_h")))
         floor_ref = m2s_prof(P(end_model.x, end_model.y, 0))
 
-        # Step 4: Intersect seat body for cross-section reference
+        # Step 4: Project seat body for reference
         seat_proxy = seat_body.createForAssemblyContext(seat_occ)
-        seat_curves = prof_sk.intersectWithSketchPlane([seat_proxy])
-        for sc_c in (seat_curves if seat_curves else []):
-            if hasattr(sc_c, 'isConstruction'): sc_c.isConstruction = True
+        prof_sk.project(seat_proxy)
         _sp.refs_to_construction(prof_sk)
 
-        # Find seat top line by proximity to known seat_ref position
+        # Find seat top line by proximity to known seat top position
         seat_top_line = _sp.find_nearest_line(prof_sk,
             P(start_model.x, start_model.y, ev("seat_h")))
+        print(name + " seat_top_line: " + ("found" if seat_top_line else "NOT FOUND"))
 
         # Step 5: Construct floor reference line at model Z=0
         floor_line = _sp.construct_ref_line(prof_sk, model_z=0,
