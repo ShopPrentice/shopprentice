@@ -97,9 +97,9 @@ Each folder under `examples/` contains a complete Fusion 360 project with screen
 <td align="center"><a href="examples/crib/"><img src="examples/crib/screenshots/iso-top-right.png" width="200" /><br /><b>Crib</b></a><br />CPSC spindles, dominos, mattress support</td>
 </tr>
 <tr>
+<td align="center"><a href="examples/windsor-chair/"><img src="examples/windsor-chair/iso.png" width="200" /><br /><b>Windsor Chair</b></a><br />Splayed legs, turned stretchers, scooped seat</td>
 <td align="center"><a href="examples/chair/"><img src="examples/chair/screenshots/iso-top-right.png" width="200" /><br /><b>Dining Chair</b></a><br />Bent-back legs, vertical slats, tilted dominos</td>
 <td align="center"><a href="examples/rachels-table/"><img src="examples/rachels-table/screenshots/iso-top-right.png" width="200" /><br /><b>Rachel's Table</b></a><br />Bridle joints, arched rails, tapered legs</td>
-<td align="center"><a href="examples/coffee-table/"><img src="examples/coffee-table/screenshots/iso-top-right.png" width="200" /><br /><b>Coffee Table</b></a><br />Tapered legs, slatted top, dominos</td>
 </tr>
 <tr>
 <td align="center"><a href="examples/bookshelf/"><img src="examples/bookshelf/screenshots/iso-top-right.png" width="200" /><br /><b>Bookshelf</b></a><br />Through M&T shelves, dovetail top</td>
@@ -338,7 +338,7 @@ Planned features and improvements — contributions welcome:
 ## Current Limitations
 
 - **Fusion 360 only** — requires Autodesk Fusion 360 with the ShopPrentice add-in running. No support for other CAD platforms yet.
-- **Rectilinear geometry** — best at straight-line furniture (tables, shelves, benches, cabinets). Curved forms (Windsor chairs, cabriole legs, bent laminations) are not yet supported.
+- **Rectilinear geometry** — best at straight-line furniture (tables, shelves, benches, cabinets). Some curved forms are supported (Windsor chairs with turned legs/stretchers, swept crest rails) but cabriole legs and bent laminations are not yet supported.
 - **Growing wood species catalog** — 20+ built-in species from Fusion's library plus 5 custom high-res exotic species (teak, brazilian rosewood, cocobolo, ziricote, spalted maple). More custom species can be added by dropping photos in `textures/wood/`.
 - **Growing hardware catalog** — bed rail fasteners, hinges, and chest locks are supported. Drawer slides, knobs, and pulls are in progress.
 - **No CNC/cut list output** — generates parametric models but not toolpaths, cut lists, or shop drawings.

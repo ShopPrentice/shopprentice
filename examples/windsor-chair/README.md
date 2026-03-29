@@ -2,6 +2,11 @@
 
 A parametric Windsor chair with splayed/raked legs, turned stretchers, curved spindle back, and scooped seat.
 
+| | |
+|---|---|
+| ![Iso](iso.png) | ![Front](front.png) |
+| ![Right](right.png) | |
+
 ## Features
 
 - **Shaped seat** with trapezoidal outline (front/back arcs, angled sides), dual comfort scoops, and filleted edges

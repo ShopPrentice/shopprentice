@@ -12,7 +12,8 @@ def run(context):
 
     # Clean up stale params from previous runs
     for old_p in ["leg_splay_tan", "leg_rake_tan", "back_rake_sin", "back_rake_cos",
-                   "fan_splay", "leg_tenon_len", "scoop_offset", "scoop_center_h"]:
+                   "fan_splay", "leg_tenon_len", "scoop_offset", "scoop_center_h",
+                   "seat_fil"]:
         p = params.itemByName(old_p)
         if p:
             try: p.deleteMe()
@@ -40,7 +41,8 @@ def run(context):
         ("crest_curve_r", "18 in", "in", "Radius of crest rail arc (top curve)"),
         ("crest_h", "2 in", "in", "Crest rail cross-section height"),
         ("ch_leg", "0.125 in", "in", "Leg foot chamfer"),
-        ("seat_fil", "0.5 in", "in", "Seat top edge fillet radius"),
+        ("seat_fil_top", "0.125 in", "in", "Seat top edge fillet radius"),
+        ("seat_fil_bot", "0.75 in", "in", "Seat bottom/corner fillet radius"),
         ("leg_to_edge", "2 in", "in", "Gap between leg and seat edge"),
         ("leg_tenon_dia", "0.875 in", "in", "Leg tenon diameter (into seat)"),
         ("leg_tenon_frac", "0.10", "", "Leg tenon as fraction of total length"),
@@ -1529,23 +1531,58 @@ def run(context):
     print("Both scoops done")
 
     # ── SEAT FILLET ───────────────────────────────────────────────
-    if ev("seat_fil") > 0:
-        # Fillet all edges of the seat (top + bottom perimeter + scoop edges)
-        fil_edges = adsk.core.ObjectCollection.create()
-        seen = set()
+    # Two fillet passes: top edges (small radius), bottom/corner edges (large radius)
+    seat_top_z_val = ev("seat_h")
+    seat_bot_z_val = ev("seat_h") - ev("seat_t")
+
+    # Top edges: edges where both vertices are near seat_h (top face perimeter + scoop edges)
+    if ev("seat_fil_top") > 0:
+        top_edges = adsk.core.ObjectCollection.create()
+        seen_top = set()
         for ei in range(Seat_Seat.edges.count):
             e = Seat_Seat.edges.item(ei)
             tid = e.tempId
-            if tid not in seen:
-                seen.add(tid)
-                fil_edges.add(e)
-        if fil_edges.count > 0:
-            fil_inp = Seat_c.features.filletFeatures.createInput()
-            fil_inp.addConstantRadiusEdgeSet(
-                fil_edges, adsk.core.ValueInput.createByString("seat_fil"), True)
-            fil_f = Seat_c.features.filletFeatures.add(fil_inp)
-            fil_f.name = "Seat_Fil"
-            print("Seat fillet: all edges")
+            if tid in seen_top: continue
+            sv = e.startVertex; ev_ = e.endVertex
+            if sv and ev_:
+                if sv.geometry.z > (seat_bot_z_val + seat_top_z_val) / 2 and \
+                   ev_.geometry.z > (seat_bot_z_val + seat_top_z_val) / 2:
+                    seen_top.add(tid)
+                    top_edges.add(e)
+        if top_edges.count > 0:
+            fil_top = Seat_c.features.filletFeatures.createInput()
+            fil_top.addConstantRadiusEdgeSet(
+                top_edges, adsk.core.ValueInput.createByString("seat_fil_top"), True)
+            fil_tf = Seat_c.features.filletFeatures.add(fil_top)
+            fil_tf.name = "Seat_Fil_Top"
+            # Re-find seat body after fillet
+            Seat_Seat = fil_tf.bodies.item(0)
+            Seat_Seat.name = "Seat"
+            print("Seat fillet top: " + str(top_edges.count) + " edges")
+
+    # Bottom/corner edges: remaining edges (near seat_bot or vertical side edges)
+    if ev("seat_fil_bot") > 0:
+        bot_edges = adsk.core.ObjectCollection.create()
+        seen_bot = set()
+        for ei in range(Seat_Seat.edges.count):
+            e = Seat_Seat.edges.item(ei)
+            tid = e.tempId
+            if tid in seen_bot: continue
+            sv = e.startVertex; ev_ = e.endVertex
+            if sv and ev_:
+                # Bottom edges: at least one vertex near seat_bot, or vertical edges
+                near_bot = sv.geometry.z < (seat_bot_z_val + seat_top_z_val) / 2 or \
+                           ev_.geometry.z < (seat_bot_z_val + seat_top_z_val) / 2
+                if near_bot:
+                    seen_bot.add(tid)
+                    bot_edges.add(e)
+        if bot_edges.count > 0:
+            fil_bot = Seat_c.features.filletFeatures.createInput()
+            fil_bot.addConstantRadiusEdgeSet(
+                bot_edges, adsk.core.ValueInput.createByString("seat_fil_bot"), True)
+            fil_bf = Seat_c.features.filletFeatures.add(fil_bot)
+            fil_bf.name = "Seat_Fil_Bot"
+            print("Seat fillet bottom: " + str(bot_edges.count) + " edges")
 
     # ── APPEARANCE ────────────────────────────────────────────────
     from helpers import sp as _sp_app
