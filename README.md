@@ -118,7 +118,7 @@ Each folder under `examples/` contains a complete Fusion 360 project with screen
 </tr>
 <tr>
 <td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a><br />Writing desk with aprons</td>
-<td align="center"><a href="examples/side-table/"><img src="examples/side-table/screenshots/iso-top-right.png" width="200" /><br /><b>Side Table</b></a><br />Compact, tapered legs</td>
+<td align="center"><a href="examples/side-table/"><img src="examples/side-table/screenshots/iso-top-right.png" width="200" /><br /><b>Side Table</b></a><br />Walnut with spalted maple drawer front</td>
 <td align="center"><a href="examples/shelf/"><img src="examples/shelf/screenshots/iso-top-right.png" width="200" /><br /><b>Wall Shelf</b></a><br />Floating shelf, hidden hardware</td>
 </tr>
 </table>
