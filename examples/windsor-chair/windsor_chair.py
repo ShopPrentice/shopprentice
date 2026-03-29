@@ -21,12 +21,12 @@ def run(context):
     # ── PARAMETERS ────────────────────────────────────────────────
     for name, expr, unit, comment in [
         ("seat_w", "18 in", "in", "Seat width at widest (front)"),
-        ("seat_d", "17 in", "in", "Seat depth front to back"),
+        ("seat_d", "15 in", "in", "Seat depth front to back"),
         ("seat_t", "1.75 in", "in", "Seat plank thickness"),
         ("seat_h", "17.5 in", "in", "Floor to seat top"),
         ("leg_dia", "1.375 in", "in", "Leg diameter at socket (top)"),
         ("leg_foot_dia", "0.875 in", "in", "Leg diameter at foot (bottom)"),
-        ("leg_splay", "2", "", "Leg outward splay (degrees)"),
+        ("leg_splay", "10", "", "Leg outward splay (degrees)"),
         ("leg_rake", "10", "", "Leg fore-aft rake (degrees)"),
         ("crest_w", "16 in", "in", "Crest rail width"),
         ("crest_t", "0.875 in", "in", "Crest cross-section thickness (Y)"),
@@ -40,21 +40,23 @@ def run(context):
         ("crest_curve_r", "18 in", "in", "Radius of crest rail arc (top curve)"),
         ("crest_h", "2 in", "in", "Crest rail cross-section height"),
         ("ch_leg", "0.125 in", "in", "Leg foot chamfer"),
-        ("leg_to_edge", "0.25 in", "in", "Gap between leg and seat edge"),
+        ("seat_fil", "0.5 in", "in", "Seat top edge fillet radius"),
+        ("leg_to_edge", "2 in", "in", "Gap between leg and seat edge"),
         ("leg_tenon_dia", "0.875 in", "in", "Leg tenon diameter (into seat)"),
-        ("leg_tenon_frac", "0.07", "", "Leg tenon as fraction of total length"),
-        ("leg_shoulder_frac", "0.10", "", "Leg shoulder transition fraction"),
+        ("leg_tenon_frac", "0.10", "", "Leg tenon as fraction of total length"),
+        ("leg_shoulder_frac", "0.13", "", "Leg shoulder transition fraction"),
         # Stretcher profile
         ("str_mid_dia", "0.75 in", "in", "Stretcher center diameter (thickest)"),
         ("str_end_dia", "0.5 in", "in", "Stretcher tenon diameter (at ends)"),
         ("str_tenon_frac", "0.10", "", "Fraction of length that is tenon (each end)"),
         ("str_shoulder_frac", "0.20", "", "Fraction of length for shoulder transition"),
+        ("tenon_ext", "0.1 in", "in", "Tenon extension beyond body"),
         ("seat_back_w", "14.0000 in", "in", "Back edge width"),
         ("seat_front_r", "68.8753 in", "in", "Front arc radius"),
         ("seat_back_r", "124.5584 in", "in", "Back arc radius"),
         # Seat scoop
-        ("scoop_depth", "0.4 in", "in", "Max scoop depth"),
-        ("scoop_start_y", "10 in", "in", "Distance from back edge where scoop begins"),
+        ("scoop_depth", "0.5 in", "in", "Max scoop depth"),
+        ("scoop_start_y", "9 in", "in", "Distance from back edge where scoop begins"),
         ("scoop_trans_r", "14 in", "in", "Transition arc radius (must be > scoop_r)"),
         ("scoop_end_y", "2 in", "in", "Distance from front edge where scoop ends"),
         ("scoop_r", "13 in", "in", "Gouge radius (larger = shallower scoop)"),
@@ -389,70 +391,120 @@ def run(context):
         ax_sk.project(seat_proxy)
         _sp.refs_to_construction(ax_sk)
 
-        # Top point = seat joint (fixed position)
-        tc = m2s_ax(P(top_x_val, top_y_val, top_z))
-        # Foot projection on this plane
-        bc = m2s_ax(P(bot_x_val, bot_y_val, top_z))
-
-        # Draw axis projection: line from top to foot projection
-        ax_line = ax_sk.sketchCurves.sketchLines.addByTwoPoints(
-            P(tc.x, tc.y, 0), P(bc.x, bc.y, 0))
-
-        # Dimension top point from projected seat edges (face-relative, not origin)
-        # Find the front edge (arc) and left side edge (line) from projected seat
-        # Front edge: closest arc to the front of the seat (small Y)
-        # Left side edge: closest line to the left side (small X, angled)
+        # ---- Find projected seat edges ----
         front_edge = None; side_edge = None
-        front_ref_pt = m2s_ax(P(ev("mid_x"), 0, top_z))  # front center
-        side_ref_pt = m2s_ax(P(0, ev("mid_y"), top_z))    # left mid
+        front_ref_pt = m2s_ax(P(ev("mid_x"), 0, top_z))
+        side_ref_pt = m2s_ax(P(0, ev("mid_y"), top_z))
 
         best_front_d = 1e10; best_side_d = 1e10
         for ci in range(ax_sk.sketchCurves.count):
             c = ax_sk.sketchCurves.item(ci)
-            if not c.isConstruction: continue
+            if not (c.isConstruction or c.isReference): continue
             sg = c.startSketchPoint.geometry; eg = c.endSketchPoint.geometry
-            mid_x = (sg.x + eg.x) / 2; mid_y_c = (sg.y + eg.y) / 2
+            mid_x_c = (sg.x + eg.x) / 2; mid_y_c = (sg.y + eg.y) / 2
 
             if c.objectType.endswith('SketchArc'):
-                # Arc — could be front or back edge
-                d = _ml.sqrt((mid_x - front_ref_pt.x)**2 + (mid_y_c - front_ref_pt.y)**2)
+                d = _ml.sqrt((mid_x_c - front_ref_pt.x)**2 + (mid_y_c - front_ref_pt.y)**2)
                 if d < best_front_d:
                     best_front_d = d; front_edge = c
             elif c.objectType.endswith('SketchLine'):
-                # Line — could be left or right side edge
                 dx = abs(eg.x - sg.x); dy = abs(eg.y - sg.y)
-                if dy > dx * 0.5:  # angled line (not horizontal)
-                    d = _ml.sqrt((mid_x - side_ref_pt.x)**2 + (mid_y_c - side_ref_pt.y)**2)
+                if dy > dx * 0.5:
+                    d = _ml.sqrt((mid_x_c - side_ref_pt.x)**2 + (mid_y_c - side_ref_pt.y)**2)
                     if d < best_side_d:
                         best_side_d = d; side_edge = c
 
-        ax_dims = ax_sk.sketchDimensions
-        _orient = _sp.probe_orientations(ax_sk, top_x_val, top_y_val, top_z)
-        # Perpendicular distance from left side edge (line) to top point = leg_inset
-        if side_edge:
-            ax_dims.addOffsetDimension(
-                side_edge, ax_line.startSketchPoint,
-                P(tc.x - 1, tc.y, 0)
-            ).parameter.expression = "leg_inset"
-            print(name + " side edge dim: leg_inset from side edge")
+        print(name + " edges: front=" + str(front_edge is not None) + " side=" + str(side_edge is not None))
 
-        # Distance from front edge (arc) to top point = leg_inset
-        # For arc-to-point, use addDistanceDimension between arc center and point,
-        # then set expression = arc_radius + leg_inset... but that's complex.
-        # Simpler: drop a perpendicular from top point to a horizontal line at the front,
-        # or just use the Y component dimension from the front edge endpoint.
-        if front_edge:
-            # Use the nearest point on the front edge to dimension from
-            # The front arc's startSketchPoint or endSketchPoint is at the corner
-            # Dimension from the arc's nearest endpoint Y to the top point Y
-            front_corner = front_edge.startSketchPoint  # front-left corner of seat
+        # ---- Find front-left corner (closest endpoints between front_edge and side_edge) ----
+        corner_pt = None
+        corner_arc_pt = None
+        if front_edge and side_edge:
+            best_d = 1e10
+            for sp1 in [side_edge.startSketchPoint, side_edge.endSketchPoint]:
+                for sp2 in [front_edge.startSketchPoint, front_edge.endSketchPoint]:
+                    d = _ml.sqrt((sp1.geometry.x - sp2.geometry.x)**2 +
+                                 (sp1.geometry.y - sp2.geometry.y)**2)
+                    if d < best_d:
+                        best_d = d; corner_pt = sp1; corner_arc_pt = sp2
+            pass  # corner found
+
+        # ---- Leg top from corner: along side edge + perpendicular ----
+        gc_ax = ax_sk.geometricConstraints
+        ax_dims = ax_sk.sketchDimensions
+        AL = adsk.fusion.DimensionOrientations.AlignedDimensionOrientation
+        lte = ev("leg_to_edge")
+
+        if corner_pt and side_edge:
+            # Side edge direction from corner
+            other_end = side_edge.endSketchPoint if \
+                _ml.sqrt((side_edge.startSketchPoint.geometry.x - corner_pt.geometry.x)**2 +
+                         (side_edge.startSketchPoint.geometry.y - corner_pt.geometry.y)**2) < 0.1 \
+                else side_edge.startSketchPoint
+            se_dx = other_end.geometry.x - corner_pt.geometry.x
+            se_dy = other_end.geometry.y - corner_pt.geometry.y
+            se_len = _ml.sqrt(se_dx**2 + se_dy**2)
+            se_ux, se_uy = se_dx/se_len, se_dy/se_len
+
+            # Perpendicular direction (inward toward seat center)
+            perp_ux, perp_uy = -se_uy, se_ux
+            mid_sk = m2s_ax(P(ev("mid_x"), ev("mid_y"), top_z))
+            if (mid_sk.x - corner_pt.geometry.x) * perp_ux + \
+               (mid_sk.y - corner_pt.geometry.y) * perp_uy < 0:
+                perp_ux, perp_uy = -perp_ux, -perp_uy
+
+            # Point along side edge at leg_to_edge from corner
+            along_end = P(corner_pt.geometry.x + se_ux * lte,
+                          corner_pt.geometry.y + se_uy * lte, 0)
+            along_line = ax_sk.sketchCurves.sketchLines.addByTwoPoints(
+                corner_pt, along_end)
+            along_line.isConstruction = True
+            gc_ax.addCollinear(along_line, side_edge)
+
+            # Perpendicular from that point, length = leg_to_edge
+            leg_top = P(along_end.x + perp_ux * lte,
+                        along_end.y + perp_uy * lte, 0)
+            perp_line = ax_sk.sketchCurves.sketchLines.addByTwoPoints(
+                along_line.endSketchPoint, leg_top)
+            perp_line.isConstruction = True
+            gc_ax.addPerpendicular(perp_line, along_line)
+
+            # Dimension both construction lines = leg_to_edge
             ax_dims.addDistanceDimension(
-                front_corner, ax_line.startSketchPoint, _orient["y"],
-                P(tc.x, tc.y - 1, 0)
-            ).parameter.expression = "leg_inset"
-            print(name + " front edge dim: leg_inset from front corner Y")
+                along_line.startSketchPoint, along_line.endSketchPoint, AL,
+                P(along_end.x + perp_ux, along_end.y + perp_uy, 0)
+            ).parameter.expression = "leg_to_edge"
+            ax_dims.addDistanceDimension(
+                perp_line.startSketchPoint, perp_line.endSketchPoint, AL,
+                P(leg_top.x + se_ux, leg_top.y + se_uy, 0)
+            ).parameter.expression = "leg_to_edge"
+            print(name + " leg top: corner + leg_to_edge along side + perpendicular")
+
+            # Leg top position = end of perpendicular line
+            tc = perp_line.endSketchPoint.geometry
+            # Recompute foot from actual leg top (not old leg_inset position)
+            s2m_ax = ax_sk.sketchToModelSpace
+            tc_model = s2m_ax(P(tc.x, tc.y, 0))
+            bot_x_val = tc_model.x + splay_dir_x * splay_off_val
+            bot_y_val = tc_model.y + splay_dir_y * rake_off_val
+        else:
+            # Fallback: use computed position
+            tc = m2s_ax(P(top_x_val, top_y_val, top_z))
+            print(name + " leg top: fallback to computed position")
+
+        # Foot projection on this plane
+        bc = m2s_ax(P(bot_x_val, bot_y_val, top_z))
+
+        # Draw axis line from leg top to foot projection
+        ax_line = ax_sk.sketchCurves.sketchLines.addByTwoPoints(
+            P(tc.x, tc.y, 0), P(bc.x, bc.y, 0))
+
+        # Constrain axis start to perp line end (parametric link)
+        if corner_pt and side_edge:
+            gc_ax.addCoincident(ax_line.startSketchPoint, perp_line.endSketchPoint)
 
         # Dimension foot offset FROM top point (always positive splay_off/rake_off)
+        _orient = _sp.probe_orientations(ax_sk, top_x_val, top_y_val, top_z)
         ax_dims.addDistanceDimension(
             ax_line.startSketchPoint, ax_line.endSketchPoint, _orient["x"],
             P((tc.x + bc.x) / 2, tc.y - 1, 0)
@@ -622,6 +674,32 @@ def run(context):
         rev.setAngleExtent(False, adsk.core.ValueInput.createByString("360 deg"))
         rf = comp.features.revolveFeatures.add(rev)
         rf.name = name; body = rf.bodies.item(0); body.name = name
+
+        # Tenon extension: extrude a small cylinder from the tenon end face (top)
+        tenon_face = find_face(body, "z", +1)
+        if tenon_face:
+            te_sk = comp.sketches.add(tenon_face)
+            te_sk.name = name + "_TenExt_Sk"
+            # Draw circle matching tenon diameter on the face
+            # Face center is at the tenon end
+            fc_pt = tenon_face.pointOnFace
+            te_m2s = te_sk.modelToSketchSpace
+            fc_s = te_m2s(fc_pt)
+            te_circ = te_sk.sketchCurves.sketchCircles.addByCenterRadius(
+                P(fc_s.x, fc_s.y, 0), ev("leg_tenon_dia") / 2)
+            te_sk.sketchDimensions.addRadialDimension(
+                te_circ, P(fc_s.x + 1, fc_s.y, 0)
+            ).parameter.expression = "leg_tenon_dia / 2"
+            from helpers import sp as _sp_te
+            _sp_te.refs_to_construction(te_sk)
+            te_prof = _sp_te.smallest_profile(te_sk)
+            if te_prof:
+                te_ext = comp.features.extrudeFeatures.createInput(te_prof, JOIN)
+                te_ext.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
+                te_ext.participantBodies = [body]
+                te_f = comp.features.extrudeFeatures.add(te_ext)
+                te_f.name = name + "_TenExt"
+
         print("Built " + name)
         return rf, body
 
@@ -650,10 +728,11 @@ def run(context):
         "leg_inset", "leg_inset", -1, -1)
 
     # Mirror plane perpendicular to seat side edge at its midpoint
-    # Side edge: from (0, 0) to (back_edge_x, seat_d)
-    # Midpoint: (back_edge_x/2, seat_d/2)
-    # Draw the side edge in a sketch, create plane perpendicular to it at midpoint
+    # Draw line from (0,0) to (back_edge_x, seat_d) with parametric dimensions
+    # so it updates when seat_d or seat_back_w change.
     import math as _mlg
+    from helpers import sp as _sp_mir
+
     side_sk = comp.sketches.add(comp.xYConstructionPlane)
     side_sk.name = "SideEdge_Sk"
     m2s_side = side_sk.modelToSketchSpace
@@ -665,6 +744,23 @@ def run(context):
         P(s_front.x, s_front.y, 0), P(s_back.x, s_back.y, 0))
     side_line.isConstruction = True
 
+    # Parametric dimensions: pin start at origin, dimension end point
+    orient_side = _sp_mir.probe_orientations(side_sk, bex/2, sd/2, 0)
+    side_dims = side_sk.sketchDimensions
+    # Fix start point to origin
+    side_sk.geometricConstraints.addCoincident(
+        side_line.startSketchPoint, side_sk.originPoint)
+    # End point X = back_edge_x
+    side_dims.addDistanceDimension(
+        side_sk.originPoint, side_line.endSketchPoint, orient_side["x"],
+        P(s_back.x / 2, s_back.y + 1, 0)
+    ).parameter.expression = "back_edge_x"
+    # End point Y = seat_d
+    side_dims.addDistanceDimension(
+        side_sk.originPoint, side_line.endSketchPoint, orient_side["y"],
+        P(s_back.x + 1, s_back.y / 2, 0)
+    ).parameter.expression = "seat_d"
+
     # Create path from side line, then plane at midpoint (0.5 = 50%)
     side_path = comp.features.createPath(side_line, False)
     side_mid_inp = comp.constructionPlanes.createInput()
@@ -672,7 +768,20 @@ def run(context):
     side_mid_pl = comp.constructionPlanes.add(side_mid_inp)
     side_mid_pl.name = "LegSideMid"
 
-    # Mirror FL across this plane → BL
+    # Chamfer FL leg foot edges BEFORE mirroring (mirrors replicate it)
+    if ev("ch_leg") > 0:
+        bot_edges = adsk.core.ObjectCollection.create()
+        for ei in range(fl_body.edges.count):
+            e = fl_body.edges.item(ei)
+            if e.startVertex and e.endVertex and e.startVertex.geometry.z < 0.5 and e.endVertex.geometry.z < 0.5:
+                bot_edges.add(e)
+        if bot_edges.count > 0:
+            ch = comp.features.chamferFeatures.createInput2()
+            ch.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                bot_edges, adsk.core.ValueInput.createByString("ch_leg"), True)
+            comp.features.chamferFeatures.add(ch).name = "Leg_FL_Ch"
+
+    # Mirror FL across side edge midplane → BL
     mir_y = mirror_bodies(comp, [fl_body], side_mid_pl, "LegMirY")
     bl_body = mir_y.bodies.item(0)
     bl_body.name = "Leg_BL"
@@ -686,28 +795,11 @@ def run(context):
     mir_feat.name = "LegMirX"
     for i in range(mir_feat.bodies.count):
         b = mir_feat.bodies.item(i)
-        # Front legs have small Y, back legs have large Y
         if b.boundingBox.minPoint.y < ev("mid_y"):
             b.name = "Leg_FR"
         else:
             b.name = "Leg_BR"
-    print("Legs: 4 (FL built, mirrored Y→BL, mirrored X→FR+BR)")
-
-
-    if ev("ch_leg") > 0:
-        for bname in ["Leg_FL", "Leg_FR", "Leg_BL", "Leg_BR"]:
-            body = find_body(bname, comp)
-            if not body: continue
-            bot_edges = adsk.core.ObjectCollection.create()
-            for ei in range(body.edges.count):
-                e = body.edges.item(ei)
-                if e.startVertex and e.endVertex and e.startVertex.geometry.z < 0.5 and e.endVertex.geometry.z < 0.5:
-                    bot_edges.add(e)
-            if bot_edges.count > 0:
-                ch = comp.features.chamferFeatures.createInput2()
-                ch.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
-                    bot_edges, adsk.core.ValueInput.createByString("ch_leg"), True)
-                comp.features.chamferFeatures.add(ch).name = bname + "_Ch"
+    print("Legs: 4 (FL built, chamfered, mirrored Y→BL, mirrored X→FR+BR)")
 
     # ==== STRETCHERS (H-stretcher via Loft between leg centers) ====
     # Each side stretcher is a Loft connecting FL and BL leg centers at stretcher height.
@@ -742,7 +834,7 @@ def run(context):
     str_sk.intersectWithSketchPlane([fl_proxy, bl_proxy])
     _sps2.refs_to_construction(str_sk)
 
-    # Find projected circle centers (closest to approximate leg positions)
+    # Find projected ellipses (closest to approximate leg positions)
     import math as _mstr
     m2s_str = str_sk.modelToSketchSpace
     fl_approx = m2s_str(P(ev("fl_str_x"), ev("fl_str_y"), str_z))
@@ -751,22 +843,46 @@ def run(context):
     bl_ay = (bl_bb.minPoint.y + bl_bb.maxPoint.y) / 2
     bl_approx = m2s_str(P(bl_ax, bl_ay, str_z))
 
-    fl_center = None
-    bl_center = None
+    fl_info = None  # (center_sketch_point, distance, curve)
+    bl_info = None
     for ci in range(str_sk.sketchCurves.count):
         c = str_sk.sketchCurves.item(ci)
         if hasattr(c, 'centerSketchPoint') and c.centerSketchPoint:
             cp = c.centerSketchPoint.geometry
             d_fl = _mstr.sqrt((cp.x-fl_approx.x)**2 + (cp.y-fl_approx.y)**2)
             d_bl = _mstr.sqrt((cp.x-bl_approx.x)**2 + (cp.y-bl_approx.y)**2)
-            if fl_center is None or d_fl < fl_center[1]:
-                fl_center = (c.centerSketchPoint, d_fl)
-            if bl_center is None or d_bl < bl_center[1]:
-                bl_center = (c.centerSketchPoint, d_bl)
+            if fl_info is None or d_fl < fl_info[1]:
+                fl_info = (c.centerSketchPoint, d_fl, c)
+            if bl_info is None or d_bl < bl_info[1]:
+                bl_info = (c.centerSketchPoint, d_bl, c)
 
-    if fl_center and bl_center and fl_center[0] != bl_center[0]:
-        ax_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(fl_center[0], bl_center[0])
-        print("Stretcher axis: snapped to projected leg centers")
+    if fl_info and bl_info and fl_info[0] != bl_info[0]:
+        fl_c = fl_info[0].geometry
+        bl_c = bl_info[0].geometry
+
+        # Construction line through both ellipse centers (direction reference)
+        ctr_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(
+            fl_info[0], bl_info[0])
+        ctr_line.isConstruction = True
+
+        # Approximate outer extremes for initial placement
+        dx = bl_c.x - fl_c.x; dy = bl_c.y - fl_c.y
+        dd = _mstr.sqrt(dx*dx + dy*dy)
+        ux, uy = dx/dd, dy/dd
+        r_approx = ev("leg_dia") / 2
+        fl_out_pt = P(fl_c.x - ux * r_approx, fl_c.y - uy * r_approx, 0)
+        bl_out_pt = P(bl_c.x + ux * r_approx, bl_c.y + uy * r_approx, 0)
+
+        # Draw axis line at approximate outer extremes
+        ax_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(fl_out_pt, bl_out_pt)
+
+        # Constrain: endpoints lie ON the ellipses, line is collinear with center line
+        str_gc = str_sk.geometricConstraints
+        str_gc.addCoincident(ax_line.startSketchPoint, fl_info[2])  # start on FL ellipse
+        str_gc.addCoincident(ax_line.endSketchPoint, bl_info[2])    # end on BL ellipse
+        str_gc.addCollinear(ax_line, ctr_line)  # stays aligned through centers
+
+        print("Stretcher axis: constrained to ellipse outer extremes")
     else:
         fl_s = m2s_str(P(ev("fl_str_x"), ev("fl_str_y"), str_z))
         bl_s = m2s_str(P(bl_ax, bl_ay, str_z))
@@ -783,11 +899,28 @@ def run(context):
     p_sk = comp.sketches.add(vert_pl)
     p_sk.name = "StrLeft_Prof"
     m2s_p = p_sk.modelToSketchSpace
-    sm = str_sk.sketchToModelSpace
-    s_m = sm(P(ax_line.startSketchPoint.geometry.x, ax_line.startSketchPoint.geometry.y, 0))
-    e_m = sm(P(ax_line.endSketchPoint.geometry.x, ax_line.endSketchPoint.geometry.y, 0))
-    ps_s = m2s_p(s_m)
-    ps_e = m2s_p(e_m)
+
+    # Project the axis line into the profile sketch → parametric reference endpoints
+    p_sk.project(ax_line)
+    _sps2.refs_to_construction(p_sk)
+
+    # Find the projected axis line (the construction line in the profile sketch)
+    proj_ax = None
+    for ci in range(p_sk.sketchCurves.count):
+        c = p_sk.sketchCurves.item(ci)
+        if (c.isConstruction or c.isReference) and c.objectType.endswith('SketchLine'):
+            proj_ax = c; break
+
+    if proj_ax:
+        ps_s = proj_ax.startSketchPoint.geometry
+        ps_e = proj_ax.endSketchPoint.geometry
+    else:
+        # Fallback: compute from script-time coords
+        sm = str_sk.sketchToModelSpace
+        s_m = sm(P(ax_line.startSketchPoint.geometry.x, ax_line.startSketchPoint.geometry.y, 0))
+        e_m = sm(P(ax_line.endSketchPoint.geometry.x, ax_line.endSketchPoint.geometry.y, 0))
+        ps_s = m2s_p(s_m)
+        ps_e = m2s_p(e_m)
 
     adx = ps_e.x - ps_s.x
     ady = ps_e.y - ps_s.y
@@ -815,6 +948,10 @@ def run(context):
     gc=p_sk.geometricConstraints
     gc.addParallel(L0,L_bot); gc.addParallel(L5,L_bot); gc.addParallel(L2,L_bot); gc.addParallel(L3,L_bot)
     gc.addEqual(L5,L0); gc.addEqual(L3,L2)
+    # Constrain L_bot endpoints to projected axis endpoints (parametric link)
+    if proj_ax:
+        gc.addCoincident(L_r.endSketchPoint, proj_ax.endSketchPoint)
+        gc.addCoincident(L_bot.endSketchPoint, proj_ax.startSketchPoint)
 
     dims=p_sk.sketchDimensions; AL=adsk.fusion.DimensionOrientations.AlignedDimensionOrientation
     dims.addDistanceDimension(L_l.startSketchPoint,L_l.endSketchPoint,AL,
@@ -833,9 +970,40 @@ def run(context):
         rev.setAngleExtent(False,adsk.core.ValueInput.createByString("360 deg"))
         rf=comp.features.revolveFeatures.add(rev); rf.name="Str_Left"
         Str_Left=rf.bodies.item(0); Str_Left.name="Str_Left"
+
+        # Tenon extensions on both ends of side stretcher
+        # The stretcher axis runs from FL to BL; end faces are the smallest-area planar faces
+        from helpers import sp as _sp_te2
+        str_faces = []
+        for fi in range(Str_Left.faces.count):
+            f = Str_Left.faces.item(fi)
+            if isinstance(f.geometry, adsk.core.Plane):
+                str_faces.append(f)
+        # Sort by area (smallest = tenon end faces)
+        str_faces.sort(key=lambda f: f.area)
+        for tfi, tf in enumerate(str_faces[:2]):
+            te_sk2 = comp.sketches.add(tf)
+            te_sk2.name = "StrL_TenExt" + str(tfi) + "_Sk"
+            fc2 = tf.pointOnFace
+            m2s2 = te_sk2.modelToSketchSpace
+            fc2s = m2s2(fc2)
+            tc2 = te_sk2.sketchCurves.sketchCircles.addByCenterRadius(
+                P(fc2s.x, fc2s.y, 0), ev("str_end_dia") / 2)
+            te_sk2.sketchDimensions.addRadialDimension(
+                tc2, P(fc2s.x + 0.5, fc2s.y, 0)
+            ).parameter.expression = "str_end_dia / 2"
+            _sp_te2.refs_to_construction(te_sk2)
+            tp2 = _sp_te2.smallest_profile(te_sk2)
+            if tp2:
+                te_inp2 = comp.features.extrudeFeatures.createInput(tp2, JOIN)
+                te_inp2.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
+                te_inp2.participantBodies = [Str_Left]
+                te_f2 = comp.features.extrudeFeatures.add(te_inp2)
+                te_f2.name = "StrL_TenExt" + str(tfi)
+
         StrMirX=mirror_bodies(comp,[Str_Left],XMid,"StrMirX")
         Str_Right=StrMirX.bodies.item(0); Str_Right.name="Str_Right"
-        print("Side stretchers: revolved + mirrored")
+        print("Side stretchers: revolved + tenon ext + mirrored")
 
     # ---- Cross stretcher: body-referenced via intersection in profile sketch ----
     # Create vertical plane at mid_y (cross stretcher runs left-right)
@@ -867,34 +1035,46 @@ def run(context):
                 rc.isConstruction = True
     _sps2.refs_to_construction(cross_sk)
 
-    # Find leftmost point of left intersection, rightmost of right
-    # In this sketch (XZ plane at mid_y): sketch X = model X, sketch Y = model -Z
+    # Find the 2 intersection ellipses (left and right side stretcher cross-sections)
     m2s_cx = cross_sk.modelToSketchSpace
     mid_x_val = ev("mid_x")
 
-    # For closed curves (ellipses), use bounding box extremes instead of endpoints
-    # Find the leftmost X of all construction curves on left side, rightmost on right
-    s2m = cross_sk.sketchToModelSpace
-    left_min_x = 1e10; left_sk_pt = None
-    right_max_x = -1e10; right_sk_pt = None
+    # Identify left vs right ellipse by center X relative to mid_x
+    left_info = None; right_info = None
     for ci in range(cross_sk.sketchCurves.count):
         c = cross_sk.sketchCurves.item(ci)
-        # Check ALL curves (intersection curves might not be marked construction)
-        bb = c.boundingBox
-        if not bb: continue
-        # Left extreme of this curve
-        bb_min_model = s2m(P(bb.minPoint.x, (bb.minPoint.y+bb.maxPoint.y)/2, 0))
-        bb_max_model = s2m(P(bb.maxPoint.x, (bb.minPoint.y+bb.maxPoint.y)/2, 0))
-        if bb_min_model.x < left_min_x:
-            left_min_x = bb_min_model.x
-            left_sk_pt = P(bb.minPoint.x, (bb.minPoint.y+bb.maxPoint.y)/2, 0)
-        if bb_max_model.x > right_max_x:
-            right_max_x = bb_max_model.x
-            right_sk_pt = P(bb.maxPoint.x, (bb.minPoint.y+bb.maxPoint.y)/2, 0)
+        if not (c.isConstruction or c.isReference): continue
+        if hasattr(c, 'centerSketchPoint') and c.centerSketchPoint:
+            cp = c.centerSketchPoint.geometry
+            cp_model = cross_sk.sketchToModelSpace(P(cp.x, cp.y, 0))
+            if cp_model.x < mid_x_val:
+                if left_info is None or cp_model.x < left_info[1]:
+                    left_info = (c.centerSketchPoint, cp_model.x, c)
+            else:
+                if right_info is None or cp_model.x > right_info[1]:
+                    right_info = (c.centerSketchPoint, cp_model.x, c)
 
-    if left_sk_pt and right_sk_pt:
-        cross_axis = cross_sk.sketchCurves.sketchLines.addByTwoPoints(left_sk_pt, right_sk_pt)
-        print("Cross stretcher: axis from intersection extremes")
+    if left_info and right_info:
+        # Center-to-center construction line (direction reference)
+        cx_ctr_line = cross_sk.sketchCurves.sketchLines.addByTwoPoints(
+            left_info[0], right_info[0])
+        cx_ctr_line.isConstruction = True
+
+        # Approximate outer extremes for initial axis placement
+        lc = left_info[0].geometry; rc = right_info[0].geometry
+        cx_dx = rc.x - lc.x; cx_dy = rc.y - lc.y
+        cx_dd = _mstr.sqrt(cx_dx*cx_dx + cx_dy*cx_dy)
+        cx_ux, cx_uy = cx_dx/cx_dd, cx_dy/cx_dd
+        r_approx = ev("str_mid_dia") / 2
+        l_out = P(lc.x - cx_ux * r_approx, lc.y - cx_uy * r_approx, 0)
+        r_out = P(rc.x + cx_ux * r_approx, rc.y + cx_uy * r_approx, 0)
+
+        cross_axis = cross_sk.sketchCurves.sketchLines.addByTwoPoints(l_out, r_out)
+        cx_gc = cross_sk.geometricConstraints
+        cx_gc.addCoincident(cross_axis.startSketchPoint, left_info[2])
+        cx_gc.addCoincident(cross_axis.endSketchPoint, right_info[2])
+        cx_gc.addCollinear(cross_axis, cx_ctr_line)
+        print("Cross stretcher: constrained to side stretcher ellipse extremes")
     else:
         # Fallback
         cl = m2s_cx(P(ev("fl_str_x"), ev("mid_y"), str_z))
@@ -931,6 +1111,9 @@ def run(context):
     cs_gc.addParallel(cL0,cL_bot); cs_gc.addParallel(cL5,cL_bot)
     cs_gc.addParallel(cL2,cL_bot); cs_gc.addParallel(cL3,cL_bot)
     cs_gc.addEqual(cL5,cL0); cs_gc.addEqual(cL3,cL2)
+    # Constrain revolve axis endpoints to cross_axis endpoints (parametric link)
+    cs_gc.addCoincident(cL_r.endSketchPoint, cross_axis.endSketchPoint)
+    cs_gc.addCoincident(cL_bot.endSketchPoint, cross_axis.startSketchPoint)
 
     # Radius dimensions only (tenon/shoulder proportions maintained by constraints)
     cs_dims = cross_sk.sketchDimensions
@@ -946,14 +1129,42 @@ def run(context):
 
     cs_prof = _sps2.smallest_profile(cross_sk) if cross_sk.profiles.count > 0 else None
     print("Cross profiles: " + str(cross_sk.profiles.count))
+    Str_Cross = None
     if cs_prof:
         cs_rev = comp.features.revolveFeatures.createInput(cs_prof, cL_bot, NEWBODY)
         cs_rev.setAngleExtent(False, adsk.core.ValueInput.createByString("360 deg"))
         cs_rf = comp.features.revolveFeatures.add(cs_rev)
         cs_rf.name = "Str_Cross"
-        cs_rf.bodies.item(0).name = "Str_Cross"
+        Str_Cross = cs_rf.bodies.item(0); Str_Cross.name = "Str_Cross"
 
-    print("Stretchers: 3 (all revolved, body-referenced)")
+        # Tenon extensions on both ends of cross stretcher
+        cs_faces = []
+        for fi in range(Str_Cross.faces.count):
+            f = Str_Cross.faces.item(fi)
+            if isinstance(f.geometry, adsk.core.Plane):
+                cs_faces.append(f)
+        cs_faces.sort(key=lambda f: f.area)
+        for tfi, tf in enumerate(cs_faces[:2]):
+            te_sk3 = comp.sketches.add(tf)
+            te_sk3.name = "StrC_TenExt" + str(tfi) + "_Sk"
+            fc3 = tf.pointOnFace
+            m2s3 = te_sk3.modelToSketchSpace
+            fc3s = m2s3(fc3)
+            tc3 = te_sk3.sketchCurves.sketchCircles.addByCenterRadius(
+                P(fc3s.x, fc3s.y, 0), ev("str_end_dia") / 2)
+            te_sk3.sketchDimensions.addRadialDimension(
+                tc3, P(fc3s.x + 0.5, fc3s.y, 0)
+            ).parameter.expression = "str_end_dia / 2"
+            _sps2.refs_to_construction(te_sk3)
+            tp3 = _sps2.smallest_profile(te_sk3)
+            if tp3:
+                te_inp3 = comp.features.extrudeFeatures.createInput(tp3, JOIN)
+                te_inp3.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
+                te_inp3.participantBodies = [Str_Cross]
+                te_f3 = comp.features.extrudeFeatures.add(te_inp3)
+                te_f3.name = "StrC_TenExt" + str(tfi)
+
+    print("Stretchers: 3 (all revolved + tenon ext)")
 
     # ==== BACK: Spindles on curved arc + Curved crest rail ====
     # Spindles arranged along an arc for comfort.
@@ -1316,6 +1527,29 @@ def run(context):
     Seat_Seat = mir_feat.bodies.item(0)
     Seat_Seat.name = "Seat"
     print("Both scoops done")
+
+    # ── SEAT FILLET ───────────────────────────────────────────────
+    if ev("seat_fil") > 0:
+        # Fillet all edges of the seat (top + bottom perimeter + scoop edges)
+        fil_edges = adsk.core.ObjectCollection.create()
+        seen = set()
+        for ei in range(Seat_Seat.edges.count):
+            e = Seat_Seat.edges.item(ei)
+            tid = e.tempId
+            if tid not in seen:
+                seen.add(tid)
+                fil_edges.add(e)
+        if fil_edges.count > 0:
+            fil_inp = Seat_c.features.filletFeatures.createInput()
+            fil_inp.addConstantRadiusEdgeSet(
+                fil_edges, adsk.core.ValueInput.createByString("seat_fil"), True)
+            fil_f = Seat_c.features.filletFeatures.add(fil_inp)
+            fil_f.name = "Seat_Fil"
+            print("Seat fillet: all edges")
+
+    # ── APPEARANCE ────────────────────────────────────────────────
+    from helpers import sp as _sp_app
+    _sp_app.apply_appearance("white oak")
 
     # ── FIT VIEW ──────────────────────────────────────────────────
     cam = app.activeViewport.camera
