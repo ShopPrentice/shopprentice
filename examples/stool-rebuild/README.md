@@ -1,6 +1,6 @@
 # Step Stool (Rebuild)
 
-A parametric step stool with splayed legs and through-tenon joinery. 12"L x 7"W seat, 7" leg height, with compound splay angles and beveled seat edges.
+A parametric step stool with splayed legs and through-tenon joinery. 12"L x 7"W seat, 7" leg height, with compound splay angles and beveled seat edges. The model is a rebuild from this [stool](https://www.instagram.com/p/DPJs7ezkZ03/?img_index=1) by asking the agent to build the stool given the pictures.
 
 ![Stool — iso top-right](screenshots/iso-top-right.png)
 
