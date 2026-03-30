@@ -187,3 +187,7 @@ dm_left_proxies = [b.createForAssemblyContext(kick_occ) for b in dm_left]
 combine(root, left_side_proxy, dm_left_proxies, CUT, True, "KickDomL")
 # ... right side proxies ...
 ```
+
+## Appearance
+
+Domino loose tenons are **beech** by default — this matches real Festool dominos which are made from compressed beech. Apply `sp.apply_appearance("beech", bodies=[...])` to all domino void bodies after the build is complete. Use a different species only when the user explicitly requests it (e.g., walnut dominos for a visible through-domino joint).
