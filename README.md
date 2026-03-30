@@ -144,6 +144,17 @@ Every script produces a full Fusion 360 parametric timeline — not static geome
 - **Build one, replicate the rest**: Mirror and Rectangular Pattern features for symmetric parts
 - **Component structure**: logical grouping (Legs, Rails, Shelves, Top) with cross-component CUT operations via assembly proxies
 
+### Parameter Editor
+
+The ShopPrentice add-in includes a dockable parameter editor palette for iterating on designs without leaving Fusion:
+
+- **Parameters tab** — all user parameters grouped by component, editable inline. Changes update the Fusion model immediately.
+- **Rebuild button** — re-executes the tracked script with your current parameter values (~14s). Writes changes back to the `.py` file on disk so the script stays in sync.
+- **History tab** — tracks what changed in each rebuild with timestamps and a Restore button to revert to any previous state.
+- **Sync tab** — captures structural UI changes (added/removed features) and sends them to Claude Code for script integration.
+
+The palette appears automatically when the add-in starts. Edit parameters, click Rebuild, and iterate — no need to go back to Claude for simple parameter tweaks.
+
 ### Joinery
 
 12 joint types with parametric modeling guides and reusable Python templates for complex joints. The AI checks for a template first, then reads the reference file for orientation rules and sizing constraints.

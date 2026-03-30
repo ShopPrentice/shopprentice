@@ -10,7 +10,7 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 
 | Tool | When to Call |
 |------|-------------|
-| `execute_script` | Run a Fusion 360 Python script (one phase at a time). Set `sandbox=true` for throwaway validation, `clean=true` to rebuild an existing model (Ctrl+Z reverts). |
+| `execute_script` | Run a Fusion 360 Python script (one phase at a time). Set `sandbox=true` for throwaway validation, `clean=true` to rebuild an existing model (Ctrl+Z reverts). Pass `script_path` to track the file for palette parameter sync. |
 | `capture_design` | After every `execute_script` — validate body count, positions, volumes |
 | `get_timeline_state` | When `capture_design` shows unexpected state — bisect timeline to find the bad feature |
 | `get_screenshot` | Quick viewport capture for build validation (1024x1024, as-is) |
@@ -26,6 +26,16 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 | `sync_script` | After UI tweaks — auto-patch parameter changes in script, report feature adds/removes/edits for agent |
 | `get_document_status` | Check if the active document was built by a known script — gates incremental updates |
 | `apply_appearance` | Apply wood appearance with grain-aligned texture — call after final validation |
+
+### Parameter Editor Palette
+
+The add-in includes a dockable "ShopPrentice" palette with Parameters/History/Sync tabs. When executing a script, always pass `script_path` so the palette can write parameter changes back to the `.py` file:
+
+```python
+execute_script(script=script, clean=True, script_path="/path/to/script.py")
+```
+
+The user can then edit parameters and click Rebuild in the palette without involving Claude. When the user says "I changed parameters, update the script", call `sync_script` to pick up changes and re-execute.
 
 ### Workflow
 
