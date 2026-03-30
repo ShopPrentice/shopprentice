@@ -41,7 +41,7 @@ def _reload_modules():
     corrupted module state by partially flushing sys.modules.
     """
     # Flush tools, primitives, server (children first, then parents)
-    prefixes = ('tools', 'primitives', 'server', 'helpers')
+    prefixes = ('tools', 'primitives', 'server', 'helpers', 'palette')
     to_remove = sorted(
         [k for k in sys.modules
          if any(k == p or k.startswith(p + '.') for p in prefixes)],
@@ -86,6 +86,10 @@ def run(context):
             resources=registered_resources
         )
 
+        # Create parameter editor palette
+        from palette.param_editor import ParamEditorPalette
+        ParamEditorPalette.create()
+
         # Store MCP ref for hot-reload access
         sys._shopprentice_mcp = mcp
 
@@ -111,6 +115,9 @@ def stop(context):
         from server.action_log import ActionLog
         from server.task_manager import TaskManager
         from server.mcp_server import stop_mcp_server
+
+        from palette.param_editor import ParamEditorPalette
+        ParamEditorPalette.destroy()
 
         ActionLog.stop()
         TaskManager.stop()

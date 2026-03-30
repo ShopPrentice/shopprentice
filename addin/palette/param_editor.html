@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    background: #2b2b2b;
+    color: #e0e0e0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  /* ── Tabs ── */
+  .tab-bar {
+    display: flex;
+    background: #222;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+  }
+  .tab {
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #888;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    user-select: none;
+  }
+  .tab:hover { color: #bbb; }
+  .tab.active { color: #8ab4f8; border-bottom-color: #8ab4f8; }
+  .tab-content { display: none; flex: 1; overflow-y: auto; padding: 8px; }
+  .tab-content.active { display: block; }
+
+  /* ── Parameters tab ── */
+  .group { margin-bottom: 12px; }
+  .group-header {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; color: #8ab4f8; padding: 4px 0;
+    border-bottom: 1px solid #444; margin-bottom: 4px;
+    cursor: pointer; user-select: none;
+  }
+  .group-header:hover { color: #aed4ff; }
+  .group-header.collapsed::before { content: "\25B6 "; font-size: 9px; }
+  .group-header:not(.collapsed)::before { content: "\25BC "; font-size: 9px; }
+  .group-body.hidden { display: none; }
+  .param-row {
+    display: flex; align-items: center; padding: 3px 0; gap: 6px;
+  }
+  .param-row:hover { background: #333; }
+  .param-name {
+    flex: 0 0 140px; font-size: 11px; color: #bbb;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .param-name.derived { color: #777; font-style: italic; }
+  .param-input {
+    flex: 1; background: #1e1e1e; border: 1px solid #555;
+    border-radius: 3px; color: #e0e0e0; padding: 3px 6px;
+    font-size: 12px; font-family: 'SF Mono', 'Consolas', monospace;
+  }
+  .param-input:focus { border-color: #8ab4f8; outline: none; }
+  .param-input.derived { background: #252525; color: #888; border-color: #3a3a3a; }
+  .param-input.changed { border-color: #f0a040; background: #2a2518; }
+  .param-unit { flex: 0 0 24px; font-size: 10px; color: #777; }
+  .toolbar {
+    display: flex; gap: 8px; margin-bottom: 10px; align-items: center;
+  }
+  .btn {
+    padding: 6px 14px; border: none; border-radius: 4px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+  }
+  .btn-refresh { background: #4a90d9; color: white; }
+  .btn-refresh:hover { background: #5ba0e9; }
+  .btn-refresh.running { background: #666; cursor: wait; }
+  .btn-secondary { background: #555; color: #ddd; }
+  .btn-secondary:hover { background: #666; }
+  .status { flex: 1; font-size: 11px; color: #888; text-align: right; }
+  .status.ok { color: #6abf6a; }
+  .status.error { color: #e06060; }
+  .search {
+    width: 100%; background: #1e1e1e; border: 1px solid #444;
+    border-radius: 3px; color: #e0e0e0; padding: 5px 8px;
+    font-size: 12px; margin-bottom: 8px;
+  }
+  .search:focus { border-color: #8ab4f8; outline: none; }
+
+  /* ── History tab ── */
+  .history-entry {
+    padding: 8px; margin-bottom: 6px; background: #1e1e1e;
+    border: 1px solid #3a3a3a; border-radius: 4px;
+  }
+  .history-entry:hover { border-color: #555; }
+  .history-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 4px;
+  }
+  .history-time { font-size: 11px; color: #888; }
+  .history-status { font-size: 10px; font-weight: 600; }
+  .history-status.ok { color: #6abf6a; }
+  .history-status.fail { color: #e06060; }
+  .history-changes { font-size: 11px; color: #aaa; }
+  .history-change {
+    padding: 2px 0; font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 11px;
+  }
+  .history-change .old { color: #e06060; text-decoration: line-through; }
+  .history-change .new { color: #6abf6a; }
+  .btn-restore {
+    padding: 3px 8px; font-size: 10px; background: #444;
+    color: #ccc; border: none; border-radius: 3px; cursor: pointer;
+  }
+  .btn-restore:hover { background: #555; }
+  .empty-state {
+    text-align: center; color: #666; padding: 40px 20px; font-size: 12px;
+  }
+
+  /* ── Sync tab ── */
+  .sync-section { padding: 8px 0; }
+  .sync-info {
+    font-size: 12px; color: #aaa; line-height: 1.5; margin-bottom: 12px;
+  }
+  .sync-result {
+    padding: 8px; background: #1e1e1e; border: 1px solid #3a3a3a;
+    border-radius: 4px; font-size: 11px; margin-top: 8px;
+    white-space: pre-wrap; font-family: 'SF Mono', 'Consolas', monospace;
+    color: #aaa; max-height: 300px; overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('params')">Parameters</div>
+    <div class="tab" onclick="switchTab('history')">History</div>
+    <div class="tab" onclick="switchTab('sync')">Sync</div>
+  </div>
+
+  <!-- Parameters Tab -->
+  <div class="tab-content active" id="tab-params">
+    <div class="toolbar">
+      <button class="btn btn-refresh" id="btnRefresh" onclick="doRefresh()">Rebuild</button>
+      <button class="btn btn-secondary" onclick="doReset()">Reset</button>
+      <span class="status" id="status"></span>
+    </div>
+    <input class="search" type="text" id="search" placeholder="Filter parameters..." oninput="filterParams()">
+    <div id="params"></div>
+  </div>
+
+  <!-- History Tab -->
+  <div class="tab-content" id="tab-history">
+    <div id="historyList">
+      <div class="empty-state">No rebuilds yet. Edit parameters and click Rebuild.</div>
+    </div>
+  </div>
+
+  <!-- Sync Tab -->
+  <div class="tab-content" id="tab-sync">
+    <div class="sync-section">
+      <div class="sync-info">
+        Capture structural changes you made in the Fusion UI (added/removed features,
+        edited dimensions) and send them to Claude Code for script integration.
+      </div>
+      <button class="btn btn-refresh" id="btnSync" onclick="doSync()">Capture Changes</button>
+      <span class="status" id="syncStatus"></span>
+      <div class="sync-result" id="syncResult" style="display:none;"></div>
+    </div>
+  </div>
+
+<script>
+  let allParams = [];
+  let originalValues = {};
+  let pendingChanges = {};
+  let history = [];
+
+  const GROUP_MAP = [
+    ['Seat',       p => /^seat_[^fb]/.test(p.name) && !/^seat_fil/.test(p.name)],
+    ['Seat Shape', p => /^seat_(back|front)/.test(p.name)],
+    ['Seat Scoop', p => /^scoop_/.test(p.name)],
+    ['Seat Detail', p => /^seat_fil/.test(p.name)],
+    ['Legs',       p => /^(leg_|ch_leg|splay|rake)/.test(p.name)],
+    ['Stretchers', p => /^(str_|tenon_ext|fl_str)/.test(p.name)],
+    ['Back',       p => /^(n_spindles|spindle_|back_|crest_|fan_)/.test(p.name)],
+    ['Layout',     p => /^(mid_|back_edge)/.test(p.name)],
+  ];
+
+  function getGroup(param) {
+    for (const [name, test] of GROUP_MAP) {
+      if (test(param)) return name;
+    }
+    return 'Other';
+  }
+
+  function isDerived(param) {
+    if (!param.expression) return false;
+    return allParams.some(p => p.name !== param.name && param.expression.includes(p.name));
+  }
+
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+    // Highlight the clicked tab
+    const tabs = document.querySelectorAll('.tab');
+    const names = ['params', 'history', 'sync'];
+    for (let i = 0; i < tabs.length; i++) {
+      if (names[i] === tabId) tabs[i].classList.add('active');
+    }
+  }
+
+  function renderParams() {
+    const container = document.getElementById('params');
+    container.innerHTML = '';
+    const groups = {};
+    for (const p of allParams) {
+      const g = getGroup(p);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(p);
+    }
+    const orderedGroups = GROUP_MAP.map(g => g[0]).filter(g => groups[g]);
+    if (groups['Other']) orderedGroups.push('Other');
+
+    for (const gName of orderedGroups) {
+      const params = groups[gName];
+      if (!params || params.length === 0) continue;
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'group';
+      const header = document.createElement('div');
+      header.className = 'group-header';
+      header.textContent = gName;
+      header.onclick = () => {
+        header.classList.toggle('collapsed');
+        body.classList.toggle('hidden');
+      };
+      groupDiv.appendChild(header);
+      const body = document.createElement('div');
+      body.className = 'group-body';
+      for (const p of params) {
+        const derived = isDerived(p);
+        const row = document.createElement('div');
+        row.className = 'param-row';
+        row.dataset.name = p.name;
+        row.title = p.comment || p.name;
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'param-name' + (derived ? ' derived' : '');
+        nameSpan.textContent = p.name;
+        const input = document.createElement('input');
+        input.className = 'param-input' + (derived ? ' derived' : '');
+        input.type = 'text';
+        input.value = p.expression;
+        input.dataset.name = p.name;
+        input.dataset.original = p.expression;
+        input.onchange = () => onParamChange(input);
+        input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
+        const unitSpan = document.createElement('span');
+        unitSpan.className = 'param-unit';
+        unitSpan.textContent = p.unit || '';
+        row.appendChild(nameSpan);
+        row.appendChild(input);
+        row.appendChild(unitSpan);
+        body.appendChild(row);
+      }
+      groupDiv.appendChild(body);
+      container.appendChild(groupDiv);
+    }
+  }
+
+  function onParamChange(input) {
+    const name = input.dataset.name;
+    const newVal = input.value.trim();
+    const origVal = input.dataset.original;
+    if (newVal !== origVal) {
+      input.classList.add('changed');
+      pendingChanges[name] = {old: origVal, new: newVal};
+    } else {
+      input.classList.remove('changed');
+      delete pendingChanges[name];
+    }
+    adsk.fusionSendData('paramChange', JSON.stringify({name: name, expression: newVal}));
+  }
+
+  function doRefresh() {
+    const btn = document.getElementById('btnRefresh');
+    const status = document.getElementById('status');
+    btn.classList.add('running');
+    btn.textContent = 'Rebuilding...';
+    status.textContent = '';
+    status.className = 'status';
+
+    // Snapshot changes for history before rebuild
+    let changes = Object.assign({}, pendingChanges);
+
+    try { adsk.fusionSendData('refresh', '{}'); } catch(e) {}
+
+    let startTime = Date.now();
+    let pollInterval = setInterval(function() {
+      let elapsed = Math.round((Date.now() - startTime) / 1000);
+      status.textContent = elapsed + 's';
+      if (elapsed >= 3) {
+        try {
+          adsk.fusionSendData('ping', '{}');
+          btn.classList.remove('running');
+          btn.textContent = 'Rebuild';
+          status.textContent = 'Done (' + elapsed + 's)';
+          status.className = 'status ok';
+          clearInterval(pollInterval);
+          // Add to history
+          addHistory(changes, true, elapsed);
+          // Update originals
+          for (const input of document.querySelectorAll('.param-input')) {
+            input.dataset.original = input.value;
+            input.classList.remove('changed');
+          }
+          pendingChanges = {};
+        } catch(e) {}
+      }
+      if (elapsed > 120) {
+        btn.classList.remove('running');
+        btn.textContent = 'Rebuild';
+        status.textContent = 'Timeout';
+        status.className = 'status error';
+        clearInterval(pollInterval);
+        addHistory(changes, false, elapsed);
+      }
+    }, 1000);
+  }
+
+  function doReset() {
+    const inputs = document.querySelectorAll('.param-input.changed');
+    for (const input of inputs) {
+      input.value = input.dataset.original;
+      input.classList.remove('changed');
+      adsk.fusionSendData('paramChange', JSON.stringify({
+        name: input.dataset.name, expression: input.dataset.original
+      }));
+    }
+    pendingChanges = {};
+  }
+
+  function filterParams() {
+    const q = document.getElementById('search').value.toLowerCase();
+    const rows = document.querySelectorAll('.param-row');
+    for (const row of rows) {
+      const name = row.dataset.name.toLowerCase();
+      const comment = (row.title || '').toLowerCase();
+      row.style.display = (name.includes(q) || comment.includes(q)) ? '' : 'none';
+    }
+  }
+
+  function loadParams(paramsJson) {
+    allParams = typeof paramsJson === 'string' ? JSON.parse(paramsJson) : paramsJson;
+    originalValues = {};
+    pendingChanges = {};
+    for (const p of allParams) originalValues[p.name] = p.expression;
+    renderParams();
+  }
+
+  // ── History ──
+  function addHistory(changes, success, elapsed) {
+    let changeList = [];
+    for (const [name, info] of Object.entries(changes)) {
+      changeList.push({name: name, old: info.old, new: info.new});
+    }
+    if (changeList.length === 0) return; // skip no-change rebuilds
+    const entry = {
+      time: new Date().toLocaleTimeString(),
+      changes: changeList,
+      success: success,
+      elapsed: elapsed
+    };
+    history.unshift(entry);
+    if (history.length > 20) history.pop(); // keep last 20
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const container = document.getElementById('historyList');
+    if (history.length === 0) {
+      container.innerHTML = '<div class="empty-state">No rebuilds yet.</div>';
+      return;
+    }
+    container.innerHTML = '';
+    for (let i = 0; i < history.length; i++) {
+      const e = history[i];
+      const div = document.createElement('div');
+      div.className = 'history-entry';
+      let changesHtml = '';
+      for (const c of e.changes) {
+        changesHtml += `<div class="history-change">${c.name}: <span class="old">${c.old}</span> → <span class="new">${c.new}</span></div>`;
+      }
+      div.innerHTML = `
+        <div class="history-header">
+          <span class="history-time">${e.time} (${e.elapsed}s)</span>
+          <span class="history-status ${e.success ? 'ok' : 'fail'}">${e.success ? 'OK' : 'FAILED'}</span>
+          <button class="btn-restore" onclick="restoreHistory(${i})">Restore</button>
+        </div>
+        <div class="history-changes">${changesHtml}</div>
+      `;
+      container.appendChild(div);
+    }
+  }
+
+  function restoreHistory(index) {
+    // Restore the "old" values from this history entry
+    const entry = history[index];
+    for (const c of entry.changes) {
+      const input = document.querySelector(`.param-input[data-name="${c.name}"]`);
+      if (input) {
+        input.value = c.old;
+        input.classList.add('changed');
+        pendingChanges[c.name] = {old: input.dataset.original, new: c.old};
+        adsk.fusionSendData('paramChange', JSON.stringify({name: c.name, expression: c.old}));
+      }
+    }
+  }
+
+  // ── Sync ──
+  function doSync() {
+    const btn = document.getElementById('btnSync');
+    const status = document.getElementById('syncStatus');
+    const result = document.getElementById('syncResult');
+    btn.classList.add('running');
+    btn.textContent = 'Capturing...';
+    status.textContent = '';
+    result.style.display = 'none';
+
+    try { adsk.fusionSendData('sync', '{}'); } catch(e) {}
+
+    let startTime = Date.now();
+    let pollInterval = setInterval(function() {
+      let elapsed = Math.round((Date.now() - startTime) / 1000);
+      status.textContent = elapsed + 's';
+      if (elapsed >= 3) {
+        try {
+          adsk.fusionSendData('ping', '{}');
+          btn.classList.remove('running');
+          btn.textContent = 'Capture Changes';
+          status.textContent = 'Done (' + elapsed + 's)';
+          status.className = 'status ok';
+          result.style.display = 'block';
+          result.textContent = 'Changes captured. Check Claude Code — tell it:\n"I made structural changes, update the script"\n\nClaude will pick up the captured diff automatically.';
+          clearInterval(pollInterval);
+        } catch(e) {}
+      }
+      if (elapsed > 60) {
+        btn.classList.remove('running');
+        btn.textContent = 'Capture Changes';
+        status.textContent = 'Timeout';
+        status.className = 'status error';
+        clearInterval(pollInterval);
+      }
+    }, 1000);
+  }
+
+  // Params injected by Python at palette creation time via window.onload.
+</script>
+</body>
+</html>

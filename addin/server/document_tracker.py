@@ -44,6 +44,7 @@ class DocumentTracker:
     """
 
     _script_source = None     # str: full script text from last execute_script
+    _script_path = None       # str: file path of the script (if known)
     _script_hash = None       # str: SHA-256 of script_source
     _sync_cursor = None       # str: ActionLog cursor UUID after last script/sync
     _reference_model_params = None  # dict: {featureName.paramName: expression}

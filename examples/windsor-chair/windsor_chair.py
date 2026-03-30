@@ -42,8 +42,8 @@ def run(context):
         ("crest_h", "2 in", "in", "Crest rail cross-section height"),
         ("ch_leg", "0.125 in", "in", "Leg foot chamfer"),
         ("seat_fil_top", "0.125 in", "in", "Seat top edge fillet radius"),
-        ("seat_fil_bot", "0.75 in", "in", "Seat bottom/corner fillet radius"),
-        ("leg_to_edge", "2 in", "in", "Gap between leg and seat edge"),
+        ("seat_fil_bot", "1 in", "in", "Seat bottom/corner fillet radius"),
+        ("leg_to_edge", "2.2 in", "in", "Gap between leg and seat edge"),
         ("leg_tenon_dia", "0.875 in", "in", "Leg tenon diameter (into seat)"),
         ("leg_tenon_frac", "0.10", "", "Leg tenon as fraction of total length"),
         ("leg_shoulder_frac", "0.13", "", "Leg shoulder transition fraction"),
@@ -80,13 +80,13 @@ def run(context):
         ("leg_inset", "leg_dia / 2 + leg_to_edge", "in", "Leg center inset from seat edge"),
         ("splay_off", "leg_h * tan(leg_splay * 1 deg)", "in", "Leg splay offset at floor"),
         ("rake_off", "leg_h * tan(leg_rake * 1 deg)", "in", "Leg rake offset at floor"),
-        ("back_edge_x", "(seat_w - seat_back_w) / 2", "in", "Back edge X offset"),
+        ("back_edge_x", "( seat_w - seat_back_w ) / 2", "in", "Back edge X offset"),
         # Stretcher positions: leg center at str_height_frac of leg_h
         # At frac from floor: x = top_x + (bot_x - top_x) * (1 - frac)
         # = leg_inset + (-splay_off) * (1 - frac) = leg_inset - (1 - frac) * splay_off
         ("str_z", "leg_h * str_height_frac", "in", "Stretcher Z height"),
-        ("fl_str_x", "leg_inset - (1 - str_height_frac) * splay_off", "in", "FL stretcher X"),
-        ("fl_str_y", "leg_inset - (1 - str_height_frac) * rake_off", "in", "FL stretcher Y"),
+        ("fl_str_x", "leg_inset - ( 1 - str_height_frac ) * splay_off", "in", "FL stretcher X"),
+        ("fl_str_y", "leg_inset - ( 1 - str_height_frac ) * rake_off", "in", "FL stretcher Y"),
         ("scoop_back_y", "seat_d - scoop_start_y", "in", "Scoop start Y from origin"),
         ("scoop_front_y", "scoop_end_y", "in", "Scoop end Y from origin"),
     ]:
@@ -677,30 +677,15 @@ def run(context):
         rf = comp.features.revolveFeatures.add(rev)
         rf.name = name; body = rf.bodies.item(0); body.name = name
 
-        # Tenon extension: extrude a small cylinder from the tenon end face (top)
+        # Tenon extension: extrude the tenon end face outward
         tenon_face = find_face(body, "z", +1)
-        if tenon_face:
-            te_sk = comp.sketches.add(tenon_face)
-            te_sk.name = name + "_TenExt_Sk"
-            # Draw circle matching tenon diameter on the face
-            # Face center is at the tenon end
-            fc_pt = tenon_face.pointOnFace
-            te_m2s = te_sk.modelToSketchSpace
-            fc_s = te_m2s(fc_pt)
-            te_circ = te_sk.sketchCurves.sketchCircles.addByCenterRadius(
-                P(fc_s.x, fc_s.y, 0), ev("leg_tenon_dia") / 2)
-            te_sk.sketchDimensions.addRadialDimension(
-                te_circ, P(fc_s.x + 1, fc_s.y, 0)
-            ).parameter.expression = "leg_tenon_dia / 2"
-            from helpers import sp as _sp_te
-            _sp_te.refs_to_construction(te_sk)
-            te_prof = _sp_te.smallest_profile(te_sk)
-            if te_prof:
-                te_ext = comp.features.extrudeFeatures.createInput(te_prof, JOIN)
-                te_ext.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
-                te_ext.participantBodies = [body]
-                te_f = comp.features.extrudeFeatures.add(te_ext)
-                te_f.name = name + "_TenExt"
+        if tenon_face and tenon_face.loops.count > 0:
+            te_ext = comp.features.extrudeFeatures.createInput(
+                tenon_face, JOIN)
+            te_ext.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
+            te_ext.participantBodies = [body]
+            te_f = comp.features.extrudeFeatures.add(te_ext)
+            te_f.name = name + "_TenExt"
 
         print("Built " + name)
         return rf, body
@@ -858,33 +843,43 @@ def run(context):
             if bl_info is None or d_bl < bl_info[1]:
                 bl_info = (c.centerSketchPoint, d_bl, c)
 
+    def _outer_extreme(curve, dir_x, dir_y, m2s_fn):
+        """Sample curve to find point most extreme in direction (dir_x, dir_y)."""
+        geo = curve.worldGeometry
+        evaluator = geo.evaluator
+        _, min_p, max_p = evaluator.getParameterExtents()
+        best_proj = -1e10
+        best_pt = None
+        for i in range(72):
+            t = min_p + (max_p - min_p) * i / 72
+            ok, pt = evaluator.getPointAtParameter(t)
+            if ok:
+                s = m2s_fn(pt)
+                proj = s.x * dir_x + s.y * dir_y
+                if proj > best_proj:
+                    best_proj = proj
+                    best_pt = s
+        return best_pt
+
     if fl_info and bl_info and fl_info[0] != bl_info[0]:
         fl_c = fl_info[0].geometry
         bl_c = bl_info[0].geometry
-
-        # Construction line through both ellipse centers (direction reference)
-        ctr_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(
-            fl_info[0], bl_info[0])
-        ctr_line.isConstruction = True
-
-        # Approximate outer extremes for initial placement
+        # Direction FL→BL
         dx = bl_c.x - fl_c.x; dy = bl_c.y - fl_c.y
         dd = _mstr.sqrt(dx*dx + dy*dy)
         ux, uy = dx/dd, dy/dd
-        r_approx = ev("leg_dia") / 2
-        fl_out_pt = P(fl_c.x - ux * r_approx, fl_c.y - uy * r_approx, 0)
-        bl_out_pt = P(bl_c.x + ux * r_approx, bl_c.y + uy * r_approx, 0)
 
-        # Draw axis line at approximate outer extremes
-        ax_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(fl_out_pt, bl_out_pt)
+        # Sample actual outer extremes — no constraint ambiguity
+        fl_outer = _outer_extreme(fl_info[2], -ux, -uy, m2s_str)
+        bl_outer = _outer_extreme(bl_info[2], ux, uy, m2s_str)
 
-        # Constrain: endpoints lie ON the ellipses, line is collinear with center line
-        str_gc = str_sk.geometricConstraints
-        str_gc.addCoincident(ax_line.startSketchPoint, fl_info[2])  # start on FL ellipse
-        str_gc.addCoincident(ax_line.endSketchPoint, bl_info[2])    # end on BL ellipse
-        str_gc.addCollinear(ax_line, ctr_line)  # stays aligned through centers
-
-        print("Stretcher axis: constrained to ellipse outer extremes")
+        if fl_outer and bl_outer:
+            ax_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(
+                P(fl_outer.x, fl_outer.y, 0), P(bl_outer.x, bl_outer.y, 0))
+            print("Stretcher axis: sampled outer extremes")
+        else:
+            ax_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(fl_info[0], bl_info[0])
+            print("Stretcher axis: fallback to centers")
     else:
         fl_s = m2s_str(P(ev("fl_str_x"), ev("fl_str_y"), str_z))
         bl_s = m2s_str(P(bl_ax, bl_ay, str_z))
@@ -932,8 +927,11 @@ def run(context):
 
     end_r = ev("str_end_dia") / 2
     mid_r = ev("str_mid_dia") / 2
-    tenon_f = ev("str_tenon_frac")
-    shldr_f = ev("str_shoulder_frac")
+    # Tenon must pass fully through the leg — use leg_dia * 1.5 to account
+    # for the elliptical cross-section when the leg is tilted (splay + rake)
+    through_dist = ev("leg_dia") * 1.5
+    tenon_f = min(through_dist / alen, 0.25)  # cap at 25%
+    shldr_f = tenon_f + ev("str_shoulder_frac") * (0.5 - tenon_f)
 
     pts = [(0.0, end_r), (tenon_f, end_r), (shldr_f, mid_r),
            (0.5, mid_r), (1.0-shldr_f, mid_r), (1.0-tenon_f, end_r), (1.0, end_r)]
@@ -974,30 +972,15 @@ def run(context):
         Str_Left=rf.bodies.item(0); Str_Left.name="Str_Left"
 
         # Tenon extensions on both ends of side stretcher
-        # The stretcher axis runs from FL to BL; end faces are the smallest-area planar faces
-        from helpers import sp as _sp_te2
         str_faces = []
         for fi in range(Str_Left.faces.count):
             f = Str_Left.faces.item(fi)
             if isinstance(f.geometry, adsk.core.Plane):
                 str_faces.append(f)
-        # Sort by area (smallest = tenon end faces)
         str_faces.sort(key=lambda f: f.area)
         for tfi, tf in enumerate(str_faces[:2]):
-            te_sk2 = comp.sketches.add(tf)
-            te_sk2.name = "StrL_TenExt" + str(tfi) + "_Sk"
-            fc2 = tf.pointOnFace
-            m2s2 = te_sk2.modelToSketchSpace
-            fc2s = m2s2(fc2)
-            tc2 = te_sk2.sketchCurves.sketchCircles.addByCenterRadius(
-                P(fc2s.x, fc2s.y, 0), ev("str_end_dia") / 2)
-            te_sk2.sketchDimensions.addRadialDimension(
-                tc2, P(fc2s.x + 0.5, fc2s.y, 0)
-            ).parameter.expression = "str_end_dia / 2"
-            _sp_te2.refs_to_construction(te_sk2)
-            tp2 = _sp_te2.smallest_profile(te_sk2)
-            if tp2:
-                te_inp2 = comp.features.extrudeFeatures.createInput(tp2, JOIN)
+            if tf.loops.count > 0:
+                te_inp2 = comp.features.extrudeFeatures.createInput(tf, JOIN)
                 te_inp2.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
                 te_inp2.participantBodies = [Str_Left]
                 te_f2 = comp.features.extrudeFeatures.add(te_inp2)
@@ -1057,26 +1040,24 @@ def run(context):
                     right_info = (c.centerSketchPoint, cp_model.x, c)
 
     if left_info and right_info:
-        # Center-to-center construction line (direction reference)
-        cx_ctr_line = cross_sk.sketchCurves.sketchLines.addByTwoPoints(
-            left_info[0], right_info[0])
-        cx_ctr_line.isConstruction = True
-
-        # Approximate outer extremes for initial axis placement
         lc = left_info[0].geometry; rc = right_info[0].geometry
         cx_dx = rc.x - lc.x; cx_dy = rc.y - lc.y
         cx_dd = _mstr.sqrt(cx_dx*cx_dx + cx_dy*cx_dy)
         cx_ux, cx_uy = cx_dx/cx_dd, cx_dy/cx_dd
-        r_approx = ev("str_mid_dia") / 2
-        l_out = P(lc.x - cx_ux * r_approx, lc.y - cx_uy * r_approx, 0)
-        r_out = P(rc.x + cx_ux * r_approx, rc.y + cx_uy * r_approx, 0)
 
-        cross_axis = cross_sk.sketchCurves.sketchLines.addByTwoPoints(l_out, r_out)
-        cx_gc = cross_sk.geometricConstraints
-        cx_gc.addCoincident(cross_axis.startSketchPoint, left_info[2])
-        cx_gc.addCoincident(cross_axis.endSketchPoint, right_info[2])
-        cx_gc.addCollinear(cross_axis, cx_ctr_line)
-        print("Cross stretcher: constrained to side stretcher ellipse extremes")
+        # Sample actual outer extremes on side stretcher ellipses
+        m2s_cx = cross_sk.modelToSketchSpace
+        l_outer = _outer_extreme(left_info[2], -cx_ux, -cx_uy, m2s_cx)
+        r_outer = _outer_extreme(right_info[2], cx_ux, cx_uy, m2s_cx)
+
+        if l_outer and r_outer:
+            cross_axis = cross_sk.sketchCurves.sketchLines.addByTwoPoints(
+                P(l_outer.x, l_outer.y, 0), P(r_outer.x, r_outer.y, 0))
+            print("Cross stretcher: sampled outer extremes")
+        else:
+            cross_axis = cross_sk.sketchCurves.sketchLines.addByTwoPoints(
+                left_info[0], right_info[0])
+            print("Cross stretcher: fallback to centers")
     else:
         # Fallback
         cl = m2s_cx(P(ev("fl_str_x"), ev("mid_y"), str_z))
@@ -1093,8 +1074,11 @@ def run(context):
     cs_ux, cs_uy = cs_dx/cs_len, cs_dy/cs_len
     cs_nx, cs_ny = -cs_uy, cs_ux
 
-    cs_pts = [(0.0, end_r), (tenon_f, end_r), (shldr_f, mid_r),
-              (0.5, mid_r), (1.0-shldr_f, mid_r), (1.0-tenon_f, end_r), (1.0, end_r)]
+    # Cross stretcher tenon covers side stretcher diameter
+    cs_tenon_f = min(ev("str_mid_dia") / cs_len, 0.25)
+    cs_shldr_f = cs_tenon_f + ev("str_shoulder_frac") * (0.5 - cs_tenon_f)
+    cs_pts = [(0.0, end_r), (cs_tenon_f, end_r), (cs_shldr_f, mid_r),
+              (0.5, mid_r), (1.0-cs_shldr_f, mid_r), (1.0-cs_tenon_f, end_r), (1.0, end_r)]
     cs_sk_pts = [P(cs_s.x+cs_ux*cs_len*f+cs_nx*r, cs_s.y+cs_uy*cs_len*f+cs_ny*r, 0)
                  for f, r in cs_pts]
 
@@ -1147,20 +1131,8 @@ def run(context):
                 cs_faces.append(f)
         cs_faces.sort(key=lambda f: f.area)
         for tfi, tf in enumerate(cs_faces[:2]):
-            te_sk3 = comp.sketches.add(tf)
-            te_sk3.name = "StrC_TenExt" + str(tfi) + "_Sk"
-            fc3 = tf.pointOnFace
-            m2s3 = te_sk3.modelToSketchSpace
-            fc3s = m2s3(fc3)
-            tc3 = te_sk3.sketchCurves.sketchCircles.addByCenterRadius(
-                P(fc3s.x, fc3s.y, 0), ev("str_end_dia") / 2)
-            te_sk3.sketchDimensions.addRadialDimension(
-                tc3, P(fc3s.x + 0.5, fc3s.y, 0)
-            ).parameter.expression = "str_end_dia / 2"
-            _sps2.refs_to_construction(te_sk3)
-            tp3 = _sps2.smallest_profile(te_sk3)
-            if tp3:
-                te_inp3 = comp.features.extrudeFeatures.createInput(tp3, JOIN)
+            if tf.loops.count > 0:
+                te_inp3 = comp.features.extrudeFeatures.createInput(tf, JOIN)
                 te_inp3.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
                 te_inp3.participantBodies = [Str_Cross]
                 te_f3 = comp.features.extrudeFeatures.add(te_inp3)
@@ -1374,12 +1346,6 @@ def run(context):
     else:
         print("Crest rail: no profile, skipped")
 
-    # Hide construction
-    for sk in comp.sketches:
-        sk.isVisible = False
-    for cp in comp.constructionPlanes:
-        cp.isLightBulbOn = False
-
     # ==== SEAT SCOOP (one sweep + mirror) ====
     # Path: straight line at seat surface from front toward back, with arc
     #       transition curving up at the back end (smooth exit from surface)
@@ -1583,6 +1549,19 @@ def run(context):
             fil_bf = Seat_c.features.filletFeatures.add(fil_bot)
             fil_bf.name = "Seat_Fil_Bot"
             print("Seat fillet bottom: " + str(bot_edges.count) + " edges")
+
+    # ── HIDE CONSTRUCTION ─────────────────────────────────────────
+    for _comp in [root, Seat_c, comp]:  # comp = Legs_c at this point
+        for si in range(_comp.sketches.count):
+            _comp.sketches.item(si).isVisible = False
+        for ci in range(_comp.constructionPlanes.count):
+            _comp.constructionPlanes.item(ci).isLightBulbOn = False
+    for _occ in root.allOccurrences:
+        _oc = _occ.component
+        for si in range(_oc.sketches.count):
+            _oc.sketches.item(si).isVisible = False
+        for ci in range(_oc.constructionPlanes.count):
+            _oc.constructionPlanes.item(ci).isLightBulbOn = False
 
     # ── APPEARANCE ────────────────────────────────────────────────
     from helpers import sp as _sp_app

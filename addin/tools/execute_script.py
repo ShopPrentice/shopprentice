@@ -150,7 +150,7 @@ def _clean_design():
             pass
 
 
-def handler(script: str, sandbox: bool = False, clean: bool = False) -> dict:
+def handler(script: str, sandbox: bool = False, clean: bool = False, script_path: str = None) -> dict:
     """Execute a Fusion API Python script."""
 
     run_function_match = re.search(r'def\s+run\s*\(\s*(\w+)\s*\):', script)
@@ -259,6 +259,8 @@ def handler(script: str, sandbox: bool = False, clean: bool = False) -> dict:
         try:
             from server.document_tracker import DocumentTracker
             DocumentTracker.on_script_executed(original_script, app.activeDocument)
+            if script_path:
+                DocumentTracker._script_path = script_path
         except Exception:
             pass
 
@@ -358,6 +360,11 @@ tool = Tool.create_simple(
     "clean", {
         "type": "boolean",
         "description": "Delete all existing features and parameters before running. Enables clean rebuild of an existing model. Ctrl+Z reverts the entire operation."
+    }
+).add_input_property(
+    "script_path", {
+        "type": "string",
+        "description": "File path of the script on disk. Tracked for palette parameter sync — palette Rebuild writes param changes back to this file."
     }
 ).add_required_input("script").strict_schema()
 
