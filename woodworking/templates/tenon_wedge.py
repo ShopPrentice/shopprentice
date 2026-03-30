@@ -6,44 +6,46 @@ tighter fit in the mortise.  The wedge grain runs along the taper
 direction; the slot is oriented perpendicular to the mortise piece's
 grain to prevent splitting.
 
-Supports:
+Supports arbitrary tenon orientations (axis-aligned AND compound-angle)
+by deriving all geometry from the tenon's **end face**.
+
+Variants:
   - **Rectangular tenons** (``rect``): 2 wedges at ``offset_ratio``
     from each end of the tenon cross-section.
   - **Round tenons** (``round_tenon``): 1 centred wedge, trimmed flush
     to the cylindrical surface via intersect.
 
-Call **before** JOIN-ing the tenon into the rail body so the template
-can read the standalone tenon's bounding box.  The wedge CUTs the
-tenon to create its slot, then stays as a separate visible body in
-the same component.
-
 Usage::
 
-    from helpers.templates import tenon_wedge as tw
+    from woodworking.templates import tenon_wedge as tw
 
     tw.define_params(params)
 
-    # Rectangular tenon — 2 wedges
+    # Axis-aligned rectangular tenon
     tw.rect(comp, tenon_body=tenon, mortise_body=leg,
             tenon_axis="x", tenon_depth_expr="mt_td",
-            slot_span_expr="mt_tw", offset_dim_expr="mt_tt",
-            name="TW_FL", ev=ev)
+            slot_span_expr="mt_tt", offset_dim_expr="mt_tw",
+            name="TW", ev=ev)
 
-    # Round tenon — 1 centred wedge trimmed to cylinder
-    tw.round_tenon(comp, tenon_body=spindle_tenon, mortise_body=seat,
-                   tenon_axis="z", tenon_depth_expr="sp_td",
-                   tenon_diam_expr="sp_dia",
-                   name="TW_S1", ev=ev)
+    # Compound-angle round tenon (e.g. Windsor splayed leg)
+    end = sp.find_face(leg_body, "z", +1)
+    tw.round_tenon(comp, tenon_body=leg_body, mortise_body=seat,
+                   end_face=end, tenon_depth_expr="seat_t",
+                   tenon_diam_expr="leg_tenon_dia",
+                   name="TW_FL", ev=ev)
 """
 
 import adsk.core
 import adsk.fusion
+import math
 from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 NEW = adsk.fusion.FeatureOperations.NewBodyFeatureOperation
+AL = adsk.fusion.DimensionOrientations.AlignedDimensionOrientation
 VI = adsk.core.ValueInput.createByString
 P3 = adsk.core.Point3D.create
+V3 = adsk.core.Vector3D.create
 
 
 # ── Public API ──────────────────────────────────────────────────────
@@ -52,18 +54,7 @@ def define_params(params, prefix="tw", slot_w="0.1 in",
                   depth_ratio="2 / 3", offset_ratio="1 / 4"):
     """Add wedge parameters to the design.
 
-    Parameters
-    ----------
-    params : UserParameters
-    prefix : str
-    slot_w : str   – slot width at the tenon surface
-    depth_ratio : str – slot depth as a fraction of tenon depth
-    offset_ratio : str – wedge centre position as a fraction from
-                         each end of the offset dimension (rect only)
-
-    Returns
-    -------
-    dict  ``{sw, dr, or}`` → full parameter names
+    Returns dict ``{sw, dr, or}`` → full parameter names.
     """
     p = prefix
     for pname, expr, unit, desc in [
@@ -75,87 +66,57 @@ def define_params(params, prefix="tw", slot_w="0.1 in",
     return {"sw": f"{p}_sw", "dr": f"{p}_dr", "or": f"{p}_or"}
 
 
-def rect(comp, tenon_body, mortise_body, tenon_axis,
+def rect(comp, tenon_body, mortise_body,
          tenon_depth_expr, slot_span_expr, offset_dim_expr,
-         tenon_dir=None, prefix="tw", name="TW", ev=None):
+         tenon_axis=None, tenon_dir=None, end_face=None,
+         prefix="tw", name="TW", ev=None):
     """Two wedges on a rectangular tenon.
 
-    The slot runs perpendicular to the mortise grain.  Wedges sit at
-    ``offset_ratio`` from each end of the offset dimension.
-
-    Parameters
-    ----------
-    comp : Component – component containing *tenon_body*
-    tenon_body : BRepBody – the **standalone tenon** (before JOIN)
-    mortise_body : BRepBody – the mortise piece (for grain detection)
-    tenon_axis : str – ``'x'|'y'|'z'``, protrusion axis
-    tenon_depth_expr : str – parametric depth (e.g. ``"mt_td"``)
-    slot_span_expr : str – tenon extent in slot direction (e.g. ``"mt_tw"``)
-    offset_dim_expr : str – tenon extent in offset direction (e.g. ``"mt_tt"``)
-    tenon_dir : int|None – +1/-1, auto-detected from *mortise_body*
-    prefix, name : str
-    ev : callable
-
-    Returns
-    -------
-    list[BRepBody]  ``[wedge_near, wedge_far]``
+    Provide *end_face* for arbitrary orientations (compound-angle),
+    or *tenon_axis* + optional *tenon_dir* for axis-aligned tenons.
     """
     ev = ev or _default_ev()
-    if tenon_dir is None:
-        tenon_dir = _detect_tenon_dir(tenon_body, mortise_body, tenon_axis)
+    end_face = _resolve_end_face(
+        tenon_body, mortise_body, tenon_axis, tenon_dir, end_face)
 
-    mortise_grain = _detect_grain(mortise_body)
-    slot_axis, offset_axis = _slot_axes(tenon_axis, mortise_grain)
+    face_n, slot_dir, off_dir = _face_directions(end_face, mortise_body)
 
-    w1 = _make_wedge(comp, tenon_body, tenon_axis, slot_axis, offset_axis,
-                     tenon_dir, f"{prefix}_or",
-                     tenon_depth_expr, slot_span_expr,
+    w1 = _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
+                     f"{prefix}_or", tenon_depth_expr, slot_span_expr,
                      prefix, f"{name}_1", ev,
                      offset_dim_expr=offset_dim_expr)
 
-    w2 = _make_wedge(comp, tenon_body, tenon_axis, slot_axis, offset_axis,
-                     tenon_dir, f"1 - {prefix}_or",
-                     tenon_depth_expr, slot_span_expr,
+    # Re-find end face — the CUT from w1 invalidated the old reference
+    if tenon_axis:
+        end_face = _resolve_end_face(
+            tenon_body, mortise_body, tenon_axis, tenon_dir, None)
+    else:
+        # Angled tenon — re-find by face normal closest to original
+        end_face = _find_face_by_normal(tenon_body, face_n)
+
+    w2 = _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
+                     f"1 - {prefix}_or", tenon_depth_expr, slot_span_expr,
                      prefix, f"{name}_2", ev,
                      offset_dim_expr=offset_dim_expr)
 
     return [w1, w2]
 
 
-def round_tenon(comp, tenon_body, mortise_body, tenon_axis,
+def round_tenon(comp, tenon_body, mortise_body,
                 tenon_depth_expr, tenon_diam_expr,
-                tenon_dir=None, prefix="tw", name="TW", ev=None):
-    """One centred wedge on a round tenon, trimmed to the cylinder.
-
-    Parameters
-    ----------
-    comp : Component
-    tenon_body : BRepBody – cylindrical tenon (before JOIN)
-    mortise_body : BRepBody
-    tenon_axis : str
-    tenon_depth_expr : str
-    tenon_diam_expr : str – diameter expression
-    tenon_dir : int|None
-    prefix, name : str
-    ev : callable
-
-    Returns
-    -------
-    BRepBody – the trimmed wedge
-    """
+                tenon_axis=None, tenon_dir=None, end_face=None,
+                prefix="tw", name="TW", ev=None):
+    """One centred wedge on a round tenon, trimmed to the cylinder."""
     ev = ev or _default_ev()
-    if tenon_dir is None:
-        tenon_dir = _detect_tenon_dir(tenon_body, mortise_body, tenon_axis)
+    end_face = _resolve_end_face(
+        tenon_body, mortise_body, tenon_axis, tenon_dir, end_face)
 
-    mortise_grain = _detect_grain(mortise_body)
-    slot_axis, offset_axis = _slot_axes(tenon_axis, mortise_grain)
+    face_n, slot_dir, off_dir = _face_directions(end_face, mortise_body)
 
-    wedge = _make_wedge(comp, tenon_body, tenon_axis, slot_axis, offset_axis,
-                        tenon_dir, "0.5",
-                        tenon_depth_expr, tenon_diam_expr,
+    wedge = _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
+                        "0.5", tenon_depth_expr, tenon_diam_expr,
                         prefix, name, ev, skip_cut=True)
 
-    # Trim wedge to tenon cylinder via intersect, then CUT the slot
     _intersect_trim(comp, wedge, tenon_body, f"{name}_Trim")
     sp.combine(comp, tenon_body, wedge, CUT, True, f"{name}_Cut")
 
@@ -177,132 +138,179 @@ def _default_ev():
     return _ev
 
 
-def _detect_grain(body):
-    """Longest bounding-box axis → assumed grain direction."""
-    bb = body.boundingBox
-    dims = {a: getattr(bb.maxPoint, a) - getattr(bb.minPoint, a)
-            for a in ('x', 'y', 'z')}
-    return max(dims, key=dims.get)
+def _resolve_end_face(tenon_body, mortise_body, tenon_axis, tenon_dir, end_face):
+    """Return the tenon end face (BRepFace).
 
-
-def _slot_axes(tenon_axis, mortise_grain):
-    """Return (slot_axis, offset_axis).
-
-    slot_axis  – perpendicular to mortise grain in the tenon cross-section;
-                 the slot spans the full tenon width in this direction.
-    offset_axis – the other cross-section axis (parallel to mortise grain);
-                  wedges are spaced along this direction.
+    If *end_face* is provided, return it directly.
+    Otherwise derive from *tenon_axis* and *tenon_dir*.
     """
-    cross = [a for a in ('x', 'y', 'z') if a != tenon_axis]
-    if mortise_grain in cross:
-        slot_axis = [a for a in cross if a != mortise_grain][0]
-        offset_axis = mortise_grain
-    else:
-        # mortise grain along tenon axis (unusual) — pick arbitrary cross axes
-        slot_axis, offset_axis = cross
-    return slot_axis, offset_axis
+    if end_face is not None:
+        return end_face
+
+    if tenon_axis is None:
+        raise ValueError("Provide either end_face or tenon_axis")
+
+    if tenon_dir is None:
+        tenon_dir = _detect_tenon_dir(tenon_body, mortise_body, tenon_axis)
+
+    return sp.find_face(tenon_body, tenon_axis, tenon_dir)
 
 
 def _detect_tenon_dir(tenon_body, mortise_body, tenon_axis):
-    """Return +1 if the wedge end face is at max-axis, -1 if at min-axis.
-
-    For through tenons the end face protrudes beyond the mortise body.
-    For blind tenons the end face is the deeper face (closer to the
-    mortise centre).
-    """
+    """Return +1 if the wedge end face is at max-axis, -1 if at min-axis."""
     tbb = tenon_body.boundingBox
     mbb = mortise_body.boundingBox
     t_min = getattr(tbb.minPoint, tenon_axis)
     t_max = getattr(tbb.maxPoint, tenon_axis)
     m_min = getattr(mbb.minPoint, tenon_axis)
     m_max = getattr(mbb.maxPoint, tenon_axis)
-    TOL = 0.01  # cm
+    TOL = 0.01
 
-    protrudes_pos = t_max > m_max + TOL
-    protrudes_neg = t_min < m_min - TOL
-
-    if protrudes_pos and not protrudes_neg:
+    if t_max > m_max + TOL and not (t_min < m_min - TOL):
         return +1
-    if protrudes_neg and not protrudes_pos:
+    if t_min < m_min - TOL and not (t_max > m_max + TOL):
         return -1
-    # Blind — end face is the one closer to the mortise centre
     mc = (m_min + m_max) / 2
     return -1 if abs(t_min - mc) < abs(t_max - mc) else +1
 
 
-def _bbox_center(body, axis):
-    bb = body.boundingBox
-    return (getattr(bb.minPoint, axis) + getattr(bb.maxPoint, axis)) / 2
+def _find_face_by_normal(body, target_normal, tol=0.1):
+    """Find a planar face whose normal is closest to target_normal."""
+    best = None
+    best_dot = -2
+    for i in range(body.faces.count):
+        f = body.faces.item(i)
+        if not isinstance(f.geometry, adsk.core.Plane):
+            continue
+        ok, n = f.evaluator.getNormalAtPoint(f.pointOnFace)
+        if not ok:
+            continue
+        dot = n.x * target_normal[0] + n.y * target_normal[1] + n.z * target_normal[2]
+        if dot > best_dot:
+            best_dot = dot
+            best = f
+    return best
 
 
-def _plane_base_attr(axis):
-    """Construction-plane attribute name perpendicular to *axis*."""
-    return {'x': 'yZConstructionPlane',
-            'y': 'xZConstructionPlane',
-            'z': 'xYConstructionPlane'}[axis]
+def _face_directions(end_face, mortise_body):
+    """Compute (face_normal, slot_dir, offset_dir) for the end face.
+
+    face_normal : points outward from the tenon (away from body)
+    slot_dir    : on the end face plane, ⊥ to mortise grain
+    offset_dir  : on the end face plane, ⊥ to slot_dir
+    """
+    # Face outward normal
+    ok, normal = end_face.evaluator.getNormalAtPoint(end_face.pointOnFace)
+    if not ok:
+        normal = V3(0, 0, 1)
+    fn = (normal.x, normal.y, normal.z)
+
+    # Mortise grain direction (longest bbox axis)
+    bb = mortise_body.boundingBox
+    dims = {a: getattr(bb.maxPoint, a) - getattr(bb.minPoint, a)
+            for a in ('x', 'y', 'z')}
+    grain_axis = max(dims, key=dims.get)
+    gv = {'x': (1, 0, 0), 'y': (0, 1, 0), 'z': (0, 0, 1)}[grain_axis]
+
+    # slot_dir = face_normal × grain (lies on face, ⊥ to grain)
+    sx = fn[1] * gv[2] - fn[2] * gv[1]
+    sy = fn[2] * gv[0] - fn[0] * gv[2]
+    sz = fn[0] * gv[1] - fn[1] * gv[0]
+    mag = math.sqrt(sx * sx + sy * sy + sz * sz)
+
+    if mag < 1e-6:
+        # Grain parallel to face normal — pick from a face edge
+        e = end_face.edges.item(0)
+        sp_g = e.startVertex.geometry
+        ep_g = e.endVertex.geometry
+        sx = ep_g.x - sp_g.x
+        sy = ep_g.y - sp_g.y
+        sz = ep_g.z - sp_g.z
+        mag = math.sqrt(sx * sx + sy * sy + sz * sz)
+
+    slot_dir = (sx / mag, sy / mag, sz / mag)
+
+    # offset_dir = face_normal × slot_dir
+    ox = fn[1] * slot_dir[2] - fn[2] * slot_dir[1]
+    oy = fn[2] * slot_dir[0] - fn[0] * slot_dir[2]
+    oz = fn[0] * slot_dir[1] - fn[1] * slot_dir[0]
+    omag = math.sqrt(ox * ox + oy * oy + oz * oz)
+    if omag < 1e-6:
+        offset_dir = (0, 0, 1)
+    else:
+        offset_dir = (ox / omag, oy / omag, oz / omag)
+
+    return fn, slot_dir, offset_dir
 
 
-def _make_wedge(comp, tenon_body, tenon_axis, slot_axis, offset_axis,
-                tenon_dir, offset_frac_expr,
-                tenon_depth_expr, slot_span_expr,
+def _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
+                offset_frac_expr, tenon_depth_expr, slot_span_expr,
                 prefix, name, ev, skip_cut=False,
                 offset_dim_expr=None):
-    """Build one wedge body (triangle profile, symmetric extrude).
+    """Build one wedge body on an arbitrarily oriented tenon.
 
-    Uses face-based references so it works on both standalone tenon
-    bodies and tenons already JOINed into a rail.  The end face is
-    found via ``find_face`` (tenon tip always protrudes furthest).
-    The slot-axis and offset-axis centres are derived from the end
-    face coordinate + parametric expressions.
+    1. Draw a construction line on the end face along the slot direction.
+    2. Create a plane at 90° from the end face around that line — this
+       plane contains the tenon axis (face normal) and offset direction.
+    3. Sketch the triangle profile on that plane.
+    4. Symmetric-extrude along the slot direction for the full span.
     """
     sw = ev(f"{prefix}_sw")
     depth = ev(tenon_depth_expr) * ev(f"{prefix}_dr")
+    span = ev(slot_span_expr)
     frac = ev(offset_frac_expr)
-
-    # End face — the tenon tip is the outermost face on the body
-    end_face = sp.find_face(tenon_body, tenon_axis, tenon_dir)
-    end = end_face.pointOnFace
-    end_val = getattr(end, tenon_axis)
-
-    # Slot centre — offset from end face by half the slot span
-    # On the end face, the slot_axis extent = slot_span_expr.
-    # Centre = end face coordinate in slot_axis (read from face point)
-    slot_ctr = getattr(end, slot_axis)
-
-    # Offset centre — from end face point + fraction of offset_dim
-    off_face_val = getattr(end, offset_axis)
-    if offset_dim_expr is not None:
+    if offset_dim_expr:
         off_dim = ev(offset_dim_expr)
     else:
-        off_dim = ev(slot_span_expr)  # fallback for round tenons
-    # Shift from face centre to wedge position
-    # face point is near the centre; offset from centre by (frac - 0.5)
-    w_ctr = off_face_val + off_dim * (frac - 0.5)
+        off_dim = span
 
-    # Construction plane ⊥ slot_axis at tenon centre.
-    # For rect tenons: offset from the planar slot-axis face (parametric).
-    # For round tenons: the face is cylindrical, so fall back to a
-    # component construction plane with a computed offset.
-    slot_face = sp.find_face(tenon_body, slot_axis, -1)
-    if slot_face and isinstance(slot_face.geometry, adsk.core.Plane):
-        c_plane = sp.off_plane(
-            comp, slot_face, f"{slot_span_expr} / 2", f"{name}_Pl")
-    else:
-        c_plane = sp.off_plane(
-            comp, getattr(comp, _plane_base_attr(slot_axis)),
-            f"{slot_ctr} cm", f"{name}_Pl")
+    # ── wedge centre in model space ─────────────────────────────
+    fc = end_face.pointOnFace
+    shift = off_dim * (frac - 0.5)
+    wcx = fc.x + shift * off_dir[0]
+    wcy = fc.y + shift * off_dir[1]
+    wcz = fc.z + shift * off_dir[2]
 
-    # ── triangle sketch ─────────────────────────────────────────
-    sk = comp.sketches.add(c_plane)
+    # ── construction line on end face along OFFSET direction ────
+    # Rotating the end face 90° around this line gives a plane
+    # containing face_normal + offset_dir, ⊥ to slot_dir.
+    aux_sk = comp.sketches.add(end_face)
+    m2s_a = aux_sk.modelToSketchSpace
+    p_ctr = m2s_a(P3(wcx, wcy, wcz))
+    p_far = m2s_a(P3(wcx + off_dir[0] * 5,
+                      wcy + off_dir[1] * 5,
+                      wcz + off_dir[2] * 5))
+    off_line = aux_sk.sketchCurves.sketchLines.addByTwoPoints(
+        P3(p_ctr.x, p_ctr.y, 0), P3(p_far.x, p_far.y, 0))
+    off_line.isConstruction = True
+    sp.refs_to_construction(aux_sk)
+    aux_sk.name = f"{name}_Aux"
+
+    # ── plane at 90° from end face around offset line ───────────
+    # Contains face_normal (tenon axis) + offset_dir; ⊥ to slot_dir
+    pl_inp = comp.constructionPlanes.createInput()
+    pl_inp.setByAngle(off_line, VI("90 deg"), end_face)
+    perp_plane = comp.constructionPlanes.add(pl_inp)
+    perp_plane.name = f"{name}_Pl"
+
+    # ── triangle profile on the perpendicular plane ─────────────
+    sk = comp.sketches.add(perp_plane)
     m2s = sk.modelToSketchSpace
 
-    def mpt(ta, sa, oa):
-        c = {tenon_axis: ta, slot_axis: sa, offset_axis: oa}
-        return P3(c['x'], c['y'], c['z'])
-
-    a_m = mpt(end_val, slot_ctr, w_ctr + sw / 2)
-    b_m = mpt(end_val, slot_ctr, w_ctr - sw / 2)
-    c_m = mpt(end_val - tenon_dir * depth, slot_ctr, w_ctr)
+    # Triangle vertices in model space:
+    # A — end face, offset + sw/2   (top of slot)
+    # B — end face, offset - sw/2   (bottom of slot)
+    # C — depth inside tenon, offset centre  (apex)
+    a_m = P3(wcx + (sw / 2) * off_dir[0],
+             wcy + (sw / 2) * off_dir[1],
+             wcz + (sw / 2) * off_dir[2])
+    b_m = P3(wcx - (sw / 2) * off_dir[0],
+             wcy - (sw / 2) * off_dir[1],
+             wcz - (sw / 2) * off_dir[2])
+    # C is at depth INTO the tenon (opposite to face normal)
+    c_m = P3(wcx - depth * face_n[0],
+             wcy - depth * face_n[1],
+             wcz - depth * face_n[2])
 
     a = m2s(a_m); b = m2s(b_m); c = m2s(c_m)
 
@@ -311,31 +319,21 @@ def _make_wedge(comp, tenon_body, tenon_axis, slot_axis, offset_axis,
     lb = lines.addByTwoPoints(la.endSketchPoint, P3(c.x, c.y, 0))
     lines.addByTwoPoints(lb.endSketchPoint, la.startSketchPoint)
 
-    # AB runs along offset_axis — constrain H or V
-    orient = sp.probe_orientations(sk, a_m.x, a_m.y, a_m.z)
-    V_e = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
-    if orient[offset_axis] == V_e:
-        sk.geometricConstraints.addVertical(la)
-    else:
-        sk.geometricConstraints.addHorizontal(la)
-
-    # parametric dimensions
+    # Dimensions (Aligned — works at any angle)
     d = sk.sketchDimensions
-    # base width = tw_sw
     d.addDistanceDimension(
-        la.startSketchPoint, la.endSketchPoint, orient[offset_axis],
+        la.startSketchPoint, la.endSketchPoint, AL,
         P3((a.x + b.x) / 2 + 0.3, (a.y + b.y) / 2, 0)
     ).parameter.expression = f"{prefix}_sw"
-    # depth = tenon_depth * tw_dr
     d.addDistanceDimension(
-        la.startSketchPoint, lb.endSketchPoint, orient[tenon_axis],
-        P3((a.x + c.x) / 2, (a.y + c.y) / 2 - 0.3, 0)
+        la.startSketchPoint, lb.endSketchPoint, AL,
+        P3((a.x + c.x) / 2 - 0.3, (a.y + c.y) / 2, 0)
     ).parameter.expression = f"{tenon_depth_expr} * {prefix}_dr"
 
     sk.name = f"{name}_Sk"
     prof = sp.smallest_profile(sk)
 
-    # symmetric extrude along slot_axis for full span
+    # ── symmetric extrude along slot direction ──────────────────
     ext = sp.ext_new_sym(comp, prof, f"{slot_span_expr} / 2", name)
     wedge = ext.bodies.item(0)
     wedge.name = name
