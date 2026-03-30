@@ -49,9 +49,14 @@ fi
 if [ "$LOCAL_REPO" = true ]; then
     echo "Local repo detected at $SCRIPT_DIR"
     if [ "$SCRIPT_DIR" != "$REPO_DIR" ]; then
-        echo "Copying to $REPO_DIR..."
-        mkdir -p "$REPO_DIR"
-        rsync -a --exclude='.git' "$SCRIPT_DIR/" "$REPO_DIR/"
+        # Symlink so edits to the source repo are immediately live
+        mkdir -p "$AUTOFUSION_HOME"
+        if [ -d "$REPO_DIR" ] && [ ! -L "$REPO_DIR" ]; then
+            echo "Removing old copy at $REPO_DIR..."
+            rm -rf "$REPO_DIR"
+        fi
+        ln -sfn "$SCRIPT_DIR" "$REPO_DIR"
+        echo "Linked $REPO_DIR -> $SCRIPT_DIR"
     else
         echo "Already at $REPO_DIR"
     fi

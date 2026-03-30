@@ -349,6 +349,170 @@ def smallest_profile(sk):
     return best
 
 
+# ── Sketch Setup Helpers ──────────────────────────────────────────
+
+def sketch_on_plane(comp, plane, project=None, intersect=None, identify=None, name="Sk"):
+    """Create a sketch on a plane with projected/intersected references and identified points.
+
+    Args:
+        comp: Component to create the sketch in.
+        plane: ConstructionPlane or BRepFace for the sketch.
+        project: List of entities to project (SketchLine, BRepBody, ConstructionPlane, etc.)
+        intersect: List of BRepBody to intersect with the sketch plane.
+        identify: Dict of {name: model_Point3D} — model-space points to identify
+                  in the sketch after projection. Returns matching SketchPoints.
+        name: Sketch name.
+
+    Returns:
+        (sketch, identified_points_dict)
+        identified_points_dict maps each name from `identify` to the closest
+        SketchPoint in the sketch after all projections.
+
+    All projected/intersected curves are converted to construction geometry.
+    Point identification uses modelToSketchSpace — no origin-based guessing.
+    """
+    sk = comp.sketches.add(plane)
+    sk.name = name
+
+    # Project requested entities
+    for entity in (project or []):
+        sk.project(entity)
+
+    # Intersect requested bodies
+    if intersect:
+        result = sk.intersectWithSketchPlane(intersect)
+        if result:
+            for c in result:
+                if hasattr(c, 'isConstruction'):
+                    c.isConstruction = True
+
+    # Convert all references to construction
+    refs_to_construction(sk)
+
+    # Identify points by matching model coordinates to sketch points
+    found = {}
+    if identify:
+        m2s = sk.modelToSketchSpace
+        # Collect all sketch points
+        all_pts = []
+        for ci in range(sk.sketchCurves.count):
+            c = sk.sketchCurves.item(ci)
+            if hasattr(c, 'startSketchPoint'):
+                all_pts.append(c.startSketchPoint)
+            if hasattr(c, 'endSketchPoint'):
+                all_pts.append(c.endSketchPoint)
+            if hasattr(c, 'centerSketchPoint') and c.centerSketchPoint:
+                all_pts.append(c.centerSketchPoint)
+
+        for label, model_pt in identify.items():
+            expected = m2s(model_pt)
+            best_pt = None
+            best_dist = float('inf')
+            for sp in all_pts:
+                g = sp.geometry
+                d = math.sqrt((g.x - expected.x)**2 + (g.y - expected.y)**2)
+                if d < best_dist:
+                    best_dist = d
+                    best_pt = sp
+            found[label] = best_pt
+
+    return sk, found
+
+
+def drop_to_line(sketch, point, ref_line, approximate_target=None):
+    """Drop a perpendicular construction line from a SketchPoint to a reference line.
+
+    Args:
+        sketch: The sketch containing both entities.
+        point: SketchPoint to drop from.
+        ref_line: SketchLine to drop onto (the reference surface line).
+        approximate_target: Optional Point3D for approximate endpoint placement.
+                           If None, uses the point's X with the ref_line's mid Y.
+
+    Returns:
+        The endpoint SketchPoint on the reference line (the projected point).
+
+    Creates a construction line constrained perpendicular to ref_line,
+    with its endpoint coincident with ref_line. This projected point
+    updates parametrically when the source point or reference moves.
+    """
+    P = Point3D.create
+    pg = point.geometry
+    if approximate_target:
+        target = approximate_target
+    else:
+        rl_s = ref_line.startSketchPoint.geometry
+        rl_e = ref_line.endSketchPoint.geometry
+        mid_y = (rl_s.y + rl_e.y) / 2
+        target = P(pg.x, mid_y, 0)
+
+    drop = sketch.sketchCurves.sketchLines.addByTwoPoints(point, target)
+    drop.isConstruction = True
+    gc = sketch.geometricConstraints
+    gc.addPerpendicular(drop, ref_line)
+    return drop.endSketchPoint
+
+
+def construct_ref_line(sketch, model_z, model_x_range=(-50, 50), model_y=0):
+    """Create a horizontal construction line at a known model Z level.
+
+    Args:
+        sketch: The sketch to add the line to.
+        model_z: The model-space Z coordinate for the reference level (e.g., 0 for floor).
+        model_x_range: Tuple (min_x, max_x) in model space for the line extent.
+        model_y: Model Y coordinate (use mid_y or relevant Y).
+
+    Returns:
+        The construction SketchLine at the specified Z level.
+
+    Uses modelToSketchSpace to place the line correctly regardless of
+    sketch plane orientation.
+    """
+    P = Point3D.create
+    m2s = sketch.modelToSketchSpace
+    p1 = m2s(P(model_x_range[0], model_y, model_z))
+    p2 = m2s(P(model_x_range[1], model_y, model_z))
+    line = sketch.sketchCurves.sketchLines.addByTwoPoints(
+        P(p1.x, p1.y, 0), P(p2.x, p2.y, 0))
+    line.isConstruction = True
+    return line
+
+
+def find_nearest_line(sketch, model_point, construction_only=True):
+    """Find the sketch line whose midpoint is closest to a model-space reference point.
+
+    Args:
+        sketch: The sketch to search.
+        model_point: Point3D in model space to match against.
+        construction_only: If True, only search construction lines.
+
+    Returns:
+        The closest SketchLine, or None.
+
+    Converts the model point to sketch space and compares by distance.
+    Use this to find projected seat surface / floor lines after projection.
+    """
+    m2s = sketch.modelToSketchSpace
+    expected = m2s(model_point)
+    best_line = None
+    best_dist = float('inf')
+    for ci in range(sketch.sketchCurves.count):
+        c = sketch.sketchCurves.item(ci)
+        if construction_only and not c.isConstruction:
+            continue
+        if not c.objectType.endswith('SketchLine'):
+            continue
+        sg = c.startSketchPoint.geometry
+        eg = c.endSketchPoint.geometry
+        mid_x = (sg.x + eg.x) / 2
+        mid_y = (sg.y + eg.y) / 2
+        d = math.sqrt((mid_x - expected.x)**2 + (mid_y - expected.y)**2)
+        if d < best_dist:
+            best_dist = d
+            best_line = c
+    return best_line
+
+
 # ── Feature Builders ───────────────────────────────────────────────
 
 def ext_new(comp, prof, dist, name="Ext"):
