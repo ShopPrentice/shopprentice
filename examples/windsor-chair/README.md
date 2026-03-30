@@ -5,7 +5,7 @@ A parametric Windsor chair with splayed/raked legs, turned stretchers, curved sp
 | | |
 |---|---|
 | ![Iso](iso.png) | ![Front](front.png) |
-| ![Right](right.png) | |
+| ![Right](right.png) | ![Transparent](iso-transparent.png) |
 
 ## Features
 
