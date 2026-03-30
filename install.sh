@@ -121,13 +121,6 @@ fi
 if [ "$opt_mcp" = true ]; then
     echo "--- MCP (ShopPrentice Add-in) ---"
 
-    # Check Node.js (required for mcp-remote proxy)
-    if ! command -v npx &>/dev/null; then
-        echo "Error: npx not found. Install Node.js first: https://nodejs.org"
-        exit 1
-    fi
-    echo "Node.js $(node --version) OK"
-
     # Install the ShopPrentice add-in via symlink
     ADDIN_SRC="$REPO_DIR/addin"
     if [ "$(uname)" = "Darwin" ]; then
@@ -155,30 +148,21 @@ if [ "$opt_mcp" = true ]; then
     fi
 
     # Configure MCP for Claude Code
-    CLAUDE_SETTINGS="$HOME/.claude/settings.json"
-    echo "Configuring MCP for Claude Code..."
+    echo "Configuring MCP server for Claude Code..."
 
-    python3 -c "
-import json, os
-
-path = os.path.expanduser('$CLAUDE_SETTINGS')
-data = {}
-if os.path.isfile(path):
-    with open(path) as f:
-        data = json.load(f)
-
-data.setdefault('mcpServers', {})
-data['mcpServers']['fusion360'] = {
-    'command': 'npx',
-    'args': ['mcp-remote', 'http://localhost:9100/']
-}
-
-os.makedirs(os.path.dirname(path), exist_ok=True)
-with open(path, 'w') as f:
-    json.dump(data, f, indent=2)
-    f.write('\n')
-"
-    echo "Added fusion360 MCP server to $CLAUDE_SETTINGS"
+    if command -v claude >/dev/null 2>&1; then
+        # Check if fusion360 MCP server is already configured
+        if claude mcp get fusion360 >/dev/null 2>&1; then
+            echo "fusion360 MCP server already configured in Claude Code"
+        else
+            claude mcp add --transport http -s user fusion360 http://localhost:9100/
+            echo "Added fusion360 MCP server to Claude Code (user scope)"
+        fi
+    else
+        echo "Warning: 'claude' CLI not found — skipping MCP registration."
+        echo "Install Claude Code, then run:"
+        echo "  claude mcp add --transport http -s user fusion360 http://localhost:9100/"
+    fi
 
     echo
     echo "MCP setup complete!"
