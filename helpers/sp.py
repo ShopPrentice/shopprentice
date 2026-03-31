@@ -1448,64 +1448,41 @@ def _grain_axis(body):
 
 
 def _grain_vector(body):
-    """Compute actual grain direction as a unit vector.
+    """Compute grain direction as a unit vector using principal axes of inertia.
 
-    For axis-aligned bodies, returns (0,0,1) etc.  For angled bodies
-    (splayed legs), returns the true elongation direction by averaging
-    the longest linear edges.
+    The axis with the smallest moment of inertia is the elongation axis
+    (grain direction).  Works for any orientation: axis-aligned boards,
+    compound-angle splayed legs, angled stretchers, turned spindles.
+
+    Falls back to bounding-box longest axis if the API call fails.
     """
     import adsk.core
-    # Collect linear edge vectors
-    edges = []
-    for i in range(body.edges.count):
-        e = body.edges.item(i)
-        if isinstance(e.geometry, adsk.core.Line3D):
-            sv = e.startVertex.geometry
-            ev = e.endVertex.geometry
-            dx, dy, dz = ev.x - sv.x, ev.y - sv.y, ev.z - sv.z
-            length = (dx*dx + dy*dy + dz*dz) ** 0.5
-            if length > 0.001:
-                edges.append((length, dx/length, dy/length, dz/length))
 
-    if not edges:
-        # Fallback to bounding box axis
-        axis = _grain_axis(body)
-        v = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}[axis]
-        return adsk.core.Vector3D.create(*v)
+    # Primary: principal axes of inertia
+    try:
+        pp = body.physicalProperties
+        ok_ax, ax_x, ax_y, ax_z = pp.getPrincipalAxes()
+        ok_mo, mx, my, mz = pp.getPrincipalMomentsOfInertia()
+        if ok_ax and ok_mo:
+            axes = [(mx, ax_x), (my, ax_y), (mz, ax_z)]
+            axes.sort(key=lambda a: a[0])
+            g = axes[0][1]  # smallest moment = elongation axis
+            vx, vy, vz = g.x, g.y, g.z
+            # Ensure dominant component is positive for consistent rotation
+            comps = [("x", abs(vx)), ("y", abs(vy)), ("z", abs(vz))]
+            dominant = max(comps, key=lambda c: c[1])[0]
+            if (dominant == "x" and vx < 0) or \
+               (dominant == "y" and vy < 0) or \
+               (dominant == "z" and vz < 0):
+                vx, vy, vz = -vx, -vy, -vz
+            return adsk.core.Vector3D.create(vx, vy, vz)
+    except Exception:
+        pass
 
-    # Find the longest edge length
-    max_len = max(e[0] for e in edges)
-    # Average direction of edges within 20% of the longest (the "grain" edges)
-    threshold = max_len * 0.8
-    sx, sy, sz, n = 0, 0, 0, 0
-    for length, dx, dy, dz in edges:
-        if length >= threshold:
-            # Ensure consistent sign (flip if pointing "negative" in dominant axis)
-            if sx * dx + sy * dy + sz * dz < 0:
-                dx, dy, dz = -dx, -dy, -dz
-            sx += dx; sy += dy; sz += dz; n += 1
-
-    if n == 0:
-        axis = _grain_axis(body)
-        v = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}[axis]
-        return adsk.core.Vector3D.create(*v)
-
-    # Normalize
-    sx /= n; sy /= n; sz /= n
-    mag = (sx*sx + sy*sy + sz*sz) ** 0.5
-    if mag < 0.001:
-        axis = _grain_axis(body)
-        v = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}[axis]
-        return adsk.core.Vector3D.create(*v)
-    vx, vy, vz = sx/mag, sy/mag, sz/mag
-    # Ensure dominant component is positive so rotation angle stays small
-    comps = [("x", abs(vx)), ("y", abs(vy)), ("z", abs(vz))]
-    dominant = max(comps, key=lambda c: c[1])[0]
-    if (dominant == "x" and vx < 0) or \
-       (dominant == "y" and vy < 0) or \
-       (dominant == "z" and vz < 0):
-        vx, vy, vz = -vx, -vy, -vz
-    return adsk.core.Vector3D.create(vx, vy, vz)
+    # Fallback: bounding box longest axis
+    axis = _grain_axis(body)
+    v = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}[axis]
+    return adsk.core.Vector3D.create(*v)
 
 
 def _find_endgrain_faces(body, grain_vec):

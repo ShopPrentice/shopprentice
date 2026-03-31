@@ -1674,69 +1674,6 @@ def run(context):
     if _wedge_actual:
         _sp_app.apply_appearance("rosewood", bodies=_wedge_actual)
 
-    # Fix leg grain direction — wedge slot edges confuse auto-detection.
-    # Compute actual leg grain vector from splay+rake angles.
-    import math as _mga
-    _splay_rad = ev("leg_splay") * _mga.pi / 180
-    _rake_rad = ev("leg_rake") * _mga.pi / 180
-    # Leg axes for each corner (Z dominant, tilted by splay in X and rake in Y)
-    # Side stretcher grain: FL leg to BL leg direction at str_height
-    _fl_sx = ev("fl_str_x"); _fl_sy = ev("fl_str_y")
-    _bl_sx = ev("seat_w") - _fl_sx  # mirrored across side midplane
-    _bl_sy = ev("seat_d") - _fl_sy
-    _sdx = _bl_sx - _fl_sx; _sdy = _bl_sy - _fl_sy
-    _smag = _mga.sqrt(_sdx*_sdx + _sdy*_sdy)
-    _str_left_grain = (_sdx/_smag, _sdy/_smag, 0) if _smag > 0.01 else (0, 1, 0)
-    _str_right_grain = _str_left_grain  # mirror preserves grain dir
-    # Prefix-matched grain overrides for turned bodies
-    _grain_prefix_map = {
-        "Leg_FL": (-_mga.sin(_splay_rad), -_mga.sin(_rake_rad), _mga.cos(_splay_rad)),
-        "Leg_BL": (-_mga.sin(_splay_rad),  _mga.sin(_rake_rad), _mga.cos(_splay_rad)),
-        "Leg_FR": ( _mga.sin(_splay_rad), -_mga.sin(_rake_rad), _mga.cos(_splay_rad)),
-        "Leg_BR": ( _mga.sin(_splay_rad),  _mga.sin(_rake_rad), _mga.cos(_splay_rad)),
-        "Str_Left": _str_left_grain,
-        "Str_Right": _str_right_grain,
-        "Str_Cross": (1, 0, 0),
-    }
-    def _match_grain(body_name):
-        """Match body name to grain override, handling (1) suffixes."""
-        for prefix, grain in _grain_prefix_map.items():
-            if body_name == prefix or body_name.startswith(prefix + " ("):
-                return grain
-        return None
-    def _all_bodies_recursive(c):
-        result = []
-        for i in range(c.bRepBodies.count):
-            result.append(c.bRepBodies.item(i))
-        for i in range(c.occurrences.count):
-            result.extend(_all_bodies_recursive(c.occurrences.item(i).component))
-        return result
-    def _grain_xform(gv):
-        """Rotate texture so grain aligns with direction vector."""
-        m = adsk.core.Matrix3D.create()
-        z_ax = adsk.core.Vector3D.create(0, 0, 1)
-        angle = z_ax.angleTo(gv)
-        if 0.001 < angle < _mga.pi - 0.001:
-            cross = z_ax.crossProduct(gv)
-            if cross.length > 0.001:
-                cross.normalize()
-                m.setToRotation(angle, cross, adsk.core.Point3D.create(0, 0, 0))
-        elif angle >= _mga.pi - 0.001:
-            m.setToRotation(_mga.pi, adsk.core.Vector3D.create(0, 1, 0),
-                            adsk.core.Point3D.create(0, 0, 0))
-        return m
-    for _b in _all_bodies_recursive(root):
-        _go = _match_grain(_b.name)
-        if _go:
-            gx, gy, gz = _go
-            _gv = adsk.core.Vector3D.create(gx, gy, gz)
-            adsk.doEvents()
-            _tmc = _b.textureMapControl
-            if _tmc:
-                _ptmc = adsk.core.ProjectedTextureMapControl.cast(_tmc)
-                if _ptmc:
-                    _ptmc.transform = _grain_xform(_gv)
-
     # ── FIT VIEW ──────────────────────────────────────────────────
     cam = app.activeViewport.camera
     cam.isFitView = True

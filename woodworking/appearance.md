@@ -44,10 +44,10 @@ apply_appearance(species="walnut",                        # override grain
 
 ## Grain Direction
 
-Grain direction is determined automatically per-body using two rules:
+Grain direction is determined automatically per-body using **principal axes of inertia**:
 
-1. **Longest axis** — fibers run parallel to the longest bounding box dimension (legs=Z, rails=X/Y, panels=longest).
-2. **Dovetail constraint** — the tool scans the timeline for dovetail features (DT_Pat, DT_Cut*, DT_Join*). Dovetailed edges are end grain, so the joint axis (pattern direction) is excluded. If the longest axis conflicts with a dovetail constraint, the next-longest non-excluded axis is chosen.
+1. **Principal axis** — `body.physicalProperties.getPrincipalAxes()` returns three orthogonal axes. The axis with the **smallest moment of inertia** is the elongation axis (grain direction). This works for any orientation: axis-aligned boards, compound-angle splayed legs, angled stretchers, turned spindles. Falls back to bounding-box longest axis if the API call fails.
+2. **Dovetail constraint** — the MCP tool scans the timeline for dovetail features (DT_Pat, DT_Cut*, DT_Join*). Dovetailed edges are end grain, so the joint axis (pattern direction) is excluded. If the principal axis conflicts with a dovetail constraint, the next axis is chosen.
 
 ### Example: Blanket Box
 

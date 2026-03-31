@@ -98,6 +98,21 @@ tw.round_tenon(comp, tenon_body=leg, mortise_body=seat,
 - The wedge body remains separate (not JOINed) — it's a different piece of wood with cross-grain orientation.
 - Apply a contrasting appearance to wedges for visibility (e.g., walnut wedges in white oak tenons).
 
+## Verification
+
+After building wedges, verify orientation with a **transparent view** so internal wedge bodies and slots are visible through the mortise piece:
+
+```python
+# Transparent view to verify wedge slot orientation
+get_product_shots(views=["iso-top-right"], style="transparent")
+```
+
+**Check two things:**
+1. **Taper axis** — wedge tip points INTO the tenon (away from the end face). Visually: the dark wedge body narrows as it goes deeper.
+2. **Slot axis** — the slot line on the end face runs PERPENDICULAR to the mortise grain. Visually: for a vertical leg, the slot should be horizontal; for a horizontal rail, the slot should be vertical.
+
+If the slot appears parallel to grain, the grain detection is wrong — pass `grain_dir=` explicitly.
+
 ## Common Pitfalls
 
 | Error | Cause | Fix |
