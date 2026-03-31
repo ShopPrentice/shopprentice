@@ -29,7 +29,27 @@ A **tenon wedge** is a small tapered piece of wood driven into a slot cut in the
 
 ## Orientation Rule
 
-The slot is always **perpendicular to the mortise piece's grain**. This prevents the wedge from splitting the mortise along its fibers. The template auto-detects mortise grain from the bounding box longest axis.
+The slot is always **perpendicular to the mortise piece's grain**. This prevents the wedge from splitting the mortise along its fibers.
+
+### Grain Detection
+
+The template auto-detects mortise grain using **principal axes of inertia** (`body.physicalProperties.getPrincipalAxes()`). The axis with the **smallest moment of inertia** is the elongation axis (grain direction). This works for any orientation — axis-aligned, splayed legs, compound-angle stretchers.
+
+Falls back to bounding-box longest axis if the API call fails.
+
+### grain_dir Override
+
+When the mortise piece has **ambiguous proportions** (near-equal dimensions in multiple axes), the auto-detection may pick the wrong axis. Pass `grain_dir=(x, y, z)` to override:
+
+```python
+# Seat is 18" wide × 15" deep — nearly square, grain runs front-to-back
+tw.round_tenon(comp, tenon_body=leg, mortise_body=seat,
+               end_face=end, grain_dir=(0, 1, 0),  # Y = front-to-back
+               tenon_depth_expr="seat_t", tenon_diam_expr="leg_tenon_dia",
+               name="TW_FL", ev=ev)
+```
+
+**Always pass `grain_dir`** when the mortise piece is a wide panel (seat, tabletop, slab) where width ≈ depth. For elongated pieces (legs, rails, stretchers), auto-detection is reliable.
 
 For a vertical leg (grain Z) with a horizontal rail tenon: the slot runs in the cross-grain direction of the leg.
 
@@ -55,11 +75,18 @@ tw.rect(comp, tenon_body=tenon, mortise_body=leg,
         slot_span_expr="mt_tt", offset_dim_expr="mt_tw",
         name="TW_FL", ev=ev)
 
-# Round tenon — 1 centred wedge
-tw.round_tenon(comp, tenon_body=spindle_tenon, mortise_body=seat,
-               tenon_axis="z", tenon_depth_expr="sp_td",
-               tenon_diam_expr="sp_dia",
-               name="TW_S1", ev=ev)
+# Round tenon — 1 centred wedge (auto grain detection)
+tw.round_tenon(comp, tenon_body=stretcher, mortise_body=leg,
+               end_face=str_end, tenon_depth_expr="leg_dia",
+               tenon_diam_expr="str_end_dia",
+               name="TW_SL", ev=ev)
+
+# Round tenon — explicit grain_dir for ambiguous mortise (seat)
+tw.round_tenon(comp, tenon_body=leg, mortise_body=seat,
+               end_face=leg_end, tenon_depth_expr="seat_t",
+               tenon_diam_expr="leg_tenon_dia",
+               grain_dir=(0, 1, 0),  # seat grain front-to-back
+               name="TW_FL", ev=ev)
 ```
 
 **Important:** `slot_span_expr` is the tenon extent in the **slot direction** (perpendicular to mortise grain). `offset_dim_expr` is the extent in the **offset direction** (parallel to mortise grain, where the 2 wedges are spaced). For a typical M&T: slot spans `mt_tt` (thin), wedges offset along `mt_tw` (wide).
@@ -79,4 +106,5 @@ tw.round_tenon(comp, tenon_body=spindle_tenon, mortise_body=seat,
 | Wedge tapers wrong direction | `_detect_tenon_dir` returns wrong sign | Pass `tenon_dir` explicitly (+1 or -1) |
 | Wedge protrudes beyond round tenon | No trim step | Use `round_tenon()` which intersects with the tenon body |
 | `setByOffset` error on round tenon | Cylindrical face used as construction plane base | Template auto-falls back to component plane for non-planar faces |
-| Diagonal grain on square mortise board | Ambiguous grain detection (equal bbox dimensions) | Make the mortise board clearly rectangular so longest axis is unambiguous |
+| Slot parallel to grain instead of perpendicular | Ambiguous grain detection on near-square mortise (seat, slab) | Pass `grain_dir=(x, y, z)` explicitly |
+| Grain texture rotated on turned bodies after wedge CUT | Wedge slot edges confuse `_grain_vector` in `apply_appearance` | Override grain in appearance section for turned bodies (legs, stretchers) |

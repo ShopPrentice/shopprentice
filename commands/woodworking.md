@@ -103,7 +103,7 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | **Dowel Joint** | Edge joining, panel glue-ups, face frames, spindle-to-rail, round-peg alignment | Tested | `woodworking/joinery/dowel-joint.md` + `woodworking/templates/dowel.py` |
 | **Pocket Hole** | Face frames, quick assemblies, tabletop attachment — screw-based | Draft | `woodworking/joinery/pocket-hole.md` |
 | **Bed Rail Fastener** | Bed rail to post — detachable STEP hardware (mortise bedlock, hooks + slots) | Tested (queen + twin beds) | `woodworking/templates/bed_rail_fastener.py` + `woodworking/hardware-installation.md` |
-| **Tenon Wedge** | Through tenon tightening, fox wedging (blind tenons), Windsor spindle/stretcher locking — rect (2 wedges) or round (1 centred, trimmed to cylinder) | Tested (rect through, round through, blind fox, round-in-round) | `woodworking/joinery/tenon-wedge.md` + `tenon_wedge` template |
+| **Tenon Wedge** | Through tenon tightening, fox wedging (blind tenons), Windsor spindle/stretcher locking — rect (2 wedges) or round (1 centred, trimmed to cylinder). Grain detected via principal axes of inertia; pass `grain_dir=` for ambiguous mortise pieces (seats, slabs) | Tested (Windsor chair — splayed legs + angled stretchers) | `woodworking/joinery/tenon-wedge.md` + `tenon_wedge` template |
 | **Bowtie / Butterfly Key** | Live edge slab crack stabilization, decorative inlay | Tested (twin bed) | `woodworking/templates/bowtie.py` |
 
 **Read the topic/joinery file BEFORE writing code** that uses those techniques. The core skill provides the routing — the reference files provide the implementation details. For Draft files, treat instructions as a starting point and validate aggressively.
@@ -689,7 +689,7 @@ Reusable templates for joints that involve 4+ features with variant logic. For s
 | `half_blind_dovetail` | Drawer fronts (hides end grain) | `define_params()`, `box()` |
 | `splayed_legs` | 4 compound-splayed legs with floor trim | `define_params()`, `build()`, `splay_offset()` |
 | `dovetailed_drawer` | Complete drawer box (half-blind front + through back) | `define_params()`, `build()`, `pattern()` |
-| `tenon_wedge` | Through/blind tenon tightening, Windsor spindle locking | `define_params()`, `rect()`, `round_tenon()` |
+| `tenon_wedge` | Through/blind tenon tightening, Windsor spindle/stretcher locking. Pass `grain_dir=` for ambiguous mortise bodies | `define_params()`, `rect(grain_dir=)`, `round_tenon(grain_dir=)` |
 
 **When NOT to use templates:** Dado/rabbet (just `sketch_rect_model` + `ext_op CUT` — 2 features). Angled M&T (use inline `angled_tenon_end` from `woodworking/angled-construction.md`). Tongue & groove (inline pattern from `woodworking/joinery.md`).
 
