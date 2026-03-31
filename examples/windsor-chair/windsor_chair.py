@@ -768,12 +768,34 @@ def run(context):
                 bot_edges, adsk.core.ValueInput.createByString("ch_leg"), True)
             comp.features.chamferFeatures.add(ch).name = "Leg_FL_Ch"
 
-    # Mirror FL across side edge midplane → BL
+    # Mirror FL across side edge midplane → BL (before wedges)
     mir_y = mirror_bodies(comp, [fl_body], side_mid_pl, "LegMirY")
     bl_body = mir_y.bodies.item(0)
     bl_body.name = "Leg_BL"
 
-    # Mirror FL+BL across XMid → FR+BR
+    # Tenon wedges on FL and BL independently (correct grain_dir on each)
+    from woodworking.templates import tenon_wedge as tw
+    import importlib; importlib.reload(tw)
+    tw.define_params(params, prefix="tw", slot_w="0.08 in",
+                     depth_ratio="1 / 2", offset_ratio="1 / 4")
+    fl_end_face = find_face(fl_body, "z", +1)
+    fl_wedge = tw.round_tenon(comp, tenon_body=fl_body,
+        mortise_body=Seat_body_ref,
+        end_face=fl_end_face,
+        tenon_depth_expr="seat_t",
+        tenon_diam_expr="leg_tenon_dia",
+        grain_dir=(0, 1, 0),  # seat grain front-to-back (Y)
+        name="TW_FL", ev=ev)
+    bl_end_face = find_face(bl_body, "z", +1)
+    bl_wedge = tw.round_tenon(comp, tenon_body=bl_body,
+        mortise_body=Seat_body_ref,
+        end_face=bl_end_face,
+        tenon_depth_expr="seat_t",
+        tenon_diam_expr="leg_tenon_dia",
+        grain_dir=(0, 1, 0),  # seat grain front-to-back (Y)
+        name="TW_BL", ev=ev)
+
+    # Mirror FL+BL across XMid → FR+BR (slots replicate via mirror)
     mir_coll = adsk.core.ObjectCollection.create()
     mir_coll.add(fl_body)
     mir_coll.add(bl_body)
@@ -786,7 +808,15 @@ def run(context):
             b.name = "Leg_FR"
         else:
             b.name = "Leg_BR"
-    print("Legs: 4 (FL built, chamfered, mirrored Y→BL, mirrored X→FR+BR)")
+    # Mirror wedge bodies separately across XMid
+    mir_w_x = mirror_bodies(comp, [fl_wedge, bl_wedge], XMid, "WedgeMirX")
+    for i in range(mir_w_x.bodies.count):
+        b = mir_w_x.bodies.item(i)
+        if b.boundingBox.minPoint.y < ev("mid_y"):
+            b.name = "TW_FR"
+        else:
+            b.name = "TW_BR"
+    print("Legs: 4 + 4 wedges (chamfered, wedged, mirrored)")
 
     # ==== STRETCHERS (H-stretcher via Loft between leg centers) ====
     # Each side stretcher is a Loft connecting FL and BL leg centers at stretcher height.
@@ -986,9 +1016,47 @@ def run(context):
                 te_f2 = comp.features.extrudeFeatures.add(te_inp2)
                 te_f2.name = "StrL_TenExt" + str(tfi)
 
+        # Wedges on Str_Left tenon ends (before mirror so slots replicate)
+        # Find the 2 smallest planar faces = tenon ends
+        sl_pfaces = []
+        for fi in range(Str_Left.faces.count):
+            f = Str_Left.faces.item(fi)
+            if isinstance(f.geometry, adsk.core.Plane):
+                sl_pfaces.append(f)
+        sl_pfaces.sort(key=lambda f: f.area)
+        # Identify FL vs BL end by face center proximity to leg positions
+        fl_bb = fl_body.boundingBox
+        fl_cx = (fl_bb.minPoint.x + fl_bb.maxPoint.x) / 2
+        fl_cy = (fl_bb.minPoint.y + fl_bb.maxPoint.y) / 2
+        sl_wedges = []
+        for tfi, ef in enumerate(sl_pfaces[:2]):
+            ok, fn = ef.evaluator.getNormalAtPoint(ef.pointOnFace)
+            fc = ef.pointOnFace
+            d_fl = _mstr.sqrt((fc.x - fl_cx)**2 + (fc.y - fl_cy)**2)
+            # Closer to FL leg = FL end, else BL end
+            if d_fl < 5:  # cm threshold
+                mort_ref = fl_body
+                wname = "TW_SL_FL"
+            else:
+                mort_ref = bl_body
+                wname = "TW_SL_BL"
+            sw = tw.round_tenon(comp, tenon_body=Str_Left,
+                mortise_body=mort_ref, end_face=ef,
+                tenon_depth_expr="leg_dia",
+                tenon_diam_expr="str_end_dia",
+                name=wname, ev=ev)
+            sl_wedges.append(sw)
+        print("Side stretcher wedges: " + str(len(sl_wedges)))
+
         StrMirX=mirror_bodies(comp,[Str_Left],XMid,"StrMirX")
         Str_Right=StrMirX.bodies.item(0); Str_Right.name="Str_Right"
-        print("Side stretchers: revolved + tenon ext + mirrored")
+        # Mirror side stretcher wedge bodies
+        if sl_wedges:
+            sl_w_mir = mirror_bodies(comp, sl_wedges, XMid, "StrWedgeMirX")
+            for wi in range(sl_w_mir.bodies.count):
+                wb = sl_w_mir.bodies.item(wi)
+                wb.name = "TW_SR_" + str(wi)
+        print("Side stretchers: revolved + tenon ext + wedged + mirrored")
 
     # ---- Cross stretcher: body-referenced via intersection in profile sketch ----
     # Create vertical plane at mid_y (cross stretcher runs left-right)
@@ -1138,7 +1206,33 @@ def run(context):
                 te_f3 = comp.features.extrudeFeatures.add(te_inp3)
                 te_f3.name = "StrC_TenExt" + str(tfi)
 
-    print("Stretchers: 3 (all revolved + tenon ext)")
+    # Wedges on cross stretcher tenon ends (into side stretchers)
+    cs_wedges = []
+    if Str_Cross:
+        cs_pfaces = []
+        for fi in range(Str_Cross.faces.count):
+            f = Str_Cross.faces.item(fi)
+            if isinstance(f.geometry, adsk.core.Plane):
+                cs_pfaces.append(f)
+        cs_pfaces.sort(key=lambda f: f.area)
+        for csi, ef in enumerate(cs_pfaces[:2]):
+            fc = ef.pointOnFace
+            # Identify left vs right end by X position relative to mid_x
+            if fc.x < ev("mid_x"):
+                mort_ref = Str_Left
+                wname = "TW_SC_L"
+            else:
+                mort_ref = Str_Right
+                wname = "TW_SC_R"
+            cw = tw.round_tenon(comp, tenon_body=Str_Cross,
+                mortise_body=mort_ref, end_face=ef,
+                tenon_depth_expr="str_mid_dia",
+                tenon_diam_expr="str_end_dia",
+                name=wname, ev=ev)
+            cs_wedges.append(cw)
+        print("Cross stretcher wedges: " + str(len(cs_wedges)))
+
+    print("Stretchers: 3 (all revolved + tenon ext + wedged)")
 
     # ==== BACK: Spindles on curved arc + Curved crest rail ====
     # Spindles arranged along an arc for comfort.
@@ -1565,7 +1659,83 @@ def run(context):
 
     # ── APPEARANCE ────────────────────────────────────────────────
     from helpers import sp as _sp_app
-    _sp_app.apply_appearance("white oak")
+    # Collect all body names, split wedge (TW_ prefix) vs non-wedge
+    def _all_body_names(comp):
+        names = []
+        for i in range(comp.bRepBodies.count):
+            names.append(comp.bRepBodies.item(i).name)
+        for i in range(comp.occurrences.count):
+            names.extend(_all_body_names(comp.occurrences.item(i).component))
+        return names
+    _all_names = _all_body_names(root)
+    _non_wedge = [n for n in _all_names if not n.startswith("TW_")]
+    _wedge_actual = [n for n in _all_names if n.startswith("TW_")]
+    _sp_app.apply_appearance("white oak", bodies=_non_wedge)
+    if _wedge_actual:
+        _sp_app.apply_appearance("rosewood", bodies=_wedge_actual)
+
+    # Fix leg grain direction — wedge slot edges confuse auto-detection.
+    # Compute actual leg grain vector from splay+rake angles.
+    import math as _mga
+    _splay_rad = ev("leg_splay") * _mga.pi / 180
+    _rake_rad = ev("leg_rake") * _mga.pi / 180
+    # Leg axes for each corner (Z dominant, tilted by splay in X and rake in Y)
+    # Side stretcher grain: FL leg to BL leg direction at str_height
+    _fl_sx = ev("fl_str_x"); _fl_sy = ev("fl_str_y")
+    _bl_sx = ev("seat_w") - _fl_sx  # mirrored across side midplane
+    _bl_sy = ev("seat_d") - _fl_sy
+    _sdx = _bl_sx - _fl_sx; _sdy = _bl_sy - _fl_sy
+    _smag = _mga.sqrt(_sdx*_sdx + _sdy*_sdy)
+    _str_left_grain = (_sdx/_smag, _sdy/_smag, 0) if _smag > 0.01 else (0, 1, 0)
+    _str_right_grain = _str_left_grain  # mirror preserves grain dir
+    # Prefix-matched grain overrides for turned bodies
+    _grain_prefix_map = {
+        "Leg_FL": (-_mga.sin(_splay_rad), -_mga.sin(_rake_rad), _mga.cos(_splay_rad)),
+        "Leg_BL": (-_mga.sin(_splay_rad),  _mga.sin(_rake_rad), _mga.cos(_splay_rad)),
+        "Leg_FR": ( _mga.sin(_splay_rad), -_mga.sin(_rake_rad), _mga.cos(_splay_rad)),
+        "Leg_BR": ( _mga.sin(_splay_rad),  _mga.sin(_rake_rad), _mga.cos(_splay_rad)),
+        "Str_Left": _str_left_grain,
+        "Str_Right": _str_right_grain,
+        "Str_Cross": (1, 0, 0),
+    }
+    def _match_grain(body_name):
+        """Match body name to grain override, handling (1) suffixes."""
+        for prefix, grain in _grain_prefix_map.items():
+            if body_name == prefix or body_name.startswith(prefix + " ("):
+                return grain
+        return None
+    def _all_bodies_recursive(c):
+        result = []
+        for i in range(c.bRepBodies.count):
+            result.append(c.bRepBodies.item(i))
+        for i in range(c.occurrences.count):
+            result.extend(_all_bodies_recursive(c.occurrences.item(i).component))
+        return result
+    def _grain_xform(gv):
+        """Rotate texture so grain aligns with direction vector."""
+        m = adsk.core.Matrix3D.create()
+        z_ax = adsk.core.Vector3D.create(0, 0, 1)
+        angle = z_ax.angleTo(gv)
+        if 0.001 < angle < _mga.pi - 0.001:
+            cross = z_ax.crossProduct(gv)
+            if cross.length > 0.001:
+                cross.normalize()
+                m.setToRotation(angle, cross, adsk.core.Point3D.create(0, 0, 0))
+        elif angle >= _mga.pi - 0.001:
+            m.setToRotation(_mga.pi, adsk.core.Vector3D.create(0, 1, 0),
+                            adsk.core.Point3D.create(0, 0, 0))
+        return m
+    for _b in _all_bodies_recursive(root):
+        _go = _match_grain(_b.name)
+        if _go:
+            gx, gy, gz = _go
+            _gv = adsk.core.Vector3D.create(gx, gy, gz)
+            adsk.doEvents()
+            _tmc = _b.textureMapControl
+            if _tmc:
+                _ptmc = adsk.core.ProjectedTextureMapControl.cast(_tmc)
+                if _ptmc:
+                    _ptmc.transform = _grain_xform(_gv)
 
     # ── FIT VIEW ──────────────────────────────────────────────────
     cam = app.activeViewport.camera

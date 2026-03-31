@@ -1,6 +1,6 @@
 # Side Table / Nightstand
 
-A parametric modern side table — 22"L x 16"W x 24"H with single dovetailed drawer. Front apron with drawer opening, blind M&T joinery at all 8 leg-apron joints with interlocking tenon notches, 3" bar pull, leg chamfers, and top edge fillet.
+A parametric modern side table — 22"L x 16"W x 24"H with single dovetailed drawer. Three aprons (back + two sides) with blind M&T joinery, two front stretchers (upper + lower) framing the drawer opening, interlocking tenon notches at back corners, 3" bar pull, leg chamfers, and top edge fillet. Drawer front is the visible front face framed by horizontal rails.
 
 ![Side Table — iso top-right](screenshots/iso-top-right.png)
 
@@ -18,12 +18,13 @@ A parametric modern side table — 22"L x 16"W x 24"H with single dovetailed dra
 
 ---
 
-**Script:** [`side_table.py`](side_table.py) — 15 bodies (4 legs, 4 aprons, top, 5 drawer, pull handle). Uses `mortise_tenon`, `dovetailed_drawer`, and `pull` templates.
+**Script:** [`side_table.py`](side_table.py) — 16 bodies (4 legs, 3 aprons, 2 stretchers, top, 5 drawer, pull handle). Uses `mortise_tenon`, `dovetailed_drawer`, and `pull` templates.
 
 ### Techniques
 
-- **Blind M&T** — 8 joints via `mortise_tenon.blind()` with mirror planes
-- **Interlocking notches** — center-half on front/back tenons, top+bottom quarter on side tenons
+- **Blind M&T** — 6 apron joints + 4 stretcher joints via `mortise_tenon.blind()` with mirror planes
+- **Interlocking notches** — center-half on back tenons, top+bottom quarter on side back-end tenons
+- **Two front stretchers** — upper + lower rails framing the drawer opening with smaller M&T (0.75" tenon width)
 - **Dovetailed drawer** — half-blind front, through back
 - **Bar pull** — 3" center-to-center via `pull.install()`
 - **Leg chamfers** — 1/8" on bottom edges

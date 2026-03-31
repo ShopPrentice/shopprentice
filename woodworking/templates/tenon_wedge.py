@@ -69,17 +69,22 @@ def define_params(params, prefix="tw", slot_w="0.1 in",
 def rect(comp, tenon_body, mortise_body,
          tenon_depth_expr, slot_span_expr, offset_dim_expr,
          tenon_axis=None, tenon_dir=None, end_face=None,
-         prefix="tw", name="TW", ev=None):
+         grain_dir=None, prefix="tw", name="TW", ev=None):
     """Two wedges on a rectangular tenon.
 
     Provide *end_face* for arbitrary orientations (compound-angle),
     or *tenon_axis* + optional *tenon_dir* for axis-aligned tenons.
+
+    *grain_dir* overrides auto-detected mortise grain.  Pass a tuple
+    ``(x, y, z)`` when the mortise piece has ambiguous proportions
+    (e.g. a nearly-square seat plank).
     """
     ev = ev or _default_ev()
     end_face = _resolve_end_face(
         tenon_body, mortise_body, tenon_axis, tenon_dir, end_face)
 
-    face_n, slot_dir, off_dir = _face_directions(end_face, mortise_body)
+    face_n, slot_dir, off_dir = _face_directions(
+        end_face, mortise_body, grain_dir=grain_dir)
 
     w1 = _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
                      f"{prefix}_or", tenon_depth_expr, slot_span_expr,
@@ -105,13 +110,18 @@ def rect(comp, tenon_body, mortise_body,
 def round_tenon(comp, tenon_body, mortise_body,
                 tenon_depth_expr, tenon_diam_expr,
                 tenon_axis=None, tenon_dir=None, end_face=None,
-                prefix="tw", name="TW", ev=None):
-    """One centred wedge on a round tenon, trimmed to the cylinder."""
+                grain_dir=None, prefix="tw", name="TW", ev=None):
+    """One centred wedge on a round tenon, trimmed to the cylinder.
+
+    *grain_dir* overrides auto-detected mortise grain.  Pass a tuple
+    ``(x, y, z)`` when the mortise piece has ambiguous proportions.
+    """
     ev = ev or _default_ev()
     end_face = _resolve_end_face(
         tenon_body, mortise_body, tenon_axis, tenon_dir, end_face)
 
-    face_n, slot_dir, off_dir = _face_directions(end_face, mortise_body)
+    face_n, slot_dir, off_dir = _face_directions(
+        end_face, mortise_body, grain_dir=grain_dir)
 
     wedge = _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
                         "0.5", tenon_depth_expr, tenon_diam_expr,
@@ -192,12 +202,43 @@ def _find_face_by_normal(body, target_normal, tol=0.1):
     return best
 
 
-def _face_directions(end_face, mortise_body):
+def _mortise_grain(mortise_body):
+    """Compute mortise grain direction as a unit-length tuple.
+
+    Uses principal axes of inertia: the axis with the smallest moment
+    is the elongation axis (grain direction).  Works for any orientation
+    including compound-angle splayed legs and angled stretchers.
+
+    Falls back to bounding-box longest axis if the API call fails.
+    """
+    try:
+        pp = mortise_body.physicalProperties
+        ok_ax, ax_x, ax_y, ax_z = pp.getPrincipalAxes()
+        ok_mo, mx, my, mz = pp.getPrincipalMomentsOfInertia()
+        if ok_ax and ok_mo:
+            axes = [(mx, ax_x), (my, ax_y), (mz, ax_z)]
+            axes.sort(key=lambda a: a[0])
+            g = axes[0][1]          # smallest moment = elongation axis
+            return (g.x, g.y, g.z)
+    except Exception:
+        pass
+
+    # Fallback: bounding-box longest axis
+    bb = mortise_body.boundingBox
+    dims = {a: getattr(bb.maxPoint, a) - getattr(bb.minPoint, a)
+            for a in ('x', 'y', 'z')}
+    grain_axis = max(dims, key=dims.get)
+    return {'x': (1, 0, 0), 'y': (0, 1, 0), 'z': (0, 0, 1)}[grain_axis]
+
+
+def _face_directions(end_face, mortise_body, grain_dir=None):
     """Compute (face_normal, slot_dir, offset_dir) for the end face.
 
     face_normal : points outward from the tenon (away from body)
     slot_dir    : on the end face plane, ⊥ to mortise grain
     offset_dir  : on the end face plane, ⊥ to slot_dir
+
+    *grain_dir*: optional ``(x, y, z)`` tuple overriding auto-detection.
     """
     # Face outward normal
     ok, normal = end_face.evaluator.getNormalAtPoint(end_face.pointOnFace)
@@ -205,12 +246,11 @@ def _face_directions(end_face, mortise_body):
         normal = V3(0, 0, 1)
     fn = (normal.x, normal.y, normal.z)
 
-    # Mortise grain direction (longest bbox axis)
-    bb = mortise_body.boundingBox
-    dims = {a: getattr(bb.maxPoint, a) - getattr(bb.minPoint, a)
-            for a in ('x', 'y', 'z')}
-    grain_axis = max(dims, key=dims.get)
-    gv = {'x': (1, 0, 0), 'y': (0, 1, 0), 'z': (0, 0, 1)}[grain_axis]
+    # Mortise grain direction — explicit override or auto-detect
+    if grain_dir is not None:
+        gv = grain_dir
+    else:
+        gv = _mortise_grain(mortise_body)
 
     # slot_dir = face_normal × grain (lies on face, ⊥ to grain)
     sx = fn[1] * gv[2] - fn[2] * gv[1]
