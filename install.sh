@@ -64,10 +64,17 @@ else
     echo "No local repo detected — cloning from $REPO_URL..."
     if [ -d "$REPO_DIR" ]; then
         echo "Existing install found at $REPO_DIR, pulling latest..."
+        git -C "$REPO_DIR" fetch --tags
         git -C "$REPO_DIR" pull --ff-only
     else
         mkdir -p "$AUTOFUSION_HOME"
         git clone "$REPO_URL" "$REPO_DIR"
+    fi
+    # Checkout latest release tag if available
+    LATEST_TAG=$(git -C "$REPO_DIR" tag --sort=-v:refname | head -1)
+    if [ -n "$LATEST_TAG" ]; then
+        echo "Checking out latest release: $LATEST_TAG"
+        git -C "$REPO_DIR" checkout "$LATEST_TAG" --quiet
     fi
 fi
 
@@ -182,4 +189,4 @@ echo "  Source:  $REPO_DIR"
 [ "$opt_claude_code" = true ] && echo "  Claude Code: /woodworking skill installed"
 [ "$opt_mcp" = true ]         && echo "  MCP:         fusion360 server installed + configured"
 echo
-echo "To update later: cd $REPO_DIR && git pull && ./install.sh"
+echo "To update later: cd $REPO_DIR && git fetch --tags && git pull && ./install.sh"
