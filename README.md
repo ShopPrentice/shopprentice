@@ -4,6 +4,8 @@ Parametric furniture modeling for Fusion 360, driven by AI agents via MCP.
 
 Describe a piece of furniture in natural language — or show the AI a photo — and ShopPrentice generates a fully parametric Fusion 360 Python script with proper feature timelines, mirror/pattern replication, and joinery. Connect to a running Fusion 360 instance via the built-in MCP server for live execution, validation, and iterative refinement.
 
+[![ShopPrentice Demo](https://img.youtube.com/vi/yb9XpCFWsMs/maxresdefault.jpg)](https://www.youtube.com/watch?v=yb9XpCFWsMs)
+
 ## Model Support
 
 ShopPrentice is developed and tested with **Claude Code** powered by **Claude Opus and Sonnet** models from Anthropic. The woodworking skill, joinery templates, and MCP tools are tuned for Claude's capabilities — particularly long-context reasoning, parametric code generation, and iterative debugging.
@@ -119,7 +121,6 @@ Each folder under `examples/` contains a complete Fusion 360 project with screen
 <tr>
 <td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a><br />Writing desk with aprons</td>
 <td align="center"><a href="examples/side-table/"><img src="examples/side-table/screenshots/iso-top-right.png" width="200" /><br /><b>Side Table</b></a><br />Walnut with spalted maple drawer front</td>
-<td align="center"><a href="examples/shelf/"><img src="examples/shelf/screenshots/iso-top-right.png" width="200" /><br /><b>Wall Shelf</b></a><br />Floating shelf, hidden hardware</td>
 </tr>
 </table>
 
