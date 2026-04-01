@@ -51,7 +51,7 @@ def run(context):
         ("str_mid_dia", "0.75 in", "in", "Stretcher center diameter (thickest)"),
         ("str_end_dia", "0.5 in", "in", "Stretcher tenon diameter (at ends)"),
         ("str_tenon_frac", "0.10", "", "Fraction of length that is tenon (each end)"),
-        ("str_shoulder_frac", "0.20", "", "Fraction of length for shoulder transition"),
+        ("str_shoulder_frac", "0.06", "", "Fraction of length for shoulder transition"),
         ("tenon_ext", "0.1 in", "in", "Tenon extension beyond body"),
         ("seat_back_w", "14.0000 in", "in", "Back edge width"),
         ("seat_front_r", "68.8753 in", "in", "Front arc radius"),

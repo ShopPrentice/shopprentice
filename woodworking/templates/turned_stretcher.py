@@ -260,11 +260,22 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     gc.addCoincident(L8.endSketchPoint, ax_line.endSketchPoint)
     gc.addPerpendicular(L8, ax_line)
 
-    # Symmetry (L5=L4 not needed — addMidPoint on ax_line ensures it)
-    gc.addEqual(L7, L2)
-    gc.addEqual(L6, L3)
+    # ── Symmetry via mirror line at axis midpoint ────────────────
+    # Construction line at midpoint of ax_line, perpendicular to it
+    mid_pt = P((as_g.x + ae_g.x) / 2, (as_g.y + ae_g.y) / 2, 0)
+    sym_line = lines.addByTwoPoints(
+        mid_pt,
+        P(mid_pt.x + anx * 3, mid_pt.y + any_ * 3, 0))
+    sym_line.isConstruction = True
+    gc.addPerpendicular(sym_line, ax_line)
+    gc.addMidPoint(sym_line.startSketchPoint, ax_line)
 
-    # Dimensions
+    # Mirror corresponding points across sym_line
+    gc.addSymmetry(L1.endSketchPoint, L7.endSketchPoint, sym_line)
+    gc.addSymmetry(L2.endSketchPoint, L6.endSketchPoint, sym_line)
+    gc.addSymmetry(L3.endSketchPoint, L5.endSketchPoint, sym_line)
+
+    # ── Dimensions ─────────────────────────────────────────────────
     # Tenon radius
     dims.addDistanceDimension(
         L1.startSketchPoint, L1.endSketchPoint, AL,
@@ -277,9 +288,7 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
         P(pt(t_frac, end_r).x + anx, pt(t_frac, end_r).y + any_, 0)
     ).parameter.expression = f"{prefix}_tenon_frac * {len_param}"
 
-    # Body radius: dimension from L3.endSketchPoint perpendicular to axis.
-    # L3.end = shoulder-to-body transition point, which sets the body radius.
-    # Use a construction line from axis to L3.end, dimensioned as body radius.
+    # Body radius via construction line from axis to L3.end
     shoulder_pt = L3.endSketchPoint.geometry
     body_con = lines.addByTwoPoints(
         P(shoulder_pt.x - anx * mid_r, shoulder_pt.y - any_ * mid_r, 0),
@@ -292,9 +301,6 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
         body_con.startSketchPoint, body_con.endSketchPoint, AL,
         P(shoulder_pt.x + anx * 2, shoulder_pt.y + any_ * 2, 0)
     ).parameter.expression = f"{prefix}_mid_dia / 2"
-
-    # Symmetric body halves (replaces addMidPoint which over-constrains)
-    gc.addEqual(L5, L4)
 
     # Shoulder length
     dims.addDistanceDimension(
