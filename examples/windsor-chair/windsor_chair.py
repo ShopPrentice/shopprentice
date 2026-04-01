@@ -836,36 +836,57 @@ def run(context):
     from woodworking.templates import turned_stretcher as ts
     importlib.reload(ts)
 
-    # Use existing Windsor params for the template
+    # Side stretcher params
     ts.define_params(params, prefix="ts",
                      mid_dia="str_mid_dia", end_dia="str_end_dia",
-                     tenon_frac="0.5 in", shoulder_frac="0.25 in",
+                     tenon_len="0.5 in", shoulder_len="0.25 in",
+                     ext="tenon_ext")
+    # Cross stretcher params (shorter tenon, goes into side stretcher)
+    ts.define_params(params, prefix="tc",
+                     mid_dia="str_mid_dia", end_dia="str_end_dia",
+                     tenon_len="0.375 in", shoulder_len="0.2 in",
                      ext="tenon_ext")
 
     # ---- Get leg axes from circular edges ----
     # FL and BL legs are in the Legs component. Find their circular end
     # edges to create construction axes that track the bodies.
     def _leg_axis(comp, body, name):
-        """Create a construction axis through a leg's circular end edges."""
+        """Create a construction axis through a body's two end circles.
+
+        Works for vertical legs (sorted by Z) and horizontal stretchers
+        (sorted by distance between circle centers — picks the two
+        farthest-apart circles = the body ends).
+        """
         circ_edges = []
         for ei in range(body.edges.count):
             e = body.edges.item(ei)
             if isinstance(e.geometry, adsk.core.Circle3D):
                 circ_edges.append(e)
-        circ_edges.sort(key=lambda e: e.geometry.center.z)
         if len(circ_edges) < 2:
             print(f"{name}: not enough circular edges ({len(circ_edges)})")
             return None
-        cp_bot_inp = comp.constructionPoints.createInput()
-        cp_bot_inp.setByCenter(circ_edges[0])
-        cp_bot = comp.constructionPoints.add(cp_bot_inp)
-        cp_bot.name = f"{name}_Bot"
-        cp_top_inp = comp.constructionPoints.createInput()
-        cp_top_inp.setByCenter(circ_edges[-1])
-        cp_top = comp.constructionPoints.add(cp_top_inp)
-        cp_top.name = f"{name}_Top"
+        # Find the two circles farthest apart (= the body endpoints)
+        best_d = 0
+        best_pair = (0, 1)
+        for i in range(len(circ_edges)):
+            for j in range(i + 1, len(circ_edges)):
+                ci = circ_edges[i].geometry.center
+                cj = circ_edges[j].geometry.center
+                d = math.sqrt((ci.x-cj.x)**2 + (ci.y-cj.y)**2 + (ci.z-cj.z)**2)
+                if d > best_d:
+                    best_d = d
+                    best_pair = (i, j)
+        e0, e1 = circ_edges[best_pair[0]], circ_edges[best_pair[1]]
+        cp0_inp = comp.constructionPoints.createInput()
+        cp0_inp.setByCenter(e0)
+        cp0 = comp.constructionPoints.add(cp0_inp)
+        cp0.name = f"{name}_End0"
+        cp1_inp = comp.constructionPoints.createInput()
+        cp1_inp.setByCenter(e1)
+        cp1 = comp.constructionPoints.add(cp1_inp)
+        cp1.name = f"{name}_End1"
         ax_inp = comp.constructionAxes.createInput()
-        ax_inp.setByTwoPoints(cp_bot, cp_top)
+        ax_inp.setByTwoPoints(cp0, cp1)
         ax = comp.constructionAxes.add(ax_inp)
         ax.name = f"{name}_Ax"
         return ax
@@ -898,29 +919,16 @@ def run(context):
         Str_Right = None
 
     # ---- Cross stretcher (Str_Left → Str_Right) via template ----
+    # Treat side stretchers as "legs" — get their axes and connect
+    # at mid_y from each end (≈ midpoint of side stretcher).
     Str_Cross = None
     if Str_Left and Str_Right:
         sl_axis = _leg_axis(Legs_c, Str_Left, "SL")
         sr_axis = _leg_axis(Legs_c, Str_Right, "SR")
         if sl_axis and sr_axis:
-            sl_bb = Str_Left.boundingBox
-            sl_len = math.sqrt(
-                (sl_bb.maxPoint.x - sl_bb.minPoint.x)**2 +
-                (sl_bb.maxPoint.y - sl_bb.minPoint.y)**2 +
-                (sl_bb.maxPoint.z - sl_bb.minPoint.z)**2)
-            half_sl = sl_len / 2
-            _cx_expr = f"{round(half_sl / 2.54, 4)} in"
-            _cx_p = params.itemByName("cx_dist")
-            if _cx_p:
-                _cx_p.expression = _cx_expr
-            else:
-                params.add("cx_dist",
-                    adsk.core.ValueInput.createByString(_cx_expr),
-                    "in", "Cross stretcher midpoint distance")
-
             Str_Cross = ts.build(Legs_c, axis_a=sl_axis, axis_b=sr_axis,
-                                 dist_a="cx_dist", dist_b="cx_dist",
-                                 body_dia_expr="str_mid_dia", prefix="ts",
+                                 dist_a="mid_y", dist_b="mid_y",
+                                 body_dia_expr="str_mid_dia", prefix="tc",
                                  name="Str_Cross", ev=ev)
 
     # ---- Wedges on stretcher joints ----

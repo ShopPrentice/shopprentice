@@ -35,15 +35,15 @@ P = adsk.core.Point3D.create
 
 def define_params(params, prefix="ts",
                   mid_dia="0.75 in", end_dia="0.5 in",
-                  tenon_frac="0.5 in", shoulder_frac="0.25 in",
+                  tenon_len="0.5 in", shoulder_len="0.25 in",
                   ext="0.1 in"):
     """Add turned stretcher parameters to the design."""
     p = prefix
     for pname, expr, unit, desc in [
         (f"{p}_mid_dia", mid_dia,       "in", "Stretcher body diameter"),
         (f"{p}_end_dia", end_dia,       "in", "Stretcher tenon diameter"),
-        (f"{p}_tenon_len", tenon_frac,  "in", "Tenon length"),
-        (f"{p}_shoulder_len", shoulder_frac, "in", "Shoulder transition length"),
+        (f"{p}_tenon_len", tenon_len,     "in", "Tenon length"),
+        (f"{p}_shoulder_len", shoulder_len, "in", "Shoulder transition length"),
         (f"{p}_ext", ext,               "in", "Tenon extension beyond leg surface"),
     ]:
         existing = params.itemByName(pname)
