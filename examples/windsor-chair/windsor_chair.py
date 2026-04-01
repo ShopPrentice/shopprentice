@@ -832,7 +832,7 @@ def run(context):
     # Use existing Windsor params for the template
     ts.define_params(params, prefix="ts",
                      mid_dia="str_mid_dia", end_dia="str_end_dia",
-                     tenon_frac="0.12", shoulder_frac="str_shoulder_frac",
+                     tenon_frac="0.5 in", shoulder_frac="0.25 in",
                      ext="tenon_ext")
 
     # ---- Get leg axes from circular edges ----

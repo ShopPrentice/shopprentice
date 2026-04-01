@@ -35,15 +35,15 @@ P = adsk.core.Point3D.create
 
 def define_params(params, prefix="ts",
                   mid_dia="0.75 in", end_dia="0.5 in",
-                  tenon_frac="0.12", shoulder_frac="0.06",
-                  ext="0.1 in", body_ext="0"):
+                  tenon_frac="0.5 in", shoulder_frac="0.25 in",
+                  ext="0.1 in"):
     """Add turned stretcher parameters to the design."""
     p = prefix
     for pname, expr, unit, desc in [
         (f"{p}_mid_dia", mid_dia,       "in", "Stretcher body diameter"),
         (f"{p}_end_dia", end_dia,       "in", "Stretcher tenon diameter"),
-        (f"{p}_tenon_frac", tenon_frac, "",   "Tenon length as fraction of total"),
-        (f"{p}_shoulder_frac", shoulder_frac, "", "Shoulder transition fraction"),
+        (f"{p}_tenon_len", tenon_frac,  "in", "Tenon length"),
+        (f"{p}_shoulder_len", shoulder_frac, "in", "Shoulder transition length"),
         (f"{p}_ext", ext,               "in", "Tenon extension beyond leg surface"),
     ]:
         existing = params.itemByName(pname)
@@ -217,42 +217,45 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
 
     end_r = ev(f"{prefix}_end_dia") / 2
     mid_r = ev(f"{prefix}_mid_dia") / 2
-    t_frac = ev(f"{prefix}_tenon_frac")
-    s_frac = ev(f"{prefix}_shoulder_frac")
+    t_len = ev(f"{prefix}_tenon_len")
+    s_len = ev(f"{prefix}_shoulder_len")
 
     as_g = ax_line.startSketchPoint.geometry
     ae_g = ax_line.endSketchPoint.geometry
     ax_len = math.sqrt((ae_g.x - as_g.x)**2 + (ae_g.y - as_g.y)**2)
 
-    def pt(frac, radius):
-        return P(as_g.x + ux * ax_len * frac + anx * radius,
-                 as_g.y + uy * ax_len * frac + any_ * radius, 0)
+    def pt_abs(dist_from_start, radius):
+        """Point at absolute distance from axis start + radius offset."""
+        return P(as_g.x + ux * dist_from_start + anx * radius,
+                 as_g.y + uy * dist_from_start + any_ * radius, 0)
 
     # L1: perpendicular from A tip
-    L1 = lines.addByTwoPoints(P(as_g.x, as_g.y, 0), pt(0, end_r))
+    L1 = lines.addByTwoPoints(P(as_g.x, as_g.y, 0), pt_abs(0, end_r))
     gc.addCoincident(L1.startSketchPoint, ax_line.startSketchPoint)
     gc.addPerpendicular(L1, ax_line)
 
     # L2: tenon — parallel to axis
-    L2 = lines.addByTwoPoints(L1.endSketchPoint, pt(t_frac, end_r))
+    L2 = lines.addByTwoPoints(L1.endSketchPoint, pt_abs(t_len, end_r))
     gc.addParallel(L2, ax_line)
 
     # L3: angled shoulder
-    L3 = lines.addByTwoPoints(L2.endSketchPoint, pt(t_frac + s_frac, mid_r))
+    L3 = lines.addByTwoPoints(L2.endSketchPoint, pt_abs(t_len + s_len, mid_r))
 
     # L4: body left half to midpoint
-    L4 = lines.addByTwoPoints(L3.endSketchPoint, pt(0.5, mid_r))
+    L4 = lines.addByTwoPoints(L3.endSketchPoint, pt_abs(ax_len / 2, mid_r))
     gc.addParallel(L4, ax_line)
 
     # L5: body right half
-    L5 = lines.addByTwoPoints(L4.endSketchPoint, pt(1 - t_frac - s_frac, mid_r))
+    L5 = lines.addByTwoPoints(L4.endSketchPoint,
+                               pt_abs(ax_len - t_len - s_len, mid_r))
     gc.addParallel(L5, ax_line)
 
     # L6: angled shoulder (symmetric)
-    L6 = lines.addByTwoPoints(L5.endSketchPoint, pt(1 - t_frac, end_r))
+    L6 = lines.addByTwoPoints(L5.endSketchPoint,
+                               pt_abs(ax_len - t_len, end_r))
 
     # L7: tenon — parallel
-    L7 = lines.addByTwoPoints(L6.endSketchPoint, pt(1, end_r))
+    L7 = lines.addByTwoPoints(L6.endSketchPoint, pt_abs(ax_len, end_r))
     gc.addParallel(L7, ax_line)
 
     # L8: perpendicular to B tip
@@ -282,11 +285,11 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
         P(as_g.x + anx * 2, as_g.y + any_ * 2, 0)
     ).parameter.expression = f"{prefix}_end_dia / 2"
 
-    # Tenon length
+    # Tenon length (absolute)
     dims.addDistanceDimension(
         L2.startSketchPoint, L2.endSketchPoint, AL,
-        P(pt(t_frac, end_r).x + anx, pt(t_frac, end_r).y + any_, 0)
-    ).parameter.expression = f"{prefix}_tenon_frac * {len_param}"
+        P(pt_abs(t_len, end_r).x + anx, pt_abs(t_len, end_r).y + any_, 0)
+    ).parameter.expression = f"{prefix}_tenon_len"
 
     # Body radius via construction line from axis to L3.end
     shoulder_pt = L3.endSketchPoint.geometry
@@ -302,12 +305,12 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
         P(shoulder_pt.x + anx * 2, shoulder_pt.y + any_ * 2, 0)
     ).parameter.expression = f"{prefix}_mid_dia / 2"
 
-    # Shoulder length
+    # Shoulder length (absolute)
     dims.addDistanceDimension(
         L2.endSketchPoint, L3.endSketchPoint, AL,
-        P(pt(t_frac + s_frac, mid_r).x + anx,
-          pt(t_frac + s_frac, mid_r).y + any_, 0)
-    ).parameter.expression = f"{prefix}_shoulder_frac * {len_param}"
+        P(pt_abs(t_len + s_len, mid_r).x + anx,
+          pt_abs(t_len + s_len, mid_r).y + any_, 0)
+    ).parameter.expression = f"{prefix}_shoulder_len"
 
     # ── Step 6: Revolve ────────────────────────────────────────────
     prof = sp.smallest_profile(sk)
