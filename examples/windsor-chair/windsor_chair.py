@@ -964,7 +964,25 @@ def run(context):
         for wi in range(sl_w_mir.bodies.count):
             sl_w_mir.bodies.item(wi).name = "TW_SR_" + str(wi)
 
-    print("Stretchers: " + str(sum(1 for s in [Str_Left, Str_Right] if s)) + " built via template")
+    # Cross stretcher wedges
+    if Str_Cross:
+        cs_pfaces = []
+        for fi in range(Str_Cross.faces.count):
+            f = Str_Cross.faces.item(fi)
+            if isinstance(f.geometry, adsk.core.Plane):
+                cs_pfaces.append(f)
+        cs_pfaces.sort(key=lambda f: f.area)
+        for csi, ef in enumerate(cs_pfaces[:2]):
+            fc = ef.pointOnFace
+            mort = Str_Left if fc.x < ev("mid_x") else Str_Right
+            wname = "TW_SC_L" if fc.x < ev("mid_x") else "TW_SC_R"
+            tw.round_tenon(Legs_c, tenon_body=Str_Cross,
+                mortise_body=mort, end_face=ef,
+                tenon_depth_expr="stc_mid_dia",
+                tenon_diam_expr="stc_end_dia",
+                name=wname, ev=ev)
+
+    print("Stretchers: " + str(sum(1 for s in [Str_Left, Str_Right, Str_Cross] if s)) + " built via template")
 
     # ==== BACK: Spindles on curved arc + Curved crest rail ====
     # Spindles arranged along an arc for comfort.
