@@ -877,7 +877,6 @@ def run(context):
     bl_axis = _leg_axis(Legs_c, bl_body, "BL")
 
     # ---- Left side stretcher (FL → BL) via template ----
-    # Build in Legs component (where axes live) to avoid cross-component issues
     Str_Left = ts.build(Legs_c, axis_a=fl_axis, axis_b=bl_axis,
                         dist_a="str_z", dist_b="str_z",
                         body_dia_expr="leg_dia", prefix="ts",
@@ -897,15 +896,12 @@ def run(context):
         sl_axis = _leg_axis(Legs_c, Str_Left, "SL")
         sr_axis = _leg_axis(Legs_c, Str_Right, "SR")
         if sl_axis and sr_axis:
-            # Connect at the center of each side stretcher.
-            # Measure the side stretcher axis length and use half.
             sl_bb = Str_Left.boundingBox
             sl_len = math.sqrt(
                 (sl_bb.maxPoint.x - sl_bb.minPoint.x)**2 +
                 (sl_bb.maxPoint.y - sl_bb.minPoint.y)**2 +
                 (sl_bb.maxPoint.z - sl_bb.minPoint.z)**2)
             half_sl = sl_len / 2
-            # Store as parameter
             _cx_expr = f"{round(half_sl / 2.54, 4)} in"
             _cx_p = params.itemByName("cx_dist")
             if _cx_p:

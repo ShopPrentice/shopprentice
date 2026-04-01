@@ -91,17 +91,19 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
         return None
 
     # ── Step 2: Construction points + axis ─────────────────────────
-    cp_a = _construction_point(comp, pt_a, f"{name}_CpA")
-    cp_b = _construction_point(comp, pt_b, f"{name}_CpB")
+    # Construction points in the axis's own component
+    ax_comp = axis_a.component if hasattr(axis_a, 'component') else comp
+    cp_a = _construction_point(ax_comp, pt_a, f"{name}_CpA")
+    cp_b = _construction_point(ax_comp, pt_b, f"{name}_CpB")
 
     if not cp_a or not cp_b:
         print(f"{name}: could not create construction points")
         return None
 
-    # Construction axis through the two points (for plane creation)
-    ax_inp = comp.constructionAxes.createInput()
+    # Construction axis — build in same component as the points
+    ax_inp = ax_comp.constructionAxes.createInput()
     ax_inp.setByTwoPoints(cp_a, cp_b)
-    con_axis = comp.constructionAxes.add(ax_inp)
+    con_axis = ax_comp.constructionAxes.add(ax_inp)
     con_axis.name = f"{name}_Axis"
 
     # ── Step 3: Profile sketch plane ───────────────────────────────
@@ -175,41 +177,40 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     body_r = ev(body_dia_expr) / 2
     ext_total = body_r + ext_val
 
-    # A-side extension from ctr_line start outward
+    # Axis line: collinear with ctr_line, centered on ctr_line midpoint,
+    # total length = ctr_distance + 2 * (body_dia/2 + ext).
+    # Using midpoint constraint ensures extensions are symmetric and
+    # direction-independent (no flipping when legs move).
     a_tip = P(pa_g.x - ux * ext_total, pa_g.y - uy * ext_total, 0)
-    ext_a = lines.addByTwoPoints(a_tip, P(pa_g.x, pa_g.y, 0))
-    ext_a.isConstruction = True
-    gc.addCoincident(ext_a.endSketchPoint, ctr_line.startSketchPoint)
-    gc.addCollinear(ext_a, ctr_line)
-    dims.addDistanceDimension(
-        ext_a.startSketchPoint, ext_a.endSketchPoint, AL,
-        P((a_tip.x + pa_g.x) / 2 - uy, (a_tip.y + pa_g.y) / 2 + ux, 0)
-    ).parameter.expression = f"{body_dia_expr} / 2 + {prefix}_ext"
-
-    # B-side extension
     b_tip = P(pb_g.x + ux * ext_total, pb_g.y + uy * ext_total, 0)
-    ext_b = lines.addByTwoPoints(P(pb_g.x, pb_g.y, 0), b_tip)
-    ext_b.isConstruction = True
-    gc.addCoincident(ext_b.startSketchPoint, ctr_line.endSketchPoint)
-    gc.addCollinear(ext_b, ctr_line)
-    dims.addDistanceDimension(
-        ext_b.startSketchPoint, ext_b.endSketchPoint, AL,
-        P((pb_g.x + b_tip.x) / 2 - uy, (pb_g.y + b_tip.y) / 2 + ux, 0)
-    ).parameter.expression = f"{body_dia_expr} / 2 + {prefix}_ext"
+    ax_line = lines.addByTwoPoints(a_tip, b_tip)
+    gc.addCollinear(ax_line, ctr_line)
 
-    # Full axis line (non-construction, for revolve)
-    ax_line = lines.addByTwoPoints(
-        P(a_tip.x, a_tip.y, 0), P(b_tip.x, b_tip.y, 0))
-    gc.addCoincident(ax_line.startSketchPoint, ext_a.startSketchPoint)
-    gc.addCoincident(ax_line.endSketchPoint, ext_b.endSketchPoint)
+    # Midpoint of ctr_line = midpoint of ax_line → symmetric extensions
+    # Create a construction point at ctr_line midpoint, constrain ax_line
+    # midpoint to it
+    ctr_mid_pt = P((pa_g.x + pb_g.x) / 2, (pa_g.y + pb_g.y) / 2, 0)
+    ctr_mid_line = lines.addByTwoPoints(ctr_mid_pt,
+        P(ctr_mid_pt.x - uy * 0.5, ctr_mid_pt.y + ux * 0.5, 0))
+    ctr_mid_line.isConstruction = True
+    gc.addMidPoint(ctr_mid_line.startSketchPoint, ctr_line)
+    gc.addMidPoint(ctr_mid_line.startSketchPoint, ax_line)
 
-    # Driven dimension on center-to-center distance (for proportional profile)
+    # Dimension: total axis length
+    ax_len_dim = dims.addDistanceDimension(
+        ax_line.startSketchPoint, ax_line.endSketchPoint, AL,
+        P(ctr_mid_pt.x - uy * 3, ctr_mid_pt.y + ux * 3, 0))
+
+    # Driven dimension on ctr_line for proportional profile reference
     len_dim = dims.addDistanceDimension(
         ctr_line.startSketchPoint, ctr_line.endSketchPoint, AL,
-        P((pa_g.x + pb_g.x) / 2 - uy * 3,
-          (pa_g.y + pb_g.y) / 2 + ux * 3, 0),
+        P(ctr_mid_pt.x - uy * 5, ctr_mid_pt.y + ux * 5, 0),
         False)  # isDriving=False
     len_param = len_dim.parameter.name
+
+    # Total axis = ctr_distance + 2 * extension
+    ax_len_dim.parameter.expression = \
+        f"{len_param} + 2 * ({body_dia_expr} / 2 + {prefix}_ext)"
 
     # ── Step 5: Profile ────────────────────────────────────────────
     anx, any_ = -uy, ux  # normal to axis
@@ -276,16 +277,24 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
         P(pt(t_frac, end_r).x + anx, pt(t_frac, end_r).y + any_, 0)
     ).parameter.expression = f"{prefix}_tenon_frac * {len_param}"
 
-    # Body radius via midpoint
-    mid_pt = P((as_g.x + ae_g.x) / 2, (as_g.y + ae_g.y) / 2, 0)
-    mid_con = lines.addByTwoPoints(mid_pt, pt(0.5, mid_r))
-    mid_con.isConstruction = True
-    gc.addPerpendicular(mid_con, ax_line)
-    gc.addMidPoint(mid_con.startSketchPoint, ax_line)
+    # Body radius: dimension from L3.endSketchPoint perpendicular to axis.
+    # L3.end = shoulder-to-body transition point, which sets the body radius.
+    # Use a construction line from axis to L3.end, dimensioned as body radius.
+    shoulder_pt = L3.endSketchPoint.geometry
+    body_con = lines.addByTwoPoints(
+        P(shoulder_pt.x - anx * mid_r, shoulder_pt.y - any_ * mid_r, 0),
+        P(shoulder_pt.x, shoulder_pt.y, 0))
+    body_con.isConstruction = True
+    gc.addPerpendicular(body_con, ax_line)
+    gc.addCoincident(body_con.startSketchPoint, ax_line)
+    gc.addCoincident(body_con.endSketchPoint, L3.endSketchPoint)
     dims.addDistanceDimension(
-        mid_con.startSketchPoint, mid_con.endSketchPoint, AL,
-        P(mid_pt.x + anx * 2, mid_pt.y + any_ * 2, 0)
+        body_con.startSketchPoint, body_con.endSketchPoint, AL,
+        P(shoulder_pt.x + anx * 2, shoulder_pt.y + any_ * 2, 0)
     ).parameter.expression = f"{prefix}_mid_dia / 2"
+
+    # Symmetric body halves (replaces addMidPoint which over-constrains)
+    gc.addEqual(L5, L4)
 
     # Shoulder length
     dims.addDistanceDimension(
