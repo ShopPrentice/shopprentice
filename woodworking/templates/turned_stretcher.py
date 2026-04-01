@@ -362,8 +362,9 @@ def _point_on_axis(comp, axis, dist_expr, name):
         sk = axis.parentSketch
         proj_line = axis
     else:
-        # It's a ConstructionAxis — create a sketch in the axis's own
-        # component (avoids cross-component reference issues)
+        # It's a ConstructionAxis — create a sketch, project the two
+        # construction points that define the axis (not the infinite axis
+        # line, which projects with arbitrary endpoints).
         ax_comp = axis.component if hasattr(axis, 'component') else comp
         pl_inp = ax_comp.constructionPlanes.createInput()
         pl_inp.setByAngle(axis, V("90 deg"), ax_comp.xYConstructionPlane)
@@ -372,20 +373,61 @@ def _point_on_axis(comp, axis, dist_expr, name):
 
         sk = ax_comp.sketches.add(pl)
         sk.name = f"{name}_Sk"
-        sk.project(axis)
-        sp.refs_to_construction(sk)
 
-        # Find the projected line
-        proj_line = None
-        for ci in range(sk.sketchCurves.count):
-            c = sk.sketchCurves.item(ci)
-            if c.objectType.endswith('SketchLine') and \
-               (c.isConstruction or c.isReference):
-                proj_line = c
-                break
-        if not proj_line:
-            print(f"{name}: could not find projected axis")
-            return None, None
+        # Find the two construction points that define this axis
+        # They were created by _leg_axis as {name}_End0 and {name}_End1
+        cp0 = None; cp1 = None
+        ax_name_base = axis.name.replace("_Ax", "")
+        for ci in range(ax_comp.constructionPoints.count):
+            cp = ax_comp.constructionPoints.item(ci)
+            if cp.name == f"{ax_name_base}_End0":
+                cp0 = cp
+            elif cp.name == f"{ax_name_base}_End1":
+                cp1 = cp
+
+        if not cp0 or not cp1:
+            # Fallback: project the axis (infinite line — less accurate)
+            sk.project(axis)
+            sp.refs_to_construction(sk)
+            proj_line = None
+            for ci in range(sk.sketchCurves.count):
+                c = sk.sketchCurves.item(ci)
+                if c.objectType.endswith('SketchLine') and \
+                   (c.isConstruction or c.isReference):
+                    proj_line = c
+                    break
+            if not proj_line:
+                print(f"{name}: could not find projected axis")
+                return None, None
+        else:
+            # Project the two endpoints and draw a line between them
+            sk.project(cp0)
+            sk.project(cp1)
+            m2s = sk.modelToSketchSpace
+            p0 = m2s(cp0.geometry)
+            p1 = m2s(cp1.geometry)
+            # Find projected sketch points
+            best0 = None; best1 = None; d0 = 1e10; d1 = 1e10
+            for pi in range(sk.sketchPoints.count):
+                pt = sk.sketchPoints.item(pi)
+                if pt == sk.originPoint: continue
+                g = pt.geometry
+                dd0 = math.sqrt((g.x-p0.x)**2 + (g.y-p0.y)**2)
+                dd1 = math.sqrt((g.x-p1.x)**2 + (g.y-p1.y)**2)
+                if dd0 < d0: d0 = dd0; best0 = pt
+                if dd1 < d1: d1 = dd1; best1 = pt
+            if not best0 or not best1 or best0 == best1:
+                print(f"{name}: could not find projected endpoints")
+                return None, None
+            # Draw axis line between projected endpoints
+            proj_line = sk.sketchCurves.sketchLines.addByTwoPoints(
+                P(best0.geometry.x, best0.geometry.y, 0),
+                P(best1.geometry.x, best1.geometry.y, 0))
+            proj_line.isConstruction = True
+            sk.geometricConstraints.addCoincident(
+                proj_line.startSketchPoint, best0)
+            sk.geometricConstraints.addCoincident(
+                proj_line.endSketchPoint, best1)
 
     gc = sk.geometricConstraints
     dims = sk.sketchDimensions
