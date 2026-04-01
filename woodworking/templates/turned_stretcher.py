@@ -346,14 +346,15 @@ def _point_on_axis(comp, axis, dist_expr, name):
         sk = axis.parentSketch
         proj_line = axis
     else:
-        # It's a ConstructionAxis — create a sketch to project it into
-        # Plane containing the axis: 90° from XY around the axis
-        pl_inp = comp.constructionPlanes.createInput()
-        pl_inp.setByAngle(axis, V("90 deg"), comp.xYConstructionPlane)
-        pl = comp.constructionPlanes.add(pl_inp)
+        # It's a ConstructionAxis — create a sketch in the axis's own
+        # component (avoids cross-component reference issues)
+        ax_comp = axis.component if hasattr(axis, 'component') else comp
+        pl_inp = ax_comp.constructionPlanes.createInput()
+        pl_inp.setByAngle(axis, V("90 deg"), ax_comp.xYConstructionPlane)
+        pl = ax_comp.constructionPlanes.add(pl_inp)
         pl.name = f"{name}_Pl"
 
-        sk = comp.sketches.add(pl)
+        sk = ax_comp.sketches.add(pl)
         sk.name = f"{name}_Sk"
         sk.project(axis)
         sp.refs_to_construction(sk)

@@ -818,421 +818,124 @@ def run(context):
             b.name = "TW_BR"
     print("Legs: 4 + 4 wedges (chamfered, wedged, mirrored)")
 
-    # ==== STRETCHERS (H-stretcher via Loft between leg centers) ====
-    # Each side stretcher is a Loft connecting FL and BL leg centers at stretcher height.
-    # Cross stretcher connects midpoints of the two side stretchers.
+    # ==== STRETCHERS (H-stretcher via turned_stretcher template) ====
     comp = root
     Stretchers_occ = comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
     Stretchers_occ.component.name = "Stretchers"
     Stretchers_c = Stretchers_occ.component
     comp = Stretchers_c
 
-    str_z = ev("str_z")
     from helpers import sp as _sps2
+    from woodworking.templates import turned_stretcher as ts
+    importlib.reload(ts)
 
-    # ---- Left stretcher: project FL and BL legs, connect their centers ----
-    str_pl = off_plane(comp, comp.xYConstructionPlane, "str_z", "Str_Hz")
-    str_sk = comp.sketches.add(str_pl)
-    str_sk.name = "StrLeft_Axis"
+    # Use existing Windsor params for the template
+    ts.define_params(params, prefix="ts",
+                     mid_dia="str_mid_dia", end_dia="str_end_dia",
+                     tenon_frac="0.12", shoulder_frac="str_shoulder_frac",
+                     ext="tenon_ext")
 
-    # Use the FL and BL body references saved during leg building
-    # fl_body and bl_body are still valid from the leg section above
+    # ---- Get leg axes from circular edges ----
+    # FL and BL legs are in the Legs component. Find their circular end
+    # edges to create construction axes that track the bodies.
+    def _leg_axis(comp, body, name):
+        """Create a construction axis through a leg's circular end edges."""
+        circ_edges = []
+        for ei in range(body.edges.count):
+            e = body.edges.item(ei)
+            if isinstance(e.geometry, adsk.core.Circle3D):
+                circ_edges.append(e)
+        circ_edges.sort(key=lambda e: e.geometry.center.z)
+        if len(circ_edges) < 2:
+            print(f"{name}: not enough circular edges ({len(circ_edges)})")
+            return None
+        cp_bot_inp = comp.constructionPoints.createInput()
+        cp_bot_inp.setByCenter(circ_edges[0])
+        cp_bot = comp.constructionPoints.add(cp_bot_inp)
+        cp_bot.name = f"{name}_Bot"
+        cp_top_inp = comp.constructionPoints.createInput()
+        cp_top_inp.setByCenter(circ_edges[-1])
+        cp_top = comp.constructionPoints.add(cp_top_inp)
+        cp_top.name = f"{name}_Top"
+        ax_inp = comp.constructionAxes.createInput()
+        ax_inp.setByTwoPoints(cp_bot, cp_top)
+        ax = comp.constructionAxes.add(ax_inp)
+        ax.name = f"{name}_Ax"
+        return ax
+
+    # Build axes in the Legs component (where the bodies live)
+    Legs_c = None
     _legs_occ = None
     for oi in range(root.occurrences.count):
         occ = root.occurrences.item(oi)
         if occ.component.name == "Legs":
-            _legs_occ = occ; break
-    fl_leg = fl_body  # saved from build_leg call
-    bl_leg = bl_body  # saved from mirror
-    legs_occ = _legs_occ
-    # Intersect leg bodies with sketch plane → cross-section at str_z
-    fl_proxy = fl_leg.createForAssemblyContext(legs_occ)
-    bl_proxy = bl_leg.createForAssemblyContext(legs_occ)
-    str_sk.intersectWithSketchPlane([fl_proxy, bl_proxy])
-    _sps2.refs_to_construction(str_sk)
+            Legs_c = occ.component
+            _legs_occ = occ
+            break
 
-    # Find projected ellipses (closest to approximate leg positions)
-    import math as _mstr
-    m2s_str = str_sk.modelToSketchSpace
-    fl_approx = m2s_str(P(ev("fl_str_x"), ev("fl_str_y"), str_z))
-    bl_bb = bl_leg.boundingBox
-    bl_ax = (bl_bb.minPoint.x + bl_bb.maxPoint.x) / 2
-    bl_ay = (bl_bb.minPoint.y + bl_bb.maxPoint.y) / 2
-    bl_approx = m2s_str(P(bl_ax, bl_ay, str_z))
+    fl_axis = _leg_axis(Legs_c, fl_body, "FL")
+    bl_axis = _leg_axis(Legs_c, bl_body, "BL")
 
-    fl_info = None  # (center_sketch_point, distance, curve)
-    bl_info = None
-    for ci in range(str_sk.sketchCurves.count):
-        c = str_sk.sketchCurves.item(ci)
-        if hasattr(c, 'centerSketchPoint') and c.centerSketchPoint:
-            cp = c.centerSketchPoint.geometry
-            d_fl = _mstr.sqrt((cp.x-fl_approx.x)**2 + (cp.y-fl_approx.y)**2)
-            d_bl = _mstr.sqrt((cp.x-bl_approx.x)**2 + (cp.y-bl_approx.y)**2)
-            if fl_info is None or d_fl < fl_info[1]:
-                fl_info = (c.centerSketchPoint, d_fl, c)
-            if bl_info is None or d_bl < bl_info[1]:
-                bl_info = (c.centerSketchPoint, d_bl, c)
+    # ---- Left side stretcher (FL → BL) via template ----
+    # Build in Legs component (where axes live) to avoid cross-component issues
+    Str_Left = ts.build(Legs_c, axis_a=fl_axis, axis_b=bl_axis,
+                        dist_a="str_z", dist_b="str_z",
+                        body_dia_expr="leg_dia", prefix="ts",
+                        name="Str_Left", ev=ev)
 
-    def _outer_extreme(curve, dir_x, dir_y, m2s_fn):
-        """Sample curve to find point most extreme in direction (dir_x, dir_y)."""
-        geo = curve.worldGeometry
-        evaluator = geo.evaluator
-        _, min_p, max_p = evaluator.getParameterExtents()
-        best_proj = -1e10
-        best_pt = None
-        for i in range(72):
-            t = min_p + (max_p - min_p) * i / 72
-            ok, pt = evaluator.getPointAtParameter(t)
-            if ok:
-                s = m2s_fn(pt)
-                proj = s.x * dir_x + s.y * dir_y
-                if proj > best_proj:
-                    best_proj = proj
-                    best_pt = s
-        return best_pt
-
-    if fl_info and bl_info and fl_info[0] != bl_info[0]:
-        fl_c = fl_info[0].geometry
-        bl_c = bl_info[0].geometry
-        # Direction FL→BL
-        dx = bl_c.x - fl_c.x; dy = bl_c.y - fl_c.y
-        dd = _mstr.sqrt(dx*dx + dy*dy)
-        ux, uy = dx/dd, dy/dd
-
-        # Sample actual outer extremes — no constraint ambiguity
-        fl_outer = _outer_extreme(fl_info[2], -ux, -uy, m2s_str)
-        bl_outer = _outer_extreme(bl_info[2], ux, uy, m2s_str)
-
-        if fl_outer and bl_outer:
-            ax_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(
-                P(fl_outer.x, fl_outer.y, 0), P(bl_outer.x, bl_outer.y, 0))
-            print("Stretcher axis: sampled outer extremes")
-        else:
-            ax_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(fl_info[0], bl_info[0])
-            print("Stretcher axis: fallback to centers")
+    # Mirror left stretcher → right stretcher
+    if Str_Left:
+        StrMirX = mirror_bodies(Legs_c, [Str_Left], XMid, "StrMirX")
+        Str_Right = StrMirX.bodies.item(0)
+        Str_Right.name = "Str_Right"
     else:
-        fl_s = m2s_str(P(ev("fl_str_x"), ev("fl_str_y"), str_z))
-        bl_s = m2s_str(P(bl_ax, bl_ay, str_z))
-        ax_line = str_sk.sketchCurves.sketchLines.addByTwoPoints(
-            P(fl_s.x, fl_s.y, 0), P(bl_s.x, bl_s.y, 0))
-        print("Stretcher axis: fallback positions")
+        Str_Right = None
 
-    # Profile plane + turned profile
-    vert_inp = comp.constructionPlanes.createInput()
-    vert_inp.setByAngle(ax_line, adsk.core.ValueInput.createByString("90 deg"), str_pl)
-    vert_pl = comp.constructionPlanes.add(vert_inp)
-    vert_pl.name = "StrLeft_Vert"
+    # ---- Cross stretcher (Str_Left → Str_Right) via template ----
+    Str_Cross = None
+    if Str_Left and Str_Right:
+        sl_axis = _leg_axis(Legs_c, Str_Left, "SL")
+        sr_axis = _leg_axis(Legs_c, Str_Right, "SR")
+        if sl_axis and sr_axis:
+            # Connect at mid_y along each side stretcher axis
+            Str_Cross = ts.build(Legs_c, axis_a=sl_axis, axis_b=sr_axis,
+                                 dist_a="mid_y", dist_b="mid_y",
+                                 body_dia_expr="str_mid_dia", prefix="ts",
+                                 name="Str_Cross", ev=ev)
 
-    p_sk = comp.sketches.add(vert_pl)
-    p_sk.name = "StrLeft_Prof"
-    m2s_p = p_sk.modelToSketchSpace
-
-    # Project the axis line into the profile sketch → parametric reference endpoints
-    p_sk.project(ax_line)
-    _sps2.refs_to_construction(p_sk)
-
-    # Find the projected axis line (the construction line in the profile sketch)
-    proj_ax = None
-    for ci in range(p_sk.sketchCurves.count):
-        c = p_sk.sketchCurves.item(ci)
-        if (c.isConstruction or c.isReference) and c.objectType.endswith('SketchLine'):
-            proj_ax = c; break
-
-    if proj_ax:
-        ps_s = proj_ax.startSketchPoint.geometry
-        ps_e = proj_ax.endSketchPoint.geometry
-    else:
-        # Fallback: compute from script-time coords
-        sm = str_sk.sketchToModelSpace
-        s_m = sm(P(ax_line.startSketchPoint.geometry.x, ax_line.startSketchPoint.geometry.y, 0))
-        e_m = sm(P(ax_line.endSketchPoint.geometry.x, ax_line.endSketchPoint.geometry.y, 0))
-        ps_s = m2s_p(s_m)
-        ps_e = m2s_p(e_m)
-
-    adx = ps_e.x - ps_s.x
-    ady = ps_e.y - ps_s.y
-    alen = _mstr.sqrt(adx*adx + ady*ady)
-    aux_s, auy_s = adx/alen, ady/alen
-    anx_s, any_s = -auy_s, aux_s
-
-    end_r = ev("str_end_dia") / 2
-    mid_r = ev("str_mid_dia") / 2
-    # Tenon must pass fully through the leg — use leg_dia * 1.5 to account
-    # for the elliptical cross-section when the leg is tilted (splay + rake)
-    through_dist = ev("leg_dia") * 1.5
-    tenon_f = min(through_dist / alen, 0.25)  # cap at 25%
-    shldr_f = tenon_f + ev("str_shoulder_frac") * (0.5 - tenon_f)
-
-    pts = [(0.0, end_r), (tenon_f, end_r), (shldr_f, mid_r),
-           (0.5, mid_r), (1.0-shldr_f, mid_r), (1.0-tenon_f, end_r), (1.0, end_r)]
-    sk_pts = [P(ps_s.x+aux_s*alen*f+anx_s*r, ps_s.y+auy_s*alen*f+any_s*r, 0) for f,r in pts]
-
-    lns = p_sk.sketchCurves.sketchLines
-    L0=lns.addByTwoPoints(sk_pts[0],sk_pts[1]); L1=lns.addByTwoPoints(L0.endSketchPoint,sk_pts[2])
-    L2=lns.addByTwoPoints(L1.endSketchPoint,sk_pts[3]); L3=lns.addByTwoPoints(L2.endSketchPoint,sk_pts[4])
-    L4=lns.addByTwoPoints(L3.endSketchPoint,sk_pts[5]); L5=lns.addByTwoPoints(L4.endSketchPoint,sk_pts[6])
-    L_r=lns.addByTwoPoints(L5.endSketchPoint,P(ps_e.x,ps_e.y,0))
-    L_bot=lns.addByTwoPoints(L_r.endSketchPoint,P(ps_s.x,ps_s.y,0))
-    L_l=lns.addByTwoPoints(L_bot.endSketchPoint,L0.startSketchPoint)
-
-    gc=p_sk.geometricConstraints
-    gc.addParallel(L0,L_bot); gc.addParallel(L5,L_bot); gc.addParallel(L2,L_bot); gc.addParallel(L3,L_bot)
-    gc.addEqual(L5,L0); gc.addEqual(L3,L2)
-    # Constrain L_bot endpoints to projected axis endpoints (parametric link)
-    if proj_ax:
-        gc.addCoincident(L_r.endSketchPoint, proj_ax.endSketchPoint)
-        gc.addCoincident(L_bot.endSketchPoint, proj_ax.startSketchPoint)
-
-    dims=p_sk.sketchDimensions; AL=adsk.fusion.DimensionOrientations.AlignedDimensionOrientation
-    dims.addDistanceDimension(L_l.startSketchPoint,L_l.endSketchPoint,AL,
-        P(L_l.startSketchPoint.geometry.x+anx_s*2,L_l.startSketchPoint.geometry.y+any_s*2,0)
-    ).parameter.expression="str_end_dia / 2"
-    mid_con=lns.addByTwoPoints(P((ps_s.x+ps_e.x)/2,(ps_s.y+ps_e.y)/2,0),L2.endSketchPoint)
-    mid_con.isConstruction=True; gc.addPerpendicular(mid_con,L_bot); gc.addCoincident(mid_con.startSketchPoint,L_bot)
-    dims.addDistanceDimension(mid_con.startSketchPoint,mid_con.endSketchPoint,AL,
-        P(mid_con.startSketchPoint.geometry.x+anx_s*2,mid_con.startSketchPoint.geometry.y+any_s*2,0)
-    ).parameter.expression="str_mid_dia / 2"
-
-    prof=p_sk.profiles.item(0) if p_sk.profiles.count>0 else None
-    Str_Left = None
-    if prof:
-        rev=comp.features.revolveFeatures.createInput(prof,L_bot,NEWBODY)
-        rev.setAngleExtent(False,adsk.core.ValueInput.createByString("360 deg"))
-        rf=comp.features.revolveFeatures.add(rev); rf.name="Str_Left"
-        Str_Left=rf.bodies.item(0); Str_Left.name="Str_Left"
-
-        # Tenon extensions on both ends of side stretcher
-        str_faces = []
+    # ---- Wedges on stretcher joints ----
+    # Side stretcher wedges (FL and BL ends)
+    sl_wedges = []
+    if Str_Left:
+        pfaces = []
         for fi in range(Str_Left.faces.count):
             f = Str_Left.faces.item(fi)
             if isinstance(f.geometry, adsk.core.Plane):
-                str_faces.append(f)
-        str_faces.sort(key=lambda f: f.area)
-        for tfi, tf in enumerate(str_faces[:2]):
-            if tf.loops.count > 0:
-                te_inp2 = comp.features.extrudeFeatures.createInput(tf, JOIN)
-                te_inp2.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
-                te_inp2.participantBodies = [Str_Left]
-                te_f2 = comp.features.extrudeFeatures.add(te_inp2)
-                te_f2.name = "StrL_TenExt" + str(tfi)
-
-        # Wedges on Str_Left tenon ends (before mirror so slots replicate)
-        # Find the 2 smallest planar faces = tenon ends
-        sl_pfaces = []
-        for fi in range(Str_Left.faces.count):
-            f = Str_Left.faces.item(fi)
-            if isinstance(f.geometry, adsk.core.Plane):
-                sl_pfaces.append(f)
-        sl_pfaces.sort(key=lambda f: f.area)
-        # Identify FL vs BL end by face center proximity to leg positions
+                pfaces.append(f)
+        pfaces.sort(key=lambda f: f.area)
         fl_bb = fl_body.boundingBox
         fl_cx = (fl_bb.minPoint.x + fl_bb.maxPoint.x) / 2
         fl_cy = (fl_bb.minPoint.y + fl_bb.maxPoint.y) / 2
-        sl_wedges = []
-        for tfi, ef in enumerate(sl_pfaces[:2]):
-            ok, fn = ef.evaluator.getNormalAtPoint(ef.pointOnFace)
+        for wi, ef in enumerate(pfaces[:2]):
             fc = ef.pointOnFace
-            d_fl = _mstr.sqrt((fc.x - fl_cx)**2 + (fc.y - fl_cy)**2)
-            # Closer to FL leg = FL end, else BL end
-            if d_fl < 5:  # cm threshold
-                mort_ref = fl_body
-                wname = "TW_SL_FL"
-            else:
-                mort_ref = bl_body
-                wname = "TW_SL_BL"
-            sw = tw.round_tenon(comp, tenon_body=Str_Left,
-                mortise_body=mort_ref, end_face=ef,
+            import math as _mstr_w
+            d_fl = _mstr_w.sqrt((fc.x - fl_cx)**2 + (fc.y - fl_cy)**2)
+            mort = fl_body if d_fl < 10 else bl_body
+            wname = "TW_SL_FL" if d_fl < 10 else "TW_SL_BL"
+            w = tw.round_tenon(Legs_c, tenon_body=Str_Left,
+                mortise_body=mort, end_face=ef,
                 tenon_depth_expr="leg_dia",
-                tenon_diam_expr="str_end_dia",
+                tenon_diam_expr="ts_end_dia",
                 name=wname, ev=ev)
-            sl_wedges.append(sw)
-        print("Side stretcher wedges: " + str(len(sl_wedges)))
+            sl_wedges.append(w)
 
-        StrMirX=mirror_bodies(comp,[Str_Left],XMid,"StrMirX")
-        Str_Right=StrMirX.bodies.item(0); Str_Right.name="Str_Right"
-        # Mirror side stretcher wedge bodies
-        if sl_wedges:
-            sl_w_mir = mirror_bodies(comp, sl_wedges, XMid, "StrWedgeMirX")
-            for wi in range(sl_w_mir.bodies.count):
-                wb = sl_w_mir.bodies.item(wi)
-                wb.name = "TW_SR_" + str(wi)
-        print("Side stretchers: revolved + tenon ext + wedged + mirrored")
+    # Mirror stretcher wedges
+    if sl_wedges:
+        sl_w_mir = mirror_bodies(Legs_c, sl_wedges, XMid, "StrWedgeMirX")
+        for wi in range(sl_w_mir.bodies.count):
+            sl_w_mir.bodies.item(wi).name = "TW_SR_" + str(wi)
 
-    # ---- Cross stretcher: body-referenced via intersection in profile sketch ----
-    # Create vertical plane at mid_y (cross stretcher runs left-right)
-    cross_pl = off_plane(comp, comp.xZConstructionPlane, "mid_y", "StrCross_Pl")
-    cross_sk = comp.sketches.add(cross_pl)
-    cross_sk.name = "StrCross_Prof"
-
-    # Intersect side stretcher bodies → 2 ellipse cross-sections
-    # Need assembly proxies for cross-component intersection
-    _str_occ = None
-    for oi in range(root.occurrences.count):
-        if root.occurrences.item(oi).component.name == "Stretchers":
-            _str_occ = root.occurrences.item(oi); break
-    if Str_Left and Str_Right:
-        # Try direct bodies first (same component), fallback to proxies
-        try:
-            result_curves = cross_sk.intersectWithSketchPlane([Str_Left, Str_Right])
-        except:
-            if _str_occ:
-                sl_p = Str_Left.createForAssemblyContext(_str_occ)
-                sr_p = Str_Right.createForAssemblyContext(_str_occ)
-                result_curves = cross_sk.intersectWithSketchPlane([sl_p, sr_p])
-            else:
-                result_curves = []
-        print("Cross intersect: " + str(len(result_curves) if result_curves else 0) + " curves")
-        # Force ALL intersection curves to construction
-        for rc in (result_curves if result_curves else []):
-            if hasattr(rc, 'isConstruction'):
-                rc.isConstruction = True
-    _sps2.refs_to_construction(cross_sk)
-
-    # Find the 2 intersection ellipses (left and right side stretcher cross-sections)
-    m2s_cx = cross_sk.modelToSketchSpace
-    mid_x_val = ev("mid_x")
-
-    # Identify left vs right ellipse by center X relative to mid_x
-    left_info = None; right_info = None
-    for ci in range(cross_sk.sketchCurves.count):
-        c = cross_sk.sketchCurves.item(ci)
-        if not (c.isConstruction or c.isReference): continue
-        if hasattr(c, 'centerSketchPoint') and c.centerSketchPoint:
-            cp = c.centerSketchPoint.geometry
-            cp_model = cross_sk.sketchToModelSpace(P(cp.x, cp.y, 0))
-            if cp_model.x < mid_x_val:
-                if left_info is None or cp_model.x < left_info[1]:
-                    left_info = (c.centerSketchPoint, cp_model.x, c)
-            else:
-                if right_info is None or cp_model.x > right_info[1]:
-                    right_info = (c.centerSketchPoint, cp_model.x, c)
-
-    if left_info and right_info:
-        lc = left_info[0].geometry; rc = right_info[0].geometry
-        cx_dx = rc.x - lc.x; cx_dy = rc.y - lc.y
-        cx_dd = _mstr.sqrt(cx_dx*cx_dx + cx_dy*cx_dy)
-        cx_ux, cx_uy = cx_dx/cx_dd, cx_dy/cx_dd
-
-        # Sample actual outer extremes on side stretcher ellipses
-        m2s_cx = cross_sk.modelToSketchSpace
-        l_outer = _outer_extreme(left_info[2], -cx_ux, -cx_uy, m2s_cx)
-        r_outer = _outer_extreme(right_info[2], cx_ux, cx_uy, m2s_cx)
-
-        if l_outer and r_outer:
-            cross_axis = cross_sk.sketchCurves.sketchLines.addByTwoPoints(
-                P(l_outer.x, l_outer.y, 0), P(r_outer.x, r_outer.y, 0))
-            print("Cross stretcher: sampled outer extremes")
-        else:
-            cross_axis = cross_sk.sketchCurves.sketchLines.addByTwoPoints(
-                left_info[0], right_info[0])
-            print("Cross stretcher: fallback to centers")
-    else:
-        # Fallback
-        cl = m2s_cx(P(ev("fl_str_x"), ev("mid_y"), str_z))
-        cr = m2s_cx(P(ev("seat_w") - ev("fl_str_x"), ev("mid_y"), str_z))
-        cross_axis = cross_sk.sketchCurves.sketchLines.addByTwoPoints(
-            P(cl.x, cl.y, 0), P(cr.x, cr.y, 0))
-        print("Cross stretcher: fallback")
-
-    # Draw turned profile around this axis
-    cs_s = cross_axis.startSketchPoint.geometry
-    cs_e = cross_axis.endSketchPoint.geometry
-    cs_dx = cs_e.x - cs_s.x; cs_dy = cs_e.y - cs_s.y
-    cs_len = _mstr.sqrt(cs_dx*cs_dx + cs_dy*cs_dy)
-    cs_ux, cs_uy = cs_dx/cs_len, cs_dy/cs_len
-    cs_nx, cs_ny = -cs_uy, cs_ux
-
-    # Cross stretcher tenon covers side stretcher diameter
-    cs_tenon_f = min(ev("str_mid_dia") / cs_len, 0.25)
-    cs_shldr_f = cs_tenon_f + ev("str_shoulder_frac") * (0.5 - cs_tenon_f)
-    cs_pts = [(0.0, end_r), (cs_tenon_f, end_r), (cs_shldr_f, mid_r),
-              (0.5, mid_r), (1.0-cs_shldr_f, mid_r), (1.0-cs_tenon_f, end_r), (1.0, end_r)]
-    cs_sk_pts = [P(cs_s.x+cs_ux*cs_len*f+cs_nx*r, cs_s.y+cs_uy*cs_len*f+cs_ny*r, 0)
-                 for f, r in cs_pts]
-
-    cs_lns = cross_sk.sketchCurves.sketchLines
-    cL0=cs_lns.addByTwoPoints(cs_sk_pts[0],cs_sk_pts[1])
-    cL1=cs_lns.addByTwoPoints(cL0.endSketchPoint,cs_sk_pts[2])
-    cL2=cs_lns.addByTwoPoints(cL1.endSketchPoint,cs_sk_pts[3])
-    cL3=cs_lns.addByTwoPoints(cL2.endSketchPoint,cs_sk_pts[4])
-    cL4=cs_lns.addByTwoPoints(cL3.endSketchPoint,cs_sk_pts[5])
-    cL5=cs_lns.addByTwoPoints(cL4.endSketchPoint,cs_sk_pts[6])
-    cL_r=cs_lns.addByTwoPoints(cL5.endSketchPoint,P(cs_e.x,cs_e.y,0))
-    cL_bot=cs_lns.addByTwoPoints(cL_r.endSketchPoint,P(cs_s.x,cs_s.y,0))
-    cL_l=cs_lns.addByTwoPoints(cL_bot.endSketchPoint,cL0.startSketchPoint)
-
-    cs_gc = cross_sk.geometricConstraints
-    cs_gc.addParallel(cL0,cL_bot); cs_gc.addParallel(cL5,cL_bot)
-    cs_gc.addParallel(cL2,cL_bot); cs_gc.addParallel(cL3,cL_bot)
-    cs_gc.addEqual(cL5,cL0); cs_gc.addEqual(cL3,cL2)
-    # Constrain revolve axis endpoints to cross_axis endpoints (parametric link)
-    cs_gc.addCoincident(cL_r.endSketchPoint, cross_axis.endSketchPoint)
-    cs_gc.addCoincident(cL_bot.endSketchPoint, cross_axis.startSketchPoint)
-
-    # Radius dimensions only (tenon/shoulder proportions maintained by constraints)
-    cs_dims = cross_sk.sketchDimensions
-    cs_dims.addDistanceDimension(cL_l.startSketchPoint,cL_l.endSketchPoint,AL,
-        P(cL_l.startSketchPoint.geometry.x+cs_nx*2,cL_l.startSketchPoint.geometry.y+cs_ny*2,0)
-    ).parameter.expression="str_end_dia / 2"
-    cs_mid=cs_lns.addByTwoPoints(P((cs_s.x+cs_e.x)/2,(cs_s.y+cs_e.y)/2,0),cL2.endSketchPoint)
-    cs_mid.isConstruction=True
-    cs_gc.addPerpendicular(cs_mid,cL_bot); cs_gc.addCoincident(cs_mid.startSketchPoint,cL_bot)
-    cs_dims.addDistanceDimension(cs_mid.startSketchPoint,cs_mid.endSketchPoint,AL,
-        P(cs_mid.startSketchPoint.geometry.x+cs_nx*2,cs_mid.startSketchPoint.geometry.y+cs_ny*2,0)
-    ).parameter.expression="str_mid_dia / 2"
-
-    cs_prof = _sps2.smallest_profile(cross_sk) if cross_sk.profiles.count > 0 else None
-    print("Cross profiles: " + str(cross_sk.profiles.count))
-    Str_Cross = None
-    if cs_prof:
-        cs_rev = comp.features.revolveFeatures.createInput(cs_prof, cL_bot, NEWBODY)
-        cs_rev.setAngleExtent(False, adsk.core.ValueInput.createByString("360 deg"))
-        cs_rf = comp.features.revolveFeatures.add(cs_rev)
-        cs_rf.name = "Str_Cross"
-        Str_Cross = cs_rf.bodies.item(0); Str_Cross.name = "Str_Cross"
-
-        # Tenon extensions on both ends of cross stretcher
-        cs_faces = []
-        for fi in range(Str_Cross.faces.count):
-            f = Str_Cross.faces.item(fi)
-            if isinstance(f.geometry, adsk.core.Plane):
-                cs_faces.append(f)
-        cs_faces.sort(key=lambda f: f.area)
-        for tfi, tf in enumerate(cs_faces[:2]):
-            if tf.loops.count > 0:
-                te_inp3 = comp.features.extrudeFeatures.createInput(tf, JOIN)
-                te_inp3.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
-                te_inp3.participantBodies = [Str_Cross]
-                te_f3 = comp.features.extrudeFeatures.add(te_inp3)
-                te_f3.name = "StrC_TenExt" + str(tfi)
-
-    # Wedges on cross stretcher tenon ends (into side stretchers)
-    cs_wedges = []
-    if Str_Cross:
-        cs_pfaces = []
-        for fi in range(Str_Cross.faces.count):
-            f = Str_Cross.faces.item(fi)
-            if isinstance(f.geometry, adsk.core.Plane):
-                cs_pfaces.append(f)
-        cs_pfaces.sort(key=lambda f: f.area)
-        for csi, ef in enumerate(cs_pfaces[:2]):
-            fc = ef.pointOnFace
-            # Identify left vs right end by X position relative to mid_x
-            if fc.x < ev("mid_x"):
-                mort_ref = Str_Left
-                wname = "TW_SC_L"
-            else:
-                mort_ref = Str_Right
-                wname = "TW_SC_R"
-            cw = tw.round_tenon(comp, tenon_body=Str_Cross,
-                mortise_body=mort_ref, end_face=ef,
-                tenon_depth_expr="str_mid_dia",
-                tenon_diam_expr="str_end_dia",
-                name=wname, ev=ev)
-            cs_wedges.append(cw)
-        print("Cross stretcher wedges: " + str(len(cs_wedges)))
-
-    print("Stretchers: 3 (all revolved + tenon ext + wedged)")
+    print("Stretchers: " + str(sum(1 for s in [Str_Left, Str_Right] if s)) + " built via template")
 
     # ==== BACK: Spindles on curved arc + Curved crest rail ====
     # Spindles arranged along an arc for comfort.
@@ -1645,17 +1348,18 @@ def run(context):
             print("Seat fillet bottom: " + str(bot_edges.count) + " edges")
 
     # ── HIDE CONSTRUCTION ─────────────────────────────────────────
-    for _comp in [root, Seat_c, comp]:  # comp = Legs_c at this point
-        for si in range(_comp.sketches.count):
-            _comp.sketches.item(si).isVisible = False
-        for ci in range(_comp.constructionPlanes.count):
-            _comp.constructionPlanes.item(ci).isLightBulbOn = False
+    def _hide_construction(c):
+        for si in range(c.sketches.count):
+            c.sketches.item(si).isVisible = False
+        for ci in range(c.constructionPlanes.count):
+            c.constructionPlanes.item(ci).isLightBulbOn = False
+        for ci in range(c.constructionAxes.count):
+            c.constructionAxes.item(ci).isLightBulbOn = False
+        for ci in range(c.constructionPoints.count):
+            c.constructionPoints.item(ci).isLightBulbOn = False
+    _hide_construction(root)
     for _occ in root.allOccurrences:
-        _oc = _occ.component
-        for si in range(_oc.sketches.count):
-            _oc.sketches.item(si).isVisible = False
-        for ci in range(_oc.constructionPlanes.count):
-            _oc.constructionPlanes.item(ci).isLightBulbOn = False
+        _hide_construction(_occ.component)
 
     # ── APPEARANCE ────────────────────────────────────────────────
     from helpers import sp as _sp_app
