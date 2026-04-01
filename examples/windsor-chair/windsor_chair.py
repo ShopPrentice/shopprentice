@@ -85,6 +85,13 @@ def run(context):
         # At frac from floor: x = top_x + (bot_x - top_x) * (1 - frac)
         # = leg_inset + (-splay_off) * (1 - frac) = leg_inset - (1 - frac) * splay_off
         ("str_z", "leg_h * str_height_frac", "in", "Stretcher Z height"),
+        # Leg diameter at stretcher height (linear taper from shoulder to foot)
+        # From top: shoulder starts at leg_shoulder_frac, body = leg_dia
+        # Taper: leg_dia at shoulder_frac to leg_foot_dia at 1.0
+        # Stretcher is at (1 - str_height_frac) from top
+        ("str_leg_dia",
+         "leg_foot_dia + (leg_dia - leg_foot_dia) * str_height_frac / (1 - leg_shoulder_frac)",
+         "in", "Leg diameter at stretcher height"),
         ("fl_str_x", "leg_inset - ( 1 - str_height_frac ) * splay_off", "in", "FL stretcher X"),
         ("fl_str_y", "leg_inset - ( 1 - str_height_frac ) * rake_off", "in", "FL stretcher Y"),
         ("scoop_back_y", "seat_d - scoop_start_y", "in", "Scoop start Y from origin"),
@@ -879,7 +886,7 @@ def run(context):
     # ---- Left side stretcher (FL → BL) via template ----
     Str_Left = ts.build(Legs_c, axis_a=fl_axis, axis_b=bl_axis,
                         dist_a="str_z", dist_b="str_z",
-                        body_dia_expr="leg_dia", prefix="ts",
+                        body_dia_expr="str_leg_dia", prefix="ts",
                         name="Str_Left", ev=ev)
 
     # Mirror left stretcher → right stretcher
