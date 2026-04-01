@@ -62,7 +62,8 @@ def define_params(params, prefix="tw", slot_w="0.1 in",
         (f"{p}_dr", depth_ratio,  "",   "Wedge depth ratio"),
         (f"{p}_or", offset_ratio, "",   "Wedge offset ratio"),
     ]:
-        params.add(pname, VI(expr), unit, desc)
+        if not params.itemByName(pname):
+            params.add(pname, VI(expr), unit, desc)
     return {"sw": f"{p}_sw", "dr": f"{p}_dr", "or": f"{p}_or"}
 
 

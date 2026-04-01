@@ -46,10 +46,8 @@ def define_params(params, prefix="ts",
         (f"{p}_shoulder_len", shoulder_len, "in", "Shoulder transition length"),
         (f"{p}_ext", ext,               "in", "Tenon extension beyond leg surface"),
     ]:
-        existing = params.itemByName(pname)
-        if existing:
-            existing.expression = expr
-        else:
+        # Only create if missing — don't overwrite user-modified values
+        if not params.itemByName(pname):
             params.add(pname, V(expr), unit, desc)
 
 
