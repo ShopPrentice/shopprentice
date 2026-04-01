@@ -877,6 +877,9 @@ def run(context):
                     best_d = d
                     best_pair = (i, j)
         e0, e1 = circ_edges[best_pair[0]], circ_edges[best_pair[1]]
+        # Ensure e0 is the lower end (foot) so distances are from floor
+        if e0.geometry.center.z > e1.geometry.center.z:
+            e0, e1 = e1, e0
         cp0_inp = comp.constructionPoints.createInput()
         cp0_inp.setByCenter(e0)
         cp0 = comp.constructionPoints.add(cp0_inp)
