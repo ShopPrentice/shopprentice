@@ -71,7 +71,7 @@ def run(context):
             params.add(name, adsk.core.ValueInput.createByString(expr), unit, comment)
 
     for name, expr, unit, comment in [
-        ("str_height_frac", "0.45", "", "Stretcher height as fraction of leg_h"),
+        ("str_height_frac", "0.4", "", "Stretcher height as fraction of leg_h"),
         ("crest_fil", "crest_t / 2 - 0.05 in", "in", "Crest rail end fillet"),
         ("leg_h", "seat_h - seat_t", "in", "Leg height"),
         ("mid_x", "seat_w / 2", "in", "X midplane"),
