@@ -47,12 +47,19 @@ def run(context):
         ("leg_tenon_dia", "0.875 in", "in", "Leg tenon diameter (into seat)"),
         ("leg_tenon_frac", "0.10", "", "Leg tenon as fraction of total length"),
         ("leg_shoulder_frac", "0.13", "", "Leg shoulder transition fraction"),
-        # Stretcher profile
-        ("str_mid_dia", "0.75 in", "in", "Stretcher center diameter (thickest)"),
-        ("str_end_dia", "0.5 in", "in", "Stretcher tenon diameter (at ends)"),
-        ("str_tenon_frac", "0.10", "", "Fraction of length that is tenon (each end)"),
-        ("str_shoulder_frac", "0.06", "", "Fraction of length for shoulder transition"),
-        ("tenon_ext", "0.1 in", "in", "Tenon extension beyond body"),
+        ("tenon_ext", "0.1 in", "in", "Leg tenon extension beyond seat"),
+        # Side stretcher profile
+        ("str_mid_dia", "0.75 in", "in", "Stretcher body diameter"),
+        ("str_end_dia", "0.5 in", "in", "Stretcher tenon diameter"),
+        ("str_tenon_len", "0.5 in", "in", "Stretcher tenon length"),
+        ("str_shoulder_len", "0.25 in", "in", "Stretcher shoulder length"),
+        ("str_ext", "0.1 in", "in", "Stretcher tenon extension beyond leg"),
+        # Cross stretcher profile
+        ("stc_mid_dia", "0.75 in", "in", "Cross stretcher body diameter"),
+        ("stc_end_dia", "0.5 in", "in", "Cross stretcher tenon diameter"),
+        ("stc_tenon_len", "0.375 in", "in", "Cross stretcher tenon length"),
+        ("stc_shoulder_len", "0.2 in", "in", "Cross stretcher shoulder length"),
+        ("stc_ext", "0.1 in", "in", "Cross stretcher extension"),
         ("seat_back_w", "14.0000 in", "in", "Back edge width"),
         ("seat_front_r", "68.8753 in", "in", "Front arc radius"),
         ("seat_back_r", "124.5584 in", "in", "Back arc radius"),
@@ -836,16 +843,7 @@ def run(context):
     from woodworking.templates import turned_stretcher as ts
     importlib.reload(ts)
 
-    # Side stretcher params
-    ts.define_params(params, prefix="ts",
-                     mid_dia="str_mid_dia", end_dia="str_end_dia",
-                     tenon_len="0.5 in", shoulder_len="0.25 in",
-                     ext="tenon_ext")
-    # Cross stretcher params (shorter tenon, goes into side stretcher)
-    ts.define_params(params, prefix="tc",
-                     mid_dia="str_mid_dia", end_dia="str_end_dia",
-                     tenon_len="0.375 in", shoulder_len="0.2 in",
-                     ext="tenon_ext")
+    # No ts.define_params needed — str_* and stc_* params already defined above
 
     # ---- Get leg axes from circular edges ----
     # FL and BL legs are in the Legs component. Find their circular end
@@ -910,7 +908,7 @@ def run(context):
     # ---- Left side stretcher (FL → BL) via template ----
     Str_Left = ts.build(Legs_c, axis_a=fl_axis, axis_b=bl_axis,
                         dist_a="str_z", dist_b="str_z",
-                        body_dia_expr="str_leg_dia", prefix="ts",
+                        body_dia_expr="str_leg_dia", prefix="str",
                         name="Str_Left", ev=ev)
 
     # Mirror left stretcher → right stretcher
@@ -931,7 +929,7 @@ def run(context):
         if sl_axis and sr_axis:
             Str_Cross = ts.build(Legs_c, axis_a=sl_axis, axis_b=sr_axis,
                                  dist_a="mid_y", dist_b="mid_y",
-                                 body_dia_expr="str_mid_dia", prefix="tc",
+                                 body_dia_expr="stc_mid_dia", prefix="stc",
                                  name="Str_Cross", ev=ev)
 
     # ---- Wedges on stretcher joints ----
@@ -956,7 +954,7 @@ def run(context):
             w = tw.round_tenon(Legs_c, tenon_body=Str_Left,
                 mortise_body=mort, end_face=ef,
                 tenon_depth_expr="leg_dia",
-                tenon_diam_expr="ts_end_dia",
+                tenon_diam_expr="str_end_dia",
                 name=wname, ev=ev)
             sl_wedges.append(w)
 
