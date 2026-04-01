@@ -71,7 +71,7 @@ def run(context):
             params.add(name, adsk.core.ValueInput.createByString(expr), unit, comment)
 
     for name, expr, unit, comment in [
-        ("str_height_frac", "0.4", "", "Stretcher height as fraction of leg_h"),
+        ("str_height_frac", "0.45", "", "Stretcher height as fraction of leg_h"),
         ("crest_fil", "crest_t / 2 - 0.05 in", "in", "Crest rail end fillet"),
         ("leg_h", "seat_h - seat_t", "in", "Leg height"),
         ("mid_x", "seat_w / 2", "in", "X midplane"),
@@ -897,9 +897,26 @@ def run(context):
         sl_axis = _leg_axis(Legs_c, Str_Left, "SL")
         sr_axis = _leg_axis(Legs_c, Str_Right, "SR")
         if sl_axis and sr_axis:
-            # Connect at mid_y along each side stretcher axis
+            # Connect at the center of each side stretcher.
+            # Measure the side stretcher axis length and use half.
+            sl_bb = Str_Left.boundingBox
+            sl_len = math.sqrt(
+                (sl_bb.maxPoint.x - sl_bb.minPoint.x)**2 +
+                (sl_bb.maxPoint.y - sl_bb.minPoint.y)**2 +
+                (sl_bb.maxPoint.z - sl_bb.minPoint.z)**2)
+            half_sl = sl_len / 2
+            # Store as parameter
+            _cx_expr = f"{round(half_sl / 2.54, 4)} in"
+            _cx_p = params.itemByName("cx_dist")
+            if _cx_p:
+                _cx_p.expression = _cx_expr
+            else:
+                params.add("cx_dist",
+                    adsk.core.ValueInput.createByString(_cx_expr),
+                    "in", "Cross stretcher midpoint distance")
+
             Str_Cross = ts.build(Legs_c, axis_a=sl_axis, axis_b=sr_axis,
-                                 dist_a="mid_y", dist_b="mid_y",
+                                 dist_a="cx_dist", dist_b="cx_dist",
                                  body_dia_expr="str_mid_dia", prefix="ts",
                                  name="Str_Cross", ev=ev)
 

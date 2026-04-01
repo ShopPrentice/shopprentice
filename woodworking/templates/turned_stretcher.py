@@ -259,9 +259,8 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     gc.addCoincident(L8.endSketchPoint, ax_line.endSketchPoint)
     gc.addPerpendicular(L8, ax_line)
 
-    # Symmetry
+    # Symmetry (L5=L4 not needed — addMidPoint on ax_line ensures it)
     gc.addEqual(L7, L2)
-    gc.addEqual(L5, L4)
     gc.addEqual(L6, L3)
 
     # Dimensions
@@ -283,7 +282,6 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     mid_con.isConstruction = True
     gc.addPerpendicular(mid_con, ax_line)
     gc.addMidPoint(mid_con.startSketchPoint, ax_line)
-    gc.addCoincident(mid_con.endSketchPoint, L4.endSketchPoint)
     dims.addDistanceDimension(
         mid_con.startSketchPoint, mid_con.endSketchPoint, AL,
         P(mid_pt.x + anx * 2, mid_pt.y + any_ * 2, 0)
