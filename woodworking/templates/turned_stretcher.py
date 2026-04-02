@@ -321,7 +321,11 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     gc.addPerpendicular(body_con, ax_line)
     gc.addCoincident(body_con.startSketchPoint, sym_line.startSketchPoint)
     if profile == "barrel":
-        gc.addCoincident(body_con.endSketchPoint, body_curve)  # ON the arc
+        # Constrain spline's middle fit point to body_con endpoint.
+        # This makes the spline apex follow ts_mid_dia parametrically.
+        mid_fit_idx = body_curve.fitPoints.count // 2
+        mid_fit_pt = body_curve.fitPoints.item(mid_fit_idx)
+        gc.addCoincident(mid_fit_pt, body_con.endSketchPoint)
     else:
         gc.addCoincident(body_con.endSketchPoint, L4.endSketchPoint)  # at midpoint
     dims.addDistanceDimension(
