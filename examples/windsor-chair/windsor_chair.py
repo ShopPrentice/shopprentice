@@ -13,7 +13,13 @@ def run(context):
     # Clean up stale params from previous runs
     for old_p in ["leg_splay_tan", "leg_rake_tan", "back_rake_sin", "back_rake_cos",
                    "fan_splay", "leg_tenon_len", "scoop_offset", "scoop_center_h",
-                   "seat_fil"]:
+                   "seat_fil", "crest_fil",
+                   "fl_str_x", "fl_str_y", "cx_dist",
+                   "str_tenon_frac", "str_shoulder_frac",
+                   "ts_mid_dia", "ts_end_dia", "ts_tenon_frac", "ts_tenon_len",
+                   "ts_shoulder_frac", "ts_shoulder_len", "ts_ext",
+                   "tc_mid_dia", "tc_end_dia", "tc_tenon_len",
+                   "tc_shoulder_len", "tc_ext"]:
         p = params.itemByName(old_p)
         if p:
             try: p.deleteMe()
@@ -83,7 +89,6 @@ def run(context):
 
     for name, expr, unit, comment in [
         ("str_height_frac", "0.4", "", "Stretcher height as fraction of leg_h"),
-        ("crest_fil", "crest_t / 2 - 0.05 in", "in", "Crest rail end fillet"),
         ("leg_h", "seat_h - seat_t", "in", "Leg height"),
         ("mid_x", "seat_w / 2", "in", "X midplane"),
         ("mid_y", "seat_d / 2", "in", "Y midplane"),
@@ -103,8 +108,6 @@ def run(context):
         ("str_leg_dia",
          "leg_foot_dia + (leg_dia - leg_foot_dia) * str_height_frac / (1 - leg_shoulder_frac)",
          "in", "Leg diameter at stretcher height"),
-        ("fl_str_x", "leg_inset - ( 1 - str_height_frac ) * splay_off", "in", "FL stretcher X"),
-        ("fl_str_y", "leg_inset - ( 1 - str_height_frac ) * rake_off", "in", "FL stretcher Y"),
         ("scoop_back_y", "seat_d - scoop_start_y", "in", "Scoop start Y from origin"),
         ("scoop_front_y", "scoop_end_y", "in", "Scoop end Y from origin"),
     ]:

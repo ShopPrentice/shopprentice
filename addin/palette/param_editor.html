@@ -179,8 +179,8 @@
     ['Seat Shape', p => /^seat_(back|front)/.test(p.name)],
     ['Seat Scoop', p => /^scoop_/.test(p.name)],
     ['Seat Detail', p => /^seat_fil/.test(p.name)],
-    ['Legs',       p => /^(leg_|ch_leg|splay|rake)/.test(p.name)],
-    ['Stretchers', p => /^(str_|tenon_ext|fl_str)/.test(p.name)],
+    ['Legs',       p => /^(leg_|ch_leg|splay|rake|tenon_ext)/.test(p.name)],
+    ['Stretchers', p => /^(str_|stc_)/.test(p.name)],
     ['Back',       p => /^(n_spindles|spindle_|back_|crest_|fan_)/.test(p.name)],
     ['Layout',     p => /^(mid_|back_edge)/.test(p.name)],
   ];
