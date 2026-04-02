@@ -494,6 +494,12 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 
 **Final step:** apply_appearance → get_product_shots → present to user.
 
+**Token efficiency:**
+- `capture_design` returns a compact summary (body names + bounding boxes + params). Full capture saved to temp file (path in response) — Read it only when deep inspection is needed.
+- `get_product_shots` — call ONCE at the very end after all validation passes. Do NOT call mid-build.
+- `get_screenshot` — use sparingly for quick visual checks, not every build cycle.
+- Prefer `validate_design` (text-only, ~100 tokens) over screenshots for intermediate validation.
+
 ## Component Structure Template
 
 Table / Bookshelf:

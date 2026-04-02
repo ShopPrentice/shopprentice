@@ -11,10 +11,10 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 | Tool | When to Call |
 |------|-------------|
 | `execute_script` | Run a Fusion 360 Python script (one phase at a time). Set `sandbox=true` for throwaway validation, `clean=true` to rebuild an existing model (Ctrl+Z reverts). Pass `script_path` to track the file for palette parameter sync. |
-| `capture_design` | After every `execute_script` — returns compact summary (body names + bounding boxes + params). Full capture saved to temp file (path in response) for deep inspection via Read when needed |
+| `capture_design` | After every `execute_script` — validate body count, positions, volumes |
 | `get_timeline_state` | When `capture_design` shows unexpected state — bisect timeline to find the bad feature |
-| `get_screenshot` | Quick viewport capture — use sparingly, only when visual check is needed (NOT every build cycle) |
-| `get_product_shots` | Final presentation shots ONLY — call once at the very end after all validation passes. Do NOT call mid-build. |
+| `get_screenshot` | Quick viewport capture for build validation (1024x1024, as-is) |
+| `get_product_shots` | Final presentation shots — hides artifacts, proper framing, multiple views (2048x2048) |
 | `get_selection` | Read what the user has selected in the Fusion 360 UI |
 | `set_selection` | Highlight entities for the user (after identifying a problem body, etc.) |
 | `modify_parameters` | Change parameter values without re-running the script — for iterative tuning |
