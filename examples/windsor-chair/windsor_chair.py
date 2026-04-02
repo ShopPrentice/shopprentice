@@ -48,18 +48,22 @@ def run(context):
         ("leg_tenon_frac", "0.10", "", "Leg tenon as fraction of total length"),
         ("leg_shoulder_frac", "0.13", "", "Leg shoulder transition fraction"),
         ("tenon_ext", "0.1 in", "in", "Leg tenon extension beyond seat"),
-        # Side stretcher profile
+        # Side stretcher profile (barrel)
         ("str_mid_dia", "0.75 in", "in", "Stretcher body diameter"),
         ("str_end_dia", "0.5 in", "in", "Stretcher tenon diameter"),
         ("str_tenon_len", "0.5 in", "in", "Stretcher tenon length"),
         ("str_shoulder_len", "0.25 in", "in", "Stretcher shoulder length"),
         ("str_ext", "0.1 in", "in", "Stretcher tenon extension beyond leg"),
-        # Cross stretcher profile
+        ("str_barrel_dist", "1.5 in", "in", "Stretcher barrel control dist from mid"),
+        ("str_barrel_r", "0.375 in", "in", "Stretcher barrel control radius"),
+        # Cross stretcher profile (barrel)
         ("stc_mid_dia", "0.75 in", "in", "Cross stretcher body diameter"),
         ("stc_end_dia", "0.5 in", "in", "Cross stretcher tenon diameter"),
         ("stc_tenon_len", "0.375 in", "in", "Cross stretcher tenon length"),
         ("stc_shoulder_len", "0.2 in", "in", "Cross stretcher shoulder length"),
         ("stc_ext", "0.1 in", "in", "Cross stretcher extension"),
+        ("stc_barrel_dist", "1.25 in", "in", "Cross stretcher barrel ctrl dist"),
+        ("stc_barrel_r", "0.375 in", "in", "Cross stretcher barrel ctrl radius"),
         ("seat_back_w", "14.0000 in", "in", "Back edge width"),
         ("seat_front_r", "68.8753 in", "in", "Front arc radius"),
         ("seat_back_r", "124.5584 in", "in", "Back arc radius"),
@@ -909,6 +913,7 @@ def run(context):
     Str_Left = ts.build(Legs_c, axis_a=fl_axis, axis_b=bl_axis,
                         dist_a="str_z", dist_b="str_z",
                         body_dia_expr="str_leg_dia", prefix="str",
+                        profile="barrel",
                         name="Str_Left", ev=ev)
 
     # Mirror left stretcher → right stretcher
@@ -930,6 +935,7 @@ def run(context):
             Str_Cross = ts.build(Legs_c, axis_a=sl_axis, axis_b=sr_axis,
                                  dist_a="mid_y", dist_b="mid_y",
                                  body_dia_expr="stc_mid_dia", prefix="stc",
+                                 profile="barrel",
                                  name="Str_Cross", ev=ev)
 
     # ---- Wedges on stretcher joints ----
