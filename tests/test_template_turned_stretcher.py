@@ -42,9 +42,16 @@ def run(context):
             params.add(name, V(expr), unit, comment)
 
     # ── Shared parameters ──────────────────────────────────────────
+    # All params defined here so the palette can patch them on Rebuild.
     for pname, expr, unit, desc in [
         ("leg_dia", "1.375 in", "in", "Leg diameter"),
         ("leg_h", "16 in", "in", "Leg height"),
+        # Stretcher profile
+        ("ts_mid_dia", "0.75 in", "in", "Stretcher body diameter"),
+        ("ts_end_dia", "0.5 in", "in", "Stretcher tenon diameter"),
+        ("ts_tenon_len", "0.5 in", "in", "Stretcher tenon length"),
+        ("ts_shoulder_len", "0.25 in", "in", "Stretcher shoulder length"),
+        ("ts_ext", "0.1 in", "in", "Stretcher extension beyond leg"),
     ]:
         add_param(pname, expr, unit, desc)
 
@@ -52,6 +59,7 @@ def run(context):
     from woodworking.templates import tenon_wedge as tw
     importlib.reload(ts)
     importlib.reload(tw)
+    # ts.define_params skips existing — won't overwrite the values above
     ts.define_params(params)
     try:
         tw.define_params(params, prefix="tw", slot_w="0.08 in",
