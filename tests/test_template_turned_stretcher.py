@@ -49,8 +49,8 @@ def run(context):
         # Stretcher profile
         ("ts_mid_dia", "0.75 in", "in", "Stretcher body diameter"),
         ("ts_end_dia", "0.5 in", "in", "Stretcher tenon diameter"),
-        ("ts_tenon_len", "0.5 in", "in", "Stretcher tenon length"),
-        ("ts_shoulder_len", "0.25 in", "in", "Stretcher shoulder length"),
+        ("ts_tenon_len", "1.6 in", "in", "Stretcher tenon length"),
+        ("ts_shoulder_len", "0.91 in", "in", "Stretcher shoulder length"),
         ("ts_ext", "0.1 in", "in", "Stretcher extension beyond leg"),
     ]:
         add_param(pname, expr, unit, desc)
@@ -189,6 +189,7 @@ def run(context):
         add_param("f1_dist_b", "leg_h * 0.44", "in", "F1 stretcher height B")
         f1_str = ts.build(f1, axis_a=f1_ax_a, axis_b=f1_ax_b,
                           dist_a="f1_dist_a", dist_b="f1_dist_b",
+                          profile="barrel",
                           name="F1_Str", ev=ev)
 
         # Wedges on the stretcher tenon ends

@@ -237,19 +237,35 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     gc.addParallel(L2, ax_line)
 
     # L3: angled shoulder
-    L3 = lines.addByTwoPoints(L2.endSketchPoint, pt_abs(t_len + s_len, mid_r))
+    # For barrel: shoulder connects at (end_r + mid_r) / 2, arc reaches mid_r
+    # For straight: shoulder connects directly at mid_r
+    shoulder_r = (end_r + mid_r) / 2 if profile == "barrel" else mid_r
+    L3 = lines.addByTwoPoints(L2.endSketchPoint,
+                               pt_abs(t_len + s_len, shoulder_r))
 
-    # L4: body left half to midpoint
-    L4 = lines.addByTwoPoints(L3.endSketchPoint, pt_abs(ax_len / 2, mid_r))
-    gc.addParallel(L4, ax_line)
-
-    # L5: body right half
-    L5 = lines.addByTwoPoints(L4.endSketchPoint,
-                               pt_abs(ax_len - t_len - s_len, mid_r))
-    gc.addParallel(L5, ax_line)
+    # ── Body section: straight or barrel ───────────────────────────
+    if profile == "barrel":
+        # Curved body: arc from shoulder end → apex at midpoint (mid_r)
+        # → symmetric shoulder end on the other side
+        l3_g = L3.endSketchPoint.geometry
+        apex = pt_abs(ax_len / 2, mid_r)
+        arc_end = pt_abs(ax_len - t_len - s_len, shoulder_r)
+        body_curve = sk.sketchCurves.sketchArcs.addByThreePoints(
+            P(l3_g.x, l3_g.y, 0), apex, arc_end)
+        gc.addCoincident(body_curve.startSketchPoint, L3.endSketchPoint)
+        body_end_pt = body_curve.endSketchPoint
+    else:
+        # Straight body: two parallel lines (L4 + L5)
+        L4 = lines.addByTwoPoints(L3.endSketchPoint,
+                                   pt_abs(ax_len / 2, mid_r))
+        gc.addParallel(L4, ax_line)
+        L5 = lines.addByTwoPoints(L4.endSketchPoint,
+                                   pt_abs(ax_len - t_len - s_len, mid_r))
+        gc.addParallel(L5, ax_line)
+        body_end_pt = L5.endSketchPoint
 
     # L6: angled shoulder (symmetric)
-    L6 = lines.addByTwoPoints(L5.endSketchPoint,
+    L6 = lines.addByTwoPoints(body_end_pt,
                                pt_abs(ax_len - t_len, end_r))
 
     # L7: tenon — parallel
@@ -262,7 +278,6 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     gc.addPerpendicular(L8, ax_line)
 
     # ── Symmetry via mirror line at axis midpoint ────────────────
-    # Construction line at midpoint of ax_line, perpendicular to it
     mid_pt = P((as_g.x + ae_g.x) / 2, (as_g.y + ae_g.y) / 2, 0)
     sym_line = lines.addByTwoPoints(
         mid_pt,
@@ -271,10 +286,9 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     gc.addPerpendicular(sym_line, ax_line)
     gc.addMidPoint(sym_line.startSketchPoint, ax_line)
 
-    # Mirror corresponding points across sym_line
     gc.addSymmetry(L1.endSketchPoint, L7.endSketchPoint, sym_line)
     gc.addSymmetry(L2.endSketchPoint, L6.endSketchPoint, sym_line)
-    gc.addSymmetry(L3.endSketchPoint, L5.endSketchPoint, sym_line)
+    gc.addSymmetry(L3.endSketchPoint, body_end_pt, sym_line)
 
     # ── Dimensions ─────────────────────────────────────────────────
     # Tenon radius
@@ -283,24 +297,26 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
         P(as_g.x + anx * 2, as_g.y + any_ * 2, 0)
     ).parameter.expression = f"{prefix}_end_dia / 2"
 
-    # Tenon length (absolute)
+    # Tenon length
     dims.addDistanceDimension(
         L2.startSketchPoint, L2.endSketchPoint, AL,
         P(pt_abs(t_len, end_r).x + anx, pt_abs(t_len, end_r).y + any_, 0)
     ).parameter.expression = f"{prefix}_tenon_len"
 
-    # Body radius via construction line from axis to L3.end
-    shoulder_pt = L3.endSketchPoint.geometry
+    # Body radius
     body_con = lines.addByTwoPoints(
-        P(shoulder_pt.x - anx * mid_r, shoulder_pt.y - any_ * mid_r, 0),
-        P(shoulder_pt.x, shoulder_pt.y, 0))
+        P(mid_pt.x, mid_pt.y, 0),
+        P(mid_pt.x + anx * mid_r, mid_pt.y + any_ * mid_r, 0))
     body_con.isConstruction = True
     gc.addPerpendicular(body_con, ax_line)
-    gc.addCoincident(body_con.startSketchPoint, ax_line)
-    gc.addCoincident(body_con.endSketchPoint, L3.endSketchPoint)
+    gc.addCoincident(body_con.startSketchPoint, sym_line.startSketchPoint)
+    if profile == "barrel":
+        gc.addCoincident(body_con.endSketchPoint, body_curve)  # ON the arc
+    else:
+        gc.addCoincident(body_con.endSketchPoint, L4.endSketchPoint)  # at midpoint
     dims.addDistanceDimension(
         body_con.startSketchPoint, body_con.endSketchPoint, AL,
-        P(shoulder_pt.x + anx * 2, shoulder_pt.y + any_ * 2, 0)
+        P(mid_pt.x + anx * 2, mid_pt.y + any_ * 2, 0)
     ).parameter.expression = f"{prefix}_mid_dia / 2"
 
     # Shoulder length (absolute)
