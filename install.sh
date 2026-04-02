@@ -63,7 +63,8 @@ if [ "$LOCAL_REPO" = true ]; then
 else
     echo "No local repo detected — cloning from $REPO_URL..."
     if [ -d "$REPO_DIR" ]; then
-        echo "Existing install found at $REPO_DIR, pulling latest..."
+        echo "Existing install found at $REPO_DIR, updating..."
+        git -C "$REPO_DIR" checkout main --quiet 2>/dev/null || true
         git -C "$REPO_DIR" fetch --tags
         git -C "$REPO_DIR" pull --ff-only
     else
@@ -73,7 +74,7 @@ else
     # Checkout latest release tag if available
     LATEST_TAG=$(git -C "$REPO_DIR" tag --sort=-v:refname | head -1)
     if [ -n "$LATEST_TAG" ]; then
-        echo "Checking out latest release: $LATEST_TAG"
+        echo "Checking out release: $LATEST_TAG"
         git -C "$REPO_DIR" checkout "$LATEST_TAG" --quiet
     fi
 fi
@@ -189,4 +190,4 @@ echo "  Source:  $REPO_DIR"
 [ "$opt_claude_code" = true ] && echo "  Claude Code: /woodworking skill installed"
 [ "$opt_mcp" = true ]         && echo "  MCP:         fusion360 server installed + configured"
 echo
-echo "To update later: cd $REPO_DIR && git fetch --tags && git pull && ./install.sh"
+echo "To update later: cd $REPO_DIR && ./install.sh"
