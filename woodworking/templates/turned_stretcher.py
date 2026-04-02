@@ -245,14 +245,24 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
 
     # ── Body section: straight or barrel ───────────────────────────
     if profile == "barrel":
-        # Curved body: arc from shoulder end → apex at midpoint (mid_r)
-        # → symmetric shoulder end on the other side
+        # Curved body: fitted spline from shoulder end → apex → symmetric end
         l3_g = L3.endSketchPoint.geometry
-        apex = pt_abs(ax_len / 2, mid_r)
+        spline_pts = adsk.core.ObjectCollection.create()
+        spline_pts.add(P(l3_g.x, l3_g.y, 0))
+        # Intermediate points for smooth curve
+        for frac in [0.25, 0.5, 0.75]:
+            d = (t_len + s_len) + frac * (ax_len - 2 * (t_len + s_len))
+            # Interpolate radius: shoulder_r at ends → mid_r at center
+            r = shoulder_r + (mid_r - shoulder_r) * math.sin(frac * math.pi)
+            spline_pts.add(pt_abs(d, r))
         arc_end = pt_abs(ax_len - t_len - s_len, shoulder_r)
-        body_curve = sk.sketchCurves.sketchArcs.addByThreePoints(
-            P(l3_g.x, l3_g.y, 0), apex, arc_end)
-        gc.addCoincident(body_curve.startSketchPoint, L3.endSketchPoint)
+        spline_pts.add(arc_end)
+        body_curve = sk.sketchCurves.sketchFittedSplines.add(spline_pts)
+        # Connect spline endpoints to adjacent profile lines
+        try:
+            gc.addCoincident(body_curve.startSketchPoint, L3.endSketchPoint)
+        except Exception:
+            pass  # spline start already at L3.end position
         body_end_pt = body_curve.endSketchPoint
     else:
         # Straight body: two parallel lines (L4 + L5)
