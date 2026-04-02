@@ -69,7 +69,8 @@ else
         git -C "$REPO_DIR" pull --ff-only
     else
         mkdir -p "$AUTOFUSION_HOME"
-        git clone --depth 1 "$REPO_URL" "$REPO_DIR"
+        git clone --depth 1 --filter=blob:none --sparse "$REPO_URL" "$REPO_DIR"
+        git -C "$REPO_DIR" sparse-checkout set --no-cone '/*' '!examples/'
         git -C "$REPO_DIR" fetch --tags
     fi
     # Checkout latest release tag if available
