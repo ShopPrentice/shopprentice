@@ -69,7 +69,8 @@ else
         git -C "$REPO_DIR" pull --ff-only
     else
         mkdir -p "$AUTOFUSION_HOME"
-        git clone "$REPO_URL" "$REPO_DIR"
+        git clone --depth 1 "$REPO_URL" "$REPO_DIR"
+        git -C "$REPO_DIR" fetch --tags
     fi
     # Checkout latest release tag if available
     LATEST_TAG=$(git -C "$REPO_DIR" tag --sort=-v:refname | head -1)
