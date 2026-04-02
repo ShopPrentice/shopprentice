@@ -36,15 +36,23 @@ P = adsk.core.Point3D.create
 def define_params(params, prefix="ts",
                   mid_dia="0.75 in", end_dia="0.5 in",
                   tenon_len="0.5 in", shoulder_len="0.25 in",
-                  ext="0.1 in"):
-    """Add turned stretcher parameters to the design."""
+                  ext="0.1 in", barrel_dist="1.5 in", barrel_r=None):
+    """Add turned stretcher parameters to the design.
+
+    barrel_dist/barrel_r only used with profile='barrel'.
+    barrel_r defaults to mid_dia/2 if not specified.
+    """
     p = prefix
+    if barrel_r is None:
+        barrel_r = f"{mid_dia} / 2" if "/" not in mid_dia else mid_dia
     for pname, expr, unit, desc in [
-        (f"{p}_mid_dia", mid_dia,       "in", "Stretcher body diameter"),
-        (f"{p}_end_dia", end_dia,       "in", "Stretcher tenon diameter"),
+        (f"{p}_mid_dia", mid_dia,         "in", "Stretcher body diameter"),
+        (f"{p}_end_dia", end_dia,         "in", "Stretcher tenon diameter"),
         (f"{p}_tenon_len", tenon_len,     "in", "Tenon length"),
-        (f"{p}_shoulder_len", shoulder_len, "in", "Shoulder transition length"),
-        (f"{p}_ext", ext,               "in", "Tenon extension beyond leg surface"),
+        (f"{p}_shoulder_len", shoulder_len,"in", "Shoulder transition length"),
+        (f"{p}_ext", ext,                 "in", "Tenon extension beyond leg surface"),
+        (f"{p}_barrel_dist", barrel_dist, "in", "Barrel control point dist from mid"),
+        (f"{p}_barrel_r", barrel_r,       "in", "Barrel control point radius"),
     ]:
         # Only create if missing — don't overwrite user-modified values
         if not params.itemByName(pname):
@@ -245,24 +253,33 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
 
     # ── Body section: straight or barrel ───────────────────────────
     if profile == "barrel":
-        # Curved body: fitted spline from shoulder end → apex → symmetric end
+        # Curved body: fitted spline with 2 symmetric control points.
+        # Control points are defined by distance from midpoint and
+        # radius from axis.
+        _design = adsk.fusion.Design.cast(
+            adsk.core.Application.get().activeProduct)
+        barrel_dist = ev(f"{prefix}_barrel_dist") if \
+            _design.userParameters.itemByName(f"{prefix}_barrel_dist") else \
+            (ax_len / 2 - t_len - s_len) * 0.4
+        barrel_r = ev(f"{prefix}_barrel_r") if \
+            _design.userParameters.itemByName(f"{prefix}_barrel_r") else \
+            mid_r
+
+        body_start = (t_len + s_len)
+        body_end = ax_len - t_len - s_len
+        body_mid = ax_len / 2
+
         l3_g = L3.endSketchPoint.geometry
         spline_pts = adsk.core.ObjectCollection.create()
         spline_pts.add(P(l3_g.x, l3_g.y, 0))
-        # Intermediate points for smooth curve
-        for frac in [0.25, 0.5, 0.75]:
-            d = (t_len + s_len) + frac * (ax_len - 2 * (t_len + s_len))
-            # Interpolate radius: shoulder_r at ends → mid_r at center
-            r = shoulder_r + (mid_r - shoulder_r) * math.sin(frac * math.pi)
-            spline_pts.add(pt_abs(d, r))
-        arc_end = pt_abs(ax_len - t_len - s_len, shoulder_r)
-        spline_pts.add(arc_end)
+        spline_pts.add(pt_abs(body_mid - barrel_dist, barrel_r))
+        spline_pts.add(pt_abs(body_mid + barrel_dist, barrel_r))
+        spline_pts.add(pt_abs(body_end, shoulder_r))
         body_curve = sk.sketchCurves.sketchFittedSplines.add(spline_pts)
-        # Connect spline endpoints to adjacent profile lines
         try:
             gc.addCoincident(body_curve.startSketchPoint, L3.endSketchPoint)
         except Exception:
-            pass  # spline start already at L3.end position
+            pass
         body_end_pt = body_curve.endSketchPoint
     else:
         # Straight body: two parallel lines (L4 + L5)
@@ -299,6 +316,11 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     gc.addSymmetry(L1.endSketchPoint, L7.endSketchPoint, sym_line)
     gc.addSymmetry(L2.endSketchPoint, L6.endSketchPoint, sym_line)
     gc.addSymmetry(L3.endSketchPoint, body_end_pt, sym_line)
+    if profile == "barrel":
+        # Mirror the two control fit points
+        ctrl_L = body_curve.fitPoints.item(1)
+        ctrl_R = body_curve.fitPoints.item(2)
+        gc.addSymmetry(ctrl_L, ctrl_R, sym_line)
 
     # ── Dimensions ─────────────────────────────────────────────────
     # Tenon radius
@@ -314,24 +336,39 @@ def build(comp, axis_a, axis_b, dist_a, dist_b,
     ).parameter.expression = f"{prefix}_tenon_len"
 
     # Body radius
-    body_con = lines.addByTwoPoints(
-        P(mid_pt.x, mid_pt.y, 0),
-        P(mid_pt.x + anx * mid_r, mid_pt.y + any_ * mid_r, 0))
-    body_con.isConstruction = True
-    gc.addPerpendicular(body_con, ax_line)
-    gc.addCoincident(body_con.startSketchPoint, sym_line.startSketchPoint)
     if profile == "barrel":
-        # Constrain spline's middle fit point to body_con endpoint.
-        # This makes the spline apex follow ts_mid_dia parametrically.
-        mid_fit_idx = body_curve.fitPoints.count // 2
-        mid_fit_pt = body_curve.fitPoints.item(mid_fit_idx)
-        gc.addCoincident(mid_fit_pt, body_con.endSketchPoint)
+        # Barrel: constrain ctrl_L fit point with 2 dimensions:
+        # perpendicular distance from axis (barrel_r) and
+        # distance from midpoint along axis (barrel_dist).
+        ctrl_L_pt = body_curve.fitPoints.item(1)
+        ctrl_con = lines.addByTwoPoints(
+            P(mid_pt.x - ux * barrel_dist, mid_pt.y - uy * barrel_dist, 0),
+            P(ctrl_L_pt.geometry.x, ctrl_L_pt.geometry.y, 0))
+        ctrl_con.isConstruction = True
+        gc.addPerpendicular(ctrl_con, ax_line)
+        gc.addCoincident(ctrl_con.startSketchPoint, ax_line)
+        gc.addCoincident(ctrl_con.endSketchPoint, ctrl_L_pt)
+        dims.addDistanceDimension(
+            ctrl_con.startSketchPoint, ctrl_con.endSketchPoint, AL,
+            P(mid_pt.x + anx * 2, mid_pt.y + any_ * 2, 0)
+        ).parameter.expression = f"{prefix}_barrel_r"
+        dims.addDistanceDimension(
+            ctrl_con.startSketchPoint, sym_line.startSketchPoint, AL,
+            P(mid_pt.x - ux * 2, mid_pt.y - uy * 2, 0)
+        ).parameter.expression = f"{prefix}_barrel_dist"
     else:
-        gc.addCoincident(body_con.endSketchPoint, L4.endSketchPoint)  # at midpoint
-    dims.addDistanceDimension(
-        body_con.startSketchPoint, body_con.endSketchPoint, AL,
-        P(mid_pt.x + anx * 2, mid_pt.y + any_ * 2, 0)
-    ).parameter.expression = f"{prefix}_mid_dia / 2"
+        # Straight: body_con at midpoint, dimensioned by mid_dia/2
+        body_con = lines.addByTwoPoints(
+            P(mid_pt.x, mid_pt.y, 0),
+            P(mid_pt.x + anx * mid_r, mid_pt.y + any_ * mid_r, 0))
+        body_con.isConstruction = True
+        gc.addPerpendicular(body_con, ax_line)
+        gc.addCoincident(body_con.startSketchPoint, sym_line.startSketchPoint)
+        gc.addCoincident(body_con.endSketchPoint, L4.endSketchPoint)
+        dims.addDistanceDimension(
+            body_con.startSketchPoint, body_con.endSketchPoint, AL,
+            P(mid_pt.x + anx * 2, mid_pt.y + any_ * 2, 0)
+        ).parameter.expression = f"{prefix}_mid_dia / 2"
 
     # Shoulder length (absolute)
     dims.addDistanceDimension(

@@ -52,6 +52,8 @@ def run(context):
         ("ts_tenon_len", "1.6 in", "in", "Stretcher tenon length"),
         ("ts_shoulder_len", "0.91 in", "in", "Stretcher shoulder length"),
         ("ts_ext", "0.1 in", "in", "Stretcher extension beyond leg"),
+        ("ts_barrel_dist", "1.5 in", "in", "Barrel control dist from mid"),
+        ("ts_barrel_r", "0.375 in", "in", "Barrel control radius"),
     ]:
         add_param(pname, expr, unit, desc)
 
