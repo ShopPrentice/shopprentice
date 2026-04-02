@@ -1,0 +1,131 @@
+# Helpers Reference
+
+Function signatures and usage for the `sp` helper library (`from helpers import sp`). Read this file when writing Fusion 360 scripts that use the helper functions.
+
+## Standard Helpers
+
+These reusable helpers form the foundation of the model-coordinate workflow. The caller specifies everything in model coordinates using parameter expressions; the helpers handle all sketch-space complexity.
+
+### Helper Library (`from helpers import sp`)
+
+The `af` helper library provides these functions as importable utilities, eliminating per-script boilerplate. Scripts can `from helpers import sp` and use them directly:
+
+```python
+from helpers import sp
+
+def run(context):
+    ctx = sp.DesignContext()          # app, design, root, params, units, ev()
+    depth = ctx.ev("shelf_depth")     # evaluate parameter or expression → cm
+    shelf = ctx.find_body("shelf_top")  # recursive body search by name
+    shelves = ctx.find_bodies("shelf_*")  # glob pattern match
+
+    # Queries
+    top = sp.find_face(shelf, "z", +1)   # outermost planar face along axis
+    at = sp.find_face_at(shelf, "z", 3.0)  # face at specific coordinate
+    edges = sp.find_edges(shelf, "z")    # linear edges aligned with axis
+    h, v = sp.probe_sketch_axes(sk)      # model axis → sketch H/V
+    h, v, hs, vs = sp.probe_sketch_signs(sk)  # + sign detection
+    p = sp.smallest_profile(sk)          # smallest-area profile in sketch
+
+    # Sketches — rectangles
+    sk, prof = sp.sketch_rect(comp, plane, "0 cm", "0 cm", "w", "d",
+                               name="Sk", ev=ctx.ev)
+    sk2, prof2 = sp.sketch_rect_model(comp, plane,
+                                       ("x0", "y0", "z0"),
+                                       {"x": "width", "z": "height"},
+                                       name="Sk2", ev=ctx.ev)
+
+    # Sketches — stadium shapes (domino mortises, slot joints)
+    sk3, prof3 = sp.sketch_slot(comp, plane, "cx", "cy",
+                                 "dm_l", "dm_w", vertical=True,
+                                 name="DM_Sk", ev=ctx.ev)
+    sk4, prof4 = sp.sketch_slot_model(comp, plane,
+                                       ("cx", "cy", "cz"), "z",
+                                       "dm_l", "dm_w",
+                                       name="DM_Sk", ev=ctx.ev)
+
+    # Feature builders
+    f = sp.ext_new(comp, prof, "board_thick", "FrontBoard")
+    f = sp.ext_new_sym(comp, prof, "board_thick / 2", "Rail")  # total = board_thick
+    f = sp.ext_op(comp, prof, "groove_depth", CUT, body, "Groove", flip=True)
+    pl = sp.off_plane(comp, base_plane, "box_width / 2", "YMid")
+    sp.combine(comp, target, [tool1, tool2], CUT, True, "Mortise")
+    m = sp.mirror_body(comp, body, mid_plane, "BackMirror")
+    m = sp.mirror_bodies(comp, [b1, b2], mid_plane, "Mirror")
+    m = sp.mirror_feats(comp, [ext_feat], mid_plane, "RabMirror")
+    occ = sp.make_comp(root, "Shelves")
+    pat = sp.feat_pattern(comp, feat, axis, "n_slats", "slat_pitch", "Pat")
+    pat = sp.body_pattern(comp, body, axis, "n_shelves", "shelf_pitch", "Pat")
+```
+
+All helpers accept explicit objects (body, component, sketch) rather than relying on module globals, so they work in both normal and sandbox mode. The `ev` parameter falls back to creating one from the active design when omitted.
+
+**Key improvements over inline versions:**
+- `sketch_rect` and `sketch_rect_model` always add explicit H/V geometric constraints (some older scripts omitted these)
+- `find_face` uses `pointOnFace` coordinate, not normal sign (handles both-direction normals correctly)
+- `DesignContext.find_body/find_bodies` walks all descendant components recursively
+
+**What's NOT in sp.py** (write these inline when needed): project-specific face finders (e.g., `find_top_face`), `angled_tenon_end`, `splay_center`.
+
+### `ev()` — Dual-Mode Parameter Access
+
+Evaluates a parameter name or expression string → float in cm. Use for computing approximate sketch positions; actual parametric behavior comes from dimension expressions, not `ev()` values.
+
+**Preferred:** `ctx.ev("shelf_depth")` via `sp.DesignContext`. **Inline fallback** (when not using af):
+```python
+def ev(e):
+    p = params.itemByName(e)
+    return p.value if p else design.unitsManager.evaluateExpression(e, "cm")
+```
+
+### `sketch_rect_model()` — Parametric Rectangle in Model Coordinates
+
+Available as `sp.sketch_rect_model(comp, plane, model_origin, model_size, name, ev)`.
+
+Creates a fully parametric rectangle on ANY plane (including non-XY construction planes and BRepFaces). Internally uses `modelToSketchSpace` to convert model coordinates to sketch space, adds explicit H/V geometric constraints, and creates 4 parametric dimensions (width, height, x-offset, y-offset).
+
+```python
+sk, prof = sp.sketch_rect_model(comp, comp.xZConstructionPlane,
+    ("0 in", "0 in", "0 in"),
+    {"x": "box_length", "z": "box_height"},
+    "Front_Sk", ev=ctx.ev)
+```
+
+- `model_origin`: `(x_expr, y_expr, z_expr)` — model-space corner expressions
+- `model_size`: `{axis: expr, axis: expr}` — 2 model-axis size expressions
+- Returns: `(sketch, profile)`
+
+**Limitation — position dimensions are always positive.** `sketch_rect_model` uses `addDistanceDimension` for the x-offset and y-offset from the sketch origin, which measures absolute distance (always positive). This works correctly when the rectangle is near the origin or in the positive quadrant. For bodies at arbitrary model positions (e.g., splay-adjusted stretchers offset from origin), the position dimensions can reflect coordinates to the wrong side.
+
+**Workaround:** For arbitrarily-positioned rectangles, use a manual sketch with `modelToSketchSpace` for approximate placement and only width/height dimensions (always positive, no position dimensions):
+
+```python
+sk = root.sketches.add(plane)
+m2s = sk.modelToSketchSpace
+s0 = m2s(P(x0_val, y0_val, z_val))
+s1 = m2s(P(x1_val, y1_val, z_val))
+rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
+    P(s0.x, s0.y, 0), P(s1.x, s1.y, 0))
+# H/V constraints + width/height dimensions only — no position dimensions
+```
+
+### Feature Builder Reference (`sp.*`)
+
+All feature builders take `comp` as first arg. Available via `from helpers import sp`.
+
+| Function | Signature | Returns | Notes |
+|----------|-----------|---------|-------|
+| `ext_new` | `(comp, prof, dist, name)` | ExtrudeFeature | Body via `f.bodies.item(0)` |
+| `ext_new_sym` | `(comp, prof, dist, name)` | ExtrudeFeature | Symmetric about sketch plane. **`dist` is the HALF-thickness** — extends `dist` on each side, creating a body of total thickness `2 × dist`. Use `"board_t / 2"` for a body of thickness `board_t`. |
+| `ext_op` | `(comp, prof, dist_expr, op, body, name, flip)` | ExtrudeFeature | `flip=True` for NegativeExtentDirection (CUT into body on face sketches) |
+| `off_plane` | `(comp, base, expr, name)` | ConstructionPlane | Offset construction plane |
+| `combine` | `(comp, target, tool_bodies, op, keep_tool, name)` | CombineFeature | `tool_bodies` accepts single body or list |
+| `mirror_body` | `(comp, body, plane, name)` | MirrorFeature | Mirrored body via `m.bodies.item(0)` |
+| `mirror_bodies` | `(comp, bodies, plane, name)` | MirrorFeature | Multiple bodies at once |
+| `mirror_feats` | `(comp, features, plane, name)` | MirrorFeature | Replays feature operations on mirrored side |
+| `make_comp` | `(root_comp, name)` | Occurrence | Component via `occ.component` |
+| `feat_pattern` | `(comp, feat, axis, count_expr, spacing_expr, name)` | RectangularPatternFeature | Feature pattern along axis |
+| `body_pattern` | `(comp, body, axis, count_expr, spacing_expr, name)` | RectangularPatternFeature | **WARNING:** replays full feature tree — creates ghost bodies if template has CUT/JOIN history. Use Python `for` loop instead for complex bodies. |
+| `sketch_slot` | `(comp, plane, cx_expr, cy_expr, long_expr, short_expr, vertical, name, ev)` | (sketch, profile) | Stadium shape in sketch-space coords. Use for domino mortises. |
+| `sketch_slot_model` | `(comp, plane, model_center, long_model_axis, long_expr, short_expr, name, ev)` | (sketch, profile) | Stadium shape in model-space coords with auto sign detection. |
+| `probe_sketch_signs` | `(sk)` | (h_axis, v_axis, h_sign, v_sign) | Extends `probe_sketch_axes` with sign detection for non-XY planes. |

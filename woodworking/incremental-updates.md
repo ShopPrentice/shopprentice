@@ -141,3 +141,128 @@ If you find yourself doing any of these, stop and redesign:
 6. **If patch OK:** add the feature in the correct position (before mirrors if applicable), with parametric dimensions, in the correct component.
 7. **Test with `capture_design`** to verify body count, positions, and volumes.
 8. **Test parametric robustness** by imagining: "What if the user changes `leg_setback`? `bench_w`? `ls_w`? Does everything still work?"
+
+## Build Strategy (Component-by-Component)
+
+Models are built **one component at a time**. Each component gets its own plan → build → validate cycle, keeping conversation context bounded regardless of total model complexity. The script file grows on disk between components, but each conversation cycle only deals with the current component's features.
+
+**Small pieces** (boxes, trays — < ~8 bodies, 1-2 joint types) can be built in a single pass.
+
+### Build Order
+
+```
+1. Plan ALL components upfront (high-level, one response)
+2. For each component (separate plan → build → validate cycle):
+   a. Shared parameters + helpers  (first component only)
+   b. Component creation + construction planes
+   c. Body extrudes + internal mirrors/patterns
+   d. Splay moves if this component connects to splayed members (see angled-construction.md "Stretcher Splay Matching")
+   e. Internal joinery (JOINs within the component)
+   f. Validate with capture_design
+3. Cross-component operations (root-level, one cycle):
+   a. Assembly proxy CUTs (mortises, dados, grooves)
+   b. Validate body count and interference
+4. Details (final cycle):
+   a. Fillets, chamfers, decorative cutouts
+   b. Validate → apply_appearance → get_product_shots → present to user
+```
+
+### Why Component-by-Component
+
+The conversation context is the bottleneck, not the script. Each component cycle adds ~5-15 features worth of code, errors, and validation to the conversation. After the cycle completes and the agent moves to the next component, only the script file carries forward — the conversation context for previous components can be compressed.
+
+**Phase-based (old, hits token limits on complex models):**
+```
+Phase 1: ALL structure (all components) → huge script + debug context
+Phase 2: ALL joinery (all components) → even bigger
+Phase 3: ALL details → biggest
+```
+
+**Component-based (scales to any complexity):**
+```
+Component A: structure + internal joinery → bounded context → done
+Component B: structure + internal joinery → bounded context → done
+...
+Cross-component: CUTs → bounded context → done
+Details: fillets → bounded context → done
+```
+
+### Rules
+
+1. **One component per build cycle.** Plan the component, write its section of the script, execute, validate. Don't combine multiple components in one cycle.
+2. **Validate after each component.** Call `capture_design` to verify body count, positions, and volumes for the component just built.
+3. **Auto-proceed on success.** If validation passes, immediately plan the next component. Do NOT wait for user approval between components.
+4. **Same file, growing content.** All components accumulate in the same `.py` file. Each cycle appends to the existing script.
+5. **Each script execution rebuilds from scratch.** The full script runs every time (document reuse pattern). This is fast — Fusion rebuilds a 100-feature timeline in seconds.
+6. **Plan before code, always in separate responses.** Before each component, output its step list as text. Then write the code and execute in the next response.
+7. **Cross-component operations are a separate cycle.** After all components are built, one final cycle adds root-level CUTs via assembly proxies.
+8. **Details are the last cycle.** Fillets and chamfers require all geometry to exist first.
+9. **Show final result.** After the last cycle, call `apply_appearance` then `get_product_shots` to capture presentation-quality images and present to the user.
+10. **Replace, don't patch.** When an approach doesn't work and you rewrite it, **replace the old code block entirely** — don't add new code below while partially cleaning up the old (e.g., calling `deleteMe()` on an old sketch but leaving its extrude). Partial cleanup creates orphan bodies invisible in code review but visible in the model. The old code is always recoverable from git or undo, so replacing is safe.
+11. **Detect UI changes automatically.** When working on an existing design, call `get_changes` at conversation start and before any `execute_script`. If changes are detected, capture them with `sync_script`, interpret the user's intent (UI edits are design signals, not literal specs), then implement correctly following the decision framework in `woodworking/incremental-updates.md`. The default is to rebuild the affected section properly, not to replicate the UI edit verbatim.
+
+### What Goes Where
+
+| Where | What |
+|-------|------|
+| **First component cycle** | Document preamble, shared parameters, shared helpers, midplanes |
+| **Each component cycle** | `make_comp`, component-local planes, extrudes, internal mirrors/patterns/JOINs |
+| **Cross-component cycle** | Assembly proxy creation, root-level Combine CUTs (`keepTool=True`) |
+| **Details cycle** | Fillets, chamfers (edge selection by coordinate or face) |
+
+### Keeping Each Cycle Bounded
+
+When writing code for a new component, do NOT re-read the entire script. Instead:
+- Read only the last ~20 lines (to see where to append)
+- Know the parameter names and body names from the plan (established in the first cycle)
+- Append the new component's code block
+
+When debugging, focus only on the current component's features — don't re-analyze earlier components that already validated.
+
+### Document Management — DO NOT manage documents in scripts
+
+Scripts MUST NOT close or create documents. The `execute_script` MCP tool manages the scratch document via `clean=True`. A script that calls `doc.close(False)` or `app.documents.add()` conflicts with the transaction wrapper and causes Fusion to allocate unbounded memory (200+ GB observed), freezing the application.
+
+A guard in `execute_script.py` rejects scripts containing this pattern.
+
+```python
+def run(context):
+    app = adsk.core.Application.get()
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    design.designType = adsk.fusion.DesignTypes.ParametricDesignType
+
+    root = design.rootComponent
+    params = design.userParameters
+    Point3D = adsk.core.Point3D
+    # ... build from scratch ...
+```
+
+Use `execute_script` with `clean=True` for a fresh slate — it deletes all timeline features and user parameters before running, wrapped in a single transaction (Ctrl+Z reverts everything).
+
+### Script Epilogue
+
+Every script should end with five standard steps:
+
+```python
+# 1. Hide construction elements (clean viewport)
+for sk in root.sketches:
+    sk.isVisible = False
+for cp in root.constructionPlanes:
+    cp.isLightBulbOn = False
+for ca in root.constructionAxes:
+    ca.isLightBulbOn = False
+
+# 2. Diagnostic body count per component
+for comp_name, comp in [("Posts", post_c), ("Rails", rail_c), ...]:
+    names = [comp.bRepBodies.item(i).name for i in range(comp.bRepBodies.count)]
+    print(f"{comp_name}: {len(names)} bodies")
+names = [root.bRepBodies.item(i).name for i in range(root.bRepBodies.count)]
+print(f"Root: {len(names)} joinery voids")
+
+# 3. Apply wood appearance (grain-aligned texture on all bodies)
+sp.apply_appearance("white oak")
+```
+
+**Step 3 is required** — scripts without `sp.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for species and grain details.
+
+After the script runs, call `get_product_shots` via MCP to capture presentation images. It handles camera positioning, artifact cleanup, and framing automatically — no fit-view or hide-sketch code needed in the script.
