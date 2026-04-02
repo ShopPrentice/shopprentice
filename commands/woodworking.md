@@ -899,9 +899,14 @@ When writing code for a new component, do NOT re-read the entire script. Instead
 
 When debugging, focus only on the current component's features — don't re-analyze earlier components that already validated.
 
-### Document Management — DO NOT manage documents in scripts
+### Document Management — ONE document, always reuse
 
-Scripts MUST NOT close or create documents. The `execute_script` MCP tool manages the scratch document via `clean=True`. A script that calls `doc.close(False)` or `app.documents.add()` conflicts with the transaction wrapper and causes Fusion to allocate unbounded memory (200+ GB observed), freezing the application.
+**Every build uses the same unsaved document.** Pass `clean=True` to `execute_script` — it deletes all features in the current document and rebuilds from scratch. No new documents are created. This is critical for free-tier users who have a document limit.
+
+**Do NOT:**
+- Call `app.documents.add()` or `doc.close()` in scripts — causes unbounded memory allocation (200+ GB observed)
+- Use `sandbox=True` for build phases — creates throwaway documents that count against the document limit. Reserve sandbox for one-off validation only.
+- Create multiple documents for different components — everything goes in one script, one document
 
 A guard in `execute_script.py` rejects scripts containing this pattern.
 
@@ -976,7 +981,7 @@ When an MCP connection to Fusion 360 is available (via the ShopPrentice add-in),
 
 After generating each component's code, run this loop:
 
-1. **Execute** — call `execute_script` to run the full script in Fusion 360. The script rebuilds from scratch each time (document reuse pattern).
+1. **Execute** — call `execute_script(script=script, clean=True)` to run the full script in Fusion 360. **Always pass `clean=True`** — this deletes all existing features and rebuilds from scratch in the same document (no new documents created). Do NOT use `sandbox=True` for build phases — sandbox creates throwaway documents that count against the user's document limit.
 2. **On error** — the `content` field contains the full Python stack trace. Analyze, fix only the current component's code, and re-execute (see Error Retry Rules below).
 3. **On success — validate with `capture_design` + `validate_design`:**
    - Call `capture_design` to verify body count, names, bounding boxes.

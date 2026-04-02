@@ -41,9 +41,11 @@ The user can then edit parameters and click Rebuild in the palette without invol
 
 1. Invoke `/woodworking` to get full design rules
 2. Plan the build (components, features, joinery)
-3. Execute Phase 1 (structure) → validate with `capture_design`
-4. Execute Phase 2 (joinery) → validate with `capture_design`
+3. Execute Phase 1 (structure) with `execute_script(clean=True)` → validate with `capture_design`
+4. Execute Phase 2 (joinery) with `execute_script(clean=True)` → validate with `capture_design`
 5. Execute Phase 3 (details) → validate → `validate_design` → `apply_appearance` → `get_product_shots` → present to user
+
+**IMPORTANT:** Always use `clean=True` — this rebuilds in the same unsaved document. Do NOT use `sandbox=True` for build phases (creates extra documents that hit free-tier limits). One document, always reused.
 
 ### Key Principles
 
