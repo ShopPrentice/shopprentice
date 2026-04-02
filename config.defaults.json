@@ -1,0 +1,17 @@
+{
+  "sandbox": false,
+  "validation": {
+    "auto_screenshot": false,
+    "capture_design_on_error_only": true,
+    "validate_design_after_phase": true
+  },
+  "execution": {
+    "clean": true,
+    "pass_script_path": true
+  },
+  "product_shots": {
+    "resolution": 1024,
+    "views": ["iso-top-right"],
+    "take_at_end": true
+  }
+}

@@ -484,15 +484,30 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 
 **Key rules:** One component per build cycle. Validate after each with `capture_design`. Auto-proceed on success. Same `.py` file, growing content. Cross-component CUTs are a separate cycle. Details (fillets/chamfers) last. Always end with `sp.apply_appearance()` + `get_product_shots`. Replace, don't patch — when rewriting code, remove the entire old block.
 
+## Default Configuration
+
+Optimize for token efficiency and free-tier compatibility:
+
+| Setting | Default | Why |
+|---------|---------|-----|
+| `clean` | Always `True` | Rebuild in same unsaved document — no new docs created |
+| `sandbox` | Never for builds | Creates throwaway documents → hits free-tier doc limit |
+| Screenshots | None during builds | User sees the model live — don't waste tokens |
+| `capture_design` | On error only | Large JSON wastes tokens; use print statements for routine checks |
+| `validate_design` | After each phase | Small pass/fail response, always call it |
+| Product shots | 1 view, 1024px, end only | `get_product_shots(views=["iso-top-right"])` |
+
 ## MCP Live Execution
 
 > **Full reference:** `woodworking/mcp-advanced.md` — MCP tool table, execution + validation loop, error retry rules, sandbox mode, timeline rollback diagnosis, modifying existing designs.
 
 **Default behavior:** When MCP is available, ALWAYS execute automatically after generating code. Do not wait for user to ask.
 
-**Loop:** execute_script → on error: fix + retry (max 3 per error) → on success: capture_design + validate_design (MANDATORY) → auto-proceed.
+**Loop:** `execute_script(clean=True)` → on error: fix + retry (max 3 per error) → on success: `validate_design` (MANDATORY, small response) → auto-proceed. Do NOT call `capture_design` or take screenshots routinely — only on errors or when debugging.
 
-**Final step:** apply_appearance → get_product_shots → present to user.
+**Document rule:** ONE unsaved document, always reused via `clean=True`. Never use `sandbox=True` for build phases.
+
+**Final step:** `apply_appearance` → `get_product_shots(views=["iso-top-right"])` → present to user.
 
 **Token efficiency:**
 - `capture_design` returns a compact summary (body names + bounding boxes + params). Full capture saved to temp file (path in response) — Read it only when deep inspection is needed.
