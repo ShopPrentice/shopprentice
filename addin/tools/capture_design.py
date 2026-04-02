@@ -426,10 +426,48 @@ def handler() -> dict:
             except:
                 pass
 
+        # Build compact inline summary (body names + bounding boxes + params)
+        # Save full capture to temp file for deep inspection when needed
+        import json, tempfile, os
+        full_json = json.dumps(out, indent=2)
+
+        # Save full capture to temp file
+        tmp_dir = os.path.join(tempfile.gettempdir(), "shopprentice_captures")
+        os.makedirs(tmp_dir, exist_ok=True)
+        import time
+        capture_path = os.path.join(tmp_dir, f"capture_{int(time.time())}.json")
+        with open(capture_path, "w") as f:
+            f.write(full_json)
+
+        # Build compact summary: bodies with bounding boxes + parameter list
+        def _flatten_bodies(comp, prefix=""):
+            bodies = []
+            for b in comp.get("bodies", []):
+                bodies.append({
+                    "name": b["name"],
+                    "component": comp["name"],
+                    "boundingBox": b.get("boundingBox"),
+                    "volume_cm3": round(b.get("volume", 0), 2) if b.get("volume") else None,
+                })
+            for child in comp.get("children", []):
+                bodies.extend(_flatten_bodies(child))
+            return bodies
+
+        all_bodies = _flatten_bodies(out["components"])
+        summary = {
+            "designName": out["designName"],
+            "bodyCount": len(all_bodies),
+            "featureCount": len(out["timeline"]),
+            "parameterCount": len(out["userParameters"]),
+            "bodies": all_bodies,
+            "userParameters": out["userParameters"],
+            "fullCapture": capture_path,
+        }
+
         return {
-            "content": [{"type": "text", "text": __import__('json').dumps(out, indent=2)}],
+            "content": [{"type": "text", "text": json.dumps(summary, indent=2)}],
             "isError": False,
-            "message": f"Captured design: {out['designName']}"
+            "message": f"Captured design: {out['designName']} ({len(all_bodies)} bodies, {len(out['timeline'])} features). Full capture: {capture_path}"
         }
 
     except Exception as e:
