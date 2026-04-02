@@ -556,3 +556,320 @@ Name every feature and body for a readable timeline and easy debugging:
 7. Body count matches expected (diagnostic print confirms no accidental merges or orphans)
 8. **`validate_design` → passed.** Single call checks connectivity (1 cluster) + interference (0 real overlaps). Fix disconnected clusters by adding mechanical joinery; fix interferences by checking CUT operations.
 
+## Common Errors and Fixes
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `RuntimeError: this is not a parametric design` | Accessed `userParameters` before setting `ParametricDesignType` | Set `design.designType` first |
+| `RuntimeError: A valid targetBaseFeature is required` | Used `TemporaryBRepManager` | Switch to Sketch > Extrude |
+| `RuntimeError: No target body found to cut` | Cut sketch drawn outside the body | Position sketch inside the body |
+| Parameters don't update geometry | Used `TemporaryBRepManager` (static BRep) | Use feature-based modeling |
+| Mirror only creates partial copies | Mirrored a `RectangularPatternFeature` | Mirror only template, create independent patterns |
+| Mirror side doesn't update count | Mirrored bodies (fixed set at script time) | Mirror template features, independent patterns per side |
+| Cut/Join affects wrong body | No `participantBodies` specified | Use `ext_input.participantBodies = [body]` |
+| `TypeError` on participantBodies | Passed `ObjectCollection` instead of list | Use Python `[body]` list |
+| Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
+| Body pattern creates extra bodies | `keepTool=True` CUTs in template history create ghost duplicates at each pattern instance | Ghost bodies are harmless — keep patterns for parametric counts. Filter ghost overlaps from `check_interference` by excluding void-on-void pairs. |
+| Mortise CUT destroys the receiving board | CUT body diameter ≥ board thickness (e.g., 0.75" spindle in 0.75" rail) | Mortise diameter must be < board thickness. Leave ≥ 1/4 wall on each side. Use blind mortises (stub tenon), not through. |
+| Fusion crashes / hangs on complex scripts | Too many individual features created in a loop (e.g., 140 dowels = 700+ timeline features). Each `dowel.single()` or `domino.single()` creates sketch + extrude + fillet + CUT. | **Use bulk CUT instead of per-element joints.** For repeated elements (spindles, slats) that insert into rails, build all bodies first (body_pattern), then CUT them ALL into the target in ONE `sp.combine(comp, rail, [all_spindles], CUT, True)` call. 8 bulk CUTs replaced 140 individual dowels in the crib build. |
+| Sketch geometry at mirrored/wrong position on non-XY plane | `probe_sketch_axes` gives axis name but not sign; model +Z → sketch -Y on XZ planes | Use `probe_sketch_signs` or `modelToSketchSpace` for approximate positions, flip offset operator based on sign |
+| Loose tenon (domino) bodies disappear | Second CUT used `keepTool=False`, consuming the body | Use `keepTool=True` on ALL CUTs for visible loose tenon joints |
+| Rectangle deforms when parameter changes | `addTwoPointRectangle` lacks explicit H/V geometric constraints | Add `addHorizontal`/`addVertical` on all 4 lines after creation. Apply same rule to any sketch line that should stay H or V. |
+| H/V constraint distorts triangle on YZ plane | On YZ planes, model-Y maps to sketch-V and model-Z to sketch-H — opposite of XZ planes. Using `addHorizontal` on a model-horizontal (same-Z) line that's sketch-vertical destroys the profile. | **Use `sp.probe_orientations(sk)`** to get correct H/V per model axis. Never hardcode H/V on non-XY planes. |
+| Chamfer fails with `createInput()` | Chamfer API requires `createInput2()`, not `createInput()` | Always use `chamferFeatures.createInput2()` and the nested `.chamferEdgeSets` collection |
+| Fillet fails — radius too large | Fillet radius exceeds half the smallest adjacent face dimension | Reduce `fl_r`; keep it < half the shortest edge on any affected face |
+| Fillet/chamfer selects wrong edges | Edge coordinate filter matches unintended edges (e.g., groove interior edges) | Add `edge.body.name` check; filter by both coordinate AND body |
+| Chamfer fails with non-manifold error | Chamfer selected edges at groove/mortise boundaries where two volumes meet | Only chamfer outer perimeter edges (check bounding box), skip edges at joint interfaces. Never chamfer mating lines of joints. |
+| No profile created on face sketch | Drawn rectangle has same height/width as the face — edges coincide with auto-projected face boundary, Fusion merges them | Use a **construction plane** at the same position instead of the face. No auto-projected edges → clean single profile. Common with full-width tenons. |
+| Tenon extrudes into stretcher body | Default extrude direction on construction plane goes in +normal, which may point into the stretcher instead of into the leg | Place the tenon sketch plane at the **outer end** of the tenon (proud face or blind stop). Extrude inward — the default +normal direction goes toward the stretcher body. |
+| Fillet API rejects BRepFace | `addConstantRadiusEdgeSet` requires edges, not faces | Iterate `face.edges`, deduplicate via `tempId`, add individual edges |
+| `InternalValidationError: face` on sketch | CUT/JOIN modifies body topology, invalidating BRepFace references | Re-find face with `sp.find_face()` after each CUT/JOIN before next sketch |
+| Face-sketch extrudes wrong profile | Auto-projected face edges and `sketch.project()` reference lines split profiles into fragments — `smallest_profile` picks a fragment instead of the drawn shape | **Always call `sp.refs_to_construction(sk)` before profile selection.** This converts all reference/projected lines to construction geometry so they don't form profile boundaries. Then `sp.smallest_profile(sk)` returns the correct drawn profile. This is mandatory for ANY sketch on a face or with projected references. |
+| Symmetric extrude body 2× too thick | Passed full thickness to `ext_new_sym` — it applies `dist` to EACH side | Pass half-thickness: `ext_new_sym(comp, prof, "board_t / 2", ...)` |
+| `sketch_rect_model` places body on wrong side of origin | Position dimensions use absolute distance — negative coordinates reflect to positive | Use manual sketch with `modelToSketchSpace` + width/height dimensions only (no position dimensions) |
+| Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `woodworking/joinery/mortise-tenon.md`) |
+| Orphan body in model from rewritten code | Rewrote a feature but only partially removed the old code (e.g., deleted old sketch but left its extrude) | Replace the entire old block when rewriting — don't patch around it. Partial cleanup like `deleteMe()` calls leaves orphan geometry. Old code is recoverable from git. |
+| Domino has square corners (rectangular cross-section) | Used `sketch_rect` instead of `sketch_slot` for domino void body | **Always use `sketch_slot`** — real Festool dominos have stadium (rounded-end) cross-sections. See `woodworking/joinery/domino-joint.md` for the full implementation. |
+
+## Incremental Build Strategy
+
+Models are built **one component at a time**. Each component gets its own plan → build → validate cycle, keeping conversation context bounded regardless of total model complexity. The script file grows on disk between components, but each conversation cycle only deals with the current component's features.
+
+**Small pieces** (boxes, trays — < ~8 bodies, 1-2 joint types) can be built in a single pass.
+
+### Build Order
+
+```
+1. Plan ALL components upfront (high-level, one response)
+2. For each component (separate plan → build → validate cycle):
+   a. Shared parameters + helpers  (first component only)
+   b. Component creation + construction planes
+   c. Body extrudes + internal mirrors/patterns
+   d. Splay moves if this component connects to splayed members (see angled-construction.md "Stretcher Splay Matching")
+   e. Internal joinery (JOINs within the component)
+   f. Validate with capture_design
+3. Cross-component operations (root-level, one cycle):
+   a. Assembly proxy CUTs (mortises, dados, grooves)
+   b. Validate body count and interference
+4. Details (final cycle):
+   a. Fillets, chamfers, decorative cutouts
+   b. Validate → apply_appearance → get_product_shots → present to user
+```
+
+### Why Component-by-Component
+
+The conversation context is the bottleneck, not the script. Each component cycle adds ~5-15 features worth of code, errors, and validation to the conversation. After the cycle completes and the agent moves to the next component, only the script file carries forward — the conversation context for previous components can be compressed.
+
+**Phase-based (old, hits token limits on complex models):**
+```
+Phase 1: ALL structure (all components) → huge script + debug context
+Phase 2: ALL joinery (all components) → even bigger
+Phase 3: ALL details → biggest
+```
+
+**Component-based (scales to any complexity):**
+```
+Component A: structure + internal joinery → bounded context → done
+Component B: structure + internal joinery → bounded context → done
+...
+Cross-component: CUTs → bounded context → done
+Details: fillets → bounded context → done
+```
+
+### Rules
+
+1. **One component per build cycle.** Plan the component, write its section of the script, execute, validate. Don't combine multiple components in one cycle.
+2. **Validate after each component.** Call `capture_design` to verify body count, positions, and volumes for the component just built.
+3. **Auto-proceed on success.** If validation passes, immediately plan the next component. Do NOT wait for user approval between components.
+4. **Same file, growing content.** All components accumulate in the same `.py` file. Each cycle appends to the existing script.
+5. **Each script execution rebuilds from scratch.** The full script runs every time (document reuse pattern). This is fast — Fusion rebuilds a 100-feature timeline in seconds.
+6. **Plan before code, always in separate responses.** Before each component, output its step list as text. Then write the code and execute in the next response.
+7. **Cross-component operations are a separate cycle.** After all components are built, one final cycle adds root-level CUTs via assembly proxies.
+8. **Details are the last cycle.** Fillets and chamfers require all geometry to exist first.
+9. **Show final result.** After the last cycle, call `apply_appearance` then `get_product_shots` to capture presentation-quality images and present to the user.
+10. **Replace, don't patch.** When an approach doesn't work and you rewrite it, **replace the old code block entirely** — don't add new code below while partially cleaning up the old (e.g., calling `deleteMe()` on an old sketch but leaving its extrude). Partial cleanup creates orphan bodies invisible in code review but visible in the model. The old code is always recoverable from git or undo, so replacing is safe.
+11. **Detect UI changes automatically.** When working on an existing design, call `get_changes` at conversation start and before any `execute_script`. If changes are detected, capture them with `sync_script`, interpret the user's intent (UI edits are design signals, not literal specs), then implement correctly following the decision framework in `woodworking/incremental-updates.md`. The default is to rebuild the affected section properly, not to replicate the UI edit verbatim.
+
+### What Goes Where
+
+| Where | What |
+|-------|------|
+| **First component cycle** | Document preamble, shared parameters, shared helpers, midplanes |
+| **Each component cycle** | `make_comp`, component-local planes, extrudes, internal mirrors/patterns/JOINs |
+| **Cross-component cycle** | Assembly proxy creation, root-level Combine CUTs (`keepTool=True`) |
+| **Details cycle** | Fillets, chamfers (edge selection by coordinate or face) |
+
+### Keeping Each Cycle Bounded
+
+When writing code for a new component, do NOT re-read the entire script. Instead:
+- Read only the last ~20 lines (to see where to append)
+- Know the parameter names and body names from the plan (established in the first cycle)
+- Append the new component's code block
+
+When debugging, focus only on the current component's features — don't re-analyze earlier components that already validated.
+
+### Document Management — ONE document, always reuse
+
+**Every build uses the same unsaved document.** Pass `clean=True` to `execute_script` — it deletes all features in the current document and rebuilds from scratch. No new documents are created. This is critical for free-tier users who have a document limit.
+
+**Do NOT:**
+- Call `app.documents.add()` or `doc.close()` in scripts — causes unbounded memory allocation (200+ GB observed)
+- Use `sandbox=True` for build phases — creates throwaway documents that count against the document limit. Reserve sandbox for one-off validation only.
+- Create multiple documents for different components — everything goes in one script, one document
+
+A guard in `execute_script.py` rejects scripts containing this pattern.
+
+```python
+def run(context):
+    app = adsk.core.Application.get()
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    design.designType = adsk.fusion.DesignTypes.ParametricDesignType
+
+    root = design.rootComponent
+    params = design.userParameters
+    Point3D = adsk.core.Point3D
+    # ... build from scratch ...
+```
+
+Use `execute_script` with `clean=True` for a fresh slate — it deletes all timeline features and user parameters before running, wrapped in a single transaction (Ctrl+Z reverts everything).
+
+### Script Epilogue
+
+Every script should end with five standard steps:
+
+```python
+# 1. Hide construction elements (clean viewport)
+for sk in root.sketches:
+    sk.isVisible = False
+for cp in root.constructionPlanes:
+    cp.isLightBulbOn = False
+for ca in root.constructionAxes:
+    ca.isLightBulbOn = False
+
+# 2. Diagnostic body count per component
+for comp_name, comp in [("Posts", post_c), ("Rails", rail_c), ...]:
+    names = [comp.bRepBodies.item(i).name for i in range(comp.bRepBodies.count)]
+    print(f"{comp_name}: {len(names)} bodies")
+names = [root.bRepBodies.item(i).name for i in range(root.bRepBodies.count)]
+print(f"Root: {len(names)} joinery voids")
+
+# 3. Apply wood appearance (grain-aligned texture on all bodies)
+sp.apply_appearance("white oak")
+```
+
+**Step 3 is required** — scripts without `sp.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for species and grain details.
+
+After the script runs, call `get_product_shots` via MCP to capture presentation images. It handles camera positioning, artifact cleanup, and framing automatically — no fit-view or hide-sketch code needed in the script.
+
+## Default Configuration
+
+These defaults optimize for token efficiency and free-tier compatibility. Users can override by stating preferences (e.g., "take screenshots after each phase").
+
+| Setting | Default | Why |
+|---------|---------|-----|
+| `clean` | `true` | Rebuild in same document, no new docs |
+| `sandbox` | `false` | Avoid creating throwaway documents |
+| `auto_screenshot` | `false` | User can see the model — don't waste tokens on validation screenshots |
+| `capture_design` | On error only | Large JSON wastes tokens; use print statements + validate_design for routine checks |
+| `product_shots` | 1 view, 1024px | Single iso shot at end; user requests more if needed |
+| `appearance` | Auto at end | Apply once after final validation |
+
+## MCP Live Execution
+
+When an MCP connection to Fusion 360 is available (via the ShopPrentice add-in), you MUST automatically execute the script after generating it. Do not wait for the user to ask — the full generate-execute-verify loop is the default workflow.
+
+### Available MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `capture_design` | Full design introspection: parameters, component tree with body geometry and sketch dimension details, timeline features (including chamfers and fillets). |
+| `get_timeline_state` | Roll timeline to any index, capture body geometry at that point, restore position. |
+| `execute_script` | Run a complete Python script in Fusion 360. Returns `isError` flag + full stack trace on failure. Failed scripts are rolled back automatically. Set `sandbox=true` to run in a throwaway document. Set `clean=true` to delete all existing features before running — enables clean rebuild of an existing model. The entire clean+execute is one transaction: Ctrl+Z reverts to the previous state. |
+| `get_screenshot` | Quick viewport capture for build validation (1024x1024, as-is with artifacts). Use during builds to verify geometry. |
+| `get_product_shots` | Final presentation screenshots. Hides construction artifacts, FOV-aware framing, multiple views in one call (default: iso-top-right + front + right at 2048x2048). Supports `style` (shaded/transparent) and `bodies` (detail framing). Use after `apply_appearance`. |
+| `get_selection` | Read the user's current UI selection. Returns structured info per entity type (body, face, edge, occurrence) AND full feature details when a feature is selected (Sketch with curves/dimensions/constraints, Extrude with operation/distance/sketch, Combine with target/tool bodies, Mirror, Pattern, Move, Chamfer, Fillet). Use when the user says "what is this?" or "make this thicker". |
+| `set_selection` | Highlight entities in the UI by name or token. Use after `capture_design` identifies a problem body — select it so the user sees which one. |
+| `modify_parameters` | Change parameter expressions with incremental recompute. Much faster than re-running the script. Use for iterative tuning ("make shelves deeper"). |
+| `validate_design` | **Single-call structural validation.** Runs connectivity (1 cluster?) + interference (0 real overlaps?) and returns pass/fail. Call this after the final build cycle — replaces separate `check_connectivity` + `check_interference` calls. |
+| `check_interference` | Detect body collisions. Diagnostic — use standalone when investigating a specific interference. Normally called via `validate_design`. |
+| `check_connectivity` | Verify all structural bodies form 1 connected cluster. Diagnostic — use standalone when investigating disconnected parts. Normally called via `validate_design`. |
+| `suppress_features` | Toggle timeline features on/off. Diagnostic tool — suppress a suspicious feature, check if it fixes the problem, unsuppress to restore. |
+| `get_changes` | Snapshot & diff. First call captures a baseline; subsequent calls return what changed — parameter expression changes, sketch dimension changes, body additions/removals, feature count delta. Use between iterations or when the user says "I changed something". |
+| `sync_script` | Auto-sync UI changes back to a script. Pass the original script source (or omit to use the tracked script from the last execute_script run) — auto-patches user parameter expression changes, reports feature-level param edits, feature additions, and feature removals with script context for the agent to apply. |
+| `get_document_status` | Check if the active document was built by a known script. Returns `tracked` (true/false), `pendingChanges` count, and `canUpdate` flag. Call before attempting incremental updates. |
+| `apply_appearance` | Apply wood appearance with grain-aligned texture. Auto-detects fiber direction from bounding box longest axis, with dovetail-aware constraints (dovetailed edges = end grain → grain excluded from that axis). Call once after final validation, before screenshots. |
+
+### Execution + Validation Loop
+
+After generating each component's code, run this loop:
+
+1. **Execute** — call `execute_script(script=script, clean=True)` to run the full script in Fusion 360. **Always pass `clean=True`** — this rebuilds from scratch in the same unsaved document (no new documents created). Do NOT use `sandbox=True` for build phases — sandbox creates throwaway documents that count against the user's document limit.
+2. **On error** — the `content` field contains the full Python stack trace. Analyze, fix only the current component's code, and re-execute (see Error Retry Rules below).
+3. **On success — validate:**
+   - The script's own print statements report body counts and build status. Check these first.
+   - Call `validate_design` — checks connectivity (1 cluster) and interference (0 overlaps). This is mandatory after every successful execution.
+   - **Do NOT call `capture_design` routinely** — it returns a large JSON blob that wastes tokens. Only call it when debugging (wrong body count, unexpected geometry).
+   - **Do NOT take screenshots for validation** — the user can see the model. Only take screenshots when the user asks, or at the very end for product shots.
+   - Report: `"12 bodies, validate_design PASSED."`
+4. **If validation fails** — use `capture_design` to inspect, then `get_timeline_state` to bisect the timeline and pinpoint the problem feature. Fix and re-execute.
+5. **Auto-proceed** to the next component if validation passes.
+7. **Appearance + product shots at the end** — after structural validation passes, call `apply_appearance` then `get_product_shots(views=["iso-top-right"], resolution=1024)` for a single presentation shot. Only add more views if the user requests them.
+
+### Diagnosing with Timeline Rollback
+
+When `capture_design` reveals unexpected state (wrong body count, bad positions), use `get_timeline_state` to narrow down which feature went wrong:
+
+1. Call `get_timeline_state` at the midpoint of the timeline.
+2. Check body count — is it correct for that point in the build?
+3. Binary search forward or backward to find the exact feature where the model diverges from the plan.
+4. Correlate with the `timeline` array from `capture_design` to identify the feature by name and type.
+
+This is like `git bisect` for the modeling timeline — fast, cheap, and precise.
+
+### Error Retry Rules
+
+- **Max 3 attempts per distinct error.** An error is "the same" if its core message is unchanged (ignore line numbers and memory addresses when comparing).
+- **Different errors reset the counter.** If a fix resolves one error but surfaces a new one, the new error gets its own 3-attempt budget.
+- **No infinite loops.** If you hit 3 distinct errors in a row (each failing 3 times), stop and present a summary of all errors to the user.
+- After each failed attempt, explain what error occurred and what you changed before retrying.
+- Failed scripts are automatically rolled back (transaction abort), so each retry starts from a clean state.
+
+### Modifying an Existing Design
+
+> **Full reference:** `woodworking/mcp-advanced.md` — provenance checking, selection-driven interaction, change detection, script sync, sandbox mode.
+
+Quick reference:
+- **Dimension changes:** `get_document_status` → `modify_parameters` → `capture_design` to validate → update `.py` file.
+- **Structural changes:** Read tracked script → edit → `execute_script(clean=true)`.
+- **UI tweaks:** `sync_script` auto-patches parameter expression changes, reports feature-level edits for agent.
+- **Sandbox:** `execute_script(sandbox=true)` runs in throwaway document for safe validation.
+
+### Example Flow
+
+```
+Response 1 (plan): High-level plan — all components, build order, joinery strategy
+
+Response 2 (plan): Case component — Front, Back, Left, Right boards
+Response 3 (build): write box.py (preamble + params + helpers + Case component)
+  → execute → capture_design → validate 4 bodies, positions OK → auto-proceed
+
+Response 4 (plan): Bottom component — panel + edge rabbets
+Response 5 (build): append Bottom code to box.py
+  → execute → capture_design → validate Bottom body + 4 Case bodies → auto-proceed
+
+Response 6 (plan): Lid component — panel + edge rabbets
+Response 7 (build): append Lid code to box.py
+  → execute → capture_design → validate 6 bodies total → auto-proceed
+
+Response 8 (plan): Cross-component CUTs — panel grooves, dovetails
+Response 9 (build): append root-level CUTs to box.py
+  → execute → capture_design → validate mortises cut, body count correct
+  → body count wrong? → get_timeline_state to bisect → fix → retry
+  → validation OK → auto-proceed
+
+Response 10 (plan): Details — lid chamfer, edge fillets
+Response 11 (build): append details to box.py
+  → execute → capture_design → validate
+  → validate_design → apply_appearance → get_product_shots → present to user
+```
+
+### Sandbox Mode
+
+Use `execute_script` with `sandbox=true` to run a script in a throwaway document. The script executes in a fresh temporary document; on completion, a design snapshot (parameters, bodies, dimensions, feature count) is returned and the temp document is discarded. The user's active document is never modified.
+
+**When to use sandbox:**
+- Validating a script before committing to the real design (especially complex joinery phases)
+- Testing helper imports or sketch logic without risk
+- Exploring "what if" variations without polluting the undo history
+
+**Behavior:**
+- ActionLog events are suppressed during the sandbox run — the user's `get_changes` baseline is unaffected
+- The sandbox document has no user parameters from the real design — scripts that reference existing parameters will fail unless they create their own
+- Returns `{sandbox: true, snapshot: {...}}` on success
+- On error, the temp document is closed and the original document is restored automatically
+
+**Not a substitute for the real execution loop.** Sandbox validates that a script runs without errors and produces expected geometry, but the real design's parameter expressions and timeline context may differ. Always follow sandbox validation with a real `execute_script` run.
+
+### Important
+
+- Always generate complete, standalone parametric scripts. MCP is the delivery mechanism — the script must also work when pasted into Fusion 360's script editor.
+- Scripts using `from helpers import sp` need the addin's `helpers/` directory on the Python path (automatic when run via `execute_script`). For standalone use outside MCP, copy `addin/helpers/` alongside the script.
+- Never generate partial snippets that only work via MCP.
+- Scripts must NOT catch exceptions — let them propagate so Fusion 360 aborts the transaction and returns the full error to the agent.
+
+### Screenshots
+
+After the final phase, call `get_product_shots` for presentation images. It handles everything automatically — artifact cleanup, FOV-aware framing, multiple views, visual style. See [woodworking/screenshots.md](woodworking/screenshots.md) for camera direction details.
+
+- **Validation during builds**: `get_screenshot` (quick, 1024x1024, as-is)
+- **Final presentation**: `get_product_shots` (2048x2048, cleaned up, multiple views)
+- **Transparent views**: `get_product_shots(style="transparent")`
+- **Detail shots**: `get_product_shots(bodies=["Post_FL", "Rail_FrontBot"], fill=0.90)`
+
+### MCP Timeout
+
+The ShopPrentice add-in's main-thread execution timeout is set in:
+`addin/server/mcp_server.py` → `_execute_on_main_thread` → `timeout = 300`
+
+Default is 300s (5 min). If scripts still time out, increase this value and restart the add-in.
+
+See `mcp/README.md` for setup instructions.
