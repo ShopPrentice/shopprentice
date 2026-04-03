@@ -264,6 +264,12 @@ def handler(script: str, sandbox: bool = False, clean: bool = False, script_path
         except Exception:
             pass
 
+        # Set visual style to Shaded with Visible Edges after every build
+        try:
+            app.activeViewport.visualStyle = adsk.core.VisualStyles.ShadedWithVisibleEdgesOnlyVisualStyle
+        except:
+            pass
+
         result = {
             "isError": False,
             "message": "Script executed successfully"
