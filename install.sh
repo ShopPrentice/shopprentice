@@ -117,9 +117,7 @@ if [ "$opt_claude_code" = true ]; then
         > "$CLAUDE_CMD_DIR/woodworking.md"
 
     # Apply user config (create default if missing)
-    PROJECTS_DIR="$HOME/shopprentice-projects"
-    CONFIG_FILE="$PROJECTS_DIR/config.json"
-    mkdir -p "$PROJECTS_DIR"
+    CONFIG_FILE="$AUTOFUSION_HOME/config.json"
     if [ ! -f "$CONFIG_FILE" ]; then
         echo '{"screenshots": "none"}' > "$CONFIG_FILE"
         echo "Created default config: $CONFIG_FILE"

@@ -159,7 +159,7 @@ cd ~/.shopprentice/repo && ./install.sh
 
 ## Configuration
 
-Settings are in `~/shopprentice-projects/config.json` (created on first install). Edit the file, then re-run the install command to apply.
+Settings are in `~/.shopprentice/config.json` (created on first install). Edit the file, then re-run the install command to apply.
 
 ```json
 {"screenshots": "none"}
