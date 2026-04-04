@@ -67,7 +67,7 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
 ## Topic Reference
 
-This skill is modular. The core (this file) covers fundamentals needed for every project. Read additional topic files based on your project's needs:
+This skill is modular. The core (this file) covers fundamentals needed for every project. **Read topic files ONLY when you need them** — do NOT pre-load all files at the start. Read the type + style file during planning. Read joinery files only when writing joinery code. Read other topics only when the specific situation arises.
 
 ### Topic Files
 
@@ -482,7 +482,12 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 
 > **Full reference:** `woodworking/incremental-updates.md` — component-by-component build order, what-goes-where, document management, script epilogue, interactive editing, rebuild-vs-patch.
 
-**Key rules:** One component per build cycle. Validate after each with `capture_design`. Auto-proceed on success. Same `.py` file, growing content. Cross-component CUTs are a separate cycle. Details (fillets/chamfers) last. Always end with `sp.apply_appearance()` + `get_product_shots`. Replace, don't patch — when rewriting code, remove the entire old block.
+**Key rules:**
+- **NEVER write more than one component's code per response.** Write Case → execute → validate → THEN write Bottom → execute → validate. Do NOT bundle multiple components in one code generation. Small pieces (< 8 bodies) may combine structure + joinery but still validate between components.
+- Auto-proceed on success — do not wait for user approval between components.
+- Same `.py` file, growing content. Cross-component CUTs are a separate cycle. Details last.
+- Always end with `sp.apply_appearance()` + `get_product_shots`.
+- Replace, don't patch — when rewriting code, remove the entire old block.
 
 ## MCP Live Execution
 
