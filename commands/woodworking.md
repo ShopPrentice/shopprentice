@@ -482,6 +482,11 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 
 > **Full reference:** `woodworking/incremental-updates.md` — component-by-component build order, what-goes-where, document management, script epilogue, interactive editing, rebuild-vs-patch.
 
+**Script location:**
+- **ALWAYS create new scripts in the current working directory.** Name the file descriptively (e.g., `dovetailed_box.py`, `dining_table.py`).
+- **NEVER modify files in `~/.shopprentice/repo/`** — that is the installed skill/add-in, not a project directory. The `examples/` folder there is read-only reference material.
+- If an example script is relevant, READ it for reference but write the new script to the current directory.
+
 **Key rules:**
 - **NEVER write more than one component's code per response.** Write Case → execute → validate → THEN write Bottom → execute → validate. Do NOT bundle multiple components in one code generation. Small pieces (< 8 bodies) may combine structure + joinery but still validate between components.
 - Auto-proceed on success — do not wait for user approval between components.
