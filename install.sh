@@ -116,6 +116,39 @@ if [ "$opt_claude_code" = true ]; then
     sed 's|joinery/|'"$REPO_DIR"'/joinery/|g' "$REPO_DIR/commands/woodworking.md" \
         > "$CLAUDE_CMD_DIR/woodworking.md"
 
+    # Apply user config if exists
+    CONFIG_FILE="$HOME/shopprentice-projects/config.json"
+    if [ -f "$CONFIG_FILE" ]; then
+        echo "Applying user config from $CONFIG_FILE"
+
+        # Screenshot mode
+        SS_MODE=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('screenshots','final-only'))" 2>/dev/null || echo "final-only")
+        case "$SS_MODE" in
+            none)
+                SS_TEXT="**Screenshot mode: none** — do NOT call \`get_product_shots\` or \`get_screenshot\` at any point. Use \`validate_design\` for all checks. Report validation results as text only. This setting overrides any screenshot instructions in topic files."
+                ;;
+            every-step)
+                SS_TEXT="**Screenshot mode: every-step** — call \`get_screenshot\` after each component for visual validation, and \`get_product_shots\` at the end. Do NOT Read the image files — report paths to the user. This setting overrides any screenshot instructions in topic files."
+                ;;
+            *)
+                SS_TEXT="**Screenshot mode: final-only** — call \`get_product_shots\` ONCE at the very end after \`apply_appearance\`. Do NOT call \`get_screenshot\` or \`get_product_shots\` mid-build. Use \`validate_design\` for intermediate checks. This setting overrides any screenshot instructions in topic files."
+                ;;
+        esac
+
+        # Patch the screenshot mode block
+        python3 -c "
+import re, sys
+with open('$CLAUDE_CMD_DIR/woodworking.md') as f:
+    content = f.read()
+content = re.sub(
+    r'<!-- SHOPPRENTICE_SCREENSHOT_MODE:.*?-->.*?<!-- END_SCREENSHOT_MODE -->',
+    '<!-- SHOPPRENTICE_SCREENSHOT_MODE: $SS_MODE -->\n$SS_TEXT\n<!-- END_SCREENSHOT_MODE -->',
+    content, flags=re.DOTALL)
+with open('$CLAUDE_CMD_DIR/woodworking.md', 'w') as f:
+    f.write(content)
+" 2>/dev/null && echo "  Screenshot mode: $SS_MODE"
+    fi
+
     echo "Installed /woodworking skill to $CLAUDE_CMD_DIR/woodworking.md"
 
     # Add global hint so agents know /woodworking exists
