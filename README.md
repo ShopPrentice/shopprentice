@@ -154,8 +154,24 @@ shopprentice/
 ## Updating
 
 ```bash
-cd ~/.shopprentice/repo && git pull && ./install.sh
+cd ~/.shopprentice/repo && ./install.sh
 ```
+
+## Configuration
+
+Settings are in `~/shopprentice-projects/config.json` (created on first install). Edit the file, then re-run the install command to apply.
+
+```json
+{"screenshots": "none"}
+```
+
+| Setting | Options | Default | Effect |
+|---------|---------|---------|--------|
+| `screenshots` | `"none"` | `"none"` | No screenshots — text validation only (most token-efficient) |
+| | `"final-only"` | | Product shots once at the very end |
+| | `"every-step"` | | Screenshot after each component (uses most tokens) |
+
+Projects are saved to `~/shopprentice-projects/<project-name>/` with a script and README for each build.
 
 ## Roadmap
 

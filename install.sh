@@ -121,7 +121,7 @@ if [ "$opt_claude_code" = true ]; then
     CONFIG_FILE="$PROJECTS_DIR/config.json"
     mkdir -p "$PROJECTS_DIR"
     if [ ! -f "$CONFIG_FILE" ]; then
-        echo '{"screenshots": "final-only"}' > "$CONFIG_FILE"
+        echo '{"screenshots": "none"}' > "$CONFIG_FILE"
         echo "Created default config: $CONFIG_FILE"
     fi
     if [ -f "$CONFIG_FILE" ]; then

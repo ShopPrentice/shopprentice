@@ -525,8 +525,8 @@ This allows the user (or a new agent session) to resume work by reading the READ
 - `get_product_shots` and `get_screenshot` save images to files and return file paths. **Do NOT Read the image files** — just report the paths to the user. The user can open them directly.
 - Prefer `validate_design` (text-only, ~100 tokens) over screenshots for intermediate validation.
 
-<!-- SHOPPRENTICE_SCREENSHOT_MODE: final-only -->
-**Screenshot mode: final-only** — call `get_product_shots` ONCE at the very end after `apply_appearance`. Do NOT call `get_screenshot` or `get_product_shots` mid-build. Use `validate_design` for intermediate checks. This setting overrides any screenshot instructions in topic files.
+<!-- SHOPPRENTICE_SCREENSHOT_MODE: none -->
+**Screenshot mode: none** — do NOT call `get_product_shots` or `get_screenshot` at any point. Use `validate_design` for all checks. Report validation results as text only. This setting overrides any screenshot instructions in topic files.
 <!-- END_SCREENSHOT_MODE -->
 
 ## Component Structure Template
