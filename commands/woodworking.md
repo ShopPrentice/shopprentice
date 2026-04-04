@@ -522,9 +522,29 @@ This allows the user (or a new agent session) to resume work by reading the READ
 
 **Token efficiency:**
 - `capture_design` returns a compact summary (body names + bounding boxes + params). Full capture saved to temp file (path in response) — Read it only when deep inspection is needed.
-- `get_product_shots` — call ONCE at the very end after all validation passes. Do NOT call mid-build.
-- `get_screenshot` — use sparingly for quick visual checks, not every build cycle.
+- `get_product_shots` and `get_screenshot` save images to files and return file paths. **Do NOT Read the image files** — just report the paths to the user. The user can open them directly.
+- `get_product_shots` — call ONCE at the very end. Do NOT call mid-build.
+- `get_screenshot` — use sparingly, not every build cycle.
 - Prefer `validate_design` (text-only, ~100 tokens) over screenshots for intermediate validation.
+
+**User config:** At the start of every session, check if `~/shopprentice-projects/config.json` exists and read it. It controls token usage behavior:
+
+```json
+{
+  "screenshots": "final-only",
+  "capture_detail": "summary"
+}
+```
+
+| Setting | Options | Default | Effect |
+|---------|---------|---------|--------|
+| `screenshots` | `"final-only"` | `"final-only"` | Product shots only at the very end |
+| | `"every-step"` | | Screenshot after each component (developer mode) |
+| | `"none"` | | No screenshots at all — text validation only |
+| `capture_detail` | `"summary"` | `"summary"` | Compact body list + params |
+| | `"full"` | | Read full capture file for every validation |
+
+If the config file doesn't exist, use defaults (final-only screenshots, summary captures). Do NOT create the config file automatically — let the user create it if they want to customize.
 
 ## Component Structure Template
 
