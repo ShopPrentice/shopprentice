@@ -99,27 +99,18 @@ def _find_bodies_by_name(root_comp, names):
 
 
 def _capture_one(viewport, width, height):
-    """Save viewport to temp file and return base64."""
+    """Save viewport to temp file and return file path (not base64)."""
+    shots_dir = os.path.join(tempfile.gettempdir(), "shopprentice_shots")
+    os.makedirs(shots_dir, exist_ok=True)
     timestamp = str(int(time.time() * 1000))
-    with tempfile.NamedTemporaryFile(
-            prefix=f'shopprentice_prod_{timestamp}_',
-            suffix='.png', delete=False) as f:
-        image_path = os.path.abspath(f.name)
+    image_path = os.path.join(shots_dir, f"product_{timestamp}.png")
 
     success = viewport.saveAsImageFile(image_path, width, height)
 
     if not success or not os.path.exists(image_path) or os.path.getsize(image_path) == 0:
         return None
 
-    with open(image_path, 'rb') as f:
-        data = base64.b64encode(f.read()).decode('utf-8')
-
-    try:
-        os.unlink(image_path)
-    except Exception:
-        pass
-
-    return data
+    return image_path
 
 
 def handler(views: list = None, width: int = 2048, height: int = 2048,
@@ -190,24 +181,19 @@ def handler(views: list = None, width: int = 2048, height: int = 2048,
             time.sleep(0.5)
             adsk.doEvents()
 
-            data = _capture_one(viewport, width, height)
-            if data:
-                results.append({
-                    "type": "image",
-                    "data": data,
-                    "mimeType": "image/png",
-                    "width": width,
-                    "height": height,
-                    "view": view_name
-                })
+            path = _capture_one(viewport, width, height)
+            if path:
+                results.append({"view": view_name, "path": path})
 
         # Restore state
         viewport.visualStyle = original_style
         _restore_construction(saved_state)
 
-        msg = f"{len(results)} product shot(s) captured ({', '.join(view_list)}, {width}x{height})"
+        # Return file paths (not inline images) to avoid context bloat
+        paths_text = "\n".join(f"  {r['view']}: {r['path']}" for r in results)
+        msg = f"{len(results)} product shot(s) saved ({', '.join(view_list)}, {width}x{height})"
         return {
-            "content": results,
+            "content": [{"type": "text", "text": f"{msg}\n{paths_text}\n\nUse Read tool to view any image."}],
             "isError": False,
             "message": msg
         }

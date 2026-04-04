@@ -62,12 +62,11 @@ def handler(view: str = "current", width: int = 1024, height: int = 1024) -> dic
                 cam.isFitView = True
                 viewport.camera = cam
 
-        # Capture
+        # Capture to file (not inline base64 — saves context tokens)
+        shots_dir = os.path.join(tempfile.gettempdir(), "shopprentice_shots")
+        os.makedirs(shots_dir, exist_ok=True)
         timestamp = str(int(time.time() * 1000))
-        with tempfile.NamedTemporaryFile(
-                prefix=f'shopprentice_ss_{timestamp}_',
-                suffix='.png', delete=False) as f:
-            image_path = os.path.abspath(f.name)
+        image_path = os.path.join(shots_dir, f"screenshot_{timestamp}.png")
 
         success = viewport.saveAsImageFile(image_path, width, height)
 
@@ -78,25 +77,10 @@ def handler(view: str = "current", width: int = 1024, height: int = 1024) -> dic
                 "message": "Failed to save screenshot"
             }
 
-        with open(image_path, 'rb') as f:
-            base64_image = base64.b64encode(f.read()).decode('utf-8')
-
-        try:
-            os.unlink(image_path)
-        except Exception:
-            pass
-
         return {
-            "content": [{
-                "type": "image",
-                "data": base64_image,
-                "mimeType": "image/png",
-                "width": width,
-                "height": height,
-                "view": view
-            }],
+            "content": [{"type": "text", "text": f"Screenshot saved: {image_path}\n\nUse Read tool to view."}],
             "isError": False,
-            "message": f"Screenshot captured ({view}, {width}x{height})"
+            "message": f"Screenshot saved ({view}, {width}x{height}): {image_path}"
         }
     except Exception as e:
         app.log(f"Error getting screenshot: {e}\n{traceback.format_exc()}")
