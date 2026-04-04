@@ -116,10 +116,16 @@ if [ "$opt_claude_code" = true ]; then
     sed 's|joinery/|'"$REPO_DIR"'/joinery/|g' "$REPO_DIR/commands/woodworking.md" \
         > "$CLAUDE_CMD_DIR/woodworking.md"
 
-    # Apply user config if exists
-    CONFIG_FILE="$HOME/shopprentice-projects/config.json"
+    # Apply user config (create default if missing)
+    PROJECTS_DIR="$HOME/shopprentice-projects"
+    CONFIG_FILE="$PROJECTS_DIR/config.json"
+    mkdir -p "$PROJECTS_DIR"
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo '{"screenshots": "final-only"}' > "$CONFIG_FILE"
+        echo "Created default config: $CONFIG_FILE"
+    fi
     if [ -f "$CONFIG_FILE" ]; then
-        echo "Applying user config from $CONFIG_FILE"
+        echo "Applying config from $CONFIG_FILE"
 
         # Screenshot mode
         SS_MODE=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('screenshots','final-only'))" 2>/dev/null || echo "final-only")
