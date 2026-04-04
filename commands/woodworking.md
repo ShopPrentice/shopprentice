@@ -483,9 +483,25 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 > **Full reference:** `woodworking/incremental-updates.md` — component-by-component build order, what-goes-where, document management, script epilogue, interactive editing, rebuild-vs-patch.
 
 **Script location:**
-- **ALWAYS create new scripts in the current working directory.** Name the file descriptively (e.g., `dovetailed_box.py`, `dining_table.py`).
+- **ALWAYS create scripts in `~/shopprentice-projects/`.** Create the directory if it doesn't exist. Each project gets a subfolder named after the piece (e.g., `~/shopprentice-projects/dovetailed-box/`).
 - **NEVER modify files in `~/.shopprentice/repo/`** — that is the installed skill/add-in, not a project directory. The `examples/` folder there is read-only reference material.
-- If an example script is relevant, READ it for reference but write the new script to the current directory.
+- If an example script is relevant, READ it for reference but write the new script to the project folder.
+
+**Project structure:** Each project folder contains:
+```
+~/shopprentice-projects/dovetailed-box/
+  dovetailed_box.py     # Fusion 360 parametric script
+  README.md             # Auto-generated project doc (see below)
+```
+
+**README.md (MANDATORY):** After completing a build (or at the end of each session), write/update a `README.md` in the project folder with:
+- **Description** — what was built, key design decisions
+- **Status** — Complete / In Progress (what's done, what's remaining)
+- **Parameters** — key user parameters and their current values
+- **Build notes** — any issues encountered and how they were resolved
+- **Screenshots** — paths to product shots if taken
+
+This allows the user (or a new agent session) to resume work by reading the README to understand the project state. When resuming, ALWAYS read the project README first before making changes.
 
 **Key rules:**
 - **NEVER write more than one component's code per response.** Write Case → execute → validate → THEN write Bottom → execute → validate. Do NOT bundle multiple components in one code generation. Small pieces (< 8 bodies) may combine structure + joinery but still validate between components.
