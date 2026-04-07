@@ -352,12 +352,12 @@ def run(context):
     ls_c = ls_occ.component
     P = adsk.core.Point3D
 
-    # 1. Stretcher body — full cross-section, between inner leg faces
+    # 1. Stretcher body — full cross-section, FLUSH with front face of leg (Y=0)
     ls_body_pl = sp.off_plane(ls_c, root.xZConstructionPlane,
-        "(leg_d - ls_t) / 2", "LSBody_Pl")
+        "0 in", "LSBody_Pl")
     _, pr = sp.sketch_rect_model(ls_c, ls_body_pl,
         ("leg_setback + leg_w",
-         "(leg_d - ls_t) / 2",
+         "0 in",
          "ls_z"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w", "z": "ls_w"},
         "LSBody_Sk", ev=ev)
@@ -366,12 +366,12 @@ def run(context):
     ls_front.name = "LS_Front"
 
     # 2. Left tenon — plane at outer end (proud face), extrude inward
-    #    through leg to stretcher end. Default direction is +X = inward. ✓
+    #    Tenon Y centered on STRETCHER (which is now flush-front at Y=[0, ls_t])
     ls_tenon_pl = sp.off_plane(ls_c, root.yZConstructionPlane,
         "leg_setback - ls_proud", "LSTenon_Pl")
     _, pr = sp.sketch_rect_model(ls_c, ls_tenon_pl,
         ("leg_setback - ls_proud",
-         "(leg_d - st_tt) / 2",
+         "(ls_t - st_tt) / 2",
          "ls_z"),
         {"y": "st_tt", "z": "ls_w"},
         "LSTenon_L_Sk", ev=ev)
@@ -452,13 +452,13 @@ def run(context):
     ss_occ = sp.make_comp(root, "ShortStretchers")
     ss_c = ss_occ.component
 
-    # 1. Stretcher body — full cross-section, between inner leg faces
+    # 1. Stretcher body — flush with OUTER face of left leg (X = leg_setback)
     ss_body_pl = sp.off_plane(ss_c, root.yZConstructionPlane,
-        "leg_setback + leg_w / 2", "SSBody_Pl")
+        "leg_setback + ss_t / 2", "SSBody_Pl")
     _, pr = sp.sketch_rect_model(ss_c, ss_body_pl,
-        ("0 in",
+        ("leg_setback + ss_t / 2",
          "leg_d",
-         "ls_z + ls_w"),
+         "ls_z"),
         {"y": "bench_w - 2 * leg_d", "z": "ss_w"},
         "SSBody_Sk", ev=ev)
     ss_body_ext = sp.ext_new_sym(ss_c, pr, "ss_t / 2", "SSBody")
@@ -470,9 +470,9 @@ def run(context):
     ss_tenon_pl = sp.off_plane(ss_c, root.xZConstructionPlane,
         "st_blind", "SSTenon_Pl")
     _, pr = sp.sketch_rect_model(ss_c, ss_tenon_pl,
-        ("leg_setback + (leg_w - st_tt) / 2",
+        ("leg_setback + (ss_t - st_tt) / 2",
          "st_blind",
-         "ls_z + ls_w"),
+         "ls_z"),
         {"x": "st_tt", "z": "ss_w"},
         "SSTenon_F_Sk", ev=ev)
     ss_tenon_f = sp.ext_new(ss_c, pr, "leg_d - st_blind", "SSTenon_F")
@@ -482,22 +482,22 @@ def run(context):
     # 3. Drawbore pins — sketch on YZ plane (normal=X) so pin goes through
     #    leg side, perpendicular to tenon which goes in Y
     ss_pin_pl = sp.off_plane(ss_c, root.yZConstructionPlane,
-        "leg_setback + leg_w / 2", "SSPinF_Pl")
+        "leg_setback", "SSPinF_Pl")
     ss_pin_sk = ss_c.sketches.add(ss_pin_pl)
     ss_pin_sk.name = "SSPinF_Sk"
     m = ss_pin_sk.modelToSketchSpace
     # Detect axis mapping on YZ plane
-    _ss_o = m(P.create(ev("leg_setback + leg_w / 2"), 0, 0))
-    _ss_ty = m(P.create(ev("leg_setback + leg_w / 2"), 1, 0))
-    _ss_tz = m(P.create(ev("leg_setback + leg_w / 2"), 0, 1))
+    _ss_o = m(P.create(ev("leg_setback"), 0, 0))
+    _ss_ty = m(P.create(ev("leg_setback"), 1, 0))
+    _ss_tz = m(P.create(ev("leg_setback"), 0, 1))
     y_is_H = abs(_ss_ty.x - _ss_o.x) > abs(_ss_ty.y - _ss_o.y)
     y_orient = H if y_is_H else V
     z_orient = V if y_is_H else H
 
     _pin_y = ev("leg_d - (leg_d - st_blind) / 3")
-    for z_expr in ["ls_z + ls_w + ss_w / 2 - pin_sp / 2",
-                    "ls_z + ls_w + ss_w / 2 + pin_sp / 2"]:
-        ctr = m(P.create(ev("leg_setback + leg_w / 2"), _pin_y, ev(z_expr)))
+    for z_expr in ["ls_z + ss_w / 2 - pin_sp / 2",
+                    "ls_z + ss_w / 2 + pin_sp / 2"]:
+        ctr = m(P.create(ev("leg_setback"), _pin_y, ev(z_expr)))
         ss_pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
             P.create(ctr.x, ctr.y, 0), ev("pin_dia") / 2)
     d = ss_pin_sk.sketchDimensions
@@ -514,7 +514,7 @@ def run(context):
     ).parameter.expression = "leg_d - (leg_d - st_blind) / 3"
     d.addDistanceDimension(ss_pin_sk.originPoint, c0.centerSketchPoint,
         z_orient, P.create(g0.x - 1, g0.y / 2, 0)
-    ).parameter.expression = "ls_z + ls_w + ss_w / 2 - pin_sp / 2"
+    ).parameter.expression = "ls_z + ss_w / 2 - pin_sp / 2"
     d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
         z_orient, P.create(g0.x - 1, (g0.y + g1.y) / 2, 0)
     ).parameter.expression = "pin_sp"
@@ -523,7 +523,7 @@ def run(context):
     for j in range(ss_pin_sk.profiles.count):
         p = ss_pin_sk.profiles.item(j)
         if p.areaProperties().area < 1.0:
-            ext = sp.ext_new_sym(ss_c, p, "leg_w / 2", f"SSPinF_{j}")
+            ext = sp.ext_new(ss_c, p, "leg_w", f"SSPinF_{j}")
             ext.bodies.item(0).name = f"SSPinF_{j}"
             ss_pin_bodies.append(ext.bodies.item(0))
 
@@ -561,12 +561,12 @@ def run(context):
     dm_c = dm_occ.component
 
     # Deadman: centered at bench midpoint (X), flush with front LS front face
-    # Y: front LS front face = (leg_d - ls_t) / 2
+    # Y: front LS front face = 0 in
     # Z: raised by dm_gap above LS top, with gap at top too
     dm_pl = sp.off_plane(dm_c, root.yZConstructionPlane,
         "mid_x", "DM_Pl")
     _, pr = sp.sketch_rect_model(dm_c, dm_pl,
-        ("0 in", "(leg_d - ls_t) / 2", "ls_z + ls_w + dm_gap"),
+        ("0 in", "0 in", "ls_z + ls_w + dm_gap"),
         {"y": "dm_thick", "z": "dm_h"},
         "DM_Sk", ev=ev)
     dm_ext = sp.ext_new_sym(dm_c, pr, "dm_w / 2", "DMPanel")
@@ -576,7 +576,7 @@ def run(context):
     # Bottom tongue — extends down from panel into LS groove
     _, pr = sp.sketch_rect_model(dm_c, dm_pl,
         ("0 in",
-         "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2",
+         "(dm_thick - dm_tongue_t) / 2",
          "ls_z + ls_w + dm_gap - dm_tongue_h"),
         {"y": "dm_tongue_t", "z": "dm_tongue_h"},
         "DMTongueBot_Sk", ev=ev)
@@ -588,7 +588,7 @@ def run(context):
     # Top tongue — extends up from panel into top groove
     _, pr = sp.sketch_rect_model(dm_c, dm_pl,
         ("0 in",
-         "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2",
+         "(dm_thick - dm_tongue_t) / 2",
          "leg_h - dm_gap"),
         {"y": "dm_tongue_t", "z": "dm_tongue_h"},
         "DMTongueTop_Sk", ev=ev)
@@ -609,9 +609,9 @@ def run(context):
     V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
 
     # Detect axis mapping: which sketch direction is model Z?
-    _dm_origin = dm_m2s(P.create(ev("mid_x"), ev("(leg_d - ls_t) / 2"),
+    _dm_origin = dm_m2s(P.create(ev("mid_x"), ev("0 in"),
                                   ev("ls_z + ls_w + dm_gap")))
-    _dm_z_test = dm_m2s(P.create(ev("mid_x"), ev("(leg_d - ls_t) / 2"),
+    _dm_z_test = dm_m2s(P.create(ev("mid_x"), ev("0 in"),
                                   ev("ls_z + ls_w + dm_gap") + 1))
     _dm_z_is_H = abs(_dm_z_test.x - _dm_origin.x) > abs(_dm_z_test.y - _dm_origin.y)
     _dm_z_orient = H if _dm_z_is_H else V
@@ -620,7 +620,7 @@ def run(context):
     # First dog hole — placed near bottom of deadman, offset 2 in from bottom
     dm_z0 = ev("ls_z + ls_w + dm_gap + 2 in")
     dm_r = ev("dog_dia") / 2
-    dm_ctr = dm_m2s(P.create(ev("mid_x"), ev("(leg_d - ls_t) / 2"), dm_z0))
+    dm_ctr = dm_m2s(P.create(ev("mid_x"), ev("0 in"), dm_z0))
     dm_sk.sketchCurves.sketchCircles.addByCenterRadius(
         P.create(dm_ctr.x, dm_ctr.y, 0), dm_r)
     dm_circle = dm_sk.sketchCurves.sketchCircles.item(0)
@@ -988,10 +988,10 @@ def run(context):
 
     # Bottom groove in front LS (top face, runs between inner leg faces)
     groove_ls_pl = sp.off_plane(ls_c, root.xZConstructionPlane,
-        "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2", "GrooveBot_Pl")
+        "(dm_thick - dm_tongue_t) / 2", "GrooveBot_Pl")
     _, pr = sp.sketch_rect_model(ls_c, groove_ls_pl,
         ("leg_setback + leg_w",
-         "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2",
+         "(dm_thick - dm_tongue_t) / 2",
          "ls_z + ls_w - (dm_tongue_h - dm_gap)"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w",
          "z": "dm_tongue_h - dm_gap"},
@@ -1001,10 +1001,10 @@ def run(context):
 
     # Top groove in bench top underside (runs between inner leg faces)
     groove_top_pl = sp.off_plane(top_c, root.xZConstructionPlane,
-        "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2", "GrooveTop_Pl")
+        "(dm_thick - dm_tongue_t) / 2", "GrooveTop_Pl")
     _, pr = sp.sketch_rect_model(top_c, groove_top_pl,
         ("leg_setback + leg_w",
-         "(leg_d - ls_t) / 2 + (dm_thick - dm_tongue_t) / 2",
+         "(dm_thick - dm_tongue_t) / 2",
          "leg_h"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w",
          "z": "dm_tongue_h - dm_gap"},
