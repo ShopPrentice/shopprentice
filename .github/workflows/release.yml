@@ -42,9 +42,14 @@ jobs:
       - name: Install ClawHub CLI
         run: npm i -g clawhub
 
+      - name: Generate SKILL.md for ClawHub publish
+        run: |
+          # Extract SKILL.md from the packaged .skill zip
+          unzip -o dist/shopprentice-${{ steps.version.outputs.version }}.skill SKILL.md -d .
+
       - name: Publish to ClawHub
         env:
           CLAWHUB_TOKEN: ${{ secrets.OPENCLAW_TOKEN }}
         run: |
           clawhub auth login --token "$CLAWHUB_TOKEN"
-          clawhub skill publish dist/shopprentice-${{ steps.version.outputs.version }}.skill --slug woodworking --version "${{ steps.version.outputs.version }}" --tags latest
+          clawhub publish . --no-input
