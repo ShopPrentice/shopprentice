@@ -46,5 +46,5 @@ jobs:
         env:
           CLAWHUB_TOKEN: ${{ secrets.OPENCLAW_TOKEN }}
         run: |
-          clawhub auth token "$CLAWHUB_TOKEN"
+          clawhub auth login --token "$CLAWHUB_TOKEN"
           clawhub skill publish dist/shopprentice-${{ steps.version.outputs.version }}.skill --slug woodworking --version "${{ steps.version.outputs.version }}" --tags latest
