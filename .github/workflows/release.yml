@@ -52,4 +52,4 @@ jobs:
           CLAWHUB_TOKEN: ${{ secrets.OPENCLAW_TOKEN }}
         run: |
           clawhub auth login --token "$CLAWHUB_TOKEN"
-          clawhub publish . --no-input
+          clawhub publish . --version "${{ steps.version.outputs.version }}" --no-input
