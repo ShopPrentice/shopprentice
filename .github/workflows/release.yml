@@ -1,0 +1,45 @@
+name: Release to ClawHub
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Package skill
+        run: ./scripts/package-clawhub.sh "${{ steps.version.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/shopprentice-${{ steps.version.outputs.version }}.skill
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+      - name: Install OpenClaw CLI
+        run: pip install openclaw
+
+      - name: Publish to ClawHub
+        env:
+          OPENCLAW_TOKEN: ${{ secrets.OPENCLAW_TOKEN }}
+        run: |
+          openclaw auth token "$OPENCLAW_TOKEN"
+          openclaw skill publish dist/shopprentice-${{ steps.version.outputs.version }}.skill

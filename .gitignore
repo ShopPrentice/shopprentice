@@ -33,3 +33,4 @@ promo/
 # OS
 Thumbs.db
 .claude/
+dist/
