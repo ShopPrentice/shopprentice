@@ -34,12 +34,17 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
 
-      - name: Install OpenClaw CLI
-        run: pip install openclaw
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ClawHub CLI
+        run: npm i -g clawhub
 
       - name: Publish to ClawHub
         env:
-          OPENCLAW_TOKEN: ${{ secrets.OPENCLAW_TOKEN }}
+          CLAWHUB_TOKEN: ${{ secrets.OPENCLAW_TOKEN }}
         run: |
-          openclaw auth token "$OPENCLAW_TOKEN"
-          openclaw skill publish dist/shopprentice-${{ steps.version.outputs.version }}.skill
+          clawhub auth token "$CLAWHUB_TOKEN"
+          clawhub skill publish dist/shopprentice-${{ steps.version.outputs.version }}.skill --slug woodworking --version "${{ steps.version.outputs.version }}" --tags latest
