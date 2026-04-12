@@ -83,6 +83,7 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 | **Incremental Updates & Build Strategy** | Build order, component-by-component workflow, document management, script epilogue, interactive editing, rebuild-vs-patch | Tested | `woodworking/incremental-updates.md` |
 | **Replication & Common Errors** | Mirror, Pattern, body pattern ghost bodies, mirror+pattern limitation, 24-row error table | Tested | `woodworking/fusion-api-rules.md` |
 | **Helpers Reference** | `sp.*` function signatures, `sketch_rect_model`, `ev()`, feature builders | Tested | `woodworking/helpers-reference.md` |
+| **Organic Shapes** | Turned legs, sculpted seats, free-form outlines, scoops, through-tenon trimming on curved surfaces — approximate→refine→capture workflow | Tested (Esherick stool) | `woodworking/organic-shapes.md` |
 
 ### Joinery Reference Files
 

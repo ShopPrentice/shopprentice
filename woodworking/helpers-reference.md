@@ -27,6 +27,11 @@ def run(context):
     h, v, hs, vs = sp.probe_sketch_signs(sk)  # + sign detection
     p = sp.smallest_profile(sk)          # smallest-area profile in sketch
 
+    # Spatial queries — body position relative to other bodies/faces
+    side = sp.body_side(frag, seat, (0,0,1))     # 'inside'|'outside'|'opposite'
+    side = sp.face_side(frag, top_face)           # 'normal'|'anti'|'on'
+    groups = sp.classify_bodies(frags, leg)        # {'inside':[], 'outside':[], ...}
+
     # Sketches — rectangles
     sk, prof = sp.sketch_rect(comp, plane, "0 cm", "0 cm", "w", "d",
                                name="Sk", ev=ctx.ev)
@@ -66,6 +71,62 @@ All helpers accept explicit objects (body, component, sketch) rather than relyin
 - `DesignContext.find_body/find_bodies` walks all descendant components recursively
 
 **What's NOT in sp.py** (write these inline when needed): project-specific face finders (e.g., `find_top_face`), `angled_tenon_end`, `splay_center`.
+
+### Spatial Queries — Body Position Testing
+
+Three functions for determining where bodies are relative to other bodies or faces. All use center-of-mass (`body.physicalProperties.centerOfMass`) as the test point, and `pointContainment` for inside/outside classification. These are general-purpose spatial tools — not joinery-specific.
+
+**`body_side(body, reference, direction)`** — Is a body on a given side of another body?
+
+Returns `'inside'` (COM inside reference), `'outside'` (COM outside, on the direction side), or `'opposite'` (outside, other side).
+
+```python
+# Is this fragment above the seat?
+if sp.body_side(frag, seat_body, (0, 0, 1)) == 'outside':
+    remove(frag)
+
+# Is this piece in front of the back panel?
+if sp.body_side(shelf, back_panel, (0, -1, 0)) == 'outside':
+    print("shelf is in front of back panel")
+```
+
+**`face_side(body, face)`** — Which side of a face is a body on?
+
+Uses the face's outward normal. Returns `'normal'` (on the normal side), `'anti'` (opposite side), or `'on'` (within 0.01 cm of surface). Ideal after `SplitBody` — classify fragments by which side of the splitting face they ended up on.
+
+```python
+# After splitting at seat top face:
+for frag in fragments:
+    if sp.face_side(frag, seat_top_face) == 'normal':
+        remove(frag)  # above the surface → excess
+```
+
+**`classify_bodies(bodies, reference, direction=None)`** — Batch-classify a list of bodies.
+
+Returns `{'inside': [...], 'outside': [...], 'opposite': [...]}`. If `direction` is omitted, all outside bodies go into `'outside'` (no side filtering).
+
+```python
+# After splitting stretchers at leg surface:
+groups = sp.classify_bodies(fragments, leg_body)
+for b in groups['inside']:
+    sp.combine(comp, stretcher, b, JOIN, False)  # tenon interior
+for b in groups['outside']:
+    comp.features.removeFeatures.add(b)  # excess tip
+
+# After splitting legs at seat — remove only above:
+groups = sp.classify_bodies(fragments, seat_body, (0, 0, 1))
+for b in groups['outside']:
+    comp.features.removeFeatures.add(b)
+# groups['opposite'] stays (below seat — main leg body)
+```
+
+**When to use which:**
+| Scenario | Function | Direction |
+|----------|----------|-----------|
+| Fragment above/below a surface | `face_side(frag, face)` | (uses face normal) |
+| Fragment above/below a body | `body_side(frag, body, dir)` | `(0,0,1)` for above |
+| Fragment inside/outside a body | `body_side(frag, body, dir)` or `classify_bodies` | any direction, or `None` |
+| Batch classification after split | `classify_bodies(frags, ref)` | optional |
 
 ### `ev()` — Dual-Mode Parameter Access
 

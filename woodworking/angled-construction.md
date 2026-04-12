@@ -359,25 +359,36 @@ The Fusion UI allows selecting multiple splitting tools, but the Python API acce
 
 **Workaround:** Chain sequential single-tool splits. Each split produces two bodies; feed the appropriate piece into the next split.
 
-### Re-Finding Bodies After Split
+### Classifying Fragments After Split
 
-After `splitBodyFeatures.add()`, the original body reference may be stale. Re-find bodies by name:
+After `splitBodyFeatures.add()`, the original body reference may be stale and there may be multiple fragments. Use the spatial query helpers to classify them by position:
 
 ```python
 split_feat = root.features.splitBodyFeatures.add(split_inp)
-# Re-find bodies — split may change which body has which name
-upper = None
-lower = None
-for i in range(root.bRepBodies.count):
-    b = root.bRepBodies.item(i)
-    if b.name == "MyBody":
-        # Determine which piece is which by bounding box
-        bb = b.boundingBox
-        if bb.maxPoint.z > threshold:
-            upper = b
-        else:
-            lower = b
+
+# Collect all fragments (re-scan component bodies)
+fragments = [comp.bRepBodies.item(i) for i in range(comp.bRepBodies.count)]
+
+# Classify: which fragments are above the seat? inside the leg?
+# body_side — test against a body with a direction
+for frag in fragments:
+    if sp.body_side(frag, seat_body, (0, 0, 1)) == 'outside':
+        remove(frag)  # above the seat → excess tenon tip
+
+# face_side — test against the splitting face directly
+for frag in fragments:
+    if sp.face_side(frag, seat_top_face) == 'normal':
+        remove(frag)  # on the normal (outside) side of the face
+
+# classify_bodies — batch classification
+groups = sp.classify_bodies(fragments, leg_body)
+for b in groups['inside']:
+    sp.combine(comp, stretcher, b, JOIN, False)  # tenon interior
+for b in groups['outside']:
+    comp.features.removeFeatures.add(b)  # excess tip
 ```
+
+These helpers use `body.physicalProperties.centerOfMass` for the test point and `body.pointContainment()` for inside/outside — works for any body shape, orientation, or complexity. See `woodworking/helpers-reference.md` for full API.
 
 ## Move Feature
 
