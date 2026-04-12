@@ -73,13 +73,38 @@ class ParamResolver:
         for name, val in sorted(self.params.items(), key=lambda x: -len(x[0])):
             text = text.replace(name, str(val))
 
-        safe_ns = {
-            "floor": math.floor, "ceil": math.ceil, "abs": abs,
-            "sin": math.sin, "cos": math.cos, "tan": math.tan,
-            "sqrt": math.sqrt, "pi": math.pi,
-        }
         try:
-            return float(eval(text, {"__builtins__": {}}, safe_ns))
+            import ast
+
+            _SAFE_FUNCS = {
+                "floor": math.floor, "ceil": math.ceil, "abs": abs,
+                "sin": math.sin, "cos": math.cos, "tan": math.tan,
+                "sqrt": math.sqrt,
+            }
+            _SAFE_CONSTS = {"pi": math.pi}
+
+            def _eval_node(node):
+                if isinstance(node, ast.Expression):
+                    return _eval_node(node.body)
+                elif isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+                    return float(node.value)
+                elif isinstance(node, ast.Name) and node.id in _SAFE_CONSTS:
+                    return _SAFE_CONSTS[node.id]
+                elif isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+                    val = _eval_node(node.operand)
+                    return -val if isinstance(node.op, ast.USub) else val
+                elif isinstance(node, ast.BinOp):
+                    l, r = _eval_node(node.left), _eval_node(node.right)
+                    ops = {ast.Add: lambda a, b: a + b, ast.Sub: lambda a, b: a - b,
+                           ast.Mult: lambda a, b: a * b, ast.Div: lambda a, b: a / b,
+                           ast.Pow: lambda a, b: a ** b, ast.Mod: lambda a, b: a % b}
+                    return ops[type(node.op)](l, r)
+                elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                    if node.func.id in _SAFE_FUNCS and len(node.args) == 1:
+                        return _SAFE_FUNCS[node.func.id](_eval_node(node.args[0]))
+                raise ValueError(f"Unsupported expression node: {type(node).__name__}")
+
+            return float(_eval_node(ast.parse(text, mode="eval")))
         except Exception:
             return 0.0
 

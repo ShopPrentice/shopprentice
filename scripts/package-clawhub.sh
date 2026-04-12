@@ -55,6 +55,17 @@ metadata:
       - kind: brew
         formula: git
         bins: [git]
+    security:
+      networkAccess:
+        - description: "MCP JSON-RPC server on localhost:9100 for live Fusion 360 script execution"
+          host: "localhost"
+          port: 9100
+          direction: "local-only"
+      installMethod:
+        - description: "One-line installer clones the GitHub repo and symlinks the Fusion 360 add-in. Source is fully auditable at https://github.com/ShopPrentice/shopprentice/blob/main/install.sh"
+          command: "curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash"
+      codeExecution:
+        - description: "The skill generates Fusion 360 Python scripts and executes them via the MCP add-in. Scripts are saved locally and can be reviewed before execution. Without the add-in, the skill still generates correct scripts — users can run them manually."
 ---
 
 FRONTMATTER
