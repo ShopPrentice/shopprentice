@@ -1,10 +1,19 @@
 # Wharton Esherick Three-Legged Stool (1958 style)
 
+![Esherick Stool](iso-top-right.png)
+
 ## Description
 
 Parametric model of a Wharton Esherick-inspired three-legged stool. Walnut seat with organic spline outline and subtle spherical scoop, ash turned legs with hand-tuned taper profile, barrel-profile turned stretchers at staggered heights, and wedged through-tenons on all joints.
 
 Reference: [Rago Arts Lot 568](https://www.ragoarts.com/auctions/2023/01/modern-design/568) — Wharton Esherick, 1958, walnut and ash.
+
+| | |
+|---|---|
+| ![Front](front.png) | ![Right](right.png) |
+| ![Iso Left](iso-top-left.png) | ![Iso Right](iso-top-right.png) |
+
+https://github.com/user-attachments/assets/demo.mp4
 
 ## Key Techniques Demonstrated
 

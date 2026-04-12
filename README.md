@@ -90,6 +90,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 <tr>
 <td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a><br />Writing desk with aprons</td>
 <td align="center"><a href="examples/side-table/"><img src="examples/side-table/screenshots/iso-top-right.png" width="200" /><br /><b>Side Table</b></a><br />Walnut with spalted maple drawer front</td>
+<td align="center"><a href="examples/esherick-stool/"><img src="examples/esherick-stool/iso-top-right.png" width="200" /><br /><b>Esherick Stool</b></a><br />Organic spline seat, turned legs, wedged through-tenons</td>
 </tr>
 </table>
 
