@@ -4,7 +4,9 @@
 
 ## Description
 
-Parametric model of a Wharton Esherick-inspired three-legged stool. Walnut seat with organic spline outline and subtle spherical scoop, ash turned legs with hand-tuned taper profile, barrel-profile turned stretchers at staggered heights, and wedged through-tenons on all joints.
+Parametric approximation of a Wharton Esherick-inspired three-legged stool. Walnut seat with organic spline outline and subtle spherical scoop, ash turned legs with hand-tuned taper profile, barrel-profile turned stretchers at staggered heights, and wedged through-tenons on all joints.
+
+This model is a close representation of an organic, hand-sculpted design — not a precise reproduction. ShopPrentice doesn't fully support true organic/free-form shapes yet, but can assist in building parametric approximations using spline profiles, spherical scoops, and revolved curves. The iterative workflow (agent builds approximate shape, user refines in Fusion UI, agent captures edits) bridges the gap between parametric modeling and organic design intent.
 
 Reference: [Rago Arts Lot 568](https://www.ragoarts.com/auctions/2023/01/modern-design/568) — Wharton Esherick, 1958, walnut and ash.
 
@@ -12,8 +14,6 @@ Reference: [Rago Arts Lot 568](https://www.ragoarts.com/auctions/2023/01/modern-
 |---|---|
 | ![Front](front.png) | ![Right](right.png) |
 | ![Iso Left](iso-top-left.png) | ![Iso Right](iso-top-right.png) |
-
-https://github.com/user-attachments/assets/demo.mp4
 
 ## Key Techniques Demonstrated
 
