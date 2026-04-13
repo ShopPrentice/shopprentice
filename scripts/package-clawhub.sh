@@ -44,7 +44,7 @@ version: ${VERSION}
 metadata:
   openclaw:
     requires:
-      bins: [claude, git]
+      bins: [git]
       anyBins: []
       env: []
     primaryEnv: ""
@@ -67,9 +67,9 @@ metadata:
       codeExecution:
         - description: "The skill generates Fusion 360 Python scripts and executes them via the MCP add-in. Scripts are saved locally and can be reviewed before execution. Without the add-in, the skill still generates correct scripts — users can run them manually."
     compatibility:
-      recommended: ["Claude Opus", "Claude Sonnet"]
-      tested: ["Claude Opus (claude-opus-4-6)", "Claude Sonnet (claude-sonnet-4-6)"]
-      note: "This skill requires frontier-level LLMs with strong long-context reasoning and code generation. Smaller or open-source models will fail to follow the multi-step procedural instructions. If your model is not listed above, expect significant limitations."
+      recommended: ["Claude Opus"]
+      tested: ["Claude Opus (claude-opus-4-6) via Claude Code"]
+      note: "This skill requires frontier-level LLMs with strong long-context reasoning and code generation. Developed and tested with Claude Opus. Other models are untested and may fail to follow the multi-step procedural instructions."
 ---
 
 FRONTMATTER

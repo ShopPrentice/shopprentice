@@ -51,9 +51,8 @@ This skill requires a frontier-level LLM with strong long-context reasoning, cod
 
 | Model | Status | Notes |
 |-------|--------|-------|
-| **Claude Opus** | ✅ Recommended | Full capability — complex furniture, joinery, multi-phase builds |
-| **Claude Sonnet** | ✅ Works well | Good for most builds, may need guidance on complex joinery |
-| **Other frontier models** | ⚠️ Untested | May work for simple builds but expect limitations |
+| **Claude Opus** | ✅ Tested | Developed and tested with this model via Claude Code |
+| **Other frontier models** | ⚠️ Untested | May work but expect limitations |
 | **Smaller / open-source models** | ❌ Not recommended | Fails to follow the multi-step procedural instructions across long context |
 
 The skill pushes models to their limits — 50K+ tokens of structured instructions, correct Fusion 360 API code generation, parametric relationships across 50+ parameters, and iterative MCP tool use. If your model is not listed above, expect significant limitations.
