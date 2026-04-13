@@ -2,22 +2,6 @@
 
 You are generating a Fusion 360 Python script to build a parametric furniture model. Follow these rules strictly.
 
-## Prerequisites
-
-This skill generates Fusion 360 Python scripts and optionally executes them live via MCP. To get the full experience:
-
-1. **Fusion 360** — install from [autodesk.com/fusion-360](https://www.autodesk.com/products/fusion-360)
-2. **ShopPrentice add-in** — provides the MCP server, helper library, and joinery templates:
-   ```bash
-   curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash
-   ```
-3. **Enable the add-in** in Fusion 360: **Tools > Add-Ins > ShopPrentice > Run**
-4. **Verify** the MCP connection: `curl http://localhost:9100/health`
-
-Without the add-in, the skill still generates correct Fusion 360 Python scripts — you just need to run them manually via Fusion's Script Manager instead of live execution.
-
-Source and full documentation: [github.com/ShopPrentice/shopprentice](https://github.com/ShopPrentice/shopprentice)
-
 ## Design Philosophy: Think Like a Furniture Maker at the Fusion 360 UI
 
 Before writing any code, plan the modeling steps the way an experienced designer would approach the Fusion 360 UI — component by component, feature by feature. You are not a software engineer writing a program. You are a craftsperson building a piece of furniture, and the API is just your hands on the mouse.
