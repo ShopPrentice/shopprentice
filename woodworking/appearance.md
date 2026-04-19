@@ -92,3 +92,67 @@ apply_appearance(species="walnut", bodies=["Drw_Front", "Drw_Back"]) # drawer ac
 - Uses `ProjectedTextureMapControl` with `BoxTextureMapProjection` for reliable grain orientation
 - The texture map Z-axis is rotated to align with the detected grain axis via `Matrix3D.setToRotation`
 - Appearances are copied from the Fusion 360 material library into the design on first use
+
+## Persisting Appearance Across Rebuilds
+
+**Problem:** Fusion stores appearance on body entity tokens in the design database, not in the script. `execute_script(clean=True)` destroys bodies and creates new ones with fresh tokens, so all prior appearance assignments are lost. The simple `sp.apply_appearance()` call inside a script handles species + body filter, but **cannot** apply `grain_overrides` or multi-pass coats — those are MCP-tool-only features.
+
+**Solution:** Declare the appearance intent as a structured comment block near the top of the script. The agent parses this block after every successful `execute_script(clean=True)` and replays it via the `apply_appearance` MCP tool.
+
+### Format
+
+```python
+# ═══════════════ APPEARANCE SPEC ══════════════════════════
+# After execute_script(clean=True), agent parses this block
+# and applies each coat in order via the apply_appearance MCP
+# tool. After coats, if hide_construction is true, hide all
+# sketches and construction geometry.
+# {
+#   "coats": [
+#     {"species": "oak"},
+#     {"species": "walnut",
+#      "bodies": ["Seat", "TW_L*", "TW_Str_*"],
+#      "grain_overrides": {"Seat": "x"}}
+#   ],
+#   "hide_construction": true
+# }
+# ══════════════════════════════════════════════════════════
+```
+
+### Schema
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `coats` | array, required | Applied **in order** — later coats override earlier on overlapping bodies |
+| `coats[].species` | string, required | Any species supported by `apply_appearance` (see *Supported Species*) |
+| `coats[].bodies` | list, optional | Body names. Supports `*` suffix as prefix glob (e.g. `TW_L*` = all `TW_L…`). Omit or use `"*"` alone for all bodies |
+| `coats[].grain_overrides` | object, optional | `{bodyName: "x"|"y"|"z"}` — forces grain axis for auto-detection-wrong cases |
+| `hide_construction` | bool, optional | If `true`, hide all `sketches`, `constructionPlanes`, `constructionAxes`, and `constructionPoints` across every component after coats are applied |
+
+### Agent Workflow
+
+After a successful `execute_script(clean=True)`:
+
+1. Read the script source from `script_path`.
+2. Locate the `# ═══════ APPEARANCE SPEC` header, then concatenate subsequent `#`-prefixed lines with the leading `# ` stripped.
+3. Parse the concatenated text as JSON.
+4. For each entry in `coats`:
+   - Expand body globs (`TW_L*` → list of matching body names from `capture_design`).
+   - Call `apply_appearance(species=..., bodies=..., grain_overrides=...)`.
+5. If `hide_construction` is true, run the hide-construction pass.
+
+If the block is absent, fall back to the default: `apply_appearance(species="white oak")` on all bodies (matches the skill default species).
+
+### When to Add the Block
+
+Add an APPEARANCE SPEC block whenever:
+
+- The model uses **more than one species** (seat + structure, inlays, accents)
+- Any body needs a **grain_override** because auto-detection picks the wrong axis (common on wide panels like seats, tabletops, slabs)
+- The agent or user has explicitly chosen a finish during a build session that should persist through later rebuilds
+
+For single-species models where the auto-detected grain is correct, calling `sp.apply_appearance("white oak")` inside the script is sufficient — no spec block needed.
+
+### Reference Example
+
+`examples/esherick-stool/esherick_stool.py` uses this convention: oak baseline, walnut on the seat + all tenon wedges, with a grain override on the seat (X). See the block at the top of that file.

@@ -60,14 +60,15 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 | **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | Tested (counter stool) | `woodworking/angled-construction.md` |
 | **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | Planned — inline quick reference below | `woodworking/details-and-finishing.md` |
 | **MCP Advanced** | Modifying existing designs, fixing dimensions, adding features to built models, delete-and-rebuild timeline sections | Tested (bar side table) | `woodworking/mcp-advanced.md` |
-| **Appearance** | Applying wood species, grain direction, multi-species designs — read before calling `apply_appearance` | Tested (blanket box) | `woodworking/appearance.md` |
+| **Appearance** | Applying wood species, grain direction, multi-species designs — read before calling `apply_appearance`. Includes the `# APPEARANCE SPEC` comment-block convention for persisting grain overrides / multi-pass finish across `execute_script(clean=True)` rebuilds | Tested (blanket box) | `woodworking/appearance.md` |
 | **Hardware Installation** | Importing STEP hardware (bed rail fasteners, hinges), positioning, caching, direction detection, component organization | Tested (queen + twin beds) | `woodworking/hardware-installation.md` |
 | **Joinery Rules** | Combine-based joinery, tooling bodies, edge rabbets, cross-component CUT patterns | Tested | `woodworking/joinery.md` |
 | **Screenshots** | Camera positioning, standard shots, transparent views, detail framing | Tested | `woodworking/screenshots.md` |
 | **Incremental Updates & Build Strategy** | Build order, component-by-component workflow, document management, script epilogue, interactive editing, rebuild-vs-patch | Tested | `woodworking/incremental-updates.md` |
 | **Replication & Common Errors** | Mirror, Pattern, body pattern ghost bodies, mirror+pattern limitation, 24-row error table | Tested | `woodworking/fusion-api-rules.md` |
 | **Helpers Reference** | `sp.*` function signatures, `sketch_rect_model`, `ev()`, feature builders | Tested | `woodworking/helpers-reference.md` |
-| **Organic Shapes** | Turned legs, sculpted seats, free-form outlines, scoops, through-tenon trimming on curved surfaces — approximate→refine→capture workflow | Tested (Esherick stool) | `woodworking/organic-shapes.md` |
+| **Organic Shapes** | Self-contained designer + recipe doc for sculpted forms. Shape taxonomy (5 classes): (1) turned/spindled parts — revolve, (2) flat-plan outlines — closed spline + extrude, (3) 3-D organic solids (lens-profile seats, rounded finial tips) — multi-section loft + tangent end conditions, (4) sculpted dish/saddle — sphere CUT, (5) character surfaces — Form T-splines (out-of-scope for scripting). Classes 1–4 include inline API snippets; also covers the approximate→refine→capture iteration loop and through-tenon trimming on organic surfaces | Tested (Esherick stool) | `woodworking/organic-shapes.md` |
+| **Loft** | Deep feature reference for advanced loft variants: closed-ring topology, rail/centerline guides, 1→N→1 branching manifolds, surface-only and loft-as-cut variants, closed-spline cross-section generators (kidney/star/cardioid), all end-condition types. **Don't preload** for common organic shapes — use the inline recipes in `organic-shapes.md` instead. Read this file only when a build actually needs one of these variants | Tested (18 fixtures) | `woodworking/loft.md` |
 
 ### Joinery Reference Files
 

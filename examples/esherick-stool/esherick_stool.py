@@ -14,6 +14,23 @@ Build order:
 
 Components: Seat, Legs, Stretchers
 """
+
+# ═══════════════ APPEARANCE SPEC ══════════════════════════
+# After execute_script(clean=True), agent parses this block
+# and applies each coat in order via the apply_appearance MCP
+# tool. After coats, if hide_construction is true, hide all
+# sketches and construction geometry. See woodworking/appearance.md
+# for the full schema and agent workflow.
+# {
+#   "coats": [
+#     {"species": "oak"},
+#     {"species": "walnut",
+#      "bodies": ["Seat", "TW_L*", "TW_Str_*"],
+#      "grain_overrides": {"Seat": "x"}}
+#   ],
+#   "hide_construction": true
+# }
+# ══════════════════════════════════════════════════════════
 import adsk.core, adsk.fusion, math
 from helpers import sp
 
@@ -80,14 +97,63 @@ def run(context):
     sw = ev("seat_w")
     sd = ev("seat_d")
 
-    tv = [
-        (cx + sd * 0.45, cy),
-        (cx - sd * 0.40, cy - sw * 0.45),
-        (cx - sd * 0.40, cy + sw * 0.45),
+    # ── Captured seat plan (12 pts/section, 5 pts/rail) from user's loft-based
+    # fixture_loft_esherick_seat edits. Baseline fixture coords in cm at
+    # fixture_cx=7, fixture_cy=157.5 (centred on geometric seat centre).
+    _BOT_PLAN = [
+        (9.6705, 156.7913), (6.9535, 154.7876), (3.8395, 153.4837),
+        (3.1864, 153.7881), (2.5900, 154.1925), (2.1931, 157.5000),
+        (2.5900, 160.8075), (3.1864, 161.2119), (3.8395, 161.5163),
+        (6.9535, 160.2124), (9.6705, 158.2087), (9.7272, 157.5000),
     ]
-    tri_cx = (tv[0][0] + tv[1][0] + tv[2][0]) / 3
-    tri_cy = (tv[0][1] + tv[1][1] + tv[2][1]) / 3
-    leg_angles_rad = [math.atan2(vy - tri_cy, vx - tri_cx) for vx, vy in tv]
+    _MID_PLAN = [
+        (10.6680, 154.9400), (7.7545, 153.3976), (3.8862, 151.9521),
+        (2.2520, 152.1974), (1.4000, 152.7750), (0.7389, 157.2908),
+        (1.5257, 162.1657), (2.2520, 162.8026), (3.2460, 163.1417),
+        (7.2552, 161.5582), (10.6875, 160.0208), (11.5960, 157.5000),
+    ]
+    _TOP_PLAN = [
+        (9.6705, 156.7913), (8.0358, 154.8266), (3.8395, 153.4837),
+        (3.1864, 153.7881), (2.5929, 154.3090), (2.1931, 157.5000),
+        (2.5900, 160.8075), (3.1864, 161.2119), (3.8395, 161.5163),
+        (6.9535, 160.2124), (9.6705, 158.2087), (9.7272, 157.5000),
+    ]
+    _RAIL_0_CTRLS = [(2.2980, 152.2539, 0.2949), (2.2948, 152.2485, 0.9625)]
+    _RAIL_1_CTRLS = [(2.4760, 162.4193, 0.2437), (2.3200, 162.6845, 0.9751)]
+    _RAIL_2_CTRLS = [(11.0660, 157.5000, 0.1912), (11.3109, 157.5000, 0.9781)]
+
+    _FIX_CX, _FIX_CY = 7.0, 157.5
+    _FIX_SD, _FIX_SW, _FIX_ST = 14.0, 15.0, 1.25
+
+    # Scale from fixture cm to stool internal cm. At default (seat_d=14 in,
+    # seat_w=15 in, seat_t=1.25 in) each scale ≈ 2.54. Changing any of those
+    # parameters in the palette rescales the seat.
+    _scale_x = sd / _FIX_SD
+    _scale_y = sw / _FIX_SW
+    _scale_z = ev("seat_t") / _FIX_ST
+
+    def _map_xy(fx, fy):
+        return (cx + (fx - _FIX_CX) * _scale_x,
+                cy + (fy - _FIX_CY) * _scale_y)
+
+    # Use the captured MID_PLAN centroid (NOT the geometric centre of seat_d/w)
+    # as tri_cx, tri_cy — the user's edits shifted the centroid slightly and
+    # downstream leg/scoop positioning must follow the real outline.
+    _mid_cent_fx = sum(p[0] for p in _MID_PLAN) / len(_MID_PLAN)
+    _mid_cent_fy = sum(p[1] for p in _MID_PLAN) / len(_MID_PLAN)
+    tri_cx, tri_cy = _map_xy(_mid_cent_fx, _mid_cent_fy)
+
+    # leg_angles_rad: directions to the 3 edited corners (MID_PLAN indices
+    # 11 = front apex, 3 = back-left, 7 = back-right) — matches the stool's
+    # expected tv[0]/tv[1]/tv[2] ordering.
+    _CORNER_IDX_TV = [11, 3, 7]
+    leg_angles_rad = []
+    for _idx in _CORNER_IDX_TV:
+        cfx, cfy = _MID_PLAN[_idx]
+        leg_angles_rad.append(math.atan2(cfy - _mid_cent_fy, cfx - _mid_cent_fx))
+
+    # Keep tv synthesised for any downstream code that still reads it.
+    tv = [_map_xy(*_MID_PLAN[i]) for i in _CORNER_IDX_TV]
 
     # ── COMPONENTS ────────────────────────────────────────────────
     seat_occ = sp.make_comp(root, "Seat")
@@ -98,79 +164,101 @@ def run(context):
     str_comp = str_occ.component
 
     # ══════════════════════════════════════════════════════════════
-    # STEP 1: SEAT
+    # STEP 1: SEAT (3-section loft with 3 adjustable rails)
+    # Captured from fixture_loft_esherick_seat. Plan points and rail
+    # control points are already baked into _BOT_PLAN/_MID_PLAN/_TOP_PLAN
+    # and _RAIL_*_CTRLS above; the section anchors on the 3 rails snap
+    # exactly onto the plan splines (CORNER_IDX_TV indices).
     # ══════════════════════════════════════════════════════════════
-    clip = 0.15
-    hex_verts = []
-    for i in range(3):
-        j = (i + 1) % 3
-        x0, y0 = tv[i]; x1, y1 = tv[j]
-        dx, dy = x1 - x0, y1 - y0
-        hex_verts.append((x0 + clip * dx, y0 + clip * dy))
-        hex_verts.append((x1 - clip * dx, y1 - clip * dy))
+    _seat_z = ev("seat_z")
+    _seat_t_val = ev("seat_t")
 
-    seat_pts = []
-    bulge_long = 0.06
-    bulge_short = 0.04
-    for i in range(6):
-        seat_pts.append(hex_verts[i])
-        j = (i + 1) % 6
-        mx = (hex_verts[i][0] + hex_verts[j][0]) / 2
-        my = (hex_verts[i][1] + hex_verts[j][1]) / 2
-        ex = hex_verts[j][0] - hex_verts[i][0]
-        ey = hex_verts[j][1] - hex_verts[i][1]
-        el = math.sqrt(ex*ex + ey*ey)
-        nx, ny = -ey/el, ex/el
-        dx_c = mx - tri_cx; dy_c = my - tri_cy
-        if nx * dx_c + ny * dy_c < 0: nx, ny = -nx, -ny
-        bulge = bulge_long if (i % 2 == 0) else bulge_short
-        seat_pts.append((mx + nx * el * bulge, my + ny * el * bulge))
+    def _add_section(plane, z_abs, pts_xy, name):
+        sk_s = seat_comp.sketches.add(plane); sk_s.name = name
+        coll = adsk.core.ObjectCollection.create()
+        for fx, fy in pts_xy:
+            mx, my = _map_xy(fx, fy)
+            p = sk_s.modelToSketchSpace(P(mx, my, z_abs))
+            coll.add(P(p.x, p.y, 0))
+        sc = sk_s.sketchCurves.sketchFittedSplines.add(coll)
+        sc.isClosed = True
+        return sk_s
 
-    seat_pl = sp.off_plane(seat_comp, seat_comp.xYConstructionPlane,
-                           "seat_z", "Seat_Pl")
-    sk = seat_comp.sketches.add(seat_pl)
-    sk.name = "Seat_Sk"
-    m2s = sk.modelToSketchSpace
-    pts_sk = adsk.core.ObjectCollection.create()
-    for mx, my in seat_pts:
-        p = m2s(P(mx, my, ev("seat_z")))
-        pts_sk.add(P(p.x, p.y, 0))
-    spline = sk.sketchCurves.sketchFittedSplines.add(pts_sk)
-    spline.isClosed = True
-    prof = sp.smallest_profile(sk)
-    seat_ext = sp.ext_new(seat_comp, prof, "seat_t", "SeatBoard")
-    seat_body = seat_ext.bodies.item(0)
+    bot_pl = sp.off_plane(seat_comp, seat_comp.xYConstructionPlane,
+                          "seat_z", "Seat_BotPl")
+    sk_bot = _add_section(bot_pl, _seat_z, _BOT_PLAN, "Seat_Bot")
+
+    mid_pl = sp.off_plane(seat_comp, seat_comp.xYConstructionPlane,
+                          "seat_z + seat_t / 2", "Seat_MidPl")
+    sk_mid = _add_section(mid_pl, _seat_z + _seat_t_val / 2, _MID_PLAN, "Seat_Mid")
+
+    top_pl = sp.off_plane(seat_comp, seat_comp.xYConstructionPlane,
+                          "seat_z + seat_t", "Seat_TopPl")
+    sk_top = _add_section(top_pl, _seat_z + _seat_t_val, _TOP_PLAN, "Seat_Top")
+
+    def _build_rail(rail_i, ctrl_fixture_pts, corner_idx):
+        # Anchor sketch-points at the bot / mid / top corner positions —
+        # the rail plane is then defined THROUGH those three anchors, so
+        # their 3D positions lie exactly on the plane (no projection drift).
+        _bmx, _bmy = _map_xy(*_BOT_PLAN[corner_idx])
+        _bs = sk_bot.modelToSketchSpace(P(_bmx, _bmy, _seat_z))
+        _bot_corner = sk_bot.sketchPoints.add(P(_bs.x, _bs.y, 0))
+
+        _mmx, _mmy = _map_xy(*_MID_PLAN[corner_idx])
+        _ms = sk_mid.modelToSketchSpace(P(_mmx, _mmy, _seat_z + _seat_t_val / 2))
+        _mid_corner = sk_mid.sketchPoints.add(P(_ms.x, _ms.y, 0))
+
+        _tmx, _tmy = _map_xy(*_TOP_PLAN[corner_idx])
+        _ts = sk_top.modelToSketchSpace(P(_tmx, _tmy, _seat_z + _seat_t_val))
+        _top_corner = sk_top.sketchPoints.add(P(_ts.x, _ts.y, 0))
+
+        cpi_r = seat_comp.constructionPlanes.createInput()
+        cpi_r.setByThreePoints(_bot_corner, _mid_corner, _top_corner)
+        rail_pl = seat_comp.constructionPlanes.add(cpi_r)
+        rail_pl.name = f"Seat_RailPl{rail_i}"
+
+        sk_r = seat_comp.sketches.add(rail_pl); sk_r.name = f"Seat_Rail{rail_i}"
+        fit = adsk.core.ObjectCollection.create()
+        ap = sk_r.modelToSketchSpace(P(_bmx, _bmy, _seat_z))
+        fit.add(P(ap.x, ap.y, 0))
+        lfx, lfy, lfz = ctrl_fixture_pts[0]
+        lmx, lmy = _map_xy(lfx, lfy)
+        lp = sk_r.modelToSketchSpace(P(lmx, lmy, _seat_z + lfz * _scale_z))
+        fit.add(P(lp.x, lp.y, 0))
+        ap = sk_r.modelToSketchSpace(P(_mmx, _mmy, _seat_z + _seat_t_val / 2))
+        fit.add(P(ap.x, ap.y, 0))
+        hfx, hfy, hfz = ctrl_fixture_pts[1]
+        hmx, hmy = _map_xy(hfx, hfy)
+        hp = sk_r.modelToSketchSpace(P(hmx, hmy, _seat_z + hfz * _scale_z))
+        fit.add(P(hp.x, hp.y, 0))
+        ap = sk_r.modelToSketchSpace(P(_tmx, _tmy, _seat_z + _seat_t_val))
+        fit.add(P(ap.x, ap.y, 0))
+        return sk_r.sketchCurves.sketchFittedSplines.add(fit)
+
+    _rail_splines = [
+        _build_rail(0, _RAIL_0_CTRLS, 3),
+        _build_rail(1, _RAIL_1_CTRLS, 7),
+        _build_rail(2, _RAIL_2_CTRLS, 11),
+    ]
+
+    loft_inp = seat_comp.features.loftFeatures.createInput(NEWBODY)
+    _sec_bot = loft_inp.loftSections.add(sk_bot.profiles.item(0))
+    loft_inp.loftSections.add(sk_mid.profiles.item(0))
+    _sec_top = loft_inp.loftSections.add(sk_top.profiles.item(0))
+    _sec_bot.setDirectionEndCondition(VI("0 deg"), VI("3.0"))
+    _sec_top.setDirectionEndCondition(VI("0 deg"), VI("3.0"))
+    for _rs in _rail_splines:
+        loft_inp.centerLineOrRails.addRail(_rs)
+    loft_inp.isSolid = True
+    loft_inp.isTangentEdgesMerged = True
+    seat_loft = seat_comp.features.loftFeatures.add(loft_inp)
+    seat_loft.name = "SeatLoft"
+    seat_body = seat_loft.bodies.item(0)
     seat_body.name = "Seat"
 
-    # Scoop (spherical)
-    top_z = ev("seat_z") + ev("seat_t")
-    scoop_r = ev("scoop_r")
-    scoop_d = ev("scoop_depth")
-    sphere_cz = top_z + scoop_r - scoop_d
-    scoop_pl = sp.off_plane(seat_comp, seat_comp.yZConstructionPlane,
-                            f"{tri_cx} cm", "Scoop_Pl")
-    sk_sc = seat_comp.sketches.add(scoop_pl)
-    sk_sc.name = "Scoop_Sk"
-    m2s_sc = sk_sc.modelToSketchSpace
-    sc_center = m2s_sc(P(tri_cx, tri_cy, sphere_cz))
-    sc_top = m2s_sc(P(tri_cx, tri_cy, sphere_cz + scoop_r))
-    sc_bot = m2s_sc(P(tri_cx, tri_cy, sphere_cz - scoop_r))
-    sc_right = m2s_sc(P(tri_cx, tri_cy + scoop_r, sphere_cz))
-    arc = sk_sc.sketchCurves.sketchArcs.addByThreePoints(
-        P(sc_bot.x, sc_bot.y, 0), P(sc_right.x, sc_right.y, 0),
-        P(sc_top.x, sc_top.y, 0))
-    dia_line = sk_sc.sketchCurves.sketchLines.addByTwoPoints(
-        arc.endSketchPoint, arc.startSketchPoint)
-    scoop_prof = sp.smallest_profile(sk_sc)
-    rev_inp = seat_comp.features.revolveFeatures.createInput(
-        scoop_prof, dia_line, NEWBODY)
-    rev_inp.setAngleExtent(False, VI("360 deg"))
-    sphere_feat = seat_comp.features.revolveFeatures.add(rev_inp)
-    sphere_feat.name = "ScoopSphere"
-    sphere_body = sphere_feat.bodies.item(0)
-    sphere_body.name = "ScoopTool"
-    sp.combine(seat_comp, seat_body, sphere_body, CUT, False, "SeatScoop")
-    print("Seat + scoop done")
+    # Scoop removed — the loft's tangent top + rail-shaped sides already
+    # give a comfortable pillowed seat without a separate sphere CUT.
+    print("Seat (lofted, no scoop) done")
 
     # ══════════════════════════════════════════════════════════════
     # STEP 2: LEGS (no mortise CUT yet)
@@ -273,7 +361,17 @@ def run(context):
                            end_face=end_face,
                            tenon_depth_expr="seat_t",
                            tenon_diam_expr="tenon_dia",
-                           grain_dir=(0, 1, 0),
+                           # Seat grain runs along X (see appearance override
+                           # on "Seat" — grain="x"). Per tenon-wedge.md the
+                           # slot must be PERPENDICULAR to mortise grain so
+                           # the wedge expansion is PARALLEL to grain (wood
+                           # resists compression along fibers but splits
+                           # easily across them). Template computes
+                           # slot_dir = face_normal × grain_dir — with
+                           # face_normal = Z and grain_dir=(1,0,0) we get
+                           # slot_dir = Y, i.e. wedge long axis crosses the
+                           # seat's X grain — the correct orientation.
+                           grain_dir=(1, 0, 0),
                            prefix="tw", name=f"TW_L{i+1}", ev=ev)
             print(f"Leg{i+1} wedge done")
         except Exception as e:
@@ -759,20 +857,8 @@ def run(context):
         if abs(pz - top_z_val) < 1.0: top_perim.add(e)
         elif abs(pz - bot_z_val) < 0.5: bot_perim.add(e)
 
-    if bot_perim.count > 0:
-        fil_inp = seat_comp.features.filletFeatures.createInput()
-        fil_inp.addConstantRadiusEdgeSet(bot_perim, VI("seat_bot_fil"), False)
-        try:
-            seat_comp.features.filletFeatures.add(fil_inp).name = "SeatBot_Fil"
-            print(f"Seat bottom fillet done")
-        except: print("Seat bottom fillet failed")
-
-    if top_perim.count > 0:
-        fil_inp = seat_comp.features.filletFeatures.createInput()
-        fil_inp.addConstantRadiusEdgeSet(top_perim, VI("seat_top_fil"), False)
-        try:
-            seat_comp.features.filletFeatures.add(fil_inp).name = "SeatTop_Fil"
-            print(f"Seat top fillet done")
-        except: print("Seat top fillet failed")
+    # Seat top/bottom perimeter fillets are redundant with the 3-section
+    # loft — direction-tangent end conditions already blend the flat top
+    # and bottom into the sides. Skipping preserves the clean loft surface.
 
     print("All steps complete")

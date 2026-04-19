@@ -1,13 +1,22 @@
 # Organic Shapes
 
-Techniques for building furniture with sculpted, hand-shaped forms — turned legs, carved seats, free-form profiles. Read this topic when the design involves curves that can't be described by simple geometric primitives.
+Designer's guide for sculpted, hand-shaped forms — turned legs, carved seats, free-form profiles, sculpted lenticular bodies. Read this topic when the design involves curves that can't be described by simple geometric primitives.
 
-## When to Read
+This file is the **application / routing** doc: identify the kind of organic shape you're making, pick the right technique, and jump to the feature-level reference for implementation details.
 
-- Turned or carved legs (Windsor, Esherick, Danish)
-- Sculpted seats with scoops or saddle contours
-- Free-form outlines (not rectangular, circular, or regular polygon)
-- Any piece where the user references a photo and wants an organic feel
+## Shape Taxonomy
+
+| Class | Examples | Technique | Feature reference |
+|-------|----------|-----------|-------------------|
+| **1. Turned / spindled part** | Windsor leg, Esherick leg, pestle, spindle, pen | Half-profile fitted spline + Revolve | *§Revolved Profiles below* |
+| **2. Flat-plan organic outline** | Rounded-hex seat footprint, kidney shelf, leaf-shaped tabletop | Closed fitted spline + Extrude | *§Organic Outlines below* |
+| **3. Three-D organic solid** | Esherick seat (lens profile), chair back, hand grip, finial tip | Multi-section Loft + tangent end conditions | *§Lofted Organic Bodies below* |
+| **4. Sculpted dish / saddle** | Windsor seat scoop, scooped pencil-box lid | Large-radius sphere revolve + CUT | *§Scoops and Carved Surfaces below* |
+| **5. Character surface** | Ergonomic grips, animal shapes, tool handles with compound curves | Form workspace T-splines | Out of scripted scope (interactive only) |
+
+Classes 1 – 4 are built inline in this doc — each has a self-contained recipe below with the exact API calls needed. Agents don't need to load any other topic file to build the common organic shapes. For **advanced loft variants only** (branching manifolds, closed-ring topology, rail/centerline guides, surface-only lofts, loft-as-CUT pockets, irregular closed-spline cross-sections like kidney/star/cardioid), see `loft.md` — deep feature reference, don't preload unless a build actually needs those variants.
+
+**Scoops (class 4) and through-tenon trimming are techniques applied *on top of* any base body** — they're documented below regardless of how the base body was constructed.
 
 ## Core Workflow: Approximate → Refine → Capture
 
@@ -20,7 +29,7 @@ Organic shapes require iteration. The agent can't guess the exact curve the user
 5. **Agent updates script** — replace the hardcoded control points with captured values
 6. **Repeat** until the user is satisfied
 
-This loop is fast because the user edits visually (what they're good at) and the agent handles code (what it's good at).
+This loop is fast because the user edits visually (what they're good at) and the agent handles code (what it's good at). It applies to **all** classes — a revolved leg profile, a closed plan outline, or the section sketches of a lofted body.
 
 ### Capturing Spline Edits
 
@@ -37,6 +46,8 @@ state = get_timeline_state(index=8, include_sketches=True)
 # Convert sketch coords back to model coords using the sketch's
 # sketchXDir/sketchYDir/sketchOrigin from the state response.
 ```
+
+For a lofted class-3 body the same loop applies across multiple section sketches — capture every edited sketch, remap to model space, and bake the updated fit points back into the script's hard-coded point lists. See `examples/esherick-stool/esherick_stool.py` for a full furniture-scale build that uses this pattern (`_BOT_PLAN`, `_MID_PLAN`, `_TOP_PLAN` are the three baked point lists, updated in place when the user edits the corresponding sketches).
 
 ## Revolved Profiles (Turned Legs, Spindles)
 
@@ -159,6 +170,122 @@ normal = outward_from_centroid(midpoint)
 # Push outward by a fraction of edge length
 control_point = midpoint + normal * edge_length * bulge_fraction
 ```
+
+## Lofted Organic Bodies (Class 3)
+
+For **three-dimensional organic solids** where the silhouette changes along the vertical axis and can't be produced by Extrude-then-fillet without visible creases — seats with pillow edges, chair-back shells, sculpted handles, finial tips, twisted columns.
+
+### When to prefer a lofted body over extrude + fillet
+
+| Symptom | Extrude + fillet limit | Lofted body solution |
+|---------|-----------------------|----------------------|
+| Flat-topped seat needs a rolled edge, not a filleted one | Fillet radius creates a uniform-radius corner — reads as machined | 3-section loft with `setDirectionEndCondition(angle="0 deg", weight)` on top and bottom — flat face flows into side with zero slope, gradually building curvature |
+| Side profile should bulge in the middle | Impossible with a single extrude | Middle section at 100 % scale, top/bottom sections shrunk (e.g., 0.70 ×) → lenticular body |
+| End should be a **rounded tip** (bullet, egg, dome) | Fillet of a cone → still cone-like | SketchPoint section + `setPointTangentEndCondition(weight)` with a near-tip full-radius section |
+
+### Recipe: lens-profile body with tangent flat top/bottom
+
+This is the Esherick-seat pattern: a shallow pillow with flat-ish top, bulging midsection, and tapered underside, where the flat top rolls smoothly into the side without any fillet feature. Works for seat boards, chair-back shells, lid tops — anywhere a shallow solid needs a soft perimeter.
+
+The **plan outline** (`base_pts`, list of `(x, y)` tuples) comes from §Organic Outlines — a closed fitted spline, typically 12 control points for a clipped-triangle hex or 8 for a kidney. The same outline is used at all three sections, just scaled about its centroid `(ctr_x, ctr_y)`.
+
+```python
+# Parameters: seat_t (thickness), bot_scale / top_scale (0.70 both for symmetric
+# pillow, or e.g. 0.70 / 0.95 for asymmetric with flatter top), blend_weight
+# (3.0 is a good default; higher = longer flat plateau before slope builds).
+
+def _scale_pts(pts, s):
+    return [(ctr_x + (x - ctr_x) * s, ctr_y + (y - ctr_y) * s) for x, y in pts]
+
+def _add_section(plane, z_val, pts_xy, name):
+    sk = comp.sketches.add(plane); sk.name = name
+    coll = adsk.core.ObjectCollection.create()
+    for mx, my in pts_xy:
+        p = sk.modelToSketchSpace(P(mx, my, z_val))
+        coll.add(P(p.x, p.y, 0))
+    sk.sketchCurves.sketchFittedSplines.add(coll).isClosed = True
+    return sk
+
+sk_bot = _add_section(comp.xYConstructionPlane, 0,
+                      _scale_pts(base_pts, bot_scale), "Seat_Bot")
+
+mid_pl = sp.off_plane(comp, comp.xYConstructionPlane, "seat_t / 2", "Seat_MidPl")
+sk_mid = _add_section(mid_pl, seat_t / 2, base_pts, "Seat_Mid")  # full scale
+
+top_pl = sp.off_plane(comp, comp.xYConstructionPlane, "seat_t", "Seat_TopPl")
+sk_top = _add_section(top_pl, seat_t,
+                      _scale_pts(base_pts, top_scale), "Seat_Top")
+
+loft_inp = comp.features.loftFeatures.createInput(NEWBODY)
+sec_bot = loft_inp.loftSections.add(sk_bot.profiles.item(0))
+loft_inp.loftSections.add(sk_mid.profiles.item(0))
+sec_top = loft_inp.loftSections.add(sk_top.profiles.item(0))
+# angle="0 deg" → surface leaves section tangent to its plane (horizontal
+# on the horizontal top/bottom sections); weight stretches the flat region.
+sec_bot.setDirectionEndCondition(VI("0 deg"), VI("blend_weight"))
+sec_top.setDirectionEndCondition(VI("0 deg"), VI("blend_weight"))
+loft_inp.isSolid = True
+loft_inp.isTangentEdgesMerged = True
+seat_body = comp.features.loftFeatures.add(loft_inp).bodies.item(0)
+seat_body.name = "Seat"
+```
+
+**Tuning knobs:** `bot_scale` / `top_scale` control the undertuck and top flatness. `blend_weight` controls how gradually slope builds — 1.0 is a tight rollover right at the edge (looks abrupt), 3.0 is a genuine flat plateau that rolls into the side, 5.0+ is a near-flat top with a very late hard rollover.
+
+### Recipe: rounded apex tip (bullet / egg / dome)
+
+For finials, drawer pulls, pestle tips, turned-look caps. Default loft-to-a-point produces a sharp cone; these three ratios together produce a hemispherical cap:
+
+| Ratio | Value |
+|-------|-------|
+| Near-tip section z-distance from apex | ≤ 5 % of total height |
+| Near-tip section radius | ≥ 0.85 × R_max |
+| Tangent weight | 4.0 – 6.0 |
+
+```python
+# Base circle at z=0, near-tip full-width section at z=0.05*h, apex at z=h.
+sk_base = comp.sketches.add(comp.xYConstructionPlane)
+c = sk_base.sketchCurves.sketchCircles.addByCenterRadius(P(cx, cy, 0), r_max)
+sk_base.sketchDimensions.addDiameterDimension(c,
+    P(cx + r_max + 0.5, cy, 0)).parameter.expression = "r_max * 2"
+
+near_pl = sp.off_plane(comp, comp.xYConstructionPlane, "h * 0.05", "NearTipPl")
+sk_near = comp.sketches.add(near_pl)
+sk_near.sketchCurves.sketchCircles.addByCenterRadius(
+    P(cx, cy, 0.05 * h), r_max * 0.9)
+
+apex_pl = sp.off_plane(comp, comp.xYConstructionPlane, "h", "ApexPl")
+sk_apex = comp.sketches.add(apex_pl)
+apex_sk = sk_apex.modelToSketchSpace(P(cx, cy, h))
+apex = sk_apex.sketchPoints.add(P(apex_sk.x, apex_sk.y, 0))
+
+loft_inp = comp.features.loftFeatures.createInput(NEWBODY)
+loft_inp.loftSections.add(sk_base.profiles.item(0))
+loft_inp.loftSections.add(sk_near.profiles.item(0))
+tip = loft_inp.loftSections.add(apex)
+tip.setPointTangentEndCondition(VI("4.0"))  # weight ≥ 4 for dome
+loft_inp.isSolid = True
+comp.features.loftFeatures.add(loft_inp).bodies.item(0).name = "Finial"
+```
+
+**Anti-pattern:** inserting a small (0.2–0.3 × R_max) transitional circle between the apex and the main body — it *pinches* the surface and makes the tip pointy regardless of weight. Go directly from apex → full-radius section.
+
+### Plan outline still matters
+
+A lofted class-3 body still has a plan outline at each section. The **class 2 techniques** from §Organic Outlines (closed fitted splines, clipped-triangle hex, convex edge bulging) are used to draw the plan at each z-level — the loft just stacks and interpolates them into a solid. Scale the same outline differently at each section to get the lenticular profile; use the **same generator** with different rotation between sections to get a twist.
+
+### Leg / joinery anchoring on a class-3 body
+
+When downstream features (legs, mortises) need to attach to a class-3 body, derive their anchors from the *actual* edited geometry, not the symmetric nominal:
+
+- **Seat centroid**: compute as the average of the mid-section's captured fit points (not `seat_d/2, seat_w/2`).
+- **Leg directions**: use `atan2(corner_y - centroid_y, corner_x - centroid_x)` on the captured mid-section corner points (not the synthesized triangle vertices).
+
+`examples/esherick-stool/esherick_stool.py` demonstrates this override — `tri_cx`, `tri_cy`, and `leg_angles_rad` are all recomputed from `_MID_PLAN` so the three legs land on the user-edited corners even when the sculpted shape shifts the centroid off-center.
+
+### Advanced loft variants (optional deep reference)
+
+For shapes beyond these two recipes — branching bodies (1 → N → 1 manifold), closed-ring topology, surface-only lofts, rail/centerline guides, closed-spline generators for kidney/star/cardioid cross-sections, loft-as-CUT pockets — see **`loft.md`**. It's a comprehensive feature reference covering all 12 loft variants. **Don't preload it** for a straightforward organic seat or finial — the two recipes above are self-contained.
 
 ## Scoops and Carved Surfaces
 
