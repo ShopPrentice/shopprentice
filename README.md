@@ -32,32 +32,7 @@ One command — no clone needed:
 curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash
 ```
 
-This installs the `/woodworking` skill for Claude Code and optionally sets up the MCP server for live Fusion 360 execution.
-
-### Options
-
-```bash
-curl ... | bash -s -- --claude-code     # skill only
-curl ... | bash -s -- --mcp             # MCP server only
-curl ... | bash -s -- --all             # skill + MCP
-# No flags = auto-detect + MCP
-```
-
-**[OpenClaw](https://openclaw.ai)** users: `curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install-openclaw.sh | bash`
-
-**Local install**: `git clone https://github.com/ShopPrentice/shopprentice.git && cd shopprentice && ./install.sh --all`
-
-## Model Compatibility
-
-This skill requires a frontier-level LLM with strong long-context reasoning, code generation, and instruction-following abilities.
-
-| Model | Status | Notes |
-|-------|--------|-------|
-| **Claude Opus** | ✅ Tested | Developed and tested with this model via Claude Code |
-| **Other frontier models** | ⚠️ Untested | May work but expect limitations |
-| **Smaller / open-source models** | ❌ Not recommended | Fails to follow the multi-step procedural instructions across long context |
-
-The skill pushes models to their limits — 50K+ tokens of structured instructions, correct Fusion 360 API code generation, parametric relationships across 50+ parameters, and iterative MCP tool use. If your model is not listed above, expect significant limitations.
+This installs the `/woodworking` skill for Claude Code and optionally sets up the MCP server for live Fusion 360 execution. For installer flags, OpenClaw users, and local clone installs, see [DEVELOPMENT.md](DEVELOPMENT.md#install-options).
 
 ## Usage
 
@@ -140,28 +115,6 @@ All joinery uses the **combine-based** approach: build the tenon/tail as a body,
 
 20+ built-in species from Fusion's library plus 5 custom high-res species (teak, brazilian rosewood, cocobolo, ziricote, spalted maple) with grain direction auto-aligned to each body's longest axis. Multi-species designs supported.
 
-## MCP Tools
-
-The ShopPrentice add-in provides an MCP server on `localhost:9100` with tools for the full design loop:
-
-| Tool | Purpose |
-|------|---------|
-| `execute_script` | Run Python in Fusion 360 (`sandbox=true` for validation, `clean=true` for rebuild) |
-| `capture_design` | Full introspection: parameters, components, body geometry, timeline |
-| `validate_design` | Connectivity + interference check in one call |
-| `modify_parameters` | Change values with incremental recompute |
-| `get_screenshot` | Viewport capture with camera orientation |
-| `get_product_shots` | High-res presentation shots, multiple views |
-| `get_selection` / `set_selection` | Read/highlight entities in the UI |
-| `apply_appearance` | Wood species with grain-aligned textures |
-| `sync_script` | Auto-patch parameter changes from UI edits into the script |
-| `get_changes` | Snapshot & diff for detecting UI modifications |
-| `check_interference` / `check_connectivity` | Structural diagnostics |
-
-```bash
-curl http://localhost:9100/health    # {"status": "healthy", "server": "ShopPrentice"}
-```
-
 ## Project Structure
 
 ```
@@ -205,10 +158,6 @@ Projects are saved to `~/shopprentice-projects/<project-name>/` with a script an
 - **Output** — cut lists, CNC toolpath hints, shop drawings
 - **Other CAD platforms** — FreeCAD, Shapr3D, Onshape
 - **Image-to-model** — better dimension extraction and 3D reconstruction from reference photos
-
-## Model Support
-
-Developed and tested with **Claude Code** powered by **Claude Opus and Sonnet**. The skill relies on long-context reasoning, Fusion 360 API code generation, and maintaining parametric relationships across 50+ parameters. Other LLM models may work for simple builds but are not tested for complex joinery.
 
 ## License
 
