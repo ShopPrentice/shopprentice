@@ -2,7 +2,7 @@
 
 Parametric furniture modeling for Fusion 360, driven by AI agents via MCP.
 
-Describe a piece of furniture in natural language — or show the AI a photo — and ShopPrentice generates a fully parametric Fusion 360 Python script with proper feature timelines, mirror/pattern replication, and joinery. Connect to a running Fusion 360 instance via the built-in MCP server for live execution, validation, and iterative refinement.
+Describe a piece of furniture in natural language — or show the AI a photo — and ShopPrentice generates a Fusion 360 Python script with proper feature timelines, mirror/pattern replication, and joinery. Rectilinear parts are fully parametric — every dimension is a named parameter expression, so the whole model rebuilds when any value changes. Organic parts (sculpted seats, turned legs, lofted shells, carved scoops) are spline-driven and refined interactively: drag fit points in the Fusion UI, or prompt the agent to adjust the shape, and it captures the result back into the script as the new defaults. Connect to a running Fusion 360 instance via the built-in MCP server for live execution, validation, and iterative refinement.
 
 [![ShopPrentice Demo](https://img.youtube.com/vi/yb9XpCFWsMs/maxresdefault.jpg)](https://www.youtube.com/watch?v=yb9XpCFWsMs)
 
@@ -20,7 +20,7 @@ ShopPrentice agent:
   6. Takes a screenshot and presents the result
 ```
 
-Every dimension uses parameter expressions — change any value in Modify > Change Parameters and the entire model updates.
+Rectilinear dimensions are parameter-driven — change any value in the palette or in Modify > Change Parameters and those features recompute incrementally. Organic features (spline outlines, lofted sections, revolved profiles) carry baked fit-point coordinates instead of named dimensions; refine them by dragging control points in Fusion, or prompt the agent to reshape, and it re-bakes the captured points into the script.
 
 ## Install
 
@@ -110,9 +110,19 @@ The **Step Stool** and **Pergola** were reverse-engineered from existing Fusion 
 
 ## Capabilities
 
-### Parametric Modeling
+### Parametric Modeling (rectilinear parts)
 
-Every script produces a full Fusion 360 parametric timeline — Sketch > Constrain > Extrude, with Mirror/Pattern for symmetric parts and component structure for logical grouping. All dimensions are parameter expressions.
+Every rectilinear part — boards, cases, frames, rails, drawer boxes, square-stock legs, hardware cutouts — is built on a full Fusion 360 parametric timeline: Sketch > Constrain > Extrude, with Mirror/Pattern for symmetric replication and component structure for logical grouping. Every dimension is a named parameter expression, so the whole piece rebuilds when a palette value changes. This covers the bulk of most furniture.
+
+### Organic Shapes (splined parts)
+
+Sculpted seats, turned legs, carved profiles, scooped surfaces, and lofted lens-profile bodies aren't driven by named dimensions — they're described by curves. ShopPrentice handles them via an **approximate → refine → capture** loop:
+
+1. Agent seeds the shape with a closed fitted spline (plan outline), a half-profile spline + Revolve (turned part), or a multi-section loft with rails (3-D organic solid).
+2. You refine interactively: drag fit points in the Fusion UI, or prompt the agent ("make the back edge narrower", "round the corner more").
+3. Agent captures edited fit points via `get_timeline_state(include_sketches=True)` and bakes them back into the script as the new defaults — edits survive `clean=true` rebuilds.
+
+Supported organic techniques: revolved turned parts, closed-spline plan outlines, multi-section lofts with direction-tangent end conditions, rail-guided loft shaping, rounded apex tips (bullets/domes/eggs), spherical scoops, through-tenon trimming that follows curved surfaces. See `woodworking/organic-shapes.md` (shape taxonomy + inline recipes) and `woodworking/loft.md` (loft feature reference). The Esherick Stool example is the end-to-end showcase of the loop.
 
 ### Parameter Editor
 
@@ -188,11 +198,11 @@ Projects are saved to `~/shopprentice-projects/<project-name>/` with a script an
 
 ## Roadmap
 
-- **Curved/organic forms** — bent laminations, cabriole legs, steam-bent backs, Chinese traditional furniture
-- **More joinery** — castle joint, sliding dovetail, wedged tenon, Japanese joinery
+- **Advanced curved forms** — bent laminations, cabriole legs, steam-bent backs, Chinese traditional furniture (sculpted organic solids, turned parts, scooped surfaces, and lofted bodies are already supported — see Organic Shapes above)
+- **More joinery** — castle joint, sliding dovetail, Japanese joinery (mortise & tenon, dovetail, box joint, domino, drawbore, dowel, dado/rabbet, lap, bridle, miter, spline, pocket hole, and wedged tenon are already implemented)
 - **Output** — cut lists, CNC toolpath hints, shop drawings
 - **Other CAD platforms** — FreeCAD, Shapr3D, Onshape
-- **Image-to-model** — better dimension extraction, 3D reconstruction for organic shapes
+- **Image-to-model** — better dimension extraction and 3D reconstruction from reference photos
 
 ## Model Support
 
