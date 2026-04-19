@@ -8,6 +8,13 @@ Parametric approximation of a Wharton Esherick-inspired three-legged stool. Waln
 
 This model is a close representation of an organic, hand-sculpted design — not a precise reproduction. The workflow bridges the gap between parametric modeling and organic design intent: the agent builds an initial shape with hard-coded spline control points, the user drags fit points in the Fusion UI to refine, and the agent captures the edits via `get_timeline_state(index, include_sketches=True)` and bakes them back into the script's `_BOT_PLAN` / `_MID_PLAN` / `_TOP_PLAN` / rail control-point lists as the new defaults.
 
+## Videos
+
+| Getting started — overall intro | Esherick stool — organic deep dive |
+|---|---|
+| [![Getting Started](https://img.youtube.com/vi/nQNU3LeYulE/maxresdefault.jpg)](https://www.youtube.com/watch?v=nQNU3LeYulE) | [![Esherick Stool Deep Dive](https://img.youtube.com/vi/upckBvHT-xY/maxresdefault.jpg)](https://www.youtube.com/watch?v=upckBvHT-xY) |
+| [Watch on YouTube](https://youtu.be/nQNU3LeYulE) — 5-minute walkthrough of the ShopPrentice workflow: writing a natural-language brief, agent-planned build phases, running a parametric script in Fusion 360, iterating with the palette. | [Watch on YouTube](https://youtu.be/upckBvHT-xY) — Deep dive on building this stool: lofted lens-profile seat, 3 adjustable rails, approximate → refine → capture loop with spline edits in Fusion, wedge grain orientation, walnut/oak finish. |
+
 Reference: [Rago Arts Lot 568](https://www.ragoarts.com/auctions/2023/01/modern-design/568) — Wharton Esherick, 1958, walnut and ash.
 
 | | |
