@@ -19,7 +19,7 @@ ShopPrentice agent:
   3. Executes it in Fusion 360 via MCP
   4. Validates with capture_design (body count, volumes, positions)
   5. Fixes any issues and re-executes
-  6. Takes a screenshot and presents the result
+  6. Waits for the next prompt from you
 ```
 
 Rectilinear dimensions are parameter-driven — change any value in the palette or in Modify > Change Parameters and those features recompute incrementally. Organic features (spline outlines, lofted sections, revolved profiles) carry baked fit-point coordinates instead of named dimensions; refine them by dragging control points in Fusion, or prompt the agent to reshape, and it re-bakes the captured points into the script.
