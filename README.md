@@ -70,14 +70,14 @@ The agent can also work from images — show it a photo or sketch of a piece and
 
 <table>
 <tr>
+<td align="center"><a href="examples/esherick-stool/"><img src="examples/esherick-stool/iso-top-right.png" width="200" /><br /><b>Esherick Stool</b></a><br />Lofted lens-profile seat, turned legs, wedged through-tenons</td>
 <td align="center"><a href="examples/roubo_workbench/"><img src="examples/roubo_workbench/screenshots/front.png" width="200" /><br /><b>Roubo Workbench</b></a><br />Leg vise, drawbore tenons, sliding deadman, dog holes</td>
 <td align="center"><a href="examples/tv-console/"><img src="examples/tv-console/screenshots/iso-top-left.png" width="200" /><br /><b>TV Console</b></a><br />Interlocking M&T, dovetails, dominos</td>
-<td align="center"><a href="examples/dresser/"><img src="examples/dresser/screenshots/iso-top-right.png" width="200" /><br /><b>Dresser</b></a><br />3-drawer, through dovetail case</td>
 </tr>
 <tr>
+<td align="center"><a href="examples/stool-rebuild/"><img src="examples/stool-rebuild/screenshots/iso-top-right.png" width="200" /><br /><b>Step Stool</b></a><br />Splayed legs, through tenons (rebuilt)</td>
 <td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/queen-platform.png" width="200" /><br /><b>Queen Bed</b></a><br />Bed rail fasteners, framed headboard, center beam</td>
 <td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/twin-live-edge-slab.png" width="200" /><br /><b>Twin Bed (Live Edge)</b></a><br />Slab headboard, bowtie inlays, Nakashima style</td>
-<td align="center"><a href="examples/crib/"><img src="examples/crib/screenshots/iso-top-right.png" width="200" /><br /><b>Crib</b></a><br />CPSC spindles, dominos, mattress support</td>
 </tr>
 <tr>
 <td align="center"><a href="examples/windsor-chair/"><img src="examples/windsor-chair/iso.png" width="200" /><br /><b>Windsor Chair</b></a><br />Splayed legs, turned stretchers, scooped seat</td>
@@ -87,22 +87,22 @@ The agent can also work from images — show it a photo or sketch of a piece and
 <tr>
 <td align="center"><a href="examples/bookshelf/"><img src="examples/bookshelf/screenshots/iso-top-right.png" width="200" /><br /><b>Bookshelf</b></a><br />Through M&T shelves, dovetail top</td>
 <td align="center"><a href="examples/counter-stool/"><img src="examples/counter-stool/screenshots/iso-top-right.png" width="200" /><br /><b>Counter Stool</b></a><br />Splayed legs, dominos, stretchers</td>
-<td align="center"><a href="examples/pergola-rebuild/"><img src="examples/pergola-rebuild/screenshots/overview.png" width="200" /><br /><b>Pergola + Deck</b></a><br />43 bodies, scarf joints (rebuilt)</td>
+<td align="center"><a href="examples/wrap-box/"><img src="examples/wrap-box/screenshots/iso-top-right.png" width="200" /><br /><b>Wrap Box</b></a><br />Dovetailed dispenser with cutter slot</td>
 </tr>
 <tr>
 <td align="center"><a href="examples/pencil-box/"><img src="examples/pencil-box/screenshots/iso-top-right.png" width="200" /><br /><b>Pencil Box</b></a><br />Dovetailed box with sliding lid</td>
-<td align="center"><a href="examples/wrap-box/"><img src="examples/wrap-box/screenshots/iso-top-right.png" width="200" /><br /><b>Wrap Box</b></a><br />Dovetailed dispenser with cutter slot</td>
 <td align="center"><a href="examples/wood-planter/"><img src="examples/wood-planter/screenshots/iso-top-right.png" width="200" /><br /><b>Wood Planter</b></a><br />Frame construction, T&G slat infill</td>
+<td align="center"><a href="examples/pergola-rebuild/"><img src="examples/pergola-rebuild/screenshots/overview.png" width="200" /><br /><b>Pergola + Deck</b></a><br />43 bodies, scarf joints (rebuilt)</td>
 </tr>
 <tr>
 <td align="center"><a href="examples/hall_bench/"><img src="examples/hall_bench/screenshots/iso-top-right.png" width="200" /><br /><b>Hall Bench</b></a><br />Raked back, profiled posts, slab seat</td>
 <td align="center"><a href="examples/bench/"><img src="examples/bench/screenshots/iso-top-right.png" width="200" /><br /><b>Bench</b></a><br />Simple construction, domino joinery</td>
-<td align="center"><a href="examples/stool-rebuild/"><img src="examples/stool-rebuild/screenshots/iso-top-right.png" width="200" /><br /><b>Step Stool</b></a><br />Splayed legs, through tenons (rebuilt)</td>
+<td align="center"><a href="examples/crib/"><img src="examples/crib/screenshots/iso-top-right.png" width="200" /><br /><b>Crib</b></a><br />CPSC spindles, dominos, mattress support</td>
 </tr>
 <tr>
 <td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a><br />Writing desk with aprons</td>
 <td align="center"><a href="examples/side-table/"><img src="examples/side-table/screenshots/iso-top-right.png" width="200" /><br /><b>Side Table</b></a><br />Walnut with spalted maple drawer front</td>
-<td align="center"><a href="examples/esherick-stool/"><img src="examples/esherick-stool/iso-top-right.png" width="200" /><br /><b>Esherick Stool</b></a><br />Organic spline seat, turned legs, wedged through-tenons</td>
+<td align="center"><a href="examples/dresser/"><img src="examples/dresser/screenshots/iso-top-right.png" width="200" /><br /><b>Dresser</b></a><br />3-drawer, through dovetail case</td>
 </tr>
 </table>
 
