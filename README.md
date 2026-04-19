@@ -2,9 +2,11 @@
 
 Parametric furniture modeling for Fusion 360, driven by AI agents via MCP.
 
-Describe a piece of furniture in natural language — or show the AI a photo — and ShopPrentice generates a Fusion 360 Python script with proper feature timelines, mirror/pattern replication, and joinery. Rectilinear parts are fully parametric — every dimension is a named parameter expression, so the whole model rebuilds when any value changes. Organic parts (sculpted seats, turned legs, lofted shells, carved scoops) are spline-driven and refined interactively: drag fit points in the Fusion UI, or prompt the agent to adjust the shape, and it captures the result back into the script as the new defaults. Connect to a running Fusion 360 instance via the built-in MCP server for live execution, validation, and iterative refinement.
+Describe a piece of furniture in natural language (or show a photo) and ShopPrentice generates a Fusion 360 parametric model, executes it live in Fusion via MCP, and iterates with you until it's right.
 
-[![ShopPrentice Demo](https://img.youtube.com/vi/yb9XpCFWsMs/maxresdefault.jpg)](https://www.youtube.com/watch?v=yb9XpCFWsMs)
+| Overview demo | Getting started tutorial |
+|---|---|
+| [![ShopPrentice Demo](https://img.youtube.com/vi/yb9XpCFWsMs/mqdefault.jpg)](https://www.youtube.com/watch?v=yb9XpCFWsMs) | [![Getting Started](https://img.youtube.com/vi/nQNU3LeYulE/mqdefault.jpg)](https://www.youtube.com/watch?v=nQNU3LeYulE) |
 
 ## How It Works
 
@@ -76,12 +78,12 @@ The agent can also work from images — show it a photo or sketch of a piece and
 </tr>
 <tr>
 <td align="center"><a href="examples/stool-rebuild/"><img src="examples/stool-rebuild/screenshots/iso-top-right.png" width="200" /><br /><b>Step Stool</b></a><br />Splayed legs, through tenons (rebuilt)</td>
-<td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/queen-platform.png" width="200" /><br /><b>Queen Bed</b></a><br />Bed rail fasteners, framed headboard, center beam</td>
+<td align="center"><a href="examples/windsor-chair/"><img src="examples/windsor-chair/iso.png" width="200" /><br /><b>Windsor Chair</b></a><br />Splayed legs, turned stretchers, scooped seat</td>
 <td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/twin-live-edge-slab.png" width="200" /><br /><b>Twin Bed (Live Edge)</b></a><br />Slab headboard, bowtie inlays, Nakashima style</td>
 </tr>
 <tr>
-<td align="center"><a href="examples/windsor-chair/"><img src="examples/windsor-chair/iso.png" width="200" /><br /><b>Windsor Chair</b></a><br />Splayed legs, turned stretchers, scooped seat</td>
-<td align="center"><a href="examples/chair/"><img src="examples/chair/screenshots/iso-top-right.png" width="200" /><br /><b>Dining Chair</b></a><br />Bent-back legs, vertical slats, tilted dominos</td>
+<td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/queen-platform.png" width="200" /><br /><b>Queen Bed</b></a><br />Bed rail fasteners, framed headboard, center beam</td>
+<td align="center"><a href="examples/crib/"><img src="examples/crib/screenshots/iso-top-right.png" width="200" /><br /><b>Crib</b></a><br />CPSC spindles, dominos, mattress support</td>
 <td align="center"><a href="examples/rachels-table/"><img src="examples/rachels-table/screenshots/iso-top-right.png" width="200" /><br /><b>Rachel's Table</b></a><br />Bridle joints, arched rails, tapered legs</td>
 </tr>
 <tr>
@@ -97,7 +99,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 <tr>
 <td align="center"><a href="examples/hall_bench/"><img src="examples/hall_bench/screenshots/iso-top-right.png" width="200" /><br /><b>Hall Bench</b></a><br />Raked back, profiled posts, slab seat</td>
 <td align="center"><a href="examples/bench/"><img src="examples/bench/screenshots/iso-top-right.png" width="200" /><br /><b>Bench</b></a><br />Simple construction, domino joinery</td>
-<td align="center"><a href="examples/crib/"><img src="examples/crib/screenshots/iso-top-right.png" width="200" /><br /><b>Crib</b></a><br />CPSC spindles, dominos, mattress support</td>
+<td align="center"><a href="examples/chair/"><img src="examples/chair/screenshots/iso-top-right.png" width="200" /><br /><b>Dining Chair</b></a><br />Bent-back legs, vertical slats, tilted dominos</td>
 </tr>
 <tr>
 <td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a><br />Writing desk with aprons</td>
