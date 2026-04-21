@@ -1,15 +1,20 @@
 """Test fixture for dovetail joint template.
 
-Tests define_params and box() with 9 configurations:
-  B1-B2: 1-corner dovetails (2 boards: front + left)
-  B3-B4: 2-corner dovetails (3 boards: front + left + right)
-  B5-B6: 4-corner dovetails, joint along Z (default)
-  B7: 4-corner, joint along X
-  B8: 4-corner, joint along Y
-  B9: 4-corner, rotated to (1,1,1) via occurrence transform
+Grid-based layout — each box lives in its own (col, row) slot on a
+uniform ``grid_x`` × ``grid_y`` grid, so variants spread out predictably
+regardless of how their individual dimensions change.
 
-Each box is in its own component, positioned with X/Y offsets.
-For 2+ corners, right tail board is created by mirroring left across x_mid.
+  Row 0 (y=0):       B1  1-corner 8x6x4     B2  1-corner 5x3x2
+                     B3  2-corner 8x5x4     B4  2-corner 6x4x6 (4 tails)
+  Row 1 (y=grid_y):      B5  4-corner 8x6x4     B6  4-corner 4x4x12 (6 tails)
+                     B9  4-corner 7x5x3 (joint along X)
+                     B10 4-corner 6x8x5 (joint along Y)
+  Row 2 (y=2*grid_y):    B11 4-corner 6x4x5, rotated to (1,1,1)
+                     B12 1-corner 8x6x4 — wide tails, ultra-thin pins
+                     B13 4-corner 6x4x5, rotated 42° about (1,2,1)/√6
+
+For 2+ corners, the right tail board is created by mirroring the left
+across x_mid. B11 and B13 are rotated via their occurrence transform.
 """
 import adsk.core
 import adsk.fusion
@@ -158,152 +163,148 @@ def run(context):
 
     ctx = sp.DesignContext(design)
 
-    # ================================================================
-    # FIXTURE 1: 1-corner — 8x6x4, 0.5" thick, 3 tails, 8 deg
-    # ================================================================
-    print("=" * 50)
-    print("FIXTURE 1: 1-corner box 8x6x4, 3 tails")
-    print("=" * 50)
+    # clean=true wipes features but keeps user parameters; drop any
+    # lingering params from earlier runs so dovetail.define_params()
+    # and our own _add_param helper are free to re-define cleanly.
+    for i in range(params.count - 1, -1, -1):
+        try:
+            params.item(i).deleteMe()
+        except Exception:
+            pass
 
-    params.add("b1_l", VI("8 in"), "in", "Box 1 length")
-    params.add("b1_w", VI("6 in"), "in", "Box 1 width")
-    params.add("b1_h", VI("4 in"), "in", "Box 1 height")
-    params.add("b1_t", VI("0.5 in"), "in", "Box 1 thickness")
+    def _add_param(name, expr, unit, comment):
+        p = params.itemByName(name)
+        if p is not None:
+            try:
+                p.expression = expr
+            except Exception:
+                pass
+        else:
+            params.add(name, VI(expr), unit, comment)
 
+    # ── Grid: each fixture lives in its own (col, row) slot ──
+    # Spacing is large enough for the biggest box (8 in) plus rotation
+    # margins. Change grid_x/grid_y to re-space the whole gallery uniformly.
+    _add_param("grid_x", "14 in", "in", "Grid X spacing between boxes")
+    _add_param("grid_y", "12 in", "in", "Grid Y spacing between boxes")
+
+    def slot(col, row):
+        x_expr = "0 in" if col == 0 else f"{col} * grid_x"
+        y_expr = "0 in" if row == 0 else f"{row} * grid_y"
+        return x_expr, y_expr
+
+    # ================================================================
+    # B1 @ (0,0): 1-corner 8x6x4, 3 tails, 8 deg
+    # ================================================================
+    print("=" * 50 + "\nB1 @ (0,0): 1-corner 8x6x4, 3 tails\n" + "=" * 50)
+    b1_x, b1_y = slot(0, 0)
+    _add_param("b1_l", "8 in", "in", "B1 length")
+    _add_param("b1_w", "6 in", "in", "B1 width")
+    _add_param("b1_h", "4 in", "in", "B1 height")
+    _add_param("b1_t", "0.5 in", "in", "B1 thickness")
     dovetail.define_params(params, prefix="dt1",
         angle="8 deg", tail_w="0.75 in", tail_count="3",
         joint_h_expr="b1_h", thick_expr="b1_t")
-
     r1 = build_box(root, "B1", "b1_l", "b1_w", "b1_h", "b1_t",
-                   "0 in", "dt1", ctx.ev, corners=1)
-    assert r1["count"] == 2, f"Box 1: expected 2, got {r1['count']}"
-    print("Box 1: PASS\n")
+                   b1_x, "dt1", ctx.ev, y_off_expr=b1_y, corners=1)
+    assert r1["count"] == 2, f"B1: expected 2, got {r1['count']}"
+    print("B1: PASS\n")
 
     # ================================================================
-    # FIXTURE 2: 1-corner — 5x3x2, 0.375" thick, 1 tail, 8 deg
+    # B2 @ (1,0): 1-corner jewelry box 5x3x2, single tail
     # ================================================================
-    print("=" * 50)
-    print("FIXTURE 2: 1-corner jewelry box 5x3x2, single tail")
-    print("=" * 50)
-
-    params.add("b2_l", VI("5 in"), "in", "Box 2 length")
-    params.add("b2_w", VI("3 in"), "in", "Box 2 width")
-    params.add("b2_h", VI("2 in"), "in", "Box 2 height")
-    params.add("b2_t", VI("0.375 in"), "in", "Box 2 thickness")
-    params.add("b2_x", VI("b1_l + 2 in"), "in", "Box 2 X offset")
-
+    print("=" * 50 + "\nB2 @ (1,0): 1-corner jewelry box 5x3x2\n" + "=" * 50)
+    b2_x, b2_y = slot(1, 0)
+    _add_param("b2_l", "5 in", "in", "B2 length")
+    _add_param("b2_w", "3 in", "in", "B2 width")
+    _add_param("b2_h", "2 in", "in", "B2 height")
+    _add_param("b2_t", "0.375 in", "in", "B2 thickness")
     dovetail.define_params(params, prefix="dt2",
         angle="8 deg", tail_w="0.25 in", tail_count="1",
         joint_h_expr="b2_h", thick_expr="b2_t")
-
     r2 = build_box(root, "B2", "b2_l", "b2_w", "b2_h", "b2_t",
-                   "b2_x", "dt2", ctx.ev, corners=1)
-    assert r2["count"] == 2, f"Box 2: expected 2, got {r2['count']}"
-    print("Box 2: PASS\n")
+                   b2_x, "dt2", ctx.ev, y_off_expr=b2_y, corners=1)
+    assert r2["count"] == 2, f"B2: expected 2, got {r2['count']}"
+    print("B2: PASS\n")
 
     # ================================================================
-    # FIXTURE 3: 2-corner — 8x5x4, 0.5" thick, 3 tails, 8 deg
+    # B3 @ (2,0): 2-corner 8x5x4, front only, 3 tails
     # ================================================================
-    print("=" * 50)
-    print("FIXTURE 3: 2-corner box 8x5x4, front only")
-    print("=" * 50)
-
-    params.add("b3_l", VI("8 in"), "in", "Box 3 length")
-    params.add("b3_w", VI("5 in"), "in", "Box 3 width")
-    params.add("b3_h", VI("4 in"), "in", "Box 3 height")
-    params.add("b3_t", VI("0.5 in"), "in", "Box 3 thickness")
-    params.add("b3_y", VI("b1_w + 2 in"), "in", "Box 3 Y offset")
-
+    print("=" * 50 + "\nB3 @ (2,0): 2-corner 8x5x4, front only\n" + "=" * 50)
+    b3_x, b3_y = slot(2, 0)
+    _add_param("b3_l", "8 in", "in", "B3 length")
+    _add_param("b3_w", "5 in", "in", "B3 width")
+    _add_param("b3_h", "4 in", "in", "B3 height")
+    _add_param("b3_t", "0.5 in", "in", "B3 thickness")
     dovetail.define_params(params, prefix="dt3",
         angle="8 deg", tail_w="0.5 in", tail_count="3",
         joint_h_expr="b3_h", thick_expr="b3_t")
-
     r3 = build_box(root, "B3", "b3_l", "b3_w", "b3_h", "b3_t",
-                   "0 in", "dt3", ctx.ev, y_off_expr="b3_y",
-                   corners=2)
-    assert r3["count"] == 3, f"Box 3: expected 3, got {r3['count']}"
-    print("Box 3: PASS\n")
+                   b3_x, "dt3", ctx.ev, y_off_expr=b3_y, corners=2)
+    assert r3["count"] == 3, f"B3: expected 3, got {r3['count']}"
+    print("B3: PASS\n")
 
     # ================================================================
-    # FIXTURE 4: 2-corner — 6x4x6, 0.5" thick, 4 tails, 8 deg
+    # B4 @ (3,0): 2-corner 6x4x6, 4 tails
     # ================================================================
-    print("=" * 50)
-    print("FIXTURE 4: 2-corner box 6x4x6, front only, 4 tails")
-    print("=" * 50)
-
-    params.add("b4_l", VI("6 in"), "in", "Box 4 length")
-    params.add("b4_w", VI("4 in"), "in", "Box 4 width")
-    params.add("b4_h", VI("6 in"), "in", "Box 4 height")
-    params.add("b4_t", VI("0.5 in"), "in", "Box 4 thickness")
-    params.add("b4_x", VI("b3_l + 2 in"), "in", "Box 4 X offset")
-
+    print("=" * 50 + "\nB4 @ (3,0): 2-corner 6x4x6, 4 tails\n" + "=" * 50)
+    b4_x, b4_y = slot(3, 0)
+    _add_param("b4_l", "6 in", "in", "B4 length")
+    _add_param("b4_w", "4 in", "in", "B4 width")
+    _add_param("b4_h", "6 in", "in", "B4 height")
+    _add_param("b4_t", "0.5 in", "in", "B4 thickness")
     dovetail.define_params(params, prefix="dt4",
         angle="8 deg", tail_w="0.5 in", tail_count="4",
         joint_h_expr="b4_h", thick_expr="b4_t")
-
     r4 = build_box(root, "B4", "b4_l", "b4_w", "b4_h", "b4_t",
-                   "b4_x", "dt4", ctx.ev, y_off_expr="b3_y",
-                   corners=2)
-    assert r4["count"] == 3, f"Box 4: expected 3, got {r4['count']}"
-    print("Box 4: PASS\n")
+                   b4_x, "dt4", ctx.ev, y_off_expr=b4_y, corners=2)
+    assert r4["count"] == 3, f"B4: expected 3, got {r4['count']}"
+    print("B4: PASS\n")
 
     # ================================================================
-    # FIXTURE 5: 4-corner — 8x6x4, 0.5" thick, 3 tails, 8 deg
+    # B5 @ (0,1): 4-corner standard 8x6x4, 3 tails
     # ================================================================
-    print("=" * 50)
-    print("FIXTURE 5: 4-corner standard box 8x6x4")
-    print("=" * 50)
-
-    params.add("b5_l", VI("8 in"), "in", "Box 5 length")
-    params.add("b5_w", VI("6 in"), "in", "Box 5 width")
-    params.add("b5_h", VI("4 in"), "in", "Box 5 height")
-    params.add("b5_t", VI("0.5 in"), "in", "Box 5 thickness")
-    params.add("b5_y", VI("b3_y + b3_w + 2 in"), "in", "Box 5 Y offset")
-
+    print("=" * 50 + "\nB5 @ (0,1): 4-corner standard 8x6x4\n" + "=" * 50)
+    b5_x, b5_y = slot(0, 1)
+    _add_param("b5_l", "8 in", "in", "B5 length")
+    _add_param("b5_w", "6 in", "in", "B5 width")
+    _add_param("b5_h", "4 in", "in", "B5 height")
+    _add_param("b5_t", "0.5 in", "in", "B5 thickness")
     dovetail.define_params(params, prefix="dt5",
         angle="8 deg", tail_w="0.75 in", tail_count="3",
         joint_h_expr="b5_h", thick_expr="b5_t")
-
     r5 = build_box(root, "B5", "b5_l", "b5_w", "b5_h", "b5_t",
-                   "0 in", "dt5", ctx.ev, y_off_expr="b5_y")
-    assert r5["count"] == 4, f"Box 5: expected 4, got {r5['count']}"
-    print("Box 5: PASS\n")
+                   b5_x, "dt5", ctx.ev, y_off_expr=b5_y)
+    assert r5["count"] == 4, f"B5: expected 4, got {r5['count']}"
+    print("B5: PASS\n")
 
     # ================================================================
-    # FIXTURE 6: 4-corner — 4x4x12, 0.5" thick, 6 tails, 8 deg
+    # B6 @ (1,1): 4-corner tall narrow 4x4x12, 6 tails
     # ================================================================
-    print("=" * 50)
-    print("FIXTURE 6: 4-corner tall narrow box 4x4x12, 6 tails")
-    print("=" * 50)
-
-    params.add("b6_l", VI("4 in"), "in", "Box 6 length")
-    params.add("b6_w", VI("4 in"), "in", "Box 6 width")
-    params.add("b6_h", VI("12 in"), "in", "Box 6 height")
-    params.add("b6_t", VI("0.5 in"), "in", "Box 6 thickness")
-    params.add("b6_x", VI("b5_l + 2 in"), "in", "Box 6 X offset")
-
+    print("=" * 50 + "\nB6 @ (1,1): 4-corner tall narrow 4x4x12, 6 tails\n" + "=" * 50)
+    b6_x, b6_y = slot(1, 1)
+    _add_param("b6_l", "4 in", "in", "B6 length")
+    _add_param("b6_w", "4 in", "in", "B6 width")
+    _add_param("b6_h", "12 in", "in", "B6 height")
+    _add_param("b6_t", "0.5 in", "in", "B6 thickness")
     dovetail.define_params(params, prefix="dt6",
         angle="8 deg", tail_w="0.625 in", tail_count="6",
         joint_h_expr="b6_h", thick_expr="b6_t")
-
     r6 = build_box(root, "B6", "b6_l", "b6_w", "b6_h", "b6_t",
-                   "b6_x", "dt6", ctx.ev, y_off_expr="b5_y")
-    assert r6["count"] == 4, f"Box 6: expected 4, got {r6['count']}"
-    print("Box 6: PASS\n")
+                   b6_x, "dt6", ctx.ev, y_off_expr=b6_y)
+    assert r6["count"] == 4, f"B6: expected 4, got {r6['count']}"
+    print("B6: PASS\n")
 
     # ================================================================
-    # FIXTURE 7: 4-corner — joint along X, thick along Z
-    # Box "lying flat": pin boards thin in Z, tail boards thin in Y
+    # B9 @ (2,1): 4-corner, joint along X, 7x5x3
+    # Box "lying flat": pin boards thin in Z, tail boards thin in Y.
+    # Built at component origin; translated to grid slot via occ transform.
     # ================================================================
-    print("=" * 50)
-    print("FIXTURE 7: 4-corner, joint along X, 7x5x3")
-    print("=" * 50)
-
-    params.add("b9_l", VI("7 in"), "in", "Box 7 length (X)")
-    params.add("b9_w", VI("5 in"), "in", "Box 7 width (Y)")
-    params.add("b9_h", VI("3 in"), "in", "Box 7 height (Z)")
-    params.add("b9_t", VI("0.5 in"), "in", "Box 7 thickness")
-    params.add("b9_y", VI("b5_y + b5_w + 2 in"), "in", "Box 7 Y offset")
+    print("=" * 50 + "\nB9 @ (2,1): 4-corner, joint along X, 7x5x3\n" + "=" * 50)
+    _add_param("b9_l", "7 in", "in", "B9 length (X)")
+    _add_param("b9_w", "5 in", "in", "B9 width (Y)")
+    _add_param("b9_h", "3 in", "in", "B9 height (Z)")
+    _add_param("b9_t", "0.5 in", "in", "B9 thickness")
 
     dovetail.define_params(params, prefix="dt9",
         angle="8 deg", tail_w="0.75 in", tail_count="3",
@@ -312,75 +313,72 @@ def run(context):
     b9_occ = sp.make_comp(root, "B9")
     b9_c = b9_occ.component
 
-    # Front (pin board): spans X×Y at z=0, thin in Z
     sk, pr = sp.sketch_rect_model(b9_c, b9_c.xYConstructionPlane,
-        ("0 in", "b9_y", "0 in"),
+        ("0 in", "0 in", "0 in"),
         {"x": "b9_l", "y": "b9_w"}, "B9_Front_Sk", ctx.ev)
     b9_front = sp.ext_new(b9_c, pr, "b9_t", "B9_Front").bodies.item(0)
     b9_front.name = "B9_Front"
 
-    # Back (pin board): spans X×Y at z=b9_h-b9_t, thin in Z
     b9_back_pl = sp.off_plane(b9_c, b9_c.xYConstructionPlane,
                                "b9_h - b9_t", "B9_Back_Pl")
     sk, pr = sp.sketch_rect_model(b9_c, b9_back_pl,
-        ("0 in", "b9_y", "b9_h - b9_t"),
+        ("0 in", "0 in", "b9_h - b9_t"),
         {"x": "b9_l", "y": "b9_w"}, "B9_Back_Sk", ctx.ev)
     b9_back = sp.ext_new(b9_c, pr, "b9_t", "B9_Back").bodies.item(0)
     b9_back.name = "B9_Back"
 
-    # Midplanes for dovetail mirrors:
-    #   x_mid: left→right mirror across ext_axis=Y midplane
     b9_ext_mid = sp.off_plane(b9_c, b9_c.xZConstructionPlane,
-                               "b9_y + b9_w / 2", "B9_ExtMid")
-    #   y_mid: front→back mirror across thick_axis=Z midplane
+                               "b9_w / 2", "B9_ExtMid")
     b9_thick_mid = sp.off_plane(b9_c, b9_c.xYConstructionPlane,
                                  "b9_h / 2", "B9_ThickMid")
 
-    # Left (tail board): spans X×Z at y=b9_y, thin in Y, narrower in Z
-    b9_left_pl = sp.off_plane(b9_c, b9_c.xZConstructionPlane,
-                               "b9_y", "B9_Left_Pl")
+    b9_left_pl = b9_c.xZConstructionPlane
     sk, pr = sp.sketch_rect_model(b9_c, b9_left_pl,
-        ("0 in", "b9_y", "b9_t"),
+        ("0 in", "0 in", "b9_t"),
         {"x": "b9_l", "z": "b9_h - 2 * b9_t"}, "B9_Left_Sk", ctx.ev)
     b9_left = sp.ext_new(b9_c, pr, "b9_t", "B9_Left").bodies.item(0)
     b9_left.name = "B9_Left"
 
-    # Right (tail board): mirror of left across ext_mid
     b9_right_mir = sp.mirror_body(b9_c, b9_left, b9_ext_mid, "B9_RightMir")
     b9_right = b9_right_mir.bodies.item(0)
     b9_right.name = "B9_Right"
 
-    print(f"  B9 boards built: 4 boards (left mirrored → right)")
-
-    # Dovetails: joint along X, thick along Z
-    dt9_result = dovetail.box(b9_c, b9_front, b9_left,
-                              b9_ext_mid, b9_thick_mid, thick_expr="b9_t",
-                              right=b9_right, back=b9_back,
-                              prefix="dt9", name="B9", ev=ctx.ev,
-                              fl_plane=b9_left_pl,
-                              front_expr="0 in",
-                              joint_axis="x", thick_axis="z")
+    dovetail.box(b9_c, b9_front, b9_left,
+                 b9_ext_mid, b9_thick_mid, thick_expr="b9_t",
+                 right=b9_right, back=b9_back,
+                 prefix="dt9", name="B9", ev=ctx.ev,
+                 fl_plane=b9_left_pl,
+                 front_expr="0 in",
+                 joint_axis="x", thick_axis="z")
 
     b9_n = b9_c.bRepBodies.count
-    b9_names = [b9_c.bRepBodies.item(i).name for i in range(b9_n)]
-    print(f"  B7 dovetails done (4-corner, X-axis): {b9_n} bodies -> {b9_names}")
-    assert b9_n == 4, f"Box 7: expected 4, got {b9_n}"
-    print("Box 7: PASS\n")
+    assert b9_n == 4, f"B9: expected 4, got {b9_n}"
+
+    # Translate to grid slot (2, 1) via MoveFeature — bakes into the
+    # timeline so the position survives later recomputes (occurrence
+    # transforms get reset when apply_appearance or other post-build
+    # steps trigger a recompute).
+    gx_cm = ctx.ev("grid_x"); gy_cm = ctx.ev("grid_y")
+    xfB9 = adsk.core.Matrix3D.create()
+    xfB9.setCell(0, 3, 2 * gx_cm)
+    xfB9.setCell(1, 3, 1 * gy_cm)
+    mc_b9 = adsk.core.ObjectCollection.create()
+    for i in range(b9_c.bRepBodies.count):
+        mc_b9.add(b9_c.bRepBodies.item(i))
+    mi_b9 = b9_c.features.moveFeatures.createInput2(mc_b9)
+    mi_b9.defineAsFreeMove(xfB9)
+    b9_c.features.moveFeatures.add(mi_b9).name = "B9_Move"
+    print("B9: PASS\n")
 
     # ================================================================
-    # FIXTURE 8: 4-corner — joint along Y, thick along X
-    # Box "on its side": front thin in X, left thin in Z
+    # B10 @ (3,1): 4-corner, joint along Y, 6x8x5
+    # Built at origin; translated via occurrence transform.
     # ================================================================
-    print("=" * 50)
-    print("FIXTURE 8: 4-corner, joint along Y, 6x8x5")
-    print("=" * 50)
-
-    params.add("b10_l", VI("6 in"), "in", "Box 8 length (X)")
-    params.add("b10_w", VI("8 in"), "in", "Box 8 width (Y)")
-    params.add("b10_h", VI("5 in"), "in", "Box 8 height (Z)")
-    params.add("b10_t", VI("0.5 in"), "in", "Box 8 thickness")
-    params.add("b10_x", VI("b9_l + 2 in"), "in", "Box 8 X offset")
-    params.add("b10_y", VI("b9_y"), "in", "Box 8 Y offset")
+    print("=" * 50 + "\nB10 @ (3,1): 4-corner, joint along Y, 6x8x5\n" + "=" * 50)
+    _add_param("b10_l", "6 in", "in", "B10 length (X)")
+    _add_param("b10_w", "8 in", "in", "B10 width (Y)")
+    _add_param("b10_h", "5 in", "in", "B10 height (Z)")
+    _add_param("b10_t", "0.5 in", "in", "B10 thickness")
 
     dovetail.define_params(params, prefix="dt10",
         angle="8 deg", tail_w="0.625 in", tail_count="4",
@@ -389,34 +387,27 @@ def run(context):
     b10_occ = sp.make_comp(root, "B10")
     b10_c = b10_occ.component
 
-    b10_ox = ctx.ev("b10_x")
-
-    # Front (pin board): spans Y×Z at x=b10_x, thin in X
-    b10_front_pl = sp.off_plane(b10_c, b10_c.yZConstructionPlane,
-                                 "b10_x", "B10_Front_Pl")
+    b10_front_pl = b10_c.yZConstructionPlane
     sk, pr = sp.sketch_rect_model(b10_c, b10_front_pl,
-        ("b10_x", "b10_y", "0 in"),
+        ("0 in", "0 in", "0 in"),
         {"y": "b10_w", "z": "b10_h"}, "B10_Front_Sk", ctx.ev)
     b10_front = sp.ext_new(b10_c, pr, "b10_t", "B10_Front").bodies.item(0)
     b10_front.name = "B10_Front"
 
-    # Back (pin board): at x=b10_x+b10_l-b10_t
     b10_back_pl = sp.off_plane(b10_c, b10_c.yZConstructionPlane,
-                                "b10_x + b10_l - b10_t", "B10_Back_Pl")
+                                "b10_l - b10_t", "B10_Back_Pl")
     sk, pr = sp.sketch_rect_model(b10_c, b10_back_pl,
-        ("b10_x + b10_l - b10_t", "b10_y", "0 in"),
+        ("b10_l - b10_t", "0 in", "0 in"),
         {"y": "b10_w", "z": "b10_h"}, "B10_Back_Sk", ctx.ev)
     b10_back = sp.ext_new(b10_c, pr, "b10_t", "B10_Back").bodies.item(0)
     b10_back.name = "B10_Back"
 
-    # Left (tail board): spans Y×X at z=0, thin in Z, narrower in X
     sk, pr = sp.sketch_rect_model(b10_c, b10_c.xYConstructionPlane,
-        ("b10_x + b10_t", "b10_y", "0 in"),
+        ("b10_t", "0 in", "0 in"),
         {"x": "b10_l - 2 * b10_t", "y": "b10_w"}, "B10_Left_Sk", ctx.ev)
     b10_left = sp.ext_new(b10_c, pr, "b10_t", "B10_Left").bodies.item(0)
     b10_left.name = "B10_Left"
 
-    # Right (tail board): mirror of left across z_mid
     b10_z_mid = sp.off_plane(b10_c, b10_c.xYConstructionPlane,
                               "b10_h / 2", "B10_ZMid")
     b10_right_mir = sp.mirror_body(b10_c, b10_left, b10_z_mid,
@@ -424,80 +415,139 @@ def run(context):
     b10_right = b10_right_mir.bodies.item(0)
     b10_right.name = "B10_Right"
 
-    # Midplanes for dovetail mirrors
     b10_x_mid = sp.off_plane(b10_c, b10_c.yZConstructionPlane,
-                              "b10_x + b10_l / 2", "B10_XMid")
-    b10_y_mid = sp.off_plane(b10_c, b10_c.xYConstructionPlane,
-                              "b10_h / 2", "B10_YMid")
+                              "b10_l / 2", "B10_XMid")
 
-    # Dovetails: joint along Y, thick along X
-    # fl_plane = XY plane at left board (z=0)
-    dt10_result = dovetail.box(b10_c, b10_front, b10_left,
-                               b10_z_mid, b10_x_mid, thick_expr="b10_t",
-                               right=b10_right, back=b10_back,
-                               prefix="dt10", name="B10", ev=ctx.ev,
-                               fl_plane=b10_c.xYConstructionPlane,
-                               front_expr="b10_x",
-                               joint_axis="y", thick_axis="x",
-                               joint_base_expr="b10_y")
+    dovetail.box(b10_c, b10_front, b10_left,
+                 b10_z_mid, b10_x_mid, thick_expr="b10_t",
+                 right=b10_right, back=b10_back,
+                 prefix="dt10", name="B10", ev=ctx.ev,
+                 fl_plane=b10_c.xYConstructionPlane,
+                 front_expr="0 in",
+                 joint_axis="y", thick_axis="x",
+                 joint_base_expr="0 in")
 
     b10_n = b10_c.bRepBodies.count
-    b10_names = [b10_c.bRepBodies.item(i).name for i in range(b10_n)]
-    print(f"  B8 dovetails done (4-corner, Y-axis): {b10_n} bodies -> {b10_names}")
-    assert b10_n == 4, f"Box 8: expected 4, got {b10_n}"
-    print("Box 8: PASS\n")
+    assert b10_n == 4, f"B10: expected 4, got {b10_n}"
+
+    # Translate to grid slot (3, 1) via MoveFeature.
+    xfB10 = adsk.core.Matrix3D.create()
+    xfB10.setCell(0, 3, 3 * gx_cm)
+    xfB10.setCell(1, 3, 1 * gy_cm)
+    mc_b10 = adsk.core.ObjectCollection.create()
+    for i in range(b10_c.bRepBodies.count):
+        mc_b10.add(b10_c.bRepBodies.item(i))
+    mi_b10 = b10_c.features.moveFeatures.createInput2(mc_b10)
+    mi_b10.defineAsFreeMove(xfB10)
+    b10_c.features.moveFeatures.add(mi_b10).name = "B10_Move"
+    print("B10: PASS\n")
 
     # ================================================================
-    # FIXTURE 9: 4-corner — standard box rotated to (1,1,1) direction
-    # Demonstrates dovetails at arbitrary angle via occurrence transform.
-    # Boards are axis-aligned in component space; the occurrence is
-    # rotated so the joint edge (Z in comp) maps to (1,1,1) in root.
+    # B11 @ (0,2): 4-corner rotated to (1,1,1)/√3
     # ================================================================
-    print("=" * 50)
-    print("FIXTURE 9: 4-corner, rotated to (1,1,1), 6x4x5")
-    print("=" * 50)
-
-    params.add("b11_l", VI("6 in"), "in", "Box 9 length")
-    params.add("b11_w", VI("4 in"), "in", "Box 9 width")
-    params.add("b11_h", VI("5 in"), "in", "Box 9 height")
-    params.add("b11_t", VI("0.5 in"), "in", "Box 9 thickness")
-
+    print("=" * 50 + "\nB11 @ (0,2): 4-corner rotated to (1,1,1)\n" + "=" * 50)
+    _add_param("b11_l", "6 in", "in", "B11 length")
+    _add_param("b11_w", "4 in", "in", "B11 width")
+    _add_param("b11_h", "5 in", "in", "B11 height")
+    _add_param("b11_t", "0.5 in", "in", "B11 thickness")
     dovetail.define_params(params, prefix="dt11",
         angle="8 deg", tail_w="0.5 in", tail_count="3",
         joint_h_expr="b11_h", thick_expr="b11_t")
-
     r11 = build_box(root, "B11", "b11_l", "b11_w", "b11_h", "b11_t",
                     "0 in", "dt11", ctx.ev)
-    assert r11["count"] == 4, f"Box 9: expected 4, got {r11['count']}"
+    assert r11["count"] == 4
 
-    # Rotate occurrence so comp-Z → (1,1,1)/√3 in root space
-    # Orthonormal basis: X→(-1,1,0)/√2, Y→(-1,-1,2)/√6, Z→(1,1,1)/√3
-    s3 = 1 / math.sqrt(3)
-    s2 = 1 / math.sqrt(2)
-    s6 = 1 / math.sqrt(6)
+    # Orthonormal basis: X→(-1,1,0)/√2, Y→(-1,-1,2)/√6, Z→(1,1,1)/√3.
+    # Translate to grid slot (0, 2) with z-margin for the rotated body.
+    s3, s2, s6 = 1/math.sqrt(3), 1/math.sqrt(2), 1/math.sqrt(6)
     xf = adsk.core.Matrix3D.create()
-    # Column 0: comp-X maps to (-1/√2, 1/√2, 0)
     xf.setCell(0, 0, -s2); xf.setCell(1, 0, s2); xf.setCell(2, 0, 0)
-    # Column 1: comp-Y maps to (-1/√6, -1/√6, 2/√6)
     xf.setCell(0, 1, -s6); xf.setCell(1, 1, -s6); xf.setCell(2, 1, 2*s6)
-    # Column 2: comp-Z maps to (1/√3, 1/√3, 1/√3)
-    xf.setCell(0, 2, s3); xf.setCell(1, 2, s3); xf.setCell(2, 2, s3)
-    # Translation: position clear of other fixtures (~15in X, 43in Y, 5in Z)
-    xf.setCell(0, 3, 15 * 2.54)
-    xf.setCell(1, 3, 43 * 2.54)
+    xf.setCell(0, 2, s3);  xf.setCell(1, 2, s3);  xf.setCell(2, 2, s3)
+    xf.setCell(0, 3, 0 * gx_cm + 6 * 2.54)   # col 0 + small x-nudge
+    xf.setCell(1, 3, 2 * gy_cm)              # row 2
     xf.setCell(2, 3, 5 * 2.54)
-    r11["occ"].transform = xf
+    mc_b11 = adsk.core.ObjectCollection.create()
+    for i in range(r11["comp"].bRepBodies.count):
+        mc_b11.add(r11["comp"].bRepBodies.item(i))
+    mi_b11 = r11["comp"].features.moveFeatures.createInput2(mc_b11)
+    mi_b11.defineAsFreeMove(xf)
+    r11["comp"].features.moveFeatures.add(mi_b11).name = "B11_Move"
+    print("B11: PASS (rotated)\n")
 
-    print(f"  B9 rotated to (1,1,1) via occurrence transform")
-    print("Box 9: PASS\n")
+    # ================================================================
+    # B12 @ (1,2): 1-corner 8x6x4 — WIDE TAILS / ULTRA-THIN PINS
+    # Same geometry as B1. Only dovetail params change: 3 tails at
+    # 1.2 in each along the 4 in joint height → 3.6 in of tails, and
+    # the 4 pin segments share the remaining 0.4 in → 0.1 in per pin.
+    # Demonstrates the dovetail template's tolerance for lopsided
+    # tail:pin ratios without driving pin width negative.
+    # ================================================================
+    print("=" * 50 + "\nB12 @ (1,2): wide tails / ultra-thin pins\n" + "=" * 50)
+    b12_x, b12_y = slot(1, 2)
+    _add_param("b12_l", "8 in", "in", "B12 length")
+    _add_param("b12_w", "6 in", "in", "B12 width")
+    _add_param("b12_h", "4 in", "in", "B12 height")
+    _add_param("b12_t", "0.5 in", "in", "B12 thickness")
+    dovetail.define_params(params, prefix="dt12",
+        angle="8 deg", tail_w="1.2 in", tail_count="3",
+        joint_h_expr="b12_h", thick_expr="b12_t")
+    r12 = build_box(root, "B12", "b12_l", "b12_w", "b12_h", "b12_t",
+                    b12_x, "dt12", ctx.ev, y_off_expr=b12_y, corners=1)
+    assert r12["count"] == 2, f"B12: expected 2, got {r12['count']}"
+    print("B12: PASS (wide tails, pins ~0.10 in)\n")
+
+    # ================================================================
+    # B13 @ (2,2): 4-corner 6x4x5, rotated 42° about (1,2,1)/√6
+    # A more extreme tilt than B11 — axis is not a coordinate axis or
+    # the body diagonal, angle is non-special, so the box ends up at
+    # a visibly awkward orientation. Exercises the same build_box
+    # pipeline — all dovetail geometry is computed in component space
+    # and the rotation is applied via the occurrence transform.
+    # ================================================================
+    print("=" * 50 + "\nB13 @ (2,2): rotated 42° about (1,2,1)/√6\n" + "=" * 50)
+    _add_param("b13_l", "6 in", "in", "B13 length")
+    _add_param("b13_w", "4 in", "in", "B13 width")
+    _add_param("b13_h", "5 in", "in", "B13 height")
+    _add_param("b13_t", "0.5 in", "in", "B13 thickness")
+    dovetail.define_params(params, prefix="dt13",
+        angle="8 deg", tail_w="0.5 in", tail_count="3",
+        joint_h_expr="b13_h", thick_expr="b13_t")
+    r13 = build_box(root, "B13", "b13_l", "b13_w", "b13_h", "b13_t",
+                    "0 in", "dt13", ctx.ev)
+    assert r13["count"] == 4
+
+    # Axis-angle rotation: 42° about (1,2,1)/√6.
+    ax_raw = (1.0, 2.0, 1.0)
+    ax_m = math.sqrt(sum(c*c for c in ax_raw))
+    ax = tuple(c / ax_m for c in ax_raw)
+    theta = math.radians(42.0)
+    c_t = math.cos(theta); s_t = math.sin(theta); one_c = 1 - c_t
+    ux, uy, uz = ax
+    rot = [
+        [c_t + ux*ux*one_c,    ux*uy*one_c - uz*s_t, ux*uz*one_c + uy*s_t],
+        [uy*ux*one_c + uz*s_t, c_t + uy*uy*one_c,    uy*uz*one_c - ux*s_t],
+        [uz*ux*one_c - uy*s_t, uz*uy*one_c + ux*s_t, c_t + uz*uz*one_c],
+    ]
+    xf2 = adsk.core.Matrix3D.create()
+    for r_ in range(3):
+        for c_ in range(3):
+            xf2.setCell(r_, c_, rot[r_][c_])
+    xf2.setCell(0, 3, 2 * gx_cm + 3 * 2.54)  # col 2 + nudge toward slot centre
+    xf2.setCell(1, 3, 2 * gy_cm + 3 * 2.54)  # row 2
+    xf2.setCell(2, 3, 4 * 2.54)
+    mc_b13 = adsk.core.ObjectCollection.create()
+    for i in range(r13["comp"].bRepBodies.count):
+        mc_b13.add(r13["comp"].bRepBodies.item(i))
+    mi_b13 = r13["comp"].features.moveFeatures.createInput2(mc_b13)
+    mi_b13.defineAsFreeMove(xf2)
+    r13["comp"].features.moveFeatures.add(mi_b13).name = "B13_Move"
+    print("B13: PASS (rotated)\n")
 
     # ================================================================
     # Summary
     # ================================================================
-    print("=" * 50)
-    print("SUMMARY")
-    print("=" * 50)
-
+    print("=" * 50 + "\nSUMMARY\n" + "=" * 50)
     total = 0
     for occ in root.occurrences:
         c = occ.component
@@ -506,10 +556,10 @@ def run(context):
         print(f"  {c.name}: {n} bodies -> {names}")
         total += n
 
-    # B1,B2: 2 bodies each = 4
-    # B3,B4: 3 bodies each = 6
-    # B5-B9: 4 bodies each = 20
-    expected = 4 + 6 + 20  # 30
+    # B1, B2, B12     : 2 bodies each (1-corner)     = 6
+    # B3, B4          : 3 bodies each (2-corner)     = 6
+    # B5, B6, B9, B10, B11, B13: 4 bodies each       = 24
+    expected = 2 * 3 + 3 * 2 + 4 * 6  # = 36
     status = "PASS" if total == expected else "FAIL"
     print(f"\n{status}: expected {expected} bodies, got {total}")
 
