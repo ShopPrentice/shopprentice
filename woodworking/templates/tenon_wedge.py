@@ -128,8 +128,11 @@ def round_tenon(comp, tenon_body, mortise_body,
                         "0.5", tenon_depth_expr, tenon_diam_expr,
                         prefix, name, ev, skip_cut=True)
 
-    _intersect_trim(comp, wedge, tenon_body, f"{name}_Trim")
-    sp.combine(comp, tenon_body, wedge, CUT, True, f"{name}_Cut")
+    # Trim wedge to tenon cylinder + cut wedge slot in tenon. Both
+    # operations route via combine_auto so they work whether
+    # tenon_body shares ``comp`` or lives in another component.
+    _intersect_trim(wedge, tenon_body, f"{name}_Trim")
+    sp.combine_auto(tenon_body, wedge, CUT, True, f"{name}_Cut")
 
     return wedge
 
@@ -380,23 +383,22 @@ def _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
     wedge.name = name
 
     if not skip_cut:
-        sp.combine(comp, tenon_body, wedge, CUT, True, f"{name}_Cut")
+        # CUT wedge slot into tenon — combine_auto routes intra- or
+        # cross-component depending on tenon_body's owning component.
+        sp.combine_auto(tenon_body, wedge, CUT, True, f"{name}_Cut")
 
     return wedge
 
 
-def _intersect_trim(comp, wedge, tenon_body, name):
+def _intersect_trim(wedge, tenon_body, name):
     """Trim a wedge to the tenon body via intersect.
 
     Keeps only the volume of *wedge* that overlaps *tenon_body*.
     The tenon body is unchanged (``isKeepToolBodies=True``).
+
+    Uses ``sp.combine_auto`` so the intersect feature lives in the
+    wedge's component when tenon_body shares it, or at root with
+    assembly proxies when they're in different components.
     """
-    comb_feats = comp.features.combineFeatures
-    tool_coll = adsk.core.ObjectCollection.create()
-    tool_coll.add(tenon_body)
-    comb_input = comb_feats.createInput(wedge, tool_coll)
-    comb_input.operation = \
-        adsk.fusion.FeatureOperations.IntersectFeatureOperation
-    comb_input.isKeepToolBodies = True
-    feat = comb_feats.add(comb_input)
-    feat.name = name
+    INTERSECT = adsk.fusion.FeatureOperations.IntersectFeatureOperation
+    sp.combine_auto(wedge, tenon_body, INTERSECT, True, name)
