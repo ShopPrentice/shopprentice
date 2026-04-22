@@ -124,11 +124,14 @@ def single(comp, plane, center, long_axis, length, end_w, waist_w,
     m2s = sk.modelToSketchSpace
     P3 = adsk.core.Point3D
 
-    sp = [m2s(P3.create(px, cy, pz)) for px, pz in pts_xz]
+    # NB: local variable used to be named ``sp``, which shadowed the
+    # imported ``helpers.sp`` module and silently broke the CUT call
+    # below. Renamed to ``pts`` to un-shadow.
+    pts = [m2s(P3.create(px, cy, pz)) for px, pz in pts_xz]
     lines = sk.sketchCurves.sketchLines
-    prev = lines.addByTwoPoints(sp[0], sp[1])
-    for j in range(2, len(sp)):
-        prev = lines.addByTwoPoints(prev.endSketchPoint, sp[j])
+    prev = lines.addByTwoPoints(pts[0], pts[1])
+    for j in range(2, len(pts)):
+        prev = lines.addByTwoPoints(prev.endSketchPoint, pts[j])
     lines.addByTwoPoints(prev.endSketchPoint,
                           sk.sketchCurves.sketchLines.item(0).startSketchPoint)
 
@@ -144,7 +147,8 @@ def single(comp, plane, center, long_axis, length, end_w, waist_w,
     bt_body.name = name
 
     if cut and slab_body:
-        sp.combine(comp, slab_body, [bt_body], CUT, True, f"{name}_Cut")
+        # combine_auto routes intra- or cross-component automatically.
+        sp.combine_auto(slab_body, [bt_body], CUT, True, f"{name}_Cut")
 
     sk.isVisible = False
     return bt_body
