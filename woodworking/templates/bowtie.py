@@ -1,28 +1,43 @@
 """Bowtie (butterfly key) inlay template.
 
-Creates decorative bowtie/butterfly key inlays that span cracks in live edge
-slabs. The bowtie is an hourglass-shaped body that CUTs into the slab surface,
-creating a pocket for a contrasting wood inlay.
+Creates decorative bowtie/butterfly key inlays that span cracks or
+edge-glue joints. The bowtie is an hourglass-shaped body that CUTs
+into the target surface, creating a pocket for a contrasting wood
+inlay.
 
-Orientation rule: bowties are always perpendicular to the crack direction.
-Since cracks run parallel to the wood fiber, the bowtie's long axis must
-cross the grain. On a slab with fiber in X, bowties are vertical (long_axis="z").
+Orientation rule: bowties are always perpendicular to the crack /
+joint direction. The long axis crosses the crack, the waist sits on
+the crack line. The bowtie lies FLAT on the visible surface and
+extrudes (as a CUT) into the wood.
+
+The template is orientation-agnostic — specify both in-plane axes
+via ``long_axis`` (the hourglass's long dimension) and ``short_axis``
+(the waist direction). The sketch plane must contain both axes; the
+extrude is in the plane's normal direction.
 
 Usage:
     from woodworking.templates import bowtie
 
-    # Single bowtie at a specific position
-    bowtie.single(comp, plane, center=("12 in", "y0", "20 in"),
-                  long_axis="z", length="bt_len", end_w="bt_end_w",
+    # Nakashima-style headboard — vertical slab, crack running in X,
+    # bowtie long axis in Z (vertical), extruding in -Y into the slab
+    bowtie.single(comp, slab.xZConstructionPlane,
+                  center=("mid_x", "0 in", "mid_z"),
+                  long_axis="z", short_axis="x",
+                  length="bt_len", end_w="bt_end_w",
                   waist_w="bt_waist_w", depth="bt_depth",
                   slab_body=slab, name="BT_1", ev=ev)
 
-    # Row of bowties along a crack line
-    bowtie.row(comp, plane, crack_axis="x", crack_center=("mid_x", "y0", "mid_z"),
-               count=3, spacing="bt_spacing",
-               long_axis="z", length="bt_len", end_w="bt_end_w",
-               waist_w="bt_waist_w", depth="bt_depth",
-               slab_body=slab, name="BT", ev=ev)
+    # Horizontal tabletop, crack along X, bowtie long axis in Y
+    bowtie.single(comp, top_pl,
+                  center=("mid_x", "mid_y", "top_z"),
+                  long_axis="y", short_axis="x",
+                  length=..., end_w=..., waist_w=..., depth=...,
+                  slab_body=top, name="BT_Top", ev=ev)
+
+    # Two boards edge-joined along X — bowtie bridges the joint,
+    # long axis Y (crosses the X joint line)
+    bowtie.single(comp, top_pl, center=("mid_x", "joint_y", "top_z"),
+                  long_axis="y", short_axis="x", ...)
 """
 
 import adsk.core
@@ -52,51 +67,88 @@ METADATA = {
 }
 
 
-def _bowtie_points(cx, cz, half_l, half_ew, half_ww, long_axis):
-    """Compute 6 corners of a bowtie in the XZ plane.
+_UNIT = {
+    "x": (1.0, 0.0, 0.0),
+    "y": (0.0, 1.0, 0.0),
+    "z": (0.0, 0.0, 1.0),
+}
 
-    Returns list of (x, z) tuples for the hourglass shape.
-    long_axis determines whether the bowtie is vertical or horizontal.
+
+def _bowtie_points_3d(center, long_axis, short_axis,
+                       half_l, half_ew, half_ww):
+    """Return 6 model-space Point3Ds for an hourglass bowtie.
+
+    Args:
+        center: (cx, cy, cz) model-space center, cm floats.
+        long_axis: "x", "y", or "z" — model axis aligned with the
+            bowtie's long dimension.
+        short_axis: "x", "y", or "z" — model axis aligned with the
+            bowtie's short (waist) dimension. Must differ from
+            long_axis; together they define the 2D bowtie plane.
+        half_l: half the long length.
+        half_ew: half-width at the wide ends (spread).
+        half_ww: half-width at the waist (narrow middle).
+
+    The 6 corners traverse the hourglass in order:
+        (+L, -S)  wide end A, short-negative side
+        (+L, +S)  wide end A, short-positive side
+        ( 0, +S)  waist on the short-positive side
+        (-L, +S)  wide end B, short-positive side
+        (-L, -S)  wide end B, short-negative side
+        ( 0, -S)  waist on the short-negative side
+    so two lines go straight across each wide end and the waist
+    corners define the hourglass pinch.
     """
-    if long_axis == "z":
-        # Long axis vertical: bowtie tall in Z, narrow in X
-        return [
-            (cx - half_ew, cz + half_l),   # top-left (wide end)
-            (cx + half_ew, cz + half_l),   # top-right (wide end)
-            (cx + half_ww, cz),             # waist right
-            (cx + half_ew, cz - half_l),   # bottom-right (wide end)
-            (cx - half_ew, cz - half_l),   # bottom-left (wide end)
-            (cx - half_ww, cz),             # waist left
-        ]
-    else:  # long_axis == "x"
-        # Long axis horizontal: bowtie wide in X, narrow in Z
-        return [
-            (cx - half_l, cz + half_ew),   # left-top (wide end)
-            (cx - half_l, cz - half_ew),   # left-bottom (wide end)
-            (cx,          cz - half_ww),    # waist bottom
-            (cx + half_l, cz - half_ew),   # right-bottom (wide end)
-            (cx + half_l, cz + half_ew),   # right-top (wide end)
-            (cx,          cz + half_ww),    # waist top
-        ]
+    if long_axis == short_axis:
+        raise ValueError(
+            f"long_axis and short_axis must differ, got {long_axis!r}")
+
+    P3 = adsk.core.Point3D
+    cx, cy, cz = center
+    la = _UNIT[long_axis]
+    sa = _UNIT[short_axis]
+
+    def pt(l, s):
+        return P3.create(cx + la[0] * l + sa[0] * s,
+                         cy + la[1] * l + sa[1] * s,
+                         cz + la[2] * l + sa[2] * s)
+
+    return [
+        pt( half_l, -half_ew),
+        pt( half_l,  half_ew),
+        pt(      0,  half_ww),
+        pt(-half_l,  half_ew),
+        pt(-half_l, -half_ew),
+        pt(      0, -half_ww),
+    ]
 
 
-def single(comp, plane, center, long_axis, length, end_w, waist_w,
-           depth, slab_body, name="BT", ev=None, cut=True):
+def single(comp, plane, center, long_axis, short_axis,
+           length, end_w, waist_w, depth, slab_body,
+           name="BT", ev=None, cut=True):
     """Create a single bowtie inlay on a slab.
 
     Args:
         comp: Component to create features in.
-        plane: Construction plane or BRepFace for the sketch.
-        center: (x_expr, y_expr, z_expr) — model-space center of the bowtie.
-        long_axis: "x" or "z" — direction of the bowtie's long dimension.
+        plane: Construction plane or BRepFace for the sketch. The
+            bowtie sketch lies in this plane and extrudes in its
+            normal direction.
+        center: (x_expr, y_expr, z_expr) — model-space center of the
+            bowtie (on the sketch plane).
+        long_axis: "x", "y", or "z" — model axis aligned with the
+            bowtie's long dimension. Crosses the crack / joint.
+        short_axis: "x", "y", or "z" — model axis aligned with the
+            bowtie's waist dimension. Along the crack / joint. Must
+            differ from long_axis and must lie in ``plane``.
         length: Expression for bowtie length (long dimension).
-        end_w: Expression for width at the wide ends.
+        end_w: Expression for width at the wide ends (short direction).
         waist_w: Expression for width at the narrow waist.
-        depth: Expression for inlay depth (how deep to CUT into slab).
+        depth: Expression for inlay depth (into slab, plane's normal).
         slab_body: The slab body to CUT into (or assembly proxy).
         name: Feature name prefix.
         ev: Parameter evaluator function.
-        cut: If True, CUT the bowtie into the slab. If False, just create the body.
+        cut: If True, CUT the bowtie into the slab. If False, just
+            create the body.
 
     Returns:
         The bowtie body.
@@ -115,19 +167,15 @@ def single(comp, plane, center, long_axis, length, end_w, waist_w,
     half_ew = ev(end_w) / 2
     half_ww = ev(waist_w) / 2
 
-    # Compute 6 corners
-    pts_xz = _bowtie_points(cx, cz, half_l, half_ew, half_ww, long_axis)
+    # 6 corners in model space, oriented by long_axis + short_axis
+    model_pts = _bowtie_points_3d((cx, cy, cz), long_axis, short_axis,
+                                   half_l, half_ew, half_ww)
 
-    # Sketch on the plane
     sk = comp.sketches.add(plane)
     sk.name = f"{name}_Sk"
     m2s = sk.modelToSketchSpace
-    P3 = adsk.core.Point3D
+    pts = [m2s(p) for p in model_pts]
 
-    # NB: local variable used to be named ``sp``, which shadowed the
-    # imported ``helpers.sp`` module and silently broke the CUT call
-    # below. Renamed to ``pts`` to un-shadow.
-    pts = [m2s(P3.create(px, cy, pz)) for px, pz in pts_xz]
     lines = sk.sketchCurves.sketchLines
     prev = lines.addByTwoPoints(pts[0], pts[1])
     for j in range(2, len(pts)):
@@ -155,18 +203,25 @@ def single(comp, plane, center, long_axis, length, end_w, waist_w,
 
 
 def row(comp, plane, crack_axis, crack_center, count, spacing,
-        long_axis, length, end_w, waist_w, depth,
+        long_axis, short_axis, length, end_w, waist_w, depth,
         slab_body, name="BT", ev=None):
-    """Create a row of bowties along a crack line.
+    """Create a row of bowties along a crack / joint line.
 
     Args:
         comp: Component.
         plane: Construction plane for sketches.
-        crack_axis: "x" or "z" — direction the crack runs.
-        crack_center: (x_expr, y_expr, z_expr) — center of the crack line.
+        crack_axis: "x", "y", or "z" — direction the crack/joint runs.
+            Bowties step along this axis. Typically == short_axis
+            (the waist direction runs along the crack).
+        crack_center: (x_expr, y_expr, z_expr) — center of the row on
+            the crack line.
         count: Number of bowties (int or expression string).
-        spacing: Expression for center-to-center spacing along crack_axis.
-        long_axis: "x" or "z" — bowtie orientation (should be perpendicular to crack_axis).
+        spacing: Expression for center-to-center spacing along
+            crack_axis.
+        long_axis: "x", "y", or "z" — bowtie's long dimension (crosses
+            the crack).
+        short_axis: "x", "y", or "z" — bowtie's waist dimension
+            (should be == crack_axis).
         length, end_w, waist_w, depth: Dimension expressions.
         slab_body: Slab body to CUT into.
         name: Name prefix.
@@ -186,18 +241,17 @@ def row(comp, plane, crack_axis, crack_center, count, spacing,
 
     # Crack center
     cc = [ev(c) if isinstance(c, str) else c for c in crack_center]
+    axis_idx = {"x": 0, "y": 1, "z": 2}
+    ax = axis_idx[crack_axis]
 
     bodies = []
     for i in range(n):
-        # Offset from center along crack axis
         offset = (i - (n - 1) / 2) * sp_cm
         center = list(cc)
-        if crack_axis == "x":
-            center[0] += offset
-        else:  # "z"
-            center[2] += offset
+        center[ax] += offset
 
-        bt = single(comp, plane, tuple(center), long_axis,
+        bt = single(comp, plane, tuple(center),
+                     long_axis, short_axis,
                      length, end_w, waist_w, depth,
                      slab_body, f"{name}_{i+1}", ev)
         bodies.append(bt)

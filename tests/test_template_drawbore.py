@@ -90,7 +90,11 @@ def run(context):
         tenon_depth="leg_w + 0.25 in",
         pin_plane=f1.xZConstructionPlane,
         pin_plane_offset="0 in",
-        pin_tenon_pos_expr="leg_w * 2 / 3",
+        # Pin sits just inside the leg from the shoulder. 2× pin_dia
+        # from the shoulder is the classic drawbore rule — close enough
+        # that the pin catches the tenon shoulder for leverage, far
+        # enough not to blow out the edge.
+        pin_tenon_pos_expr="2 * db_pin_dia",
         pin_z_ctr="st_z + st_w / 2",
         pin_through="leg_d",
         stretcher=stretcher,
@@ -136,7 +140,7 @@ def run(context):
         tenon_depth="leg_w + 0.25 in",
         pin_plane=f2_St.xZConstructionPlane,
         pin_plane_offset="0 in",
-        pin_tenon_pos_expr="leg_w * 2 / 3",
+        pin_tenon_pos_expr="2 * db_pin_dia",
         pin_z_ctr="st_z + st_w / 2",
         pin_through="leg_d",
         stretcher=f2_stretcher,

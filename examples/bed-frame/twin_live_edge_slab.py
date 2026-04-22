@@ -196,13 +196,15 @@ def run(context):
     slab_ext = sp.ext_new(hb_c, pr, "slab_thick", "Slab")
     slab = slab_ext.bodies.item(0); slab.name = "Slab"
 
-    # Bowties: perpendicular to crack (fiber in X → bowties vertical in Z)
-    # Using bowtie template for clean reusable code
+    # Bowties: perpendicular to crack (fiber in X → bowties vertical in Z).
+    # Slab face is XZ; long axis Z crosses the crack, short axis X runs
+    # along it.
     bt_bodies = bowtie.row(hb_c, slab_y_pl,
         crack_axis="x",
         crack_center=("mid_x", "slab_y", "slab_z + slab_h / 2"),
         count="n_bowties", spacing="bt_spacing",
-        long_axis="z", length="bt_len", end_w="bt_end_w",
+        long_axis="z", short_axis="x",
+        length="bt_len", end_w="bt_end_w",
         waist_w="bt_waist_w", depth="bt_depth",
         slab_body=slab, name="BT", ev=ev)
 
