@@ -618,22 +618,28 @@ def body_for_root(body, root):
 
     If ``body`` is already in ``root``, returns it unchanged. Otherwise
     walks ``root.allOccurrences`` for the occurrence whose component
-    matches ``body.parentComponent`` and returns a proxy via
+    matches ``body``'s owning component and returns a proxy via
     ``createForAssemblyContext``.
 
+    Accepts either a native body or an existing assembly-context
+    proxy — proxies are unwrapped to their native body first (Fusion
+    rejects ``createForAssemblyContext`` on a body that is already a
+    proxy).
+
     Use when placing a feature at root that must reference bodies living
-    in sub-components — Fusion requires assembly-context proxies in that
-    case.
+    in sub-components.
     """
-    comp = body.parentComponent
+    # Unwrap proxy → native so createForAssemblyContext works.
+    native = (body.nativeObject if body.assemblyContext else body)
+    comp = native.parentComponent
     if comp == root:
-        return body
+        return native
     for i in range(root.allOccurrences.count):
         occ = root.allOccurrences.item(i)
         if occ.component == comp:
-            return body.createForAssemblyContext(occ)
+            return native.createForAssemblyContext(occ)
     raise ValueError(
-        f"No occurrence in root for body '{body.name}' "
+        f"No occurrence in root for body '{native.name}' "
         f"(component '{comp.name}').")
 
 
@@ -657,19 +663,26 @@ def combine(target, tool_bodies, op, keep_tool, name="Comb"):
         name: Feature name.
     """
     tools = tool_bodies if isinstance(tool_bodies, list) else [tool_bodies]
-    tgt_comp = target.parentComponent
+    # Unwrap the target proxy → native. The feature is created in
+    # the native's parent component regardless of what assembly
+    # context the caller happened to pass in.
+    tgt = target.nativeObject if target.assemblyContext else target
+    tgt_comp = tgt.parentComponent
     root = tgt_comp.parentDesign.rootComponent
 
-    # Target is native (already in tgt_comp). For tools, proxy any
-    # that live in a different component via their root occurrence.
+    # For tool bodies: if they live in tgt_comp (same component as
+    # target), use their native directly. Otherwise wrap in a
+    # root-occurrence proxy via body_for_root (which handles the
+    # unwrap-then-rewrap step for already-proxied tools).
     tool_refs = []
     for b in tools:
-        if b.parentComponent == tgt_comp:
-            tool_refs.append(b)
+        native_b = b.nativeObject if b.assemblyContext else b
+        if native_b.parentComponent == tgt_comp:
+            tool_refs.append(native_b)
         else:
             tool_refs.append(body_for_root(b, root))
 
-    return _combine_in(tgt_comp, target, tool_refs, op, keep_tool, name)
+    return _combine_in(tgt_comp, tgt, tool_refs, op, keep_tool, name)
 
 
 def mirror_body(comp, body, plane, name="Mirror"):

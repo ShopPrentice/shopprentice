@@ -1403,6 +1403,235 @@ def run(context):
             fil_bf.name = "Seat_Fil_Bot"
             print("Seat fillet bottom: " + str(bot_edges.count) + " edges")
 
+    # ══════════════════════════════════════════════════════════════
+    # TRIM ALL THROUGH-TENONS
+    # Done after scoops + fillets so the split follows the final
+    # seat surface geometry.  Three sets of joints:
+    #   A) Leg tenons through the seat
+    #   B) Side-stretcher tenons through the legs
+    #   C) Cross-stretcher tenons through the side stretchers
+    # Each follows the Esherick pattern:
+    #   1. SplitBody using the receiving body as tool
+    #   2. Remove fragments on the far side (body_side == 'outside')
+    #   3. Rejoin interior fragments to the main body
+    #   4. CUT mortise in the receiving body
+    #   5. CUT wedge pockets into the receiving body
+    # ══════════════════════════════════════════════════════════════
+    from helpers import sp as _sp_trim
+    CUT_t  = adsk.fusion.FeatureOperations.CutFeatureOperation
+    JOIN_t = adsk.fusion.FeatureOperations.JoinFeatureOperation
+
+    # Re-find Legs component + occurrence (may have been reset)
+    _legs_c = _legs_occ2 = None
+    for _oi in range(root.occurrences.count):
+        _occ = root.occurrences.item(_oi)
+        if _occ.component.name == "Legs":
+            _legs_c = _occ.component
+            _legs_occ2 = _occ
+            break
+
+    # Re-find Seat body + occurrence (after scoops/fillets)
+    _seat_c = _seat_occ = _seat_b = None
+    for _oi in range(root.occurrences.count):
+        _occ = root.occurrences.item(_oi)
+        if _occ.component.name == "Seat":
+            _seat_occ = _occ
+            _seat_c = _occ.component
+            for _bi in range(_seat_c.bRepBodies.count):
+                if _seat_c.bRepBodies.item(_bi).name == "Seat":
+                    _seat_b = _seat_c.bRepBodies.item(_bi)
+            break
+
+    def _fb(c, name):
+        for k in range(c.bRepBodies.count):
+            b = c.bRepBodies.item(k)
+            if b.name == name:
+                return b
+        return None
+
+    def _split_remove_rejoin(comp, comp_occ, body_names, tool_body,
+                              tool_occ, direction, label):
+        """Split bodies at tool surface, remove far-side, rejoin interior."""
+        tool_proxy = tool_body.createForAssemblyContext(tool_occ)
+
+        # 1. Split
+        for n in body_names:
+            for bi in range(comp.bRepBodies.count):
+                b = comp.bRepBodies.item(bi)
+                if b.name == n or b.name.startswith(n + " ("):
+                    bp = b.createForAssemblyContext(comp_occ)
+                    try:
+                        si = root.features.splitBodyFeatures.createInput(
+                            bp, tool_proxy, True)
+                        root.features.splitBodyFeatures.add(si)
+                    except Exception:
+                        pass
+
+        # 2. Remove fragments on the far side
+        removed = 0
+        for bi in range(comp.bRepBodies.count - 1, -1, -1):
+            b = comp.bRepBodies.item(bi)
+            matches = any(b.name == n or b.name.startswith(n + " (")
+                          for n in body_names)
+            if not matches:
+                continue
+            if _sp_trim.body_side(b, tool_body, direction) == 'outside':
+                try:
+                    root.features.removeFeatures.add(
+                        b.createForAssemblyContext(comp_occ))
+                    removed += 1
+                except Exception:
+                    pass
+
+        # 3. Rejoin fragments per name group
+        for n in body_names:
+            main = None; frags = []; main_vol = 0
+            for bi in range(comp.bRepBodies.count):
+                b = comp.bRepBodies.item(bi)
+                if b.name == n or b.name.startswith(n + " ("):
+                    if b.volume > main_vol:
+                        if main:
+                            frags.append(main)
+                        main = b; main_vol = b.volume
+                    else:
+                        frags.append(b)
+            if main is not None:
+                main.name = n
+                if frags:
+                    mp = main.createForAssemblyContext(comp_occ)
+                    for frag in frags:
+                        try:
+                            _sp_trim.combine(
+                                mp, frag.createForAssemblyContext(comp_occ),
+                                JOIN_t, False, f"{n}_Rejoin")
+                        except Exception:
+                            pass
+        print(f"  {label}: split+trim done, {removed} tips removed")
+
+    if _legs_c and _seat_b:
+        # ── A) Leg tenons through seat ──────────────────────────
+        _split_remove_rejoin(
+            _legs_c, _legs_occ2,
+            ["Leg_FL", "Leg_FR", "Leg_BL", "Leg_BR",
+             "TW_FL", "TW_FR", "TW_BL", "TW_BR"],
+            _seat_b, _seat_occ, (0, 0, 1),
+            "Legs → Seat")
+
+        # CUT seat mortises
+        _seat_proxy = _seat_b.createForAssemblyContext(_seat_occ)
+        for n in ["Leg_FL", "Leg_FR", "Leg_BL", "Leg_BR"]:
+            b = _fb(_legs_c, n)
+            if b:
+                try:
+                    _sp_trim.combine(
+                        _seat_proxy, b.createForAssemblyContext(_legs_occ2),
+                        CUT_t, True, f"{n}_Mortise")
+                except Exception:
+                    pass
+
+        # CUT wedge pockets into seat
+        for n in ["TW_FL", "TW_FR", "TW_BL", "TW_BR"]:
+            b = _fb(_legs_c, n)
+            if b:
+                try:
+                    _sp_trim.combine(
+                        _seat_proxy, b.createForAssemblyContext(_legs_occ2),
+                        CUT_t, True, f"{n}_Mortise")
+                except Exception:
+                    pass
+        print("  Seat mortises + wedge pockets cut")
+
+        # ── B) Side-stretcher tenons through legs ───────────────
+        # Each side stretcher connects FL↔BL (left) and FR↔BR (right).
+        _str_pairs = [
+            ("Str_Left",  "Leg_FL", "Leg_BL",
+             ["TW_SL_FL", "TW_SL_BL"]),
+            ("Str_Right", "Leg_FR", "Leg_BR",
+             ["TW_SR_0", "TW_SR_1"]),
+        ]
+        for sname, leg_a_name, leg_b_name, sw_names in _str_pairs:
+            sb = _fb(_legs_c, sname)
+            if not sb:
+                continue
+            s_com = sb.physicalProperties.centerOfMass
+
+            for leg_name in [leg_a_name, leg_b_name]:
+                lb = _fb(_legs_c, leg_name)
+                if not lb:
+                    continue
+                l_com = lb.physicalProperties.centerOfMass
+                tdir = (l_com.x - s_com.x, l_com.y - s_com.y, 0)
+
+                names = [sname] + sw_names
+                _split_remove_rejoin(
+                    _legs_c, _legs_occ2, names,
+                    lb, _legs_occ2, tdir,
+                    f"{sname} → {leg_name}")
+
+            # CUT leg mortises with trimmed stretcher
+            sb = _fb(_legs_c, sname)
+            if sb:
+                for ln in [leg_a_name, leg_b_name]:
+                    lb = _fb(_legs_c, ln)
+                    if lb:
+                        try:
+                            _sp_trim.combine(lb, sb, CUT_t, True,
+                                             f"{sname}_{ln}_Mort")
+                        except Exception:
+                            pass
+                # CUT wedge pockets into legs
+                for wn in sw_names:
+                    wb = _fb(_legs_c, wn)
+                    if not wb:
+                        continue
+                    for ln in [leg_a_name, leg_b_name]:
+                        lb = _fb(_legs_c, ln)
+                        if lb:
+                            try:
+                                _sp_trim.combine(lb, wb, CUT_t, True,
+                                                 f"{wn}_{ln}_Mort")
+                            except Exception:
+                                pass
+
+        # ── C) Cross-stretcher tenons through side stretchers ───
+        _cross = _fb(_legs_c, "Str_Cross")
+        if _cross:
+            _sl = _fb(_legs_c, "Str_Left")
+            _sr = _fb(_legs_c, "Str_Right")
+            c_com = _cross.physicalProperties.centerOfMass
+            for side_str, cs_wn in [(_sl, "TW_SC_L"), (_sr, "TW_SC_R")]:
+                if not side_str:
+                    continue
+                ss_com = side_str.physicalProperties.centerOfMass
+                tdir = (ss_com.x - c_com.x, ss_com.y - c_com.y, 0)
+                names = ["Str_Cross", cs_wn]
+                _split_remove_rejoin(
+                    _legs_c, _legs_occ2, names,
+                    side_str, _legs_occ2, tdir,
+                    f"Str_Cross → {side_str.name}")
+
+            _cross = _fb(_legs_c, "Str_Cross")
+            if _cross:
+                for side_str in [_sl, _sr]:
+                    if side_str:
+                        try:
+                            _sp_trim.combine(side_str, _cross, CUT_t, True,
+                                             f"SC_{side_str.name}_Mort")
+                        except Exception:
+                            pass
+                for cs_wn in ["TW_SC_L", "TW_SC_R"]:
+                    wb = _fb(_legs_c, cs_wn)
+                    if wb:
+                        for side_str in [_sl, _sr]:
+                            if side_str:
+                                try:
+                                    _sp_trim.combine(side_str, wb, CUT_t,
+                                                     True, f"{cs_wn}_Mort")
+                                except Exception:
+                                    pass
+
+    print("All through-tenons trimmed, mortises + wedge pockets cut")
+
     # ── HIDE CONSTRUCTION ─────────────────────────────────────────
     def _hide_construction(c):
         for si in range(c.sketches.count):
