@@ -210,12 +210,16 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
     all_pins = [b for b in _all_bodies(comp) if "Pin" in b.name
                 and name in b.name]
 
+    # JOIN tenons into stretcher; CUT pin holes into stretcher.
+    # combine_auto routes intra-comp when stretcher shares ``comp``
+    # with the tenon/pin bodies (typical), or to root with assembly
+    # proxies when ``stretcher`` lives in a different component.
     if all_tenons:
-        sp.combine(comp, stretcher, all_tenons, JOIN, False, f"{name}_Join")
+        sp.combine_auto(stretcher, all_tenons, JOIN, False, f"{name}_Join")
         result["join"] = True
 
     if all_pins:
-        sp.combine(comp, stretcher, all_pins, CUT, True, f"{name}_PinCut")
+        sp.combine_auto(stretcher, all_pins, CUT, True, f"{name}_PinCut")
         result["pin_cut"] = True
 
     return result
