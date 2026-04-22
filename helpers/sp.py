@@ -607,6 +607,66 @@ def combine(comp, target, tool_bodies, op, keep_tool, name="Comb"):
     return f
 
 
+def body_for_root(body, root):
+    """Return a body usable by a root-level feature.
+
+    If ``body`` is already in ``root``, returns it unchanged. Otherwise
+    walks ``root.allOccurrences`` for the occurrence whose component
+    matches ``body.parentComponent`` and returns a proxy via
+    ``createForAssemblyContext``.
+
+    Use when placing a feature at root that must reference bodies living
+    in sub-components — Fusion requires assembly-context proxies in that
+    case.
+    """
+    comp = body.parentComponent
+    if comp == root:
+        return body
+    for i in range(root.allOccurrences.count):
+        occ = root.allOccurrences.item(i)
+        if occ.component == comp:
+            return body.createForAssemblyContext(occ)
+    raise ValueError(
+        f"No occurrence in root for body '{body.name}' "
+        f"(component '{comp.name}').")
+
+
+def combine_auto(target, tool_bodies, op, keep_tool, name="Comb"):
+    """Combine that auto-routes intra-component vs cross-component.
+
+    Determines where the combine feature should live based on the
+    components of ``target`` and every tool body:
+
+    * If all bodies share one component, the combine is created in that
+      component with direct body references.
+    * Otherwise, the combine is created at root and each body is
+      wrapped via ``body_for_root`` / ``createForAssemblyContext``.
+
+    Use this in joinery templates instead of ``combine(comp, ...)`` when
+    the caller might pass bodies from different components (mortise in
+    leg, tenon in rail, wedge in slab). A hard-coded ``comp`` argument
+    silently fails when bodies span components.
+
+    Args:
+        target: Target BRepBody.
+        tool_bodies: Single BRepBody or list of BRepBody.
+        op: FeatureOperations enum (CutFeatureOperation / JoinFeatureOperation).
+        keep_tool: Whether to keep tool bodies after the operation.
+        name: Feature name.
+    """
+    tools = tool_bodies if isinstance(tool_bodies, list) else [tool_bodies]
+    tgt_comp = target.parentComponent
+    same = all(b.parentComponent == tgt_comp for b in tools)
+
+    if same:
+        return combine(tgt_comp, target, tool_bodies, op, keep_tool, name)
+
+    root = tgt_comp.parentDesign.rootComponent
+    tgt_ref = body_for_root(target, root)
+    tool_refs = [body_for_root(b, root) for b in tools]
+    return combine(root, tgt_ref, tool_refs, op, keep_tool, name)
+
+
 def mirror_body(comp, body, plane, name="Mirror"):
     """Mirror a single body across a plane.
 
