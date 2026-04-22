@@ -83,43 +83,46 @@ def run(context):
     # ═══════════════════════════════════════════════════════
     # F1: Horizontal — apron pegged into leg side
     # ═══════════════════════════════════════════════════════
+    # Layout: apron X=[0, ap_l], leg X=[ap_l, ap_l+leg_w].
+    # Shoulder at X=ap_l. Tenon extrudes +X into leg.
+    # All positive coordinates (Fusion's evaluateExpression can
+    # mishandle leading minus on parameter names like "-ap_l").
     f1 = make_comp_at(root, "DB_Horizontal").component
 
-    # Leg
+    # Leg (offset by ap_l so apron fits at origin side)
     _, pr = sp.sketch_rect_model(f1, f1.xYConstructionPlane,
-        ("0 in", "0 in", "0 in"),
+        ("ap_l", "0 in", "0 in"),
         {"x": "leg_w", "y": "leg_d"}, "f1_Leg_Sk", ctx.ev)
     leg = sp.ext_new(f1, pr, "leg_h", "f1_Leg").bodies.item(0)
     leg.name = "f1_Leg"
 
-    # Apron sits against the leg's -X face (shoulder at X=0), centered
-    # in Y on the leg, at Z = ap_z.
+    # Apron from X=0 to X=ap_l, shoulder touching leg at X=ap_l
     ap_pl = sp.off_plane(f1, f1.xZConstructionPlane,
                           "(leg_d - ap_t) / 2", "f1_Ap_Pl")
     _, pr = sp.sketch_rect_model(f1, ap_pl,
-        ("-ap_l", "(leg_d - ap_t) / 2", "ap_z"),
+        ("0 in", "(leg_d - ap_t) / 2", "ap_z"),
         {"x": "ap_l", "z": "ap_w"}, "f1_Ap_Sk", ctx.ev)
     apron = sp.ext_new(f1, pr, "ap_t", "f1_Ap").bodies.item(0)
     apron.name = "f1_Apron"
 
-    # Through tenon extrudes +X into the leg; pin extrudes +Y through
-    # the leg and across the tenon's Y-thickness.
+    # Tenon plane at X=ap_l (shoulder), extrudes +X into leg.
+    # Pin plane xZ at Y=0, pins traverse leg_d in +Y.
     db.through(
         comp=f1,
-        tenon_plane=f1.yZConstructionPlane, tenon_plane_offset="0 in",
-        tenon_origin=("0 in", "(leg_d - db_tt) / 2",
+        tenon_plane=f1.yZConstructionPlane,
+        tenon_plane_offset="ap_l",
+        tenon_origin=("ap_l", "(leg_d - db_tt) / 2",
                       "ap_z + (ap_w - db_tw) / 2"),
         tenon_size={"y": "db_tt", "z": "db_tw"},
         tenon_depth="leg_w + 0.25 in",
         pin_plane=f1.xZConstructionPlane,
-        pin_plane_offset="0 in",                   # pin enters at Y=0
-        pin_tenon_pos_expr="2 * db_pin_dia",       # near the shoulder
+        pin_plane_offset="0 in",
+        pin_tenon_pos_expr="ap_l + 2 * db_pin_dia",
         pin_z_ctr="ap_z + ap_w / 2",
         pin_through="leg_d",
         stretcher=apron,
         name="f1_DB", ev=ctx.ev)
 
-    # Caller CUTs the leg mortise with the pinned apron body.
     sp.combine(leg, [apron], CUT, True, "f1_Leg_Cut")
 
     f1_count = f1.bRepBodies.count
@@ -194,8 +197,9 @@ def run(context):
     f3_Leg = make_comp_at(root, "DB_Cross_Leg", f3_x).component
     f3_Ap  = make_comp_at(root, "DB_Cross_Apron", f3_x).component
 
+    # Leg offset by ap_l (same layout as F1)
     _, pr = sp.sketch_rect_model(f3_Leg, f3_Leg.xYConstructionPlane,
-        ("0 in", "0 in", "0 in"),
+        ("ap_l", "0 in", "0 in"),
         {"x": "leg_w", "y": "leg_d"}, "f3_Leg_Sk", ctx.ev)
     f3_leg = sp.ext_new(f3_Leg, pr, "leg_h", "f3_Leg").bodies.item(0)
     f3_leg.name = "f3_Leg"
@@ -203,21 +207,22 @@ def run(context):
     f3_ap_pl = sp.off_plane(f3_Ap, f3_Ap.xZConstructionPlane,
                              "(leg_d - ap_t) / 2", "f3_Ap_Pl")
     _, pr = sp.sketch_rect_model(f3_Ap, f3_ap_pl,
-        ("-ap_l", "(leg_d - ap_t) / 2", "ap_z"),
+        ("0 in", "(leg_d - ap_t) / 2", "ap_z"),
         {"x": "ap_l", "z": "ap_w"}, "f3_Ap_Sk", ctx.ev)
     f3_ap = sp.ext_new(f3_Ap, pr, "ap_t", "f3_Ap").bodies.item(0)
     f3_ap.name = "f3_Apron"
 
     db.through(
         comp=f3_Ap,
-        tenon_plane=f3_Ap.yZConstructionPlane, tenon_plane_offset="0 in",
-        tenon_origin=("0 in", "(leg_d - db_tt) / 2",
+        tenon_plane=f3_Ap.yZConstructionPlane,
+        tenon_plane_offset="ap_l",
+        tenon_origin=("ap_l", "(leg_d - db_tt) / 2",
                       "ap_z + (ap_w - db_tw) / 2"),
         tenon_size={"y": "db_tt", "z": "db_tw"},
         tenon_depth="leg_w + 0.25 in",
         pin_plane=f3_Ap.xZConstructionPlane,
         pin_plane_offset="0 in",
-        pin_tenon_pos_expr="2 * db_pin_dia",
+        pin_tenon_pos_expr="ap_l + 2 * db_pin_dia",
         pin_z_ctr="ap_z + ap_w / 2",
         pin_through="leg_d",
         stretcher=f3_ap,
