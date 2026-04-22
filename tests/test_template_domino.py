@@ -1,12 +1,15 @@
 """Test fixture for domino joint template.
 
-Tests 3 real-world use cases:
-  F1 M&T_Replacement: Seat + 4 posts using four_corners. 9 bodies.
+Tests 4 real-world use cases:
+  F1 M&T_Replacement: Seat + 4 posts using four_corners. 9 bodies in 1 comp.
   F2 Edge_Joint: Two boards edge-joined with grid dominos,
-                 wide face parallel to board surface. 5 bodies.
-  F3 Case_Joint: Box side-to-back connection (like bookshelf). 4 bodies.
+                 wide face parallel to board surface. 5 bodies in 1 comp.
+  F3 Case_Joint: Box side-to-back connection (like bookshelf). 4 bodies in 1 comp.
+  F4 Cross_Edge_Joint: Same as F2 but Left and Right live in separate
+                       root components. Exercises grid()'s cross-component
+                       routing via combine_auto. 5 bodies across 3 comps.
 
-Total: 9 + 5 + 4 = 18 bodies.
+Total: 9 + 5 + 4 + 5 = 23 bodies.
 """
 import adsk.core
 import adsk.fusion
@@ -201,6 +204,57 @@ def run(context):
     assert f3.bRepBodies.count == 4
     print("Case_Joint: 4 bodies — PASS")
 
+    # ═══════════════════════════════════════════════════════════════════
+    # F4: Cross-component Edge Joint — like F2 but Left board, Right
+    #     board, and the grid voids live in SEPARATE root components.
+    #     Exercises grid()'s cross-component CUTs via combine_auto.
+    # ═══════════════════════════════════════════════════════════════════
+    params.add("f4_x", VI("f3_x + case_w + 3 in"), "in", "F4 X offset")
+    f4_x = ctx.ev("f4_x")
+
+    # Three sibling components under root, each at the same world X so
+    # the boards abut along Y at a common interface (ej_board_d).
+    f4_L = make_comp_at(root, "F4_Left", f4_x).component
+    f4_R = make_comp_at(root, "F4_Right", f4_x).component
+    f4_V = make_comp_at(root, "F4_Voids", f4_x).component
+
+    # Left board in F4_Left
+    _, pr = sp.sketch_rect_model(f4_L, f4_L.xYConstructionPlane,
+        ("0 in", "0 in", "0 in"),
+        {"x": "ej_board_w", "y": "ej_board_d"}, "f4_Left_Sk", ctx.ev)
+    f4_left = sp.ext_new(f4_L, pr, "ej_board_t", "f4_Left").bodies.item(0)
+    f4_left.name = "f4_Left"
+
+    # Right board in F4_Right (adjacent along Y)
+    _, pr = sp.sketch_rect_model(f4_R, f4_R.xYConstructionPlane,
+        ("0 in", "ej_board_d", "0 in"),
+        {"x": "ej_board_w", "y": "ej_board_d"}, "f4_Right_Sk", ctx.ev)
+    f4_right = sp.ext_new(f4_R, pr, "ej_board_t", "f4_Right").bodies.item(0)
+    f4_right.name = "f4_Right"
+
+    # Voids live in F4_Voids — a third sibling component. The grid()
+    # call uses comp=f4_V for sketch+extrude+pattern. CUTs into
+    # f4_left (F4_Left comp) and f4_right (F4_Right comp) must route
+    # to root via combine_auto.
+    f4_joint_pl = sp.off_plane(f4_V, f4_V.xZConstructionPlane,
+                                "ej_board_d", "f4_Joint_Pl")
+    domino.grid(f4_V, f4_joint_pl,
+        start=("3 in", "ej_board_d", "ej_board_t / 2"),
+        step_axis="x", step_expr="dm2_sp",
+        count_expr="dm2_count",
+        long_axis="x", long_expr="dm2_w",
+        short_expr="dm2_t", depth_expr="dm2_d",
+        body_a=f4_left, body_b=f4_right,
+        name="f4_DM", ev=ctx.ev)
+
+    assert f4_L.bRepBodies.count == 1, \
+        f"F4_Left expected 1 body, got {f4_L.bRepBodies.count}"
+    assert f4_R.bRepBodies.count == 1, \
+        f"F4_Right expected 1 body, got {f4_R.bRepBodies.count}"
+    assert f4_V.bRepBodies.count == 3, \
+        f"F4_Voids expected 3 bodies, got {f4_V.bRepBodies.count}"
+    print("Cross_Edge_Joint: 5 bodies across 3 comps — PASS")
+
     # ── Summary ──
     total = 0
     for occ in root.occurrences:
@@ -209,7 +263,7 @@ def run(context):
         names = [c.bRepBodies.item(i).name for i in range(n)]
         print(f"  {c.name}: {n} bodies -> {names}")
         total += n
-    print(f"\n{'PASS' if total == 18 else 'FAIL'}: {total}/18 bodies")
+    print(f"\n{'PASS' if total == 23 else 'FAIL'}: {total}/23 bodies")
 
     for occ in root.occurrences:
         c = occ.component
