@@ -17,7 +17,11 @@ Usage:
         tenon_w="ls_w", tenon_thick="1.5 in",
         pin_dia="0.375 in", pin_sp="2 in")
 
-    # Through drawbore (stretcher into leg)
+    # Through drawbore (stretcher into leg).
+    # Tenon extrudes in +X (plane normal of yZ). Pins must extrude in
+    # a perpendicular axis — here in Y, so pin_plane = xZ (normal Y).
+    # pin_plane_offset places the sketch plane at the near cheek; the
+    # pin then runs across the tenon and out the far side.
     result = db.through(
         comp=ls_c,
         tenon_plane=root.yZConstructionPlane,
@@ -27,7 +31,8 @@ Usage:
         tenon_size={"y": "db_tt", "z": "db_tw"},
         tenon_depth="leg_w + ls_proud",
         pin_plane=root.xZConstructionPlane,
-        pin_x_expr="leg_setback + 2 * leg_w / 3",
+        pin_plane_offset="0 in",                     # near cheek at Y=0
+        pin_tenon_pos_expr="leg_setback + 2 * leg_w / 3",
         pin_z_ctr="ls_z + ls_w / 2",
         pin_through="leg_d",
         stretcher=ls_front,
@@ -96,15 +101,17 @@ def define_params(params, prefix="db",
 
 
 def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
-            tenon_depth, pin_plane, pin_x_expr, pin_z_ctr, pin_through,
-            stretcher, name="DB", ev=None, mirror_plane=None,
+            tenon_depth, pin_plane, pin_plane_offset, pin_tenon_pos_expr,
+            pin_z_ctr, pin_through, stretcher, name="DB", ev=None,
+            mirror_plane=None,
             pin_dia_expr="db_pin_dia", pin_sp_expr="db_pin_sp"):
     """Create a through drawbore M&T joint.
 
     The tenon construction plane is at the outer end (proud face).
     Default extrude direction goes inward toward the stretcher.
 
-    Pin construction plane is perpendicular to the tenon direction.
+    Pin construction plane is perpendicular to the tenon direction so
+    pins cross the tenon side-faces (not run parallel to the tenon).
     Pins at 1/3 of tenon depth from the shoulder, 2 per tenon.
 
     Args:
@@ -114,10 +121,21 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
         tenon_origin: (x, y, z) model-space origin for tenon rectangle.
         tenon_size: {axis: expr, axis: expr} for tenon cross-section.
         tenon_depth: Extrude depth expression (e.g., "leg_w + ls_proud").
-        pin_plane: Base construction plane for pins (perpendicular to tenon).
-        pin_x_expr: Expression for pin center along tenon axis (1/3 from shoulder).
-        pin_z_ctr: Expression for pin Z center (stretcher midpoint).
-        pin_through: Extrude depth for pin (e.g., "leg_d").
+        pin_plane: Base construction plane for pins — must be
+            perpendicular to the tenon extrude direction. If tenon
+            extrudes in X, pass xZ or xY plane. The pin's extrude
+            direction is the pin_plane's normal.
+        pin_plane_offset: Expression for pin_plane's offset toward the
+            pin-entry face (in pin_plane's normal direction). Pick a
+            value so the offset plane sits just outside the near cheek;
+            the pin then extrudes through the tenon and out the far
+            cheek for ``pin_through`` distance.
+        pin_tenon_pos_expr: Expression for pin-center position along
+            the tenon axis (e.g., "leg_w * 2 / 3" — 1/3 from shoulder).
+        pin_z_ctr: Expression for pin center along the tenon's second
+            in-plane axis (typically Z, the stretcher mid-height).
+        pin_through: Extrude depth for pin (e.g., "leg_d") — long
+            enough to fully cross the tenon thickness.
         stretcher: Stretcher body to JOIN tenon into.
         name: Feature name prefix.
         ev: Evaluator function.
@@ -146,8 +164,9 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
     tenon_body.name = f"{name}_Tenon"
     result["tenon_ext"] = tenon_ext
 
-    # 2. Pins (on perpendicular plane)
-    p_pl = sp.off_plane(comp, pin_plane, pin_x_expr, f"{name}Pin_Pl")
+    # 2. Pins (on perpendicular plane, offset to the near cheek so the
+    # extrude direction crosses the tenon rather than running along it)
+    p_pl = sp.off_plane(comp, pin_plane, pin_plane_offset, f"{name}Pin_Pl")
     pin_sk = comp.sketches.add(p_pl)
     pin_sk.name = f"{name}Pin_Sk"
     m = pin_sk.modelToSketchSpace
@@ -155,13 +174,15 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
     _pin_r = ev(pin_dia_expr) / 2
     _pin_half_sp = ev(pin_sp_expr) / 2
     _zc = ev(pin_z_ctr)
-    _px = ev(pin_x_expr)
+    _px = ev(pin_tenon_pos_expr)
+    _ty = (ev(tenon_origin[1]) if isinstance(tenon_origin[1], str)
+           else tenon_origin[1])
 
-    # Place 2 circles using m2s for correct axis mapping
+    # Place 2 circles using m2s for correct axis mapping. The circles'
+    # model-space centers lie along the tenon axis at pin_tenon_pos_expr,
+    # offset in the pin_z_ctr axis by ±pin_sp/2.
     for z_val in [_zc - _pin_half_sp, _zc + _pin_half_sp]:
-        # Use a representative model point on the pin plane
-        ctr = m(P.create(_px, ev(tenon_origin[1]) if isinstance(tenon_origin[1], str)
-                         else tenon_origin[1], z_val))
+        ctr = m(P.create(_px, _ty, z_val))
         pin_sk.sketchCurves.sketchCircles.addByCenterRadius(
             P.create(ctr.x, ctr.y, 0), _pin_r)
 
@@ -180,7 +201,7 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
     # Position from origin + spacing between pins
     d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
         H, P.create(g0.x / 2, g0.y - 1, 0)
-    ).parameter.expression = pin_x_expr
+    ).parameter.expression = pin_tenon_pos_expr
     d.addDistanceDimension(pin_sk.originPoint, c0.centerSketchPoint,
         V, P.create(g0.x - 1, g0.y / 2, 0)
     ).parameter.expression = f"{pin_z_ctr} - {pin_sp_expr} / 2"
@@ -226,8 +247,9 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
 
 
 def blind(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
-          tenon_depth, pin_plane, pin_x_expr, pin_z_ctr, pin_through,
-          stretcher, name="DBB", ev=None, mirror_plane=None,
+          tenon_depth, pin_plane, pin_plane_offset, pin_tenon_pos_expr,
+          pin_z_ctr, pin_through, stretcher, name="DBB", ev=None,
+          mirror_plane=None,
           pin_dia_expr="db_pin_dia", pin_sp_expr="db_pin_sp"):
     """Create a blind drawbore M&T joint.
 
@@ -239,10 +261,10 @@ def blind(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
     """
     # Blind variant uses the same build logic as through
     return through(comp, tenon_plane, tenon_plane_offset, tenon_origin,
-                   tenon_size, tenon_depth, pin_plane, pin_x_expr,
-                   pin_z_ctr, pin_through, stretcher, name=name, ev=ev,
-                   mirror_plane=mirror_plane, pin_dia_expr=pin_dia_expr,
-                   pin_sp_expr=pin_sp_expr)
+                   tenon_size, tenon_depth, pin_plane, pin_plane_offset,
+                   pin_tenon_pos_expr, pin_z_ctr, pin_through, stretcher,
+                   name=name, ev=ev, mirror_plane=mirror_plane,
+                   pin_dia_expr=pin_dia_expr, pin_sp_expr=pin_sp_expr)
 
 
 def _all_bodies(comp):
