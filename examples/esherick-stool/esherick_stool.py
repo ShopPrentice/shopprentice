@@ -434,7 +434,7 @@ def run(context):
             main_proxy = main.createForAssemblyContext(legs_occ)
             for frag in frags:
                 try:
-                    sp.combine(root, main_proxy,
+                    sp.combine(main_proxy,
                                frag.createForAssemblyContext(legs_occ),
                                JOIN, False, f"Leg{i+1}_Rejoin")
                 except: pass
@@ -456,7 +456,7 @@ def run(context):
     # STEP 5: CUT SEAT WITH TRIMMED LEG TENONS (mortise)
     # ══════════════════════════════════════════════════════════════
     for i, lp in enumerate(leg_proxies):
-        sp.combine(root, seat_proxy, lp, CUT, True, f"Leg{i+1}_Mortise")
+        sp.combine(seat_proxy, lp, CUT, True, f"Leg{i+1}_Mortise")
     print("Leg mortises cut with trimmed tenons")
 
     # ══════════════════════════════════════════════════════════════
@@ -664,7 +664,7 @@ def run(context):
     for i in range(3):
         for j in range(i+1, 3):
             try:
-                sp.combine(root, str_proxies[i], str_proxies[j], CUT, True,
+                sp.combine(str_proxies[i], str_proxies[j], CUT, True,
                            f"Str{i}{j}_Fix")
             except: pass
 
@@ -771,7 +771,7 @@ def run(context):
             main_proxy = main.createForAssemblyContext(str_occ)
             for frag in frags:
                 try:
-                    sp.combine(root, main_proxy,
+                    sp.combine(main_proxy,
                                frag.createForAssemblyContext(str_occ),
                                JOIN, False, f"{str_name}_Join")
                 except: pass
@@ -795,9 +795,9 @@ def run(context):
 
     for ci, (a_idx, b_idx, str_name, _) in enumerate(connections):
         sp_body = str_proxies[ci]
-        sp.combine(root, leg_proxies[a_idx], sp_body, CUT, True,
+        sp.combine(leg_proxies[a_idx], sp_body, CUT, True,
                    f"{str_name}_MortA")
-        sp.combine(root, leg_proxies[b_idx], sp_body, CUT, True,
+        sp.combine(leg_proxies[b_idx], sp_body, CUT, True,
                    f"{str_name}_MortB")
     print("Stretcher mortises cut with trimmed tenons")
 
@@ -812,7 +812,7 @@ def run(context):
             if b.name == f"TW_L{i+1}": tw = b; break
         if tw:
             try:
-                sp.combine(root, seat_proxy,
+                sp.combine(seat_proxy,
                            tw.createForAssemblyContext(legs_occ),
                            CUT, True, f"TW_L{i+1}_Mortise")
             except: pass
@@ -828,7 +828,7 @@ def run(context):
             if not tw: continue
             leg_idx = a_idx if ei == 0 else b_idx
             try:
-                sp.combine(root, leg_proxies[leg_idx],
+                sp.combine(leg_proxies[leg_idx],
                            tw.createForAssemblyContext(str_occ),
                            CUT, True, f"{tw_name}_Mortise")
             except: pass

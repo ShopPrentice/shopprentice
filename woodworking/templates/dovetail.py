@@ -359,10 +359,10 @@ def corner(pin_body, tail_body, plane,
                               f"{p}_tail_count", f"{p}_pitch",
                               f"{name}_Pat")
 
-    # Final CUT combine — sp.combine_auto routes intra-component when
+    # Final CUT combine — sp.combine routes intra-component when
     # pin_body and tail_body share a component, or to root with
     # assembly proxies when they live in different components.
-    cut_combine = sp.combine_auto(pin_body, tail_body, CUT, True,
+    cut_combine = sp.combine(pin_body, tail_body, CUT, True,
                                    f"{name}_Cut")
 
     return {
@@ -538,11 +538,11 @@ def box(comp, front, left,
     pat.name = f"{name}_Pat"
 
     # ── CUT pin boards using tail boards as tools ──
-    cut_front = sp.combine(comp, front, tail_boards, CUT, True,
+    cut_front = sp.combine(front, tail_boards, CUT, True,
                            f"{name}_CutFront")
     cut_back = None
     if back is not None:
-        cut_back = sp.combine(comp, back, tail_boards, CUT, True,
+        cut_back = sp.combine(back, tail_boards, CUT, True,
                               f"{name}_CutBack")
 
     return {

@@ -10,7 +10,7 @@ F5  Angled round tenon (15° tilt)       → 3 bodies (leg+tenon, slab, wedge)
 F6  Compound-angle round-in-round      → 3 bodies (leg, stretcher, wedge)
 F7  Cross-component round tenon+wedge  → 3 bodies across 3 comps
     (Seat, Spindle, Tenon each in their own component). Exercises
-    tw.round_tenon()'s intersect-trim + wedge CUT via combine_auto.
+    tw.round_tenon()'s intersect-trim + wedge CUT via combine.
 
 Total: 22 bodies (F1-F6 = 19 bodies in 6 comps, F7 = 3 bodies in 3 comps).
 """
@@ -125,8 +125,8 @@ def run(context):
             slot_span_expr="mt_tt", offset_dim_expr="mt_tw",
             name="F1_TW", ev=ev)
 
-    sp.combine(f1, f1_rail, f1_tenon, JOIN, False, "F1_Join")
-    sp.combine(f1, f1_leg, f1_rail, CUT, True, "F1_Mortise")
+    sp.combine(f1_rail, f1_tenon, JOIN, False, "F1_Join")
+    sp.combine(f1_leg, f1_rail, CUT, True, "F1_Mortise")
 
     assert f1.bRepBodies.count == 4, f"F1: expected 4, got {f1.bRepBodies.count}"
     print(f"F1 Rect through: {f1.bRepBodies.count} bodies ✓")
@@ -171,8 +171,8 @@ def run(context):
                    tenon_axis="z", tenon_depth_expr="seat_t + sp_td",
                    tenon_diam_expr="sp_tn_dia", name="F2_TW", ev=ev)
 
-    sp.combine(f2, f2_spindle, f2_tenon, JOIN, False, "F2_Join")
-    sp.combine(f2, f2_seat, f2_spindle, CUT, True, "F2_Mortise")
+    sp.combine(f2_spindle, f2_tenon, JOIN, False, "F2_Join")
+    sp.combine(f2_seat, f2_spindle, CUT, True, "F2_Mortise")
 
     assert f2.bRepBodies.count == 3, f"F2: expected 3, got {f2.bRepBodies.count}"
     move_comp(f2, 30)
@@ -215,8 +215,8 @@ def run(context):
             slot_span_expr="mt_tt", offset_dim_expr="mt_tw",
             name="F3_TW", ev=ev)
 
-    sp.combine(f3, f3_rail, f3_tenon, JOIN, False, "F3_Join")
-    sp.combine(f3, f3_leg, f3_rail, CUT, True, "F3_Mortise")
+    sp.combine(f3_rail, f3_tenon, JOIN, False, "F3_Join")
+    sp.combine(f3_leg, f3_rail, CUT, True, "F3_Mortise")
 
     assert f3.bRepBodies.count == 4, f"F3: expected 4, got {f3.bRepBodies.count}"
     move_comp(f3, 60)
@@ -276,8 +276,8 @@ def run(context):
                    tenon_axis="y", tenon_depth_expr="rleg_dia + str_td",
                    tenon_diam_expr="str_tn_dia", name="F4_TW", ev=ev)
 
-    sp.combine(f4, f4_str, f4_tenon, JOIN, False, "F4_Join")
-    sp.combine(f4, f4_leg, f4_str, CUT, True, "F4_Mortise")
+    sp.combine(f4_str, f4_tenon, JOIN, False, "F4_Join")
+    sp.combine(f4_leg, f4_str, CUT, True, "F4_Mortise")
 
     assert f4.bRepBodies.count == 3, f"F4: expected 3, got {f4.bRepBodies.count}"
     move_comp(f4, 90)
@@ -353,8 +353,8 @@ def run(context):
                    name="F5_TW", ev=ev)
 
     # JOIN tenon into leg, CUT slab
-    sp.combine(f5, f5_leg, f5_tenon, JOIN, False, "F5_Join")
-    sp.combine(f5, f5_slab, f5_leg, CUT, True, "F5_Mortise")
+    sp.combine(f5_leg, f5_tenon, JOIN, False, "F5_Join")
+    sp.combine(f5_slab, f5_leg, CUT, True, "F5_Mortise")
 
     assert f5.bRepBodies.count == 3, f"F5: expected 3, got {f5.bRepBodies.count}"
     move_comp(f5, 120)
@@ -444,8 +444,8 @@ def run(context):
                    name="F6_TW", ev=ev)
 
     # JOIN tenon into stretcher, CUT leg
-    sp.combine(f6, f6_str, f6_tenon, JOIN, False, "F6_Join")
-    sp.combine(f6, f6_leg, f6_str, CUT, True, "F6_Mortise")
+    sp.combine(f6_str, f6_tenon, JOIN, False, "F6_Join")
+    sp.combine(f6_leg, f6_str, CUT, True, "F6_Mortise")
 
     assert f6.bRepBodies.count == 3, f"F6: expected 3, got {f6.bRepBodies.count}"
     move_comp(f6, 150)
@@ -501,7 +501,7 @@ def run(context):
 
     # round_tenon: tenon_body in F7_Tenon, mortise_body in F7_Seat —
     # different components. Both intersect-trim and wedge CUT must
-    # route through combine_auto to land at root with proxies.
+    # route through combine to land at root with proxies.
     tw.round_tenon(f7_tenon_c,
                    tenon_body=f7_tenon_b, mortise_body=f7_seat_b,
                    tenon_axis="z",
@@ -510,8 +510,8 @@ def run(context):
                    name="F7_TW", ev=ev)
 
     # JOIN tenon into spindle; CUT seat with spindle (both cross-comp)
-    sp.combine_auto(f7_spindle_b, f7_tenon_b, JOIN, False, "F7_Join")
-    sp.combine_auto(f7_seat_b, f7_spindle_b, CUT, True, "F7_Mortise")
+    sp.combine(f7_spindle_b, f7_tenon_b, JOIN, False, "F7_Join")
+    sp.combine(f7_seat_b, f7_spindle_b, CUT, True, "F7_Mortise")
 
     assert f7_seat.bRepBodies.count == 1, \
         f"F7_Seat expected 1 body, got {f7_seat.bRepBodies.count}"

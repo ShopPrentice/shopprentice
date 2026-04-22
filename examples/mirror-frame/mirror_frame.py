@@ -113,10 +113,10 @@ def run(context):
     rab_body = rab_ext.bodies.item(0)
 
     # CUT rabbet into all 4 frame pieces
-    sp.combine(frame_c, bottom, [rab_body], CUT, True, "Rab_Bot")
-    sp.combine(frame_c, top_body, [rab_body], CUT, True, "Rab_Top")
-    sp.combine(frame_c, left, [rab_body], CUT, True, "Rab_Left")
-    sp.combine(frame_c, right, [rab_body], CUT, False, "Rab_Right")  # consumes tool
+    sp.combine(bottom, [rab_body], CUT, True, "Rab_Bot")
+    sp.combine(top_body, [rab_body], CUT, True, "Rab_Top")
+    sp.combine(left, [rab_body], CUT, True, "Rab_Left")
+    sp.combine(right, [rab_body], CUT, False, "Rab_Right")  # consumes tool
 
     print(">>> Rabbets cut into all 4 frame pieces")
 

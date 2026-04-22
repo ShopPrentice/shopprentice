@@ -54,7 +54,7 @@ def run(context):
     f = sp.ext_new_sym(comp, prof, "board_thick / 2", "Rail")  # total = board_thick
     f = sp.ext_op(comp, prof, "groove_depth", CUT, body, "Groove", flip=True)
     pl = sp.off_plane(comp, base_plane, "box_width / 2", "YMid")
-    sp.combine(comp, target, [tool1, tool2], CUT, True, "Mortise")
+    sp.combine(target, [tool1, tool2], CUT, True, "Mortise")
     m = sp.mirror_body(comp, body, mid_plane, "BackMirror")
     m = sp.mirror_bodies(comp, [b1, b2], mid_plane, "Mirror")
     m = sp.mirror_feats(comp, [ext_feat], mid_plane, "RabMirror")
@@ -109,7 +109,7 @@ Returns `{'inside': [...], 'outside': [...], 'opposite': [...]}`. If `direction`
 # After splitting stretchers at leg surface:
 groups = sp.classify_bodies(fragments, leg_body)
 for b in groups['inside']:
-    sp.combine(comp, stretcher, b, JOIN, False)  # tenon interior
+    sp.combine(stretcher, b, JOIN, False)  # tenon interior
 for b in groups['outside']:
     comp.features.removeFeatures.add(b)  # excess tip
 

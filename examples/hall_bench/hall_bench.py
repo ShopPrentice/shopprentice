@@ -333,7 +333,7 @@ def run(context):
     print(f">>> Dominos done: {root.bRepBodies.count} voids in root")
 
     # Seat notches
-    sp.combine(root, seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
+    sp.combine(seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
 
     print(">>> Joinery done")
 

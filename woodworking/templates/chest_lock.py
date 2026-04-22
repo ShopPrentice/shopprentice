@@ -166,7 +166,7 @@ def lock_mortise(comp, body, plane, origin, size_map,
     lock_body.name = f"{name}_Body"
 
     # CUT mortise pocket
-    cut = sp.combine(comp, body, lock_body, CUT, True, f"{name}_Mort")
+    cut = sp.combine(body, lock_body, CUT, True, f"{name}_Mort")
 
     return {"lock_ext": lock_ext, "lock_body": lock_body, "cut": cut}
 
@@ -295,7 +295,7 @@ def strike(comp, body, plane, origin, size_map,
     strike_body = strike_ext.bodies.item(0)
     strike_body.name = f"{name}_Body"
 
-    cut = sp.combine(comp, body, strike_body, CUT, True, f"{name}_Mort")
+    cut = sp.combine(body, strike_body, CUT, True, f"{name}_Mort")
 
     return {"strike_ext": strike_ext, "strike_body": strike_body, "cut": cut}
 

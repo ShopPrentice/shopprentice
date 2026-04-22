@@ -112,8 +112,8 @@ def run(context):
             right = b; break
     right_proxy = right.createForAssemblyContext(case_occ)
 
-    sp.combine(root, left_proxy, [top_proxy, bot_proxy], CUT, True, "DadoLeft")
-    sp.combine(root, right_proxy, [top_proxy, bot_proxy], CUT, True, "DadoRight")
+    sp.combine(left_proxy, [top_proxy, bot_proxy], CUT, True, "DadoLeft")
+    sp.combine(right_proxy, [top_proxy, bot_proxy], CUT, True, "DadoRight")
 
     print(">>> Case: 4 bodies + dados done")
 
@@ -158,8 +158,8 @@ def run(context):
     for i in range(back_c.bRepBodies.count):
         bp = back_c.bRepBodies.item(i); break
     bp_proxy = bp.createForAssemblyContext(back_occ)
-    sp.combine(root, left_proxy, [bp_proxy], CUT, True, "RabLeft")
-    sp.combine(root, right_proxy, [bp_proxy], CUT, True, "RabRight")
+    sp.combine(left_proxy, [bp_proxy], CUT, True, "RabLeft")
+    sp.combine(right_proxy, [bp_proxy], CUT, True, "RabRight")
 
     print(">>> Back panel + rabbets done")
 

@@ -250,7 +250,7 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         bar_body.name = f"{name}_Bar"
 
         # JOIN bar + posts into one handle body
-        sp.combine(comp, post_bodies[0], [post_bodies[1], bar_body],
+        sp.combine(post_bodies[0], [post_bodies[1], bar_body],
                    JOIN, False, f"{name}_HandleJoin")
 
     return {

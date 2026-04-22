@@ -204,10 +204,10 @@ def install(comp, post_body, rail_body,
     # CUT recess pockets
     # ================================================================
     sp_proxy = strike_plate.createForAssemblyContext(strike_occ)
-    sp.combine(root, post_body, [sp_proxy], CUT, True, f"{name}_StrikeRecess")
+    sp.combine(post_body, [sp_proxy], CUT, True, f"{name}_StrikeRecess")
 
     hp_proxy = hook_plate.createForAssemblyContext(hook_occ)
-    sp.combine(root, rail_body, [hp_proxy], CUT, True, f"{name}_HookRecess")
+    sp.combine(rail_body, [hp_proxy], CUT, True, f"{name}_HookRecess")
 
     # ================================================================
     # Move into parent components' "Hardwares" sub-folder

@@ -10,7 +10,7 @@ Tests both variants and orientations using face-based sketching:
   Cross_Through_MT: Same as Through_MT but each board (LegL, LegR, Rail)
               lives in its *own* component under root. Exercises
               through()'s cross-component routing — the mortise CUT
-              must hop to root with assembly proxies via combine_auto.
+              must hop to root with assembly proxies via combine.
 
 Blind_MT / Through_MT / Leg_Top_MT: 3 bodies each in one component.
 Cross_Through_MT: 3 bodies across 3 components (1 body each).
@@ -112,8 +112,8 @@ def run(context):
         depth_expr="bmt_td",
         tenon_body=rail, mortise_body=leg_r,
         name="bmt_R", ev=ctx.ev)
-    sp.combine(bmt_c, leg_l, [rail], CUT, True, "bmt_MortL")
-    sp.combine(bmt_c, leg_r, [rail], CUT, True, "bmt_MortR")
+    sp.combine(leg_l, [rail], CUT, True, "bmt_MortL")
+    sp.combine(leg_r, [rail], CUT, True, "bmt_MortR")
     assert bmt_c.bRepBodies.count == 3
     print("Blind_MT: 3 bodies — PASS")
 
@@ -209,8 +209,8 @@ def run(context):
         name="lmt_R", ev=ctx.ev)
 
     # CUT rail with both legs (tenons create mortise pockets)
-    sp.combine(lmt_c, top_rail, [leg_l], CUT, True, "lmt_MortL")
-    sp.combine(lmt_c, top_rail, [leg_r], CUT, True, "lmt_MortR")
+    sp.combine(top_rail, [leg_l], CUT, True, "lmt_MortL")
+    sp.combine(top_rail, [leg_r], CUT, True, "lmt_MortR")
     assert lmt_c.bRepBodies.count == 3
     print("Leg_Top_MT: 3 bodies — PASS")
 
@@ -261,7 +261,7 @@ def run(context):
     rail.name = "xmt_Rail"
 
     # through() — pass xmt_rail_c as comp (where tenon lives), leg in
-    # a DIFFERENT comp. combine_auto inside through() routes the
+    # a DIFFERENT comp. combine inside through() routes the
     # mortise CUT to root with proxies.
     left_face = sp.find_face(rail, "x", -1)
     right_face = sp.find_face(rail, "x", +1)

@@ -243,7 +243,7 @@ def run(context):
     slab_p = slab.createForAssemblyContext(hb_occ)
 
     # CUT back posts from slab (slab wraps around posts)
-    sp.combine(root, slab_p, [bl_p, br_p], CUT, True, "SlabPostNotch")
+    sp.combine(slab_p, [bl_p, br_p], CUT, True, "SlabPostNotch")
 
     # Domino planes
     dm_xl = sp.off_plane(root, root.yZConstructionPlane, "post_size", "DM_XL")

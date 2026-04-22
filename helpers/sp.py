@@ -582,8 +582,14 @@ def off_plane(comp, base, expr, name="Pl"):
     return p
 
 
-def combine(comp, target, tool_bodies, op, keep_tool, name="Comb"):
-    """Combine (CUT/JOIN) tool bodies into a target body.
+def _combine_in(comp, target, tool_bodies, op, keep_tool, name="Comb"):
+    """Low-level combine primitive — creates the feature in ``comp``.
+
+    Internal helper. Joinery templates and example scripts should call
+    :func:`combine` (which picks the right component automatically and
+    handles cross-component tool proxies). Use this directly only when
+    you have a specific reason to place the feature in a component
+    other than ``target.parentComponent``.
 
     Args:
         comp: Component owning the combine feature.
@@ -631,27 +637,22 @@ def body_for_root(body, root):
         f"(component '{comp.name}').")
 
 
-def combine_auto(target, tool_bodies, op, keep_tool, name="Comb"):
-    """Combine that auto-routes intra-component vs cross-component.
+def combine(target, tool_bodies, op, keep_tool, name="Comb"):
+    """Combine (CUT / JOIN / Intersect) tool bodies into a target body.
 
-    The combine feature always lives in ``target.parentComponent`` —
-    that's the natural home for a feature that modifies the target
-    body. Tool bodies from other components are wrapped via
-    ``createForAssemblyContext`` proxies, which Fusion accepts in a
-    feature placed in any ancestor-or-same component.
-
-    Use this in joinery templates instead of ``combine(comp, ...)`` when
-    the caller might pass bodies from different components (mortise in
-    leg, tenon in rail, wedge in slab). A hard-coded ``comp`` argument
-    silently fails when bodies span components.
+    The combine feature lives in ``target.parentComponent`` — the
+    natural home for a feature that modifies the target. Tool bodies
+    from other components are wrapped via ``createForAssemblyContext``
+    proxies automatically, so the same call works whether the tools
+    are native, already proxied, or in sibling components.
 
     Args:
         target: Target BRepBody. Must be a native body (not a proxy) —
-            the combine feature will be created in its parent component.
-        tool_bodies: Single BRepBody or list of BRepBody. Native or
-            proxies; native bodies in other components will be proxied
-            automatically.
-        op: FeatureOperations enum (CutFeatureOperation / JoinFeatureOperation).
+            the combine feature is created in its parent component.
+        tool_bodies: Single BRepBody or list of BRepBody. Native bodies
+            in other components are proxied automatically.
+        op: FeatureOperations enum
+            (CutFeatureOperation / JoinFeatureOperation / IntersectFeatureOperation).
         keep_tool: Whether to keep tool bodies after the operation.
         name: Feature name.
     """
@@ -668,7 +669,7 @@ def combine_auto(target, tool_bodies, op, keep_tool, name="Comb"):
         else:
             tool_refs.append(body_for_root(b, root))
 
-    return combine(tgt_comp, target, tool_refs, op, keep_tool, name)
+    return _combine_in(tgt_comp, target, tool_refs, op, keep_tool, name)
 
 
 def mirror_body(comp, body, plane, name="Mirror"):
@@ -1132,7 +1133,7 @@ def classify_bodies(bodies, reference, direction=None):
 
         groups = sp.classify_bodies(fragments, leg_body)
         for b in groups['inside']:
-            sp.combine(comp, stretcher, b, JOIN, False)  # tenon interior
+            sp.combine(stretcher, b, JOIN, False)  # tenon interior
         for b in groups['outside']:
             comp.features.removeFeatures.add(b)  # excess tip
     """

@@ -9,7 +9,7 @@ cross-component configurations:
                    5 bodies.
   F3 Cross_Grid:   Left in one root component, Right in another,
                    voids in a third. Exercises grid()'s cross-component
-                   CUTs via combine_auto. 5 bodies across 3 comps.
+                   CUTs via combine. 5 bodies across 3 comps.
 
 Total: 3 + 5 + 5 = 13 bodies.
 """

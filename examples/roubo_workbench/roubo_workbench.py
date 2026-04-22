@@ -328,7 +328,7 @@ def run(context):
     mt_body.name = "MT_FL"
 
     # JOIN both tenons to FL leg
-    sp.combine(leg_c, leg_fl, [dt_body, mt_body], JOIN, False, "LegJt_FL_Join")
+    sp.combine(leg_fl, [dt_body, mt_body], JOIN, False, "LegJt_FL_Join")
 
     # Mirror across XMid → FR, then across YMid → BL, BR
     mir_x = sp.mirror_body(leg_c, leg_fl, XMid, "LegMirX")
@@ -432,9 +432,9 @@ def run(context):
         elif "Pin" in b.name:
             all_pins.append(b)
     if all_tenons:
-        sp.combine(ls_c, ls_front, all_tenons, JOIN, False, "LSTenonJoin")
+        sp.combine(ls_front, all_tenons, JOIN, False, "LSTenonJoin")
     if all_pins:
-        sp.combine(ls_c, ls_front, all_pins, CUT, True, "LSPinCut")
+        sp.combine(ls_front, all_pins, CUT, True, "LSPinCut")
 
     # 6. Mirror everything across YMid → LS_Back
     _ls_bodies = [ls_c.bRepBodies.item(i) for i in range(ls_c.bRepBodies.count)]
@@ -541,9 +541,9 @@ def run(context):
         elif "Pin" in b.name:
             all_pins.append(b)
     if all_tenons:
-        sp.combine(ss_c, ss_left, all_tenons, JOIN, False, "SSTenonJoin")
+        sp.combine(ss_left, all_tenons, JOIN, False, "SSTenonJoin")
     if all_pins:
-        sp.combine(ss_c, ss_left, all_pins, CUT, True, "SSPinCut")
+        sp.combine(ss_left, all_pins, CUT, True, "SSPinCut")
 
     # 6. Mirror everything across XMid → SS_Right
     _ss_bodies = [ss_c.bRepBodies.item(i) for i in range(ss_c.bRepBodies.count)]
@@ -583,7 +583,7 @@ def run(context):
     dm_tbot_ext = sp.ext_new_sym(dm_c, pr, "dm_w / 2", "DMTongueBot")
     dm_tbot = dm_tbot_ext.bodies.item(0)
     dm_tbot.name = "DM_Tongue_Bot"
-    sp.combine(dm_c, dm_body, [dm_tbot], JOIN, False, "DMTongueBot_Join")
+    sp.combine(dm_body, [dm_tbot], JOIN, False, "DMTongueBot_Join")
 
     # Top tongue — extends up from panel into top groove
     _, pr = sp.sketch_rect_model(dm_c, dm_pl,
@@ -595,7 +595,7 @@ def run(context):
     dm_ttop_ext = sp.ext_new_sym(dm_c, pr, "dm_w / 2", "DMTongueTop")
     dm_ttop = dm_ttop_ext.bodies.item(0)
     dm_ttop.name = "DM_Tongue_Top"
-    sp.combine(dm_c, dm_body, [dm_ttop], JOIN, False, "DMTongueTop_Join")
+    sp.combine(dm_body, [dm_ttop], JOIN, False, "DMTongueTop_Join")
 
     # Deadman dog holes — vertical column on front face, face-relative.
     # Sketch on the deadman front face. Use m2s to detect axis mapping,
@@ -947,13 +947,13 @@ def run(context):
     # CUT top with all 4 leg proxies (through-tenon mortises)
     top_proxy = top_c.bRepBodies.item(0).createForAssemblyContext(top_occ)
     leg_proxies = get_proxies(leg_occ)
-    sp.combine(root, top_proxy, leg_proxies, CUT, True, "LegMortise_Cut")
+    sp.combine(top_proxy, leg_proxies, CUT, True, "LegMortise_Cut")
 
     # CUT legs with long stretcher proxies (through-mortises)
     ls_proxies = get_proxies(ls_occ)
     for i in range(leg_c.bRepBodies.count):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-        sp.combine(root, lp, ls_proxies, CUT, True, f"LSMort_Leg{i}")
+        sp.combine(lp, ls_proxies, CUT, True, f"LSMort_Leg{i}")
 
     # Pin holes in legs — pins are in stretcher components, CUT via proxies
     for prefix, s_c, s_occ in [("LS", ls_c, ls_occ), ("SS", ss_c, ss_occ)]:
@@ -963,25 +963,25 @@ def run(context):
         if pin_proxies:
             for i in range(leg_c.bRepBodies.count):
                 lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-                sp.combine(root, lp, pin_proxies, CUT, True,
+                sp.combine(lp, pin_proxies, CUT, True,
                            f"{prefix}PinHole_Leg{i}")
 
     # CUT FL leg with vise screw bore and guide slot (not chop/handle)
     vise_screw_p = vise_c.bRepBodies.itemByName("Vise_Screw").createForAssemblyContext(vise_occ)
     vise_guide_p = vise_c.bRepBodies.itemByName("Vise_Guide").createForAssemblyContext(vise_occ)
     fl_proxy = leg_c.bRepBodies.item(0).createForAssemblyContext(leg_occ)
-    sp.combine(root, fl_proxy, [vise_screw_p, vise_guide_p], CUT, True, "ViseMort_FL")
+    sp.combine(fl_proxy, [vise_screw_p, vise_guide_p], CUT, True, "ViseMort_FL")
 
     # CUT chop with screw bore
     chop_proxy = vise_c.bRepBodies.itemByName("Vise_Chop").createForAssemblyContext(vise_occ)
     screw_proxy = vise_c.bRepBodies.itemByName("Vise_Screw").createForAssemblyContext(vise_occ)
-    sp.combine(root, chop_proxy, [screw_proxy], CUT, True, "ViseScrew_ChopCut")
+    sp.combine(chop_proxy, [screw_proxy], CUT, True, "ViseScrew_ChopCut")
 
     # CUT legs with short stretcher proxies (SS passes through legs)
     ss_proxies = get_proxies(ss_occ)
     for i in range(leg_c.bRepBodies.count):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-        sp.combine(root, lp, ss_proxies, CUT, True, f"SSMort_Leg{i}")
+        sp.combine(lp, ss_proxies, CUT, True, f"SSMort_Leg{i}")
 
     # Deadman tongue grooves — built in target components (local combine).
     # Groove depth into material = dm_tongue_h - dm_gap.

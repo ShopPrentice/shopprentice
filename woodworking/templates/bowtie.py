@@ -147,8 +147,8 @@ def single(comp, plane, center, long_axis, length, end_w, waist_w,
     bt_body.name = name
 
     if cut and slab_body:
-        # combine_auto routes intra- or cross-component automatically.
-        sp.combine_auto(slab_body, [bt_body], CUT, True, f"{name}_Cut")
+        # combine routes intra- or cross-component automatically.
+        sp.combine(slab_body, [bt_body], CUT, True, f"{name}_Cut")
 
     sk.isVisible = False
     return bt_body

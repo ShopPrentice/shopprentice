@@ -121,10 +121,10 @@ def single(comp, plane, center, diameter, depth,
     sk.isVisible = False
 
     if cut:
-        # combine_auto routes intra-comp or to root based on where
+        # combine routes intra-comp or to root based on where
         # body_a / body_b live relative to the dowel void.
-        sp.combine_auto(body_a, void_body, CUT, True, f"{name}_CutA")
-        sp.combine_auto(body_b, void_body, CUT, True, f"{name}_CutB")
+        sp.combine(body_a, void_body, CUT, True, f"{name}_CutA")
+        sp.combine(body_b, void_body, CUT, True, f"{name}_CutB")
 
     return void_body
 
@@ -175,10 +175,10 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
         for i in range(pat.bodies.count):
             bodies.append(pat.bodies.item(i))
 
-    # Bulk CUT all dowels into both bodies (combine_auto handles
+    # Bulk CUT all dowels into both bodies (combine handles
     # cross-component routing when body_a / body_b are elsewhere).
     if cut and body_a is not None and body_b is not None:
-        sp.combine_auto(body_a, bodies, CUT, True, f"{name}_CutA")
-        sp.combine_auto(body_b, bodies, CUT, True, f"{name}_CutB")
+        sp.combine(body_a, bodies, CUT, True, f"{name}_CutA")
+        sp.combine(body_b, bodies, CUT, True, f"{name}_CutB")
 
     return bodies

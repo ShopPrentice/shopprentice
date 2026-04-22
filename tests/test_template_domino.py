@@ -7,7 +7,7 @@ Tests 4 real-world use cases:
   F3 Case_Joint: Box side-to-back connection (like bookshelf). 4 bodies in 1 comp.
   F4 Cross_Edge_Joint: Same as F2 but Left and Right live in separate
                        root components. Exercises grid()'s cross-component
-                       routing via combine_auto. 5 bodies across 3 comps.
+                       routing via combine. 5 bodies across 3 comps.
 
 Total: 9 + 5 + 4 + 5 = 23 bodies.
 """
@@ -207,7 +207,7 @@ def run(context):
     # ═══════════════════════════════════════════════════════════════════
     # F4: Cross-component Edge Joint — like F2 but Left board, Right
     #     board, and the grid voids live in SEPARATE root components.
-    #     Exercises grid()'s cross-component CUTs via combine_auto.
+    #     Exercises grid()'s cross-component CUTs via combine.
     # ═══════════════════════════════════════════════════════════════════
     params.add("f4_x", VI("f3_x + case_w + 3 in"), "in", "F4 X offset")
     f4_x = ctx.ev("f4_x")
@@ -235,7 +235,7 @@ def run(context):
     # Voids live in F4_Voids — a third sibling component. The grid()
     # call uses comp=f4_V for sketch+extrude+pattern. CUTs into
     # f4_left (F4_Left comp) and f4_right (F4_Right comp) must route
-    # to root via combine_auto.
+    # to root via combine.
     f4_joint_pl = sp.off_plane(f4_V, f4_V.xZConstructionPlane,
                                 "ej_board_d", "f4_Joint_Pl")
     domino.grid(f4_V, f4_joint_pl,

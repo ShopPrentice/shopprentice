@@ -5,7 +5,7 @@ Covers three cases:
   F1 Single:   One bowtie CUT into a slab in the same component. 2 bodies.
   F2 Row:      Three bowties in a row along a crack, CUT into slab. 4 bodies.
   F3 Cross:    Slab in one component, bowties in another. Exercises
-               the CUT's cross-component routing via combine_auto.
+               the CUT's cross-component routing via combine.
                4 bodies across 2 components.
 
 Total: 2 + 4 + 4 = 10 bodies.

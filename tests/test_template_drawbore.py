@@ -9,7 +9,7 @@ Exercises drawbore.through() in two configurations:
             leg with the pinned stretcher body.
   F2 Cross: Leg in one root component, Stretcher in another. Same
             geometry, but the template must route its tenon-JOIN and
-            pin-CUT combines across components via sp.combine_auto.
+            pin-CUT combines across components via sp.combine.
 
 Intra total: 4 bodies (Leg, Stretcher-with-tenon-and-holes, 2 pin bodies).
 Cross total: 4 bodies across 2 components (1 leg + 1 stretcher + 2 pins).
@@ -102,7 +102,7 @@ def run(context):
         name="f1_DB", ev=ctx.ev)
 
     # Caller CUTs the leg with the stretcher (now has tenon + pin holes)
-    sp.combine_auto(leg, [stretcher], CUT, True, "f1_Leg_Cut")
+    sp.combine(leg, [stretcher], CUT, True, "f1_Leg_Cut")
 
     f1_count = f1.bRepBodies.count
     f1_names = [f1.bRepBodies.item(i).name for i in range(f1_count)]
@@ -155,7 +155,7 @@ def run(context):
         name="f2_DB", ev=ctx.ev)
 
     # Cross-comp leg CUT with pinned stretcher body
-    sp.combine_auto(f2_leg, [f2_stretcher], CUT, True, "f2_Leg_Cut")
+    sp.combine(f2_leg, [f2_stretcher], CUT, True, "f2_Leg_Cut")
 
     f2_leg_count = f2_Leg.bRepBodies.count
     f2_st_count = f2_St.bRepBodies.count
@@ -164,7 +164,7 @@ def run(context):
     print(f"  F2_Leg bodies ({f2_leg_count}): {f2_leg_names}")
     print(f"  F2_St bodies ({f2_st_count}): {f2_st_names}")
     # Key cross-component assertion: F2 produces the same total count
-    # as F1 — if combine_auto didn't route correctly, the mortise CUT
+    # as F1 — if combine didn't route correctly, the mortise CUT
     # would either fail or silently no-op, leaving F2_Leg with an
     # uncut leg (same body count but wrong geometry) or the pin CUT
     # would be missing (different body count). Both F1 and F2 use

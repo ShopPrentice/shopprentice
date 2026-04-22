@@ -216,10 +216,10 @@ def build(comp, prefix="dd", ev=None):
     bottom.name = f"{p}_Bottom"
 
     # ── Bottom grooves — CUT all 4 boards with bottom panel as tool ──
-    sp.combine(comp, front, [bottom], CUT, True, f"{p}_BGF")
-    sp.combine(comp, back, [bottom], CUT, True, f"{p}_BGB")
-    sp.combine(comp, left, [bottom], CUT, True, f"{p}_BGL")
-    sp.combine(comp, right, [bottom], CUT, True, f"{p}_BGR")
+    sp.combine(front, [bottom], CUT, True, f"{p}_BGF")
+    sp.combine(back, [bottom], CUT, True, f"{p}_BGB")
+    sp.combine(left, [bottom], CUT, True, f"{p}_BGL")
+    sp.combine(right, [bottom], CUT, True, f"{p}_BGR")
 
     print(f"  Bottom panel + grooves done")
 

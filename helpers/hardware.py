@@ -683,7 +683,7 @@ def _cut_rebates(comp, style, occ, leaf_a, leaf_b, bodies,
             proxy = _make_body_proxy(b, occ, body_occ_map) if occ else b
             for board in [board_b, board_a]:
                 try:
-                    c = sp.combine(comp, board, [proxy], CUT, True,
+                    c = sp.combine(board, [proxy], CUT, True,
                                    f"{name}_Cut_{board.name}_{b.name}")
                     if c:
                         cuts.append(c)
@@ -941,7 +941,7 @@ def install_hinge_screws(hinge_result, comp, ev=None, name="Screw",
             for sb in screw_bodies:
                 screw_proxy = sb.createForAssemblyContext(screw_occ)
                 try:
-                    sp.combine(comp, leaf_proxy, [screw_proxy], CUT, True,
+                    sp.combine(leaf_proxy, [screw_proxy], CUT, True,
                                f"{screw_name}_CSink")
                 except Exception:
                     pass
@@ -1340,7 +1340,7 @@ def install(part_id, comp, position, board=None,
         root = adsk.fusion.Design.cast(
             adsk.core.Application.get().activeProduct).rootComponent
         cut_name = f"{name}_Mort" if name else "HW_Mort"
-        cut_result = sp.combine(root, board, tool_proxies, CUT,
+        cut_result = sp.combine(board, tool_proxies, CUT,
                                 keep_tool, cut_name)
     if appearance:
         from helpers import sp

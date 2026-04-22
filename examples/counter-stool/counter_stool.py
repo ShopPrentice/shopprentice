@@ -172,7 +172,7 @@ def run(context):
             Leg_NL_b = b
         elif b.name == "Seat":
             Seat_tmp = b
-    sp.combine(root, Leg_NL_b, [Seat_tmp], CUT, True, "LegTrim_NL")
+    sp.combine(Leg_NL_b, [Seat_tmp], CUT, True, "LegTrim_NL")
 
     # ── MIRROR LEGS ────────────────────────────────────────────────
 
@@ -291,13 +291,13 @@ def run(context):
             break
 
     # CUT all 4 domino voids into seat (keepTool=True — dominos visible)
-    sp.combine(root, Seat, [DM_NL_b, DM_NR_b, DM_FL_b, DM_FR_b], CUT, True, "DM_Seat_Cut")
+    sp.combine(Seat, [DM_NL_b, DM_NR_b, DM_FL_b, DM_FR_b], CUT, True, "DM_Seat_Cut")
 
     # CUT each domino into its leg (keepTool=True)
-    sp.combine(root, Leg_NL, [DM_NL_b], CUT, True, "DM_Leg_NL")
-    sp.combine(root, Leg_NR, [DM_NR_b], CUT, True, "DM_Leg_NR")
-    sp.combine(root, Leg_FL, [DM_FL_b], CUT, True, "DM_Leg_FL")
-    sp.combine(root, Leg_FR, [DM_FR_b], CUT, True, "DM_Leg_FR")
+    sp.combine(Leg_NL, [DM_NL_b], CUT, True, "DM_Leg_NL")
+    sp.combine(Leg_NR, [DM_NR_b], CUT, True, "DM_Leg_NR")
+    sp.combine(Leg_FL, [DM_FL_b], CUT, True, "DM_Leg_FL")
+    sp.combine(Leg_FR, [DM_FR_b], CUT, True, "DM_Leg_FR")
 
     # ── STRETCHER DERIVED PARAMS ───────────────────────────────────
     # Splay-adjusted lengths ensure stretchers reach into legs at any splay angle
@@ -338,7 +338,7 @@ def run(context):
     def angled_tenon_end(str_body, leg_body, str_plane, axis, direction, name):
         """CUT leg from stretcher -> sketch tenon on angled face -> sweep -> JOIN."""
         # Step 1: CUT leg from stretcher -> angled mating face
-        sp.combine(root, str_body, [leg_body], CUT, True, f"{name}_LegCut")
+        sp.combine(str_body, [leg_body], CUT, True, f"{name}_LegCut")
         str_body = find_body(str_body.name)
 
         # Step 2: Find angled face + sketch tenon
@@ -409,7 +409,7 @@ def run(context):
         tenon_body.name = f"{name}_Tenon"
 
         # Step 5: JOIN tenon to stretcher
-        sp.combine(root, str_body, [tenon_body], JOIN, False, f"{name}_Join")
+        sp.combine(str_body, [tenon_body], JOIN, False, f"{name}_Join")
         return find_body(str_body.name)
 
     # ── BACK STRETCHER ────────────────────────────────────────────
@@ -563,12 +563,12 @@ def run(context):
     FR_b.name = "Footrest"
 
     # Trim footrest where it overlaps front legs
-    sp.combine(root, FR_b, [Leg_NL], CUT, True, "FR_LegTrim_NL")
+    sp.combine(FR_b, [Leg_NL], CUT, True, "FR_LegTrim_NL")
     FR_b = find_body("Footrest")
-    sp.combine(root, FR_b, [Leg_FL], CUT, True, "FR_LegTrim_FL")
+    sp.combine(FR_b, [Leg_FL], CUT, True, "FR_LegTrim_FL")
     FR_b = find_body("Footrest")
     Str_Front = find_body("Str_Front")
-    sp.combine(root, FR_b, [Str_Front], CUT, True, "FR_FStrTrim")
+    sp.combine(FR_b, [Str_Front], CUT, True, "FR_FStrTrim")
 
     # ── STRETCHER MORTISES (CUT into legs) ────────────────────────
     legs = {n: find_body(n) for n in ["Leg_NL", "Leg_NR", "Leg_FL", "Leg_FR"]}
@@ -578,20 +578,20 @@ def run(context):
     Str_Right = find_body("Str_Right")
 
     # Back stretcher CUTs NR and FR legs
-    sp.combine(root, legs["Leg_NR"], [Str_Back], CUT, True, "BStr_Mort_NR")
-    sp.combine(root, legs["Leg_FR"], [Str_Back], CUT, True, "BStr_Mort_FR")
+    sp.combine(legs["Leg_NR"], [Str_Back], CUT, True, "BStr_Mort_NR")
+    sp.combine(legs["Leg_FR"], [Str_Back], CUT, True, "BStr_Mort_FR")
 
     # Front stretcher CUTs NL and FL legs
-    sp.combine(root, legs["Leg_NL"], [Str_Front], CUT, True, "FStr_Mort_NL")
-    sp.combine(root, legs["Leg_FL"], [Str_Front], CUT, True, "FStr_Mort_FL")
+    sp.combine(legs["Leg_NL"], [Str_Front], CUT, True, "FStr_Mort_NL")
+    sp.combine(legs["Leg_FL"], [Str_Front], CUT, True, "FStr_Mort_FL")
 
     # Left side stretcher CUTs NL and NR legs
-    sp.combine(root, legs["Leg_NL"], [Str_Left], CUT, True, "SStr_Mort_NL")
-    sp.combine(root, legs["Leg_NR"], [Str_Left], CUT, True, "SStr_Mort_NR")
+    sp.combine(legs["Leg_NL"], [Str_Left], CUT, True, "SStr_Mort_NL")
+    sp.combine(legs["Leg_NR"], [Str_Left], CUT, True, "SStr_Mort_NR")
 
     # Right side stretcher CUTs FL and FR legs
-    sp.combine(root, legs["Leg_FL"], [Str_Right], CUT, True, "SStr_Mort_FL")
-    sp.combine(root, legs["Leg_FR"], [Str_Right], CUT, True, "SStr_Mort_FR")
+    sp.combine(legs["Leg_FL"], [Str_Right], CUT, True, "SStr_Mort_FL")
+    sp.combine(legs["Leg_FR"], [Str_Right], CUT, True, "SStr_Mort_FR")
 
     # ── DETAILS: CHAMFERS ───────────────────────────────────────────
     # Chamfer seat top edges

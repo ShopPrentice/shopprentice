@@ -289,8 +289,8 @@ def run(context):
 
     hb_slat_proxies = [b.createForAssemblyContext(hb_occ) for b in all_hb_slats]
     for i, sp in enumerate(hb_slat_proxies):
-        sp.combine(root, hb_tr_p, [sp], CUT, True, f"HBSlatMort_TR_{i}")
-        sp.combine(root, hb_br_p, [sp], CUT, True, f"HBSlatMort_BR_{i}")
+        sp.combine(hb_tr_p, [sp], CUT, True, f"HBSlatMort_TR_{i}")
+        sp.combine(hb_br_p, [sp], CUT, True, f"HBSlatMort_BR_{i}")
 
     print(">>> Headboard slat mortises done")
 

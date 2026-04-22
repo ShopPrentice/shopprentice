@@ -228,7 +228,7 @@ def corner(comp, plane, thick_expr, dist_expr,
     # CUT pin board into finger board to create interlocking sockets.
     # The pin board's remaining material IS its fingers — cutting it
     # into the finger board carves matching slots.
-    pin_cut = sp.combine(comp, finger_body, pin_body, CUT, True,
+    pin_cut = sp.combine(finger_body, pin_body, CUT, True,
                          f"{name}_PinCut")
 
     return {
@@ -430,11 +430,11 @@ def box(comp, front, left,
     pat.name = f"{name}_Pat"
 
     # ── CUT slot boards using finger boards as tools ──
-    cut_front = sp.combine(comp, front, finger_boards, CUT, True,
+    cut_front = sp.combine(front, finger_boards, CUT, True,
                            f"{name}_CutFront")
     cut_back = None
     if back is not None:
-        cut_back = sp.combine(comp, back, finger_boards, CUT, True,
+        cut_back = sp.combine(back, finger_boards, CUT, True,
                               f"{name}_CutBack")
 
     return {

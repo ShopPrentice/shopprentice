@@ -135,7 +135,7 @@ def blind(comp, plane, origin, size, depth_expr,
             ``tenon_body.parentComponent``. The tenon body is created
             here and JOINed into ``tenon_body`` (always intra-component).
             For a blind mortise in a *different* component, call the
-            caller's mortise CUT via ``sp.combine_auto`` — this template
+            caller's mortise CUT via ``sp.combine`` — this template
             only builds the tenon side.
         plane: BRepFace (rail end face) or construction plane.
         origin: (x_expr, y_expr, z_expr) — tenon corner in model space.
@@ -174,11 +174,11 @@ def blind(comp, plane, origin, size, depth_expr,
         mir = sp.mirror_feats(comp, [tenon_ext], mirror_plane,
                               f"{name}_Mirror")
         mir_body = mir.bodies.item(0)
-        join = sp.combine(comp, tenon_body, [tenon_b, mir_body],
+        join = sp.combine(tenon_body, [tenon_b, mir_body],
                           JOIN, False, f"{name}_Join")
         result["mirror"] = mir
     else:
-        join = sp.combine(comp, tenon_body, tenon_b, JOIN, False,
+        join = sp.combine(tenon_body, tenon_b, JOIN, False,
                           f"{name}_Join")
 
     result["join"] = join
@@ -201,7 +201,7 @@ def through(comp, plane, origin, size, depth_expr,
 
     Cross-component: when ``tenon_body`` and ``mortise_body`` live in
     different components, the mortise CUT is automatically placed at
-    root with assembly-context proxies via ``sp.combine_auto``. The
+    root with assembly-context proxies via ``sp.combine``. The
     sketch, tenon extrude, and tenon JOIN stay in ``comp``, which must
     be ``tenon_body.parentComponent``.
 
@@ -226,10 +226,10 @@ def through(comp, plane, origin, size, depth_expr,
 
     # CUT mortise with tenon body BEFORE joining to rail.
     # This avoids coplanar face splitting (rail end face flush with leg).
-    # combine_auto routes intra-component when mortise_body shares a
+    # combine routes intra-component when mortise_body shares a
     # component with tenon_b (== tenon_body.parentComponent), else to
     # root with assembly-context proxies.
-    mort_cut = sp.combine_auto(mortise_body, [tenon_b], CUT, True,
+    mort_cut = sp.combine(mortise_body, [tenon_b], CUT, True,
                                f"{name}_Mort")
     result["mortise_cut"] = mort_cut
 
@@ -239,11 +239,11 @@ def through(comp, plane, origin, size, depth_expr,
         mir_body = mir.bodies.item(0)
 
         # JOIN both into tenon_body (intra-component)
-        join = sp.combine(comp, tenon_body, [tenon_b, mir_body],
+        join = sp.combine(tenon_body, [tenon_b, mir_body],
                           JOIN, False, f"{name}_Join")
         result["mirror"] = mir
     else:
-        join = sp.combine(comp, tenon_body, [tenon_b], JOIN, False,
+        join = sp.combine(tenon_body, [tenon_b], JOIN, False,
                           f"{name}_Join")
 
     result["join"] = join
@@ -267,5 +267,5 @@ def bulk_cut_mortises(root_comp, mortise_body_proxy, tool_body_proxies,
     Returns:
         CombineFeature.
     """
-    return sp.combine(root_comp, mortise_body_proxy, tool_body_proxies,
+    return sp.combine(mortise_body_proxy, tool_body_proxies,
                       CUT, True, name)
