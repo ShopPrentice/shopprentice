@@ -71,7 +71,7 @@ def rect(comp, tenon_body, mortise_body,
          tenon_depth_expr, slot_span_expr, offset_dim_expr,
          tenon_axis=None, tenon_dir=None, end_face=None,
          grain_dir=None, prefix="tw", name="TW", ev=None):
-    """Two wedges on a rectangular tenon.
+    """Two wedges on a rectangular tenon, symmetric about the tenon axis.
 
     Provide *end_face* for arbitrary orientations (compound-angle),
     or *tenon_axis* + optional *tenon_dir* for axis-aligned tenons.
@@ -87,23 +87,34 @@ def rect(comp, tenon_body, mortise_body,
     face_n, slot_dir, off_dir = _face_directions(
         end_face, mortise_body, grain_dir=grain_dir)
 
+    # Cache the original face centroid. After the first wedge's CUT,
+    # the end face is split into fragments and re-finding it picks
+    # one piece whose centroid is offset from the tenon's true centre
+    # — which would make the two wedges land on the same side of the
+    # tenon rather than symmetric about its axis.
+    _c = end_face.centroid
+    face_centroid = (_c.x, _c.y, _c.z)
+
     w1 = _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
                      f"{prefix}_or", tenon_depth_expr, slot_span_expr,
                      prefix, f"{name}_1", ev,
-                     offset_dim_expr=offset_dim_expr)
+                     offset_dim_expr=offset_dim_expr,
+                     face_centroid=face_centroid)
 
-    # Re-find end face — the CUT from w1 invalidated the old reference
+    # Re-find end face for sketch/plane anchoring only (the cached
+    # face_centroid above keeps the wedge position correct regardless
+    # of which fragment this picks).
     if tenon_axis:
         end_face = _resolve_end_face(
             tenon_body, mortise_body, tenon_axis, tenon_dir, None)
     else:
-        # Angled tenon — re-find by face normal closest to original
         end_face = _find_face_by_normal(tenon_body, face_n)
 
     w2 = _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
                      f"1 - {prefix}_or", tenon_depth_expr, slot_span_expr,
                      prefix, f"{name}_2", ev,
-                     offset_dim_expr=offset_dim_expr)
+                     offset_dim_expr=offset_dim_expr,
+                     face_centroid=face_centroid)
 
     return [w1, w2]
 
@@ -290,7 +301,7 @@ def _face_directions(end_face, mortise_body, grain_dir=None):
 def _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
                 offset_frac_expr, tenon_depth_expr, slot_span_expr,
                 prefix, name, ev, skip_cut=False,
-                offset_dim_expr=None):
+                offset_dim_expr=None, face_centroid=None):
     """Build one wedge body on an arbitrarily oriented tenon.
 
     1. Draw a construction line on the end face along the slot direction.
@@ -298,6 +309,13 @@ def _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
        plane contains the tenon axis (face normal) and offset direction.
     3. Sketch the triangle profile on that plane.
     4. Symmetric-extrude along the slot direction for the full span.
+
+    ``face_centroid``: optional pre-computed model-space (x, y, z) of
+    the tenon end face centroid. Use this when the caller wants the
+    wedge centred relative to the ORIGINAL face centre — otherwise
+    the face's current ``.centroid`` is used, which may be off-centre
+    if the face was split by a previous CUT (e.g., for wedge 2 of
+    the 2-wedge ``rect`` variant).
     """
     sw = ev(f"{prefix}_sw")
     depth = ev(tenon_depth_expr) * ev(f"{prefix}_dr")
@@ -309,11 +327,15 @@ def _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
         off_dim = span
 
     # ── wedge centre in model space ─────────────────────────────
-    fc = end_face.pointOnFace
+    if face_centroid is not None:
+        fc_x, fc_y, fc_z = face_centroid
+    else:
+        _c = end_face.centroid
+        fc_x, fc_y, fc_z = _c.x, _c.y, _c.z
     shift = off_dim * (frac - 0.5)
-    wcx = fc.x + shift * off_dir[0]
-    wcy = fc.y + shift * off_dir[1]
-    wcz = fc.z + shift * off_dir[2]
+    wcx = fc_x + shift * off_dir[0]
+    wcy = fc_y + shift * off_dir[1]
+    wcz = fc_z + shift * off_dir[2]
 
     # ── construction line on end face along OFFSET direction ────
     # Rotating the end face 90° around this line gives a plane
