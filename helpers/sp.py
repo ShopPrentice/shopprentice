@@ -634,13 +634,11 @@ def body_for_root(body, root):
 def combine_auto(target, tool_bodies, op, keep_tool, name="Comb"):
     """Combine that auto-routes intra-component vs cross-component.
 
-    Determines where the combine feature should live based on the
-    components of ``target`` and every tool body:
-
-    * If all bodies share one component, the combine is created in that
-      component with direct body references.
-    * Otherwise, the combine is created at root and each body is
-      wrapped via ``body_for_root`` / ``createForAssemblyContext``.
+    The combine feature always lives in ``target.parentComponent`` —
+    that's the natural home for a feature that modifies the target
+    body. Tool bodies from other components are wrapped via
+    ``createForAssemblyContext`` proxies, which Fusion accepts in a
+    feature placed in any ancestor-or-same component.
 
     Use this in joinery templates instead of ``combine(comp, ...)`` when
     the caller might pass bodies from different components (mortise in
@@ -648,23 +646,29 @@ def combine_auto(target, tool_bodies, op, keep_tool, name="Comb"):
     silently fails when bodies span components.
 
     Args:
-        target: Target BRepBody.
-        tool_bodies: Single BRepBody or list of BRepBody.
+        target: Target BRepBody. Must be a native body (not a proxy) —
+            the combine feature will be created in its parent component.
+        tool_bodies: Single BRepBody or list of BRepBody. Native or
+            proxies; native bodies in other components will be proxied
+            automatically.
         op: FeatureOperations enum (CutFeatureOperation / JoinFeatureOperation).
         keep_tool: Whether to keep tool bodies after the operation.
         name: Feature name.
     """
     tools = tool_bodies if isinstance(tool_bodies, list) else [tool_bodies]
     tgt_comp = target.parentComponent
-    same = all(b.parentComponent == tgt_comp for b in tools)
-
-    if same:
-        return combine(tgt_comp, target, tool_bodies, op, keep_tool, name)
-
     root = tgt_comp.parentDesign.rootComponent
-    tgt_ref = body_for_root(target, root)
-    tool_refs = [body_for_root(b, root) for b in tools]
-    return combine(root, tgt_ref, tool_refs, op, keep_tool, name)
+
+    # Target is native (already in tgt_comp). For tools, proxy any
+    # that live in a different component via their root occurrence.
+    tool_refs = []
+    for b in tools:
+        if b.parentComponent == tgt_comp:
+            tool_refs.append(b)
+        else:
+            tool_refs.append(body_for_root(b, root))
+
+    return combine(tgt_comp, target, tool_refs, op, keep_tool, name)
 
 
 def mirror_body(comp, body, plane, name="Mirror"):
