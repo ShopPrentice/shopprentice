@@ -4,14 +4,20 @@ Grid-based layout — each box lives in its own (col, row) slot on a
 uniform ``grid_x`` × ``grid_y`` grid, so variants spread out predictably
 regardless of how their individual dimensions change.
 
-  Row 0 (y=0):       B1  1-corner 8x6x4     B2  1-corner 5x3x2
-                     B3  2-corner 8x5x4     B4  2-corner 6x4x6 (4 tails)
+  Row 0 (y=0):           B1  1-corner 8x6x4     B2  1-corner 5x3x2
+                         B3  2-corner 8x5x4     B4  2-corner 6x4x6 (4 tails)
   Row 1 (y=grid_y):      B5  4-corner 8x6x4     B6  4-corner 4x4x12 (6 tails)
-                     B9  4-corner 7x5x3 (joint along X)
-                     B10 4-corner 6x8x5 (joint along Y)
+                         B9  4-corner 7x5x3 (joint along X)
+                         B10 4-corner 6x8x5 (joint along Y)
   Row 2 (y=2*grid_y):    B11 4-corner 6x4x5, rotated to (1,1,1)
-                     B12 1-corner 8x6x4 — wide tails, ultra-thin pins
-                     B13 4-corner 6x4x5, rotated 42° about (1,2,1)/√6
+                         B12 1-corner 8x6x4 — wide tails, ultra-thin pins
+                         B13 4-corner 6x4x5, rotated 42° about (1,2,1)/√6
+                         C1  corner() intra-component (direct API call)
+                         C2  corner() cross-component (two components)
+
+B1–B13 exercise ``dovetail.box()``. C1 and C2 exercise ``dovetail.corner()``
+directly, covering the same-component and cross-component code paths of the
+unified API.
 
 For 2+ corners, the right tail board is created by mirroring the left
 across x_mid. B11 and B13 are rotated via their occurrence transform.
@@ -19,11 +25,12 @@ across x_mid. B11 and B13 are rotated via their occurrence transform.
 import adsk.core
 import adsk.fusion
 import math
+import sys
 
 
 def build_box(root, prefix, l_expr, w_expr, h_expr, t_expr,
               x_off_expr, dt_prefix, ev, y_off_expr="0 in",
-              corners=4):
+              corners=4, occ_transform=None):
     """Build a box with through dovetails.
 
     Args:
@@ -35,6 +42,9 @@ def build_box(root, prefix, l_expr, w_expr, h_expr, t_expr,
         ev: Evaluator function.
         y_off_expr: Y offset expression.
         corners: 4 = all corners, 2 = front corners only, 1 = FL corner only.
+        occ_transform: Optional ``Matrix3D`` — placed on the new
+            occurrence at creation time. Use this for rotated fixtures
+            where sketch-level offsets can't express the placement.
 
     Returns:
         Dict with component, bodies, and body count.
@@ -42,7 +52,7 @@ def build_box(root, prefix, l_expr, w_expr, h_expr, t_expr,
     from helpers import sp
     from woodworking.templates import dovetail
 
-    occ = sp.make_comp(root, prefix)
+    occ = sp.make_comp(root, prefix, transform=occ_transform)
     comp = occ.component
 
     ox = ev(x_off_expr) if x_off_expr != "0 in" else 0.0
@@ -149,6 +159,14 @@ def build_box(root, prefix, l_expr, w_expr, h_expr, t_expr,
 
 
 def run(context):
+    # Evict any cached ``woodworking``/``helpers`` modules from earlier
+    # sessions — Fusion keeps Python modules hot across script runs, so
+    # a recent edit to dovetail.py (new signatures, etc.) wouldn't be
+    # picked up without this.
+    for _mod in list(sys.modules):
+        if _mod.startswith("woodworking") or _mod.startswith("helpers"):
+            del sys.modules[_mod]
+
     app = adsk.core.Application.get()
 
     design = adsk.fusion.Design.cast(app.activeProduct)
@@ -296,11 +314,14 @@ def run(context):
     print("B6: PASS\n")
 
     # ================================================================
-    # B9 @ (2,1): 4-corner, joint along X, 7x5x3
+    # B9 @ (2,1): 4-corner, joint along X, 7x5x3 — built in place
     # Box "lying flat": pin boards thin in Z, tail boards thin in Y.
-    # Built at component origin; translated to grid slot via occ transform.
+    # Sketch origins and construction planes carry the grid-slot offset
+    # so the component's bodies land directly at their final world
+    # coordinates — no moveFeature, no occurrence transform.
     # ================================================================
     print("=" * 50 + "\nB9 @ (2,1): 4-corner, joint along X, 7x5x3\n" + "=" * 50)
+    b9_x, b9_y = slot(2, 1)
     _add_param("b9_l", "7 in", "in", "B9 length (X)")
     _add_param("b9_w", "5 in", "in", "B9 width (Y)")
     _add_param("b9_h", "3 in", "in", "B9 height (Z)")
@@ -313,28 +334,33 @@ def run(context):
     b9_occ = sp.make_comp(root, "B9")
     b9_c = b9_occ.component
 
+    # Front: xY plane (Z=0), at grid slot
     sk, pr = sp.sketch_rect_model(b9_c, b9_c.xYConstructionPlane,
-        ("0 in", "0 in", "0 in"),
+        (b9_x, b9_y, "0 in"),
         {"x": "b9_l", "y": "b9_w"}, "B9_Front_Sk", ctx.ev)
     b9_front = sp.ext_new(b9_c, pr, "b9_t", "B9_Front").bodies.item(0)
     b9_front.name = "B9_Front"
 
+    # Back: offset xY plane at Z=b9_h-b9_t
     b9_back_pl = sp.off_plane(b9_c, b9_c.xYConstructionPlane,
                                "b9_h - b9_t", "B9_Back_Pl")
     sk, pr = sp.sketch_rect_model(b9_c, b9_back_pl,
-        ("0 in", "0 in", "b9_h - b9_t"),
+        (b9_x, b9_y, "b9_h - b9_t"),
         {"x": "b9_l", "y": "b9_w"}, "B9_Back_Sk", ctx.ev)
     b9_back = sp.ext_new(b9_c, pr, "b9_t", "B9_Back").bodies.item(0)
     b9_back.name = "B9_Back"
 
+    # Mid planes shifted by Y offset
     b9_ext_mid = sp.off_plane(b9_c, b9_c.xZConstructionPlane,
-                               "b9_w / 2", "B9_ExtMid")
+                               f"{b9_y} + b9_w / 2", "B9_ExtMid")
     b9_thick_mid = sp.off_plane(b9_c, b9_c.xYConstructionPlane,
                                  "b9_h / 2", "B9_ThickMid")
 
-    b9_left_pl = b9_c.xZConstructionPlane
+    # Left plane: xZ offset by b9_y (Y of grid slot)
+    b9_left_pl = sp.off_plane(b9_c, b9_c.xZConstructionPlane,
+                               b9_y, "B9_LeftPl")
     sk, pr = sp.sketch_rect_model(b9_c, b9_left_pl,
-        ("0 in", "0 in", "b9_t"),
+        (b9_x, b9_y, "b9_t"),
         {"x": "b9_l", "z": "b9_h - 2 * b9_t"}, "B9_Left_Sk", ctx.ev)
     b9_left = sp.ext_new(b9_c, pr, "b9_t", "B9_Left").bodies.item(0)
     b9_left.name = "B9_Left"
@@ -349,32 +375,18 @@ def run(context):
                  prefix="dt9", name="B9", ev=ctx.ev,
                  fl_plane=b9_left_pl,
                  front_expr="0 in",
-                 joint_axis="x", thick_axis="z")
+                 joint_axis="x", thick_axis="z",
+                 joint_base_expr=b9_x)
 
     b9_n = b9_c.bRepBodies.count
     assert b9_n == 4, f"B9: expected 4, got {b9_n}"
-
-    # Translate to grid slot (2, 1) via MoveFeature — bakes into the
-    # timeline so the position survives later recomputes (occurrence
-    # transforms get reset when apply_appearance or other post-build
-    # steps trigger a recompute).
-    gx_cm = ctx.ev("grid_x"); gy_cm = ctx.ev("grid_y")
-    xfB9 = adsk.core.Matrix3D.create()
-    xfB9.setCell(0, 3, 2 * gx_cm)
-    xfB9.setCell(1, 3, 1 * gy_cm)
-    mc_b9 = adsk.core.ObjectCollection.create()
-    for i in range(b9_c.bRepBodies.count):
-        mc_b9.add(b9_c.bRepBodies.item(i))
-    mi_b9 = b9_c.features.moveFeatures.createInput2(mc_b9)
-    mi_b9.defineAsFreeMove(xfB9)
-    b9_c.features.moveFeatures.add(mi_b9).name = "B9_Move"
     print("B9: PASS\n")
 
     # ================================================================
-    # B10 @ (3,1): 4-corner, joint along Y, 6x8x5
-    # Built at origin; translated via occurrence transform.
+    # B10 @ (3,1): 4-corner, joint along Y, 6x8x5 — built in place
     # ================================================================
     print("=" * 50 + "\nB10 @ (3,1): 4-corner, joint along Y, 6x8x5\n" + "=" * 50)
+    b10_x, b10_y = slot(3, 1)
     _add_param("b10_l", "6 in", "in", "B10 length (X)")
     _add_param("b10_w", "8 in", "in", "B10 width (Y)")
     _add_param("b10_h", "5 in", "in", "B10 height (Z)")
@@ -387,23 +399,27 @@ def run(context):
     b10_occ = sp.make_comp(root, "B10")
     b10_c = b10_occ.component
 
-    b10_front_pl = b10_c.yZConstructionPlane
+    # Front: yZ plane offset to X=b10_x
+    b10_front_pl = sp.off_plane(b10_c, b10_c.yZConstructionPlane,
+                                 b10_x, "B10_FrontPl")
     sk, pr = sp.sketch_rect_model(b10_c, b10_front_pl,
-        ("0 in", "0 in", "0 in"),
+        (b10_x, b10_y, "0 in"),
         {"y": "b10_w", "z": "b10_h"}, "B10_Front_Sk", ctx.ev)
     b10_front = sp.ext_new(b10_c, pr, "b10_t", "B10_Front").bodies.item(0)
     b10_front.name = "B10_Front"
 
+    # Back: yZ plane offset to X=b10_x + b10_l - b10_t
     b10_back_pl = sp.off_plane(b10_c, b10_c.yZConstructionPlane,
-                                "b10_l - b10_t", "B10_Back_Pl")
+                                f"{b10_x} + b10_l - b10_t", "B10_Back_Pl")
     sk, pr = sp.sketch_rect_model(b10_c, b10_back_pl,
-        ("b10_l - b10_t", "0 in", "0 in"),
+        (f"{b10_x} + b10_l - b10_t", b10_y, "0 in"),
         {"y": "b10_w", "z": "b10_h"}, "B10_Back_Sk", ctx.ev)
     b10_back = sp.ext_new(b10_c, pr, "b10_t", "B10_Back").bodies.item(0)
     b10_back.name = "B10_Back"
 
+    # Left: xY plane (Z=0), inset by b10_t in X and at grid slot in Y
     sk, pr = sp.sketch_rect_model(b10_c, b10_c.xYConstructionPlane,
-        ("b10_t", "0 in", "0 in"),
+        (f"{b10_x} + b10_t", b10_y, "0 in"),
         {"x": "b10_l - 2 * b10_t", "y": "b10_w"}, "B10_Left_Sk", ctx.ev)
     b10_left = sp.ext_new(b10_c, pr, "b10_t", "B10_Left").bodies.item(0)
     b10_left.name = "B10_Left"
@@ -416,34 +432,28 @@ def run(context):
     b10_right.name = "B10_Right"
 
     b10_x_mid = sp.off_plane(b10_c, b10_c.yZConstructionPlane,
-                              "b10_l / 2", "B10_XMid")
+                              f"{b10_x} + b10_l / 2", "B10_XMid")
 
     dovetail.box(b10_c, b10_front, b10_left,
                  b10_z_mid, b10_x_mid, thick_expr="b10_t",
                  right=b10_right, back=b10_back,
                  prefix="dt10", name="B10", ev=ctx.ev,
                  fl_plane=b10_c.xYConstructionPlane,
-                 front_expr="0 in",
+                 front_expr=b10_x,
                  joint_axis="y", thick_axis="x",
-                 joint_base_expr="0 in")
+                 joint_base_expr=b10_y)
 
     b10_n = b10_c.bRepBodies.count
     assert b10_n == 4, f"B10: expected 4, got {b10_n}"
-
-    # Translate to grid slot (3, 1) via MoveFeature.
-    xfB10 = adsk.core.Matrix3D.create()
-    xfB10.setCell(0, 3, 3 * gx_cm)
-    xfB10.setCell(1, 3, 1 * gy_cm)
-    mc_b10 = adsk.core.ObjectCollection.create()
-    for i in range(b10_c.bRepBodies.count):
-        mc_b10.add(b10_c.bRepBodies.item(i))
-    mi_b10 = b10_c.features.moveFeatures.createInput2(mc_b10)
-    mi_b10.defineAsFreeMove(xfB10)
-    b10_c.features.moveFeatures.add(mi_b10).name = "B10_Move"
     print("B10: PASS\n")
 
     # ================================================================
     # B11 @ (0,2): 4-corner rotated to (1,1,1)/√3
+    # Rotation can't be baked into sketches, so we compute the
+    # occurrence transform FIRST and pass it to build_box so the
+    # component is placed at creation time. Bodies are built at
+    # component-local coords; the occurrence carries rotation +
+    # translation into world space.
     # ================================================================
     print("=" * 50 + "\nB11 @ (0,2): 4-corner rotated to (1,1,1)\n" + "=" * 50)
     _add_param("b11_l", "6 in", "in", "B11 length")
@@ -453,27 +463,23 @@ def run(context):
     dovetail.define_params(params, prefix="dt11",
         angle="8 deg", tail_w="0.5 in", tail_count="3",
         joint_h_expr="b11_h", thick_expr="b11_t")
-    r11 = build_box(root, "B11", "b11_l", "b11_w", "b11_h", "b11_t",
-                    "0 in", "dt11", ctx.ev)
-    assert r11["count"] == 4
 
     # Orthonormal basis: X→(-1,1,0)/√2, Y→(-1,-1,2)/√6, Z→(1,1,1)/√3.
-    # Translate to grid slot (0, 2) with z-margin for the rotated body.
+    gx_cm = ctx.ev("grid_x"); gy_cm = ctx.ev("grid_y")
     s3, s2, s6 = 1/math.sqrt(3), 1/math.sqrt(2), 1/math.sqrt(6)
-    xf = adsk.core.Matrix3D.create()
-    xf.setCell(0, 0, -s2); xf.setCell(1, 0, s2); xf.setCell(2, 0, 0)
-    xf.setCell(0, 1, -s6); xf.setCell(1, 1, -s6); xf.setCell(2, 1, 2*s6)
-    xf.setCell(0, 2, s3);  xf.setCell(1, 2, s3);  xf.setCell(2, 2, s3)
-    xf.setCell(0, 3, 0 * gx_cm + 6 * 2.54)   # col 0 + small x-nudge
-    xf.setCell(1, 3, 2 * gy_cm)              # row 2
-    xf.setCell(2, 3, 5 * 2.54)
-    mc_b11 = adsk.core.ObjectCollection.create()
-    for i in range(r11["comp"].bRepBodies.count):
-        mc_b11.add(r11["comp"].bRepBodies.item(i))
-    mi_b11 = r11["comp"].features.moveFeatures.createInput2(mc_b11)
-    mi_b11.defineAsFreeMove(xf)
-    r11["comp"].features.moveFeatures.add(mi_b11).name = "B11_Move"
-    print("B11: PASS (rotated)\n")
+    xf11 = adsk.core.Matrix3D.create()
+    xf11.setCell(0, 0, -s2); xf11.setCell(1, 0, s2); xf11.setCell(2, 0, 0)
+    xf11.setCell(0, 1, -s6); xf11.setCell(1, 1, -s6); xf11.setCell(2, 1, 2*s6)
+    xf11.setCell(0, 2, s3);  xf11.setCell(1, 2, s3);  xf11.setCell(2, 2, s3)
+    xf11.setCell(0, 3, 0 * gx_cm + 6 * 2.54)   # col 0 + small x-nudge
+    xf11.setCell(1, 3, 2 * gy_cm)              # row 2
+    xf11.setCell(2, 3, 5 * 2.54)
+
+    r11 = build_box(root, "B11", "b11_l", "b11_w", "b11_h", "b11_t",
+                    "0 in", "dt11", ctx.ev,
+                    occ_transform=xf11)
+    assert r11["count"] == 4
+    print("B11: PASS (placed at creation)\n")
 
     # ================================================================
     # B12 @ (1,2): 1-corner 8x6x4 — WIDE TAILS / ULTRA-THIN PINS
@@ -513,11 +519,8 @@ def run(context):
     dovetail.define_params(params, prefix="dt13",
         angle="8 deg", tail_w="0.5 in", tail_count="3",
         joint_h_expr="b13_h", thick_expr="b13_t")
-    r13 = build_box(root, "B13", "b13_l", "b13_w", "b13_h", "b13_t",
-                    "0 in", "dt13", ctx.ev)
-    assert r13["count"] == 4
-
-    # Axis-angle rotation: 42° about (1,2,1)/√6.
+    # 42° axis-angle rotation about (1,2,1)/√6, placed at creation time
+    # (same reason as B11).
     ax_raw = (1.0, 2.0, 1.0)
     ax_m = math.sqrt(sum(c*c for c in ax_raw))
     ax = tuple(c / ax_m for c in ax_raw)
@@ -529,20 +532,115 @@ def run(context):
         [uy*ux*one_c + uz*s_t, c_t + uy*uy*one_c,    uy*uz*one_c - ux*s_t],
         [uz*ux*one_c - uy*s_t, uz*uy*one_c + ux*s_t, c_t + uz*uz*one_c],
     ]
-    xf2 = adsk.core.Matrix3D.create()
+    xf13 = adsk.core.Matrix3D.create()
     for r_ in range(3):
         for c_ in range(3):
-            xf2.setCell(r_, c_, rot[r_][c_])
-    xf2.setCell(0, 3, 2 * gx_cm + 3 * 2.54)  # col 2 + nudge toward slot centre
-    xf2.setCell(1, 3, 2 * gy_cm + 3 * 2.54)  # row 2
-    xf2.setCell(2, 3, 4 * 2.54)
-    mc_b13 = adsk.core.ObjectCollection.create()
-    for i in range(r13["comp"].bRepBodies.count):
-        mc_b13.add(r13["comp"].bRepBodies.item(i))
-    mi_b13 = r13["comp"].features.moveFeatures.createInput2(mc_b13)
-    mi_b13.defineAsFreeMove(xf2)
-    r13["comp"].features.moveFeatures.add(mi_b13).name = "B13_Move"
-    print("B13: PASS (rotated)\n")
+            xf13.setCell(r_, c_, rot[r_][c_])
+    xf13.setCell(0, 3, 2 * gx_cm + 3 * 2.54)  # col 2 + nudge toward slot centre
+    xf13.setCell(1, 3, 2 * gy_cm + 3 * 2.54)  # row 2
+    xf13.setCell(2, 3, 4 * 2.54)
+
+    r13 = build_box(root, "B13", "b13_l", "b13_w", "b13_h", "b13_t",
+                    "0 in", "dt13", ctx.ev,
+                    occ_transform=xf13)
+    assert r13["count"] == 4
+    print("B13: PASS (placed at creation)\n")
+
+    # ================================================================
+    # C1 @ (3,2): dovetail.corner() — intra-component
+    # Exercises the unified corner() API with pin + tail bodies in the
+    # same component (simplest case).
+    # ================================================================
+    print("=" * 50 + "\nC1 @ (3,2): corner() intra-component\n" + "=" * 50)
+    c1_x, c1_y = slot(3, 2)
+    _add_param("c1_l", "8 in", "in", "C1 length")
+    _add_param("c1_w", "6 in", "in", "C1 width")
+    _add_param("c1_h", "4 in", "in", "C1 height")
+    _add_param("c1_t", "0.5 in", "in", "C1 thickness")
+    dovetail.define_params(params, prefix="dtc1",
+        angle="8 deg", tail_w="0.5 in", tail_count="3",
+        joint_h_expr="c1_h", thick_expr="c1_t")
+
+    c1_occ = sp.make_comp(root, "C1")
+    c1_comp = c1_occ.component
+    # Pin board (Front) on xZ plane
+    c1_front_pl = sp.off_plane(c1_comp, c1_comp.xZConstructionPlane,
+                                c1_y, "C1_FrontYPl")
+    sk, pr = sp.sketch_rect_model(c1_comp, c1_front_pl,
+        (c1_x, c1_y, "0 in"),
+        {"x": "c1_l", "z": "c1_h"}, "C1_Front_Sk", ctx.ev)
+    c1_front = sp.ext_new(c1_comp, pr, "c1_t", "C1_Front").bodies.item(0)
+    c1_front.name = "C1_Front"
+    # Tail board (Left) on yZ plane, inset by t on the front side
+    c1_left_pl = sp.off_plane(c1_comp, c1_comp.yZConstructionPlane,
+                               c1_x, "C1_LeftXPl")
+    sk, pr = sp.sketch_rect_model(c1_comp, c1_left_pl,
+        (c1_x, f"{c1_y} + c1_t", "0 in"),
+        {"y": "c1_w - 2 * c1_t", "z": "c1_h"}, "C1_Left_Sk", ctx.ev)
+    c1_left = sp.ext_new(c1_comp, pr, "c1_t", "C1_Left").bodies.item(0)
+    c1_left.name = "C1_Left"
+    # Direct corner() — pin+tail in same comp, combine lives in c1_comp
+    dovetail.corner(
+        pin_body=c1_front, tail_body=c1_left, plane=c1_left_pl,
+        x_model=ctx.ev(c1_x), y_wide=ctx.ev(c1_y),
+        y_narrow=ctx.ev(c1_y) + ctx.ev("c1_t"),
+        y_wide_expr=c1_y, thick_expr="c1_t", dist_expr="c1_t",
+        name="C1_DT", prefix="dtc1", ev=ctx.ev)
+    assert c1_comp.bRepBodies.count == 2, \
+        f"C1: expected 2 bodies, got {c1_comp.bRepBodies.count}"
+    print("C1: PASS (intra-component corner)\n")
+
+    # ================================================================
+    # C2 @ (4,2): dovetail.corner() — cross-component
+    # Exercises the unified corner() API with pin + tail bodies in
+    # SEPARATE components under root. The final combine lives at root
+    # and uses assembly-context proxies on both bodies.
+    # ================================================================
+    print("=" * 50 + "\nC2 @ (4,2): corner() cross-component\n" + "=" * 50)
+    c2_x, c2_y = slot(4, 2)
+    _add_param("c2_l", "8 in", "in", "C2 length")
+    _add_param("c2_w", "6 in", "in", "C2 width")
+    _add_param("c2_h", "4 in", "in", "C2 height")
+    _add_param("c2_t", "0.5 in", "in", "C2 thickness")
+    dovetail.define_params(params, prefix="dtc2",
+        angle="8 deg", tail_w="0.5 in", tail_count="3",
+        joint_h_expr="c2_h", thick_expr="c2_t")
+
+    # Front in its own component
+    c2_fo = sp.make_comp(root, "C2_Front")
+    c2_fc = c2_fo.component
+    c2_fp = sp.off_plane(c2_fc, c2_fc.xZConstructionPlane,
+                         c2_y, "C2_Front_YPl")
+    sk, pr = sp.sketch_rect_model(c2_fc, c2_fp,
+        (c2_x, c2_y, "0 in"),
+        {"x": "c2_l", "z": "c2_h"}, "C2_Front_Sk", ctx.ev)
+    c2_front = sp.ext_new(c2_fc, pr, "c2_t", "C2_Front").bodies.item(0)
+    c2_front.name = "C2_Front"
+
+    # Left in its own component
+    c2_lo = sp.make_comp(root, "C2_Left")
+    c2_lc = c2_lo.component
+    c2_lp = sp.off_plane(c2_lc, c2_lc.yZConstructionPlane,
+                         c2_x, "C2_Left_XPl")
+    sk, pr = sp.sketch_rect_model(c2_lc, c2_lp,
+        (c2_x, f"{c2_y} + c2_t", "0 in"),
+        {"y": "c2_w - 2 * c2_t", "z": "c2_h"}, "C2_Left_Sk", ctx.ev)
+    c2_left = sp.ext_new(c2_lc, pr, "c2_t", "C2_Left").bodies.item(0)
+    c2_left.name = "C2_Left"
+
+    # Direct corner() — pin+tail in DIFFERENT comps; corner() detects
+    # this via body.parentComponent and routes the final combine to root
+    # with createForAssemblyContext proxies.
+    dovetail.corner(
+        pin_body=c2_front, tail_body=c2_left, plane=c2_lp,
+        x_model=ctx.ev(c2_x), y_wide=ctx.ev(c2_y),
+        y_narrow=ctx.ev(c2_y) + ctx.ev("c2_t"),
+        y_wide_expr=c2_y, thick_expr="c2_t", dist_expr="c2_t",
+        name="C2_DT", prefix="dtc2", ev=ctx.ev)
+    c2_total = c2_fc.bRepBodies.count + c2_lc.bRepBodies.count
+    assert c2_total == 2, \
+        f"C2: expected 2 bodies across 2 comps, got {c2_total}"
+    print("C2: PASS (cross-component corner)\n")
 
     # ================================================================
     # Summary
@@ -559,7 +657,9 @@ def run(context):
     # B1, B2, B12     : 2 bodies each (1-corner)     = 6
     # B3, B4          : 3 bodies each (2-corner)     = 6
     # B5, B6, B9, B10, B11, B13: 4 bodies each       = 24
-    expected = 2 * 3 + 3 * 2 + 4 * 6  # = 36
+    # C1              : 2 bodies (corner intra)      = 2
+    # C2_Front, C2_Left: 1 body each (corner cross)  = 2
+    expected = 2 * 3 + 3 * 2 + 4 * 6 + 2 + 2  # = 40
     status = "PASS" if total == expected else "FAIL"
     print(f"\n{status}: expected {expected} bodies, got {total}")
 

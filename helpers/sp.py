@@ -651,12 +651,24 @@ def mirror_feats(comp, features, plane, name="Mirror"):
     return m
 
 
-def make_comp(root_comp, name):
+def make_comp(root_comp, name, transform=None):
     """Create a new component under root_comp.
 
-    Returns the Occurrence (access component via ``occ.component``).
+    Args:
+        root_comp: Parent component (typically design root).
+        name: New component name.
+        transform: Optional ``Matrix3D`` placing the occurrence in the
+            parent's space. If ``None``, creates at identity. Baking the
+            transform in at creation time is the reliable way to place
+            a rotated/translated occurrence — setting ``occurrence.
+            transform2`` AFTER bodies are built is silently rejected by
+            Fusion in many cases.
+
+    Returns:
+        The Occurrence (access component via ``occ.component``).
     """
-    occ = root_comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    xf = transform if transform is not None else adsk.core.Matrix3D.create()
+    occ = root_comp.occurrences.addNewComponent(xf)
     occ.component.name = name
     return occ
 
