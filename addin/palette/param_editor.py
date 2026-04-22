@@ -122,7 +122,10 @@ def _refresh_callback(data):
 
         from tools.execute_script import handler as exec_handler
         start = time.time()
-        result = exec_handler(script=patched_script, clean=True)
+        # Palette Rebuild is explicit user action — bypass the clean=True
+        # provenance guard (may legitimately fire with needsSync=true right
+        # after an add-in restart when the user edits params and rebuilds).
+        result = exec_handler(script=patched_script, clean=True, force_clean=True)
         elapsed = round(time.time() - start, 1)
         is_error = result.get("isError", False)
         app.log(f"ParamEditor: rebuild {'FAILED' if is_error else 'OK'} in {elapsed}s")

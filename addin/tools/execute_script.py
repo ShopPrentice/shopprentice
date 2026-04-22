@@ -5,6 +5,7 @@ Execute Fusion API Python scripts within a transaction.
 Adapted from Fusion MCP Addin's execute_api_script.
 """
 
+import hashlib
 import os
 import re
 import tempfile
@@ -114,6 +115,132 @@ def _execute_sandbox(script):
                 pass
 
 
+def _check_clean_safe(script):
+    """Return error dict if clean=True would destroy untracked or unsynced work.
+
+    The invariant: clean=True wipes the entire timeline + user parameters.
+    It must only run when the add-in knows the active document was built by
+    a tracked script AND there are no pending UI changes. Otherwise, the
+    user's manual geometry (or edits since last sync) would be destroyed.
+
+    Returns None when clean=True is safe to proceed; returns an MCP error
+    dict (with a decision-tree remediation) when it should be blocked.
+
+    Three ways to pass:
+      1. Empty design (nothing to lose)
+      2. Tracked doc, pendingChanges == 0, not needsSync
+      3. Tracked doc, pendingChanges == 0, needsSync=true BUT the script
+         being executed hashes identically to the tracked script — i.e. the
+         agent is rebuilding the same script after an add-in restart and
+         there is no drift to lose. sync_script couldn't discover anything
+         useful in this case anyway, since ActionLog was also restarted.
+
+    pendingChanges is counted only for entries that the ActionLog recorded
+    as genuinely model-changing — its SKIP_COMMANDS and empty-diff filter
+    already screen out camera/selection/view-style changes, so a non-zero
+    count is always a real signal.
+    """
+    import adsk.fusion
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    if not design:
+        return None  # no design, clean is a no-op
+
+    if design.timeline.count == 0 and design.userParameters.count == 0:
+        return None  # empty doc — nothing to lose
+
+    try:
+        from server.document_tracker import DocumentTracker
+        status = DocumentTracker.get_status()
+    except Exception:
+        # Fail-open if the tracker is unavailable — don't break the tool
+        # because of a guard infrastructure problem.
+        return None
+
+    if not status.get("tracked"):
+        return {
+            "content": [{
+                "type": "text",
+                "text": (
+                    "clean=True rejected: active document is not tracked "
+                    "(tracked=false). The timeline has features or parameters "
+                    "not built by a known script, so clean=True would destroy "
+                    "manually-built geometry.\n\n"
+                    "DECIDE WHAT THE USER WANTS:\n"
+                    "  (a) If they want to ADD features (dovetails, grooves, "
+                    "joinery) to this existing model — use additive mode. "
+                    "Call execute_script WITHOUT clean=True. Look up existing "
+                    "bodies by name (walk root.allOccurrences, match "
+                    "component.name + bRepBodies) and append sketches / "
+                    "extrudes / CUTs to the timeline. Ctrl+Z reverts just the "
+                    "addition.\n"
+                    "  (b) If they explicitly want to start over from scratch "
+                    "— ASK first: \"this will erase your existing model. OK to "
+                    "proceed?\" then pass force_clean=true.\n\n"
+                    "Do NOT silently pass force_clean=true. When uncertain, ask "
+                    "the user what they intend."
+                )
+            }],
+            "isError": True,
+            "message": "clean=True blocked on untracked document",
+        }
+
+    pending = status.get("pendingChanges", 0) or 0
+    needs_sync = bool(status.get("needsSync"))
+
+    # Fix #1: soft-pass needsSync when rebuilding the same tracked script.
+    # After an add-in restart we only have the script-on-disk to go by; if
+    # the script being executed matches, there's nothing for sync_script to
+    # discover (ActionLog was reset too) and blocking just gets the user
+    # stuck on an innocuous restart.
+    if needs_sync and pending == 0:
+        try:
+            tracked_hash = DocumentTracker._script_hash
+            current_hash = hashlib.sha256(script.encode()).hexdigest()
+            if tracked_hash and current_hash == tracked_hash:
+                return None  # same script, no drift — safe to rebuild
+        except Exception:
+            pass  # fall through to the normal rejection path
+
+    if pending > 0 or needs_sync:
+        detail = f"pendingChanges={pending}"
+        if needs_sync:
+            detail += ", needsSync=true"
+        return {
+            "content": [{
+                "type": "text",
+                "text": (
+                    f"clean=True rejected: document has unsynced UI changes "
+                    f"({detail}). clean=True would discard them.\n\n"
+                    "RESOLUTION STEPS (do them in order):\n"
+                    "  1. Call sync_script. One of three things happens:\n"
+                    "     a. All changes auto-applied (applied list non-empty, "
+                    "needsAgent empty): retry execute_script with clean=True.\n"
+                    "     b. Structural changes need agent attention "
+                    "(needsAgent list non-empty): read each item, edit the "
+                    "script to include those features, then retry with "
+                    "clean=True.\n"
+                    "     c. sync_script fails or reports nothing resolvable: "
+                    "go to step 2.\n"
+                    "  2. When sync_script cannot make progress, ASK THE "
+                    "USER. Summarize what the document shows vs what the "
+                    "script produces, and offer three choices:\n"
+                    "     - (i) Investigate the UI changes first (you read "
+                    "the doc, explain what's there).\n"
+                    "     - (ii) Incorporate the changes into the script "
+                    "manually (you extend the script, then clean=True).\n"
+                    "     - (iii) Discard the UI changes and rebuild from "
+                    "script as-is (pass force_clean=true).\n\n"
+                    "NEVER silently pass force_clean=true when there may be "
+                    "user work to lose. It is always better to ask."
+                )
+            }],
+            "isError": True,
+            "message": "clean=True blocked on unsynced document",
+        }
+
+    return None
+
+
 def _clean_design():
     """Delete all timeline features and user parameters from the active design."""
     import adsk.fusion
@@ -150,7 +277,8 @@ def _clean_design():
             pass
 
 
-def handler(script: str, sandbox: bool = False, clean: bool = False, script_path: str = None) -> dict:
+def handler(script: str, sandbox: bool = False, clean: bool = False,
+            script_path: str = None, force_clean: bool = False) -> dict:
     """Execute a Fusion API Python script."""
 
     run_function_match = re.search(r'def\s+run\s*\(\s*(\w+)\s*\):', script)
@@ -185,6 +313,15 @@ def handler(script: str, sandbox: bool = False, clean: bool = False, script_path
 
     if sandbox:
         return _execute_sandbox(script)
+
+    # Guard: clean=True destroys the timeline + user parameters. Only allow
+    # it on documents the add-in knows were built by a tracked script AND
+    # have no unsynced UI changes. force_clean=True bypasses the check for
+    # the rare "I really do want to wipe this doc" case.
+    if clean and not force_clean:
+        guard_result = _check_clean_safe(script)
+        if guard_result is not None:
+            return guard_result
 
     temp_file = None
     transaction_started = False
@@ -349,7 +486,9 @@ Helper library: Scripts can `from helpers import sp` to use shared utilities:
 
 Sandbox mode: Set sandbox=true to run the script in a temporary document. Returns a design snapshot without modifying the user's active document. Useful for validating scripts before committing to the real design.
 
-Clean rebuild: Set clean=true to delete all existing timeline features and user parameters before running the script. The clean step and script execution are wrapped in a single transaction — the user can Ctrl+Z to revert the entire operation back to the previous model state. Use this when re-executing a modified script on a document that already has a model.
+Modes:
+- Additive (default, clean=false or omitted): the script appends features to the existing timeline. Safe on any document — existing bodies, parameters, and appearances are preserved. Ctrl+Z reverts just the appended features. Use this whenever adding features to an existing model.
+- Clean rebuild (clean=true): deletes all timeline features + user parameters, then runs the script. Whole operation wrapped in one transaction; Ctrl+Z reverts everything. Guarded — rejected on untracked or unsynced documents to prevent destroying manual work. The rejection message tells you what to do next. force_clean=true overrides the guard; use only when you truly intend to wipe the document.
 """
 
 tool = Tool.create_simple(
@@ -365,12 +504,17 @@ tool = Tool.create_simple(
 ).add_input_property(
     "clean", {
         "type": "boolean",
-        "description": "Delete all existing features and parameters before running. Enables clean rebuild of an existing model. Ctrl+Z reverts the entire operation."
+        "description": "Delete all existing features and parameters before running. Enables clean rebuild of an existing model. Ctrl+Z reverts the entire operation. Rejected on untracked or unsynced documents — use the default (additive mode) to modify an existing model."
     }
 ).add_input_property(
     "script_path", {
         "type": "string",
         "description": "File path of the script on disk. Tracked for palette parameter sync — palette Rebuild writes param changes back to this file."
+    }
+).add_input_property(
+    "force_clean", {
+        "type": "boolean",
+        "description": "Bypass the clean=true safety check and wipe the document regardless of provenance. Use only when you genuinely intend to discard the current document contents (e.g., starting a completely new build over an untracked model)."
     }
 ).add_required_input("script").strict_schema()
 
