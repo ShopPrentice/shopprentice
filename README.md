@@ -156,6 +156,7 @@ Projects are saved to `~/shopprentice-projects/<project-name>/` with a script an
 
 ## Roadmap
 
+- **Real slab modeling** — capture the actual figure, grain, sapwood, knots, and live-edge profile of specific boards from photos and use them as the model's bodies. Essential for Nakashima-style live-edge work, bookmatched tops, and any piece where the soul is in *this* slab, not a generic walnut texture. Workflow: photograph your slabs → extract outline + grain map → ShopPrentice builds the model around the real material.
 - **Advanced curved forms** — bent laminations, cabriole legs, steam-bent backs, Chinese traditional furniture (sculpted organic solids, turned parts, scooped surfaces, and lofted bodies are already supported — see Organic Shapes above)
 - **More joinery** — castle joint, sliding dovetail, Japanese joinery (mortise & tenon, dovetail, box joint, domino, drawbore, dowel, dado/rabbet, lap, bridle, miter, spline, pocket hole, and wedged tenon are already implemented)
 - **Output** — cut lists, CNC toolpath hints, shop drawings
