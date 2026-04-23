@@ -43,7 +43,7 @@ cd shopprentice
 
 The installer creates a `~/.shopprentice/repo` symlink pointing at your clone, so any `git pull` in the clone immediately updates the installed skill.
 
-For Codex, the installer creates a symlink at `~/.codex/skills/woodworking` pointing back into the repo. It refuses to overwrite an existing non-ShopPrentice Codex skill at that path.
+For Codex, the installer creates a managed skill directory at `~/.codex/skills/woodworking`, generates a local `WOODWORKING.md` from the canonical `commands/woodworking.md`, applies the user's screenshot-mode config, and rewrites repo references to absolute paths. It refuses to overwrite an existing non-ShopPrentice Codex skill at that path.
 
 ## Model Compatibility
 

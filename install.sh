@@ -19,6 +19,46 @@ AUTOFUSION_HOME="$HOME/.shopprentice"
 REPO_DIR="$AUTOFUSION_HOME/repo"
 REPO_URL="https://github.com/ShopPrentice/shopprentice.git"
 
+ensure_config_file() {
+    CONFIG_FILE="$AUTOFUSION_HOME/config.json"
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo '{"screenshots": "none"}' > "$CONFIG_FILE"
+        echo "Created default config: $CONFIG_FILE"
+    fi
+}
+
+load_screenshot_mode() {
+    ensure_config_file
+    echo "Applying config from $CONFIG_FILE"
+    SS_MODE=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('screenshots','final-only'))" 2>/dev/null || echo "final-only")
+    case "$SS_MODE" in
+        none)
+            SS_TEXT="**Screenshot mode: none** — do NOT call \`get_product_shots\` or \`get_screenshot\` at any point. Use \`validate_design\` for all checks. Report validation results as text only. This setting overrides any screenshot instructions in topic files."
+            ;;
+        every-step)
+            SS_TEXT="**Screenshot mode: every-step** — call \`get_screenshot\` after each component for visual validation, and \`get_product_shots\` at the end. Do NOT Read the image files — report paths to the user. This setting overrides any screenshot instructions in topic files."
+            ;;
+        *)
+            SS_TEXT="**Screenshot mode: final-only** — call \`get_product_shots\` ONCE at the very end after \`apply_appearance\`. Do NOT call \`get_screenshot\` or \`get_product_shots\` mid-build. Use \`validate_design\` for intermediate checks. This setting overrides any screenshot instructions in topic files."
+            ;;
+    esac
+}
+
+patch_screenshot_mode() {
+    local target_file="$1"
+    python3 -c "
+import re
+with open('$target_file') as f:
+    content = f.read()
+content = re.sub(
+    r'<!-- SHOPPRENTICE_SCREENSHOT_MODE:.*?-->.*?<!-- END_SCREENSHOT_MODE -->',
+    '<!-- SHOPPRENTICE_SCREENSHOT_MODE: $SS_MODE -->\n$SS_TEXT\n<!-- END_SCREENSHOT_MODE -->',
+    content, flags=re.DOTALL)
+with open('$target_file', 'w') as f:
+    f.write(content)
+" 2>/dev/null
+}
+
 # --- Parse flags ---
 opt_claude_code=false
 opt_codex=false
@@ -116,36 +156,61 @@ if [ "$opt_codex" = true ]; then
     echo "--- Codex ---"
 
     CODEX_SKILLS_DIR="$HOME/.codex/skills"
-    CODEX_SKILL_LINK="$CODEX_SKILLS_DIR/woodworking"
-    CODEX_SKILL_SRC="$REPO_DIR/codex/woodworking"
+    CODEX_SKILL_DIR="$CODEX_SKILLS_DIR/woodworking"
+    CODEX_SKILL_TEMPLATE_DIR="$REPO_DIR/codex/woodworking"
+    CODEX_MANAGED_MARKER="$CODEX_SKILL_DIR/.shopprentice-managed"
+    CODEX_SKILL_TEMPLATE_REAL=$(python3 -c "import os; print(os.path.realpath('$CODEX_SKILL_TEMPLATE_DIR'))")
 
     mkdir -p "$CODEX_SKILLS_DIR"
 
-    if [ ! -f "$CODEX_SKILL_SRC/SKILL.md" ]; then
-        echo "Error: Codex skill source missing at $CODEX_SKILL_SRC"
+    if [ ! -f "$CODEX_SKILL_TEMPLATE_DIR/SKILL.md" ]; then
+        echo "Error: Codex skill source missing at $CODEX_SKILL_TEMPLATE_DIR"
         exit 1
     fi
 
-    if [ -e "$CODEX_SKILL_LINK" ] || [ -L "$CODEX_SKILL_LINK" ]; then
-        if [ -L "$CODEX_SKILL_LINK" ]; then
-            EXISTING_TARGET="$(readlink "$CODEX_SKILL_LINK")"
-            if [ "$EXISTING_TARGET" = "$CODEX_SKILL_SRC" ]; then
-                echo "Codex skill already linked at $CODEX_SKILL_LINK"
+    if [ -e "$CODEX_SKILL_DIR" ] || [ -L "$CODEX_SKILL_DIR" ]; then
+        if [ -L "$CODEX_SKILL_DIR" ]; then
+            EXISTING_TARGET="$(readlink "$CODEX_SKILL_DIR")"
+            EXISTING_TARGET_REAL="$(python3 -c "import os; print(os.path.realpath('$EXISTING_TARGET'))")"
+            if [ "$EXISTING_TARGET_REAL" = "$CODEX_SKILL_TEMPLATE_REAL" ]; then
+                rm "$CODEX_SKILL_DIR"
+                echo "Migrating previous ShopPrentice Codex symlink install to managed directory"
             else
-                echo "Error: $CODEX_SKILL_LINK already exists and points to:"
+                echo "Error: $CODEX_SKILL_DIR already exists and points to:"
                 echo "  $EXISTING_TARGET"
                 echo "Refusing to overwrite a non-ShopPrentice Codex skill."
                 exit 1
             fi
+        elif [ -f "$CODEX_MANAGED_MARKER" ]; then
+            rm -rf "$CODEX_SKILL_DIR"
         else
-            echo "Error: $CODEX_SKILL_LINK already exists and is not a symlink."
+            echo "Error: $CODEX_SKILL_DIR already exists and is not a ShopPrentice-managed install."
             echo "Refusing to overwrite an existing local Codex skill."
             exit 1
         fi
-    else
-        ln -s "$CODEX_SKILL_SRC" "$CODEX_SKILL_LINK"
-        echo "Installed woodworking skill to $CODEX_SKILL_LINK -> $CODEX_SKILL_SRC"
     fi
+
+    mkdir -p "$CODEX_SKILL_DIR"
+    load_screenshot_mode
+
+    cp "$REPO_DIR/commands/woodworking.md" "$CODEX_SKILL_DIR/WOODWORKING.md"
+    patch_screenshot_mode "$CODEX_SKILL_DIR/WOODWORKING.md" && echo "  Screenshot mode: $SS_MODE"
+    python3 -c "
+from pathlib import Path
+path = Path('$CODEX_SKILL_DIR/WOODWORKING.md')
+content = path.read_text()
+content = content.replace('woodworking/', '$REPO_DIR/woodworking/')
+path.write_text(content)
+"
+
+    python3 -c "
+from pathlib import Path
+template = Path('$CODEX_SKILL_TEMPLATE_DIR/SKILL.md').read_text()
+template = template.replace('__REPO_DIR__', '$REPO_DIR')
+Path('$CODEX_SKILL_DIR/SKILL.md').write_text(template)
+"
+    printf '%s\n' "$REPO_DIR" > "$CODEX_MANAGED_MARKER"
+    echo "Installed woodworking skill to $CODEX_SKILL_DIR"
     echo
 fi
 
@@ -161,42 +226,8 @@ if [ "$opt_claude_code" = true ]; then
     sed 's|joinery/|'"$REPO_DIR"'/joinery/|g' "$REPO_DIR/commands/woodworking.md" \
         > "$CLAUDE_CMD_DIR/woodworking.md"
 
-    # Apply user config (create default if missing)
-    CONFIG_FILE="$AUTOFUSION_HOME/config.json"
-    if [ ! -f "$CONFIG_FILE" ]; then
-        echo '{"screenshots": "none"}' > "$CONFIG_FILE"
-        echo "Created default config: $CONFIG_FILE"
-    fi
-    if [ -f "$CONFIG_FILE" ]; then
-        echo "Applying config from $CONFIG_FILE"
-
-        # Screenshot mode
-        SS_MODE=$(python3 -c "import json; print(json.load(open('$CONFIG_FILE')).get('screenshots','final-only'))" 2>/dev/null || echo "final-only")
-        case "$SS_MODE" in
-            none)
-                SS_TEXT="**Screenshot mode: none** — do NOT call \`get_product_shots\` or \`get_screenshot\` at any point. Use \`validate_design\` for all checks. Report validation results as text only. This setting overrides any screenshot instructions in topic files."
-                ;;
-            every-step)
-                SS_TEXT="**Screenshot mode: every-step** — call \`get_screenshot\` after each component for visual validation, and \`get_product_shots\` at the end. Do NOT Read the image files — report paths to the user. This setting overrides any screenshot instructions in topic files."
-                ;;
-            *)
-                SS_TEXT="**Screenshot mode: final-only** — call \`get_product_shots\` ONCE at the very end after \`apply_appearance\`. Do NOT call \`get_screenshot\` or \`get_product_shots\` mid-build. Use \`validate_design\` for intermediate checks. This setting overrides any screenshot instructions in topic files."
-                ;;
-        esac
-
-        # Patch the screenshot mode block
-        python3 -c "
-import re, sys
-with open('$CLAUDE_CMD_DIR/woodworking.md') as f:
-    content = f.read()
-content = re.sub(
-    r'<!-- SHOPPRENTICE_SCREENSHOT_MODE:.*?-->.*?<!-- END_SCREENSHOT_MODE -->',
-    '<!-- SHOPPRENTICE_SCREENSHOT_MODE: $SS_MODE -->\n$SS_TEXT\n<!-- END_SCREENSHOT_MODE -->',
-    content, flags=re.DOTALL)
-with open('$CLAUDE_CMD_DIR/woodworking.md', 'w') as f:
-    f.write(content)
-" 2>/dev/null && echo "  Screenshot mode: $SS_MODE"
-    fi
+    load_screenshot_mode
+    patch_screenshot_mode "$CLAUDE_CMD_DIR/woodworking.md" && echo "  Screenshot mode: $SS_MODE"
 
     echo "Installed /woodworking skill to $CLAUDE_CMD_DIR/woodworking.md"
 
