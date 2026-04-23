@@ -476,7 +476,7 @@ def run(context):
     br_rail_p = bot_rail.createForAssemblyContext(back_occ)
 
     # Seat notch
-    sp.combine(root, seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
+    sp.combine(seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
 
     # Slat stub-mortises into rails
     all_slat_bodies = [vslat_body]
@@ -486,8 +486,8 @@ def run(context):
 
     slat_proxies = [b.createForAssemblyContext(back_occ) for b in all_slat_bodies]
     for i, slat_p in enumerate(slat_proxies):
-        sp.combine(root, tr_p, [slat_p], CUT, True, f"SlatMort_TR_{i}")
-        sp.combine(root, br_rail_p, [slat_p], CUT, True, f"SlatMort_BR_{i}")
+        sp.combine(tr_p, [slat_p], CUT, True, f"SlatMort_TR_{i}")
+        sp.combine(br_rail_p, [slat_p], CUT, True, f"SlatMort_BR_{i}")
 
     # Rail-to-post TILTED dominos (aligned with backrest cross-section)
     # Build manually: sketch tilted rectangle on dm_fl/dm_fr, extrude in X
@@ -530,8 +530,8 @@ def run(context):
         ext = root.features.extrudeFeatures.add(ext_inp)
         ext.name = name
         dm_body = ext.bodies.item(0); dm_body.name = name
-        sp.combine(root, rail_body, [dm_body], CUT, True, f"{name}_CutRail")
-        sp.combine(root, leg_body, [dm_body], CUT, True, f"{name}_CutLeg")
+        sp.combine(rail_body, [dm_body], CUT, True, f"{name}_CutRail")
+        sp.combine(leg_body, [dm_body], CUT, True, f"{name}_CutLeg")
         sk.isVisible = False
         return dm_body
 

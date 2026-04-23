@@ -7,10 +7,14 @@ Tests both variants and orientations using face-based sketching:
   Leg_Top_MT: Tenon on leg top face (Z+), extruded up into a top rail.
               Tests a different face orientation and reversed relationship
               (tenon on leg, mortise in rail).
+  Cross_Through_MT: Same as Through_MT but each board (LegL, LegR, Rail)
+              lives in its *own* component under root. Exercises
+              through()'s cross-component routing — the mortise CUT
+              must hop to root with assembly proxies via combine.
 
-Blind_MT / Through_MT: 2 legs (mirror) + 1 rail = 3 bodies each.
-Leg_Top_MT: 2 legs (mirror) + 1 top rail = 3 bodies.
-Total: 3 × 3 = 9 bodies.
+Blind_MT / Through_MT / Leg_Top_MT: 3 bodies each in one component.
+Cross_Through_MT: 3 bodies across 3 components (1 body each).
+Total: 4 × 3 = 12 bodies.
 """
 import adsk.core
 import adsk.fusion
@@ -28,6 +32,7 @@ def make_comp_at(root, name, x_cm=0.0):
 
 def build_frame(comp, prefix, ev):
     """Build 2 legs (mirror) + 1 rail between them."""
+    from helpers import sp
     p = prefix
 
     mid = sp.off_plane(comp, comp.yZConstructionPlane,
@@ -107,8 +112,8 @@ def run(context):
         depth_expr="bmt_td",
         tenon_body=rail, mortise_body=leg_r,
         name="bmt_R", ev=ctx.ev)
-    sp.combine(bmt_c, leg_l, [rail], CUT, True, "bmt_MortL")
-    sp.combine(bmt_c, leg_r, [rail], CUT, True, "bmt_MortR")
+    sp.combine(leg_l, [rail], CUT, True, "bmt_MortL")
+    sp.combine(leg_r, [rail], CUT, True, "bmt_MortR")
     assert bmt_c.bRepBodies.count == 3
     print("Blind_MT: 3 bodies — PASS")
 
@@ -204,10 +209,84 @@ def run(context):
         name="lmt_R", ev=ctx.ev)
 
     # CUT rail with both legs (tenons create mortise pockets)
-    sp.combine(lmt_c, top_rail, [leg_l], CUT, True, "lmt_MortL")
-    sp.combine(lmt_c, top_rail, [leg_r], CUT, True, "lmt_MortR")
+    sp.combine(top_rail, [leg_l], CUT, True, "lmt_MortL")
+    sp.combine(top_rail, [leg_r], CUT, True, "lmt_MortR")
     assert lmt_c.bRepBodies.count == 3
     print("Leg_Top_MT: 3 bodies — PASS")
+
+    # ── Cross-component Through M&T ──
+    # LegL, LegR, Rail each in their own root-level component.
+    # through() must route its mortise CUT to root with assembly
+    # proxies because tenon_b (built in Rail's comp) and mortise_body
+    # (LegL / LegR) live in different components.
+    params.add("xmt_proud", VI("0.125 in"), "in", "Cross through proud")
+    mt.define_params(params, prefix="xmt",
+        tenon_w="1 in", tenon_thick="0.375 in",
+        tenon_depth="leg_w + xmt_proud")
+    params.add("xmt_x", VI("lmt_x + 2 * leg_w + lmt_span + 6 in"), "in",
+               "XMT X offset")
+
+    xmt_x = ctx.ev("xmt_x")
+
+    # Each board in its own component, positioned by occurrence transform
+    # so world coords match what the sketches produce.
+    xmt_legL = make_comp_at(root, "XMT_LegL", xmt_x).component
+    xmt_legR_x = xmt_x + ctx.ev("leg_w") + ctx.ev("rail_l")
+    xmt_legR = make_comp_at(root, "XMT_LegR", xmt_legR_x).component
+    xmt_rail_c = make_comp_at(root, "XMT_Rail", xmt_x).component
+
+    # Left leg — in XMT_LegL at component origin (world at xmt_x)
+    _, pr = sp.sketch_rect_model(xmt_legL, xmt_legL.xYConstructionPlane,
+        ("0 in", "0 in", "0 in"),
+        {"x": "leg_w", "y": "leg_w"}, "xmt_LegL_Sk", ctx.ev)
+    leg_l = sp.ext_new(xmt_legL, pr, "leg_h", "xmt_LegL").bodies.item(0)
+    leg_l.name = "xmt_Leg_L"
+
+    # Right leg — in XMT_LegR at component origin (world at xmt_legR_x)
+    _, pr = sp.sketch_rect_model(xmt_legR, xmt_legR.xYConstructionPlane,
+        ("0 in", "0 in", "0 in"),
+        {"x": "leg_w", "y": "leg_w"}, "xmt_LegR_Sk", ctx.ev)
+    leg_r = sp.ext_new(xmt_legR, pr, "leg_h", "xmt_LegR").bodies.item(0)
+    leg_r.name = "xmt_Leg_R"
+
+    # Rail — in XMT_Rail, sketched at world-matching X (leg_w from its
+    # comp origin = xmt_x → world-X = xmt_x + leg_w, i.e. right face of
+    # left leg). Uses same expressions as intra-comp fixture.
+    xmt_rail_pl = sp.off_plane(xmt_rail_c, xmt_rail_c.xZConstructionPlane,
+                               "(leg_w - rail_t) / 2", "xmt_Rail_Pl")
+    _, pr = sp.sketch_rect_model(xmt_rail_c, xmt_rail_pl,
+        ("leg_w", "(leg_w - rail_t) / 2", "rail_z"),
+        {"x": "rail_l", "z": "rail_w"}, "xmt_Rail_Sk", ctx.ev)
+    rail = sp.ext_new(xmt_rail_c, pr, "rail_t", "xmt_Rail").bodies.item(0)
+    rail.name = "xmt_Rail"
+
+    # through() — pass xmt_rail_c as comp (where tenon lives), leg in
+    # a DIFFERENT comp. combine inside through() routes the
+    # mortise CUT to root with proxies.
+    left_face = sp.find_face(rail, "x", -1)
+    right_face = sp.find_face(rail, "x", +1)
+    mt.through(xmt_rail_c, left_face,
+        origin=("leg_w", "(leg_w - xmt_tt) / 2",
+                "rail_z + (rail_w - xmt_tw) / 2"),
+        size={"y": "xmt_tt", "z": "xmt_tw"},
+        depth_expr="xmt_td",
+        tenon_body=rail, mortise_body=leg_l,
+        name="xmt_L", ev=ctx.ev)
+    mt.through(xmt_rail_c, right_face,
+        origin=("leg_w + rail_l", "(leg_w - xmt_tt) / 2",
+                "rail_z + (rail_w - xmt_tw) / 2"),
+        size={"y": "xmt_tt", "z": "xmt_tw"},
+        depth_expr="xmt_td",
+        tenon_body=rail, mortise_body=leg_r,
+        name="xmt_R", ev=ctx.ev)
+
+    assert xmt_legL.bRepBodies.count == 1, \
+        f"XMT_LegL expected 1 body, got {xmt_legL.bRepBodies.count}"
+    assert xmt_legR.bRepBodies.count == 1, \
+        f"XMT_LegR expected 1 body, got {xmt_legR.bRepBodies.count}"
+    assert xmt_rail_c.bRepBodies.count == 1, \
+        f"XMT_Rail expected 1 body, got {xmt_rail_c.bRepBodies.count}"
+    print("Cross_Through_MT: 3 bodies across 3 components — PASS")
 
     # ── Summary ──
     total = 0
@@ -217,7 +296,7 @@ def run(context):
         names = [c.bRepBodies.item(i).name for i in range(n)]
         print(f"  {c.name}: {n} bodies -> {names}")
         total += n
-    print(f"\n{'PASS' if total == 9 else 'FAIL'}: {total}/9 bodies")
+    print(f"\n{'PASS' if total == 12 else 'FAIL'}: {total}/12 bodies")
 
     for occ in root.occurrences:
         c = occ.component

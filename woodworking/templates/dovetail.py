@@ -78,30 +78,6 @@ METADATA = {
 
 # ── Private helpers ──────────────────────────────────────────────────
 
-def _find_root(comp):
-    """Return the root component of ``comp``'s design."""
-    return comp.parentDesign.rootComponent
-
-
-def _body_for_root(body, root):
-    """Return a body usable by a root-level feature.
-
-    If ``body`` is already in ``root``, returns it unchanged. Otherwise
-    walks ``root.allOccurrences`` for the occurrence whose component
-    matches ``body.parentComponent`` and returns a proxy via
-    ``createForAssemblyContext``.
-    """
-    comp = body.parentComponent
-    if comp == root:
-        return body
-    for i in range(root.allOccurrences.count):
-        occ = root.allOccurrences.item(i)
-        if occ.component == comp:
-            return body.createForAssemblyContext(occ)
-    raise ValueError(
-        f"No occurrence in root for body '{body.name}' "
-        f"(component '{comp.name}').")
-
 
 def _trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
                       thick_expr, z_dim_expr, thick_base_expr,
@@ -383,19 +359,11 @@ def corner(pin_body, tail_body, plane,
                               f"{p}_tail_count", f"{p}_pitch",
                               f"{name}_Pat")
 
-    # Final CUT combine — same-comp uses bodies directly, cross-comp
-    # uses root + assembly proxies on both
-    comp_pin = pin_body.parentComponent
-    if comp_pin == comp_tail:
-        cut_combine = sp.combine(comp_tail, pin_body, tail_body,
-                                 CUT, True, f"{name}_Cut")
-    else:
-        root = _find_root(comp_tail)
-        cut_combine = sp.combine(
-            root,
-            _body_for_root(pin_body, root),
-            _body_for_root(tail_body, root),
-            CUT, True, f"{name}_Cut")
+    # Final CUT combine — sp.combine routes intra-component when
+    # pin_body and tail_body share a component, or to root with
+    # assembly proxies when they live in different components.
+    cut_combine = sp.combine(pin_body, tail_body, CUT, True,
+                                   f"{name}_Cut")
 
     return {
         "join_feat": join_feat,
@@ -570,11 +538,11 @@ def box(comp, front, left,
     pat.name = f"{name}_Pat"
 
     # ── CUT pin boards using tail boards as tools ──
-    cut_front = sp.combine(comp, front, tail_boards, CUT, True,
+    cut_front = sp.combine(front, tail_boards, CUT, True,
                            f"{name}_CutFront")
     cut_back = None
     if back is not None:
-        cut_back = sp.combine(comp, back, tail_boards, CUT, True,
+        cut_back = sp.combine(back, tail_boards, CUT, True,
                               f"{name}_CutBack")
 
     return {

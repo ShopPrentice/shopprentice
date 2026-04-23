@@ -254,7 +254,7 @@ def run(context):
 
     # CUT all 4 boards with bottom panel
     for i, board in enumerate([front, back, left, right]):
-        sp.combine(f4, board, [bottom], CUT, True, f"f4_BG_{i}")
+        sp.combine(board, [bottom], CUT, True, f"f4_BG_{i}")
 
     assert f4.bRepBodies.count == 5
     print("Panel_Groove: 5 bodies — PASS")

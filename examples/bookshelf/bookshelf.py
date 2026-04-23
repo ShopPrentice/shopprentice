@@ -139,7 +139,7 @@ def run(context):
         t_bodies.append(mir_y.bodies.item(j))
     for j in range(mir_x.bodies.count):
         t_bodies.append(mir_x.bodies.item(j))
-    sp.combine(shelves_c, sh_body, t_bodies, JOIN, False, "Sh_JoinTenons")
+    sp.combine(sh_body, t_bodies, JOIN, False, "Sh_JoinTenons")
 
     # -- Shelf-to-backboard domino voids --
     sh_dm_pl = sp.off_plane(shelves_c, shelves_c.xZConstructionPlane,
@@ -191,8 +191,8 @@ def run(context):
     left_side_proxy = left_side.createForAssemblyContext(sides_occ)
     right_side_proxy = right_side.createForAssemblyContext(sides_occ)
 
-    sp.combine(root, left_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortL")
-    sp.combine(root, right_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortR")
+    sp.combine(left_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortL")
+    sp.combine(right_side_proxy, all_shelf_proxies, CUT, True, "ShelfMortR")
 
     # ==============================================================
     #  4. KICK BOARD + DOMINO VOIDS  (Kick component)
@@ -224,7 +224,7 @@ def run(context):
         b = mir_k.bodies.item(i)
         b.name = f"KDm_R_{i}"
         dm_kick_right.append(b)
-    sp.combine(kick_c, kick_body, dm_kick_right, CUT, True, "KDm_CutR")
+    sp.combine(kick_body, dm_kick_right, CUT, True, "KDm_CutR")
 
     # ==============================================================
     #  5. KICK DOMINO MORTISES — CUT sides  (root, assembly proxies)
@@ -233,8 +233,8 @@ def run(context):
                              for b in dm_kick_left]
     dm_kick_right_proxies = [b.createForAssemblyContext(kick_occ)
                               for b in dm_kick_right]
-    sp.combine(root, left_side_proxy, dm_kick_left_proxies, CUT, True, "KickDomL")
-    sp.combine(root, right_side_proxy, dm_kick_right_proxies, CUT, True, "KickDomR")
+    sp.combine(left_side_proxy, dm_kick_left_proxies, CUT, True, "KickDomL")
+    sp.combine(right_side_proxy, dm_kick_right_proxies, CUT, True, "KickDomR")
 
     # ==============================================================
     #  6. BACKBOARD  (Back component)
@@ -253,7 +253,7 @@ def run(context):
     all_sh_dm_proxies = [b.createForAssemblyContext(shelves_occ)
                           for b in all_sh_dm_voids]
     back_proxy = back_body.createForAssemblyContext(back_occ)
-    sp.combine(root, back_proxy, all_sh_dm_proxies, CUT, True, "BackDomCut")
+    sp.combine(back_proxy, all_sh_dm_proxies, CUT, True, "BackDomCut")
 
     # ==============================================================
     #  8. TOP BOARD + THROUGH DOVETAILS  (Top component)
@@ -350,14 +350,14 @@ def run(context):
                           for b in all_left_tails]
     right_tail_proxies = [b.createForAssemblyContext(top_occ)
                            for b in all_right_tails]
-    sp.combine(root, left_side_proxy, left_tail_proxies, CUT, True, "DT_SocketL")
-    sp.combine(root, right_side_proxy, right_tail_proxies, CUT, True, "DT_SocketR")
+    sp.combine(left_side_proxy, left_tail_proxies, CUT, True, "DT_SocketL")
+    sp.combine(right_side_proxy, right_tail_proxies, CUT, True, "DT_SocketR")
 
     # ==============================================================
     # 10. JOIN DOVETAILS INTO TOP  (Top component)
     # ==============================================================
-    sp.combine(top_c, top_body, all_left_tails, JOIN, False, "DT_JoinL")
-    sp.combine(top_c, top_body, all_right_tails, JOIN, False, "DT_JoinR")
+    sp.combine(top_body, all_left_tails, JOIN, False, "DT_JoinL")
+    sp.combine(top_body, all_right_tails, JOIN, False, "DT_JoinR")
 
     # ==============================================================
     #  EPILOGUE

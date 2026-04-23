@@ -167,7 +167,7 @@ def leaf(comp, body, plane, origin, size_map,
     leaf_body.name = f"{name}_Leaf"
 
     # -- CUT mortise pocket --
-    cut = sp.combine(comp, body, leaf_body, CUT, True, f"{name}_Mort")
+    cut = sp.combine(body, leaf_body, CUT, True, f"{name}_Mort")
 
     # -- Screw holes --
     screw_cuts = _add_screw_holes(comp, body, leaf_body, plane,

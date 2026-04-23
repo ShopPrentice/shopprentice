@@ -8,8 +8,11 @@ F3  Rect blind M&T + 2 fox wedges       → 4 bodies
 F4  Round tenon into round leg          → 3 bodies
 F5  Angled round tenon (15° tilt)       → 3 bodies (leg+tenon, slab, wedge)
 F6  Compound-angle round-in-round      → 3 bodies (leg, stretcher, wedge)
+F7  Cross-component round tenon+wedge  → 3 bodies across 3 comps
+    (Seat, Spindle, Tenon each in their own component). Exercises
+    tw.round_tenon()'s intersect-trim + wedge CUT via combine.
 
-Total: 19 bodies
+Total: 22 bodies (F1-F6 = 19 bodies in 6 comps, F7 = 3 bodies in 3 comps).
 """
 
 import adsk.core
@@ -122,8 +125,8 @@ def run(context):
             slot_span_expr="mt_tt", offset_dim_expr="mt_tw",
             name="F1_TW", ev=ev)
 
-    sp.combine(f1, f1_rail, f1_tenon, JOIN, False, "F1_Join")
-    sp.combine(f1, f1_leg, f1_rail, CUT, True, "F1_Mortise")
+    sp.combine(f1_rail, f1_tenon, JOIN, False, "F1_Join")
+    sp.combine(f1_leg, f1_rail, CUT, True, "F1_Mortise")
 
     assert f1.bRepBodies.count == 4, f"F1: expected 4, got {f1.bRepBodies.count}"
     print(f"F1 Rect through: {f1.bRepBodies.count} bodies ✓")
@@ -168,8 +171,8 @@ def run(context):
                    tenon_axis="z", tenon_depth_expr="seat_t + sp_td",
                    tenon_diam_expr="sp_tn_dia", name="F2_TW", ev=ev)
 
-    sp.combine(f2, f2_spindle, f2_tenon, JOIN, False, "F2_Join")
-    sp.combine(f2, f2_seat, f2_spindle, CUT, True, "F2_Mortise")
+    sp.combine(f2_spindle, f2_tenon, JOIN, False, "F2_Join")
+    sp.combine(f2_seat, f2_spindle, CUT, True, "F2_Mortise")
 
     assert f2.bRepBodies.count == 3, f"F2: expected 3, got {f2.bRepBodies.count}"
     move_comp(f2, 30)
@@ -212,8 +215,8 @@ def run(context):
             slot_span_expr="mt_tt", offset_dim_expr="mt_tw",
             name="F3_TW", ev=ev)
 
-    sp.combine(f3, f3_rail, f3_tenon, JOIN, False, "F3_Join")
-    sp.combine(f3, f3_leg, f3_rail, CUT, True, "F3_Mortise")
+    sp.combine(f3_rail, f3_tenon, JOIN, False, "F3_Join")
+    sp.combine(f3_leg, f3_rail, CUT, True, "F3_Mortise")
 
     assert f3.bRepBodies.count == 4, f"F3: expected 4, got {f3.bRepBodies.count}"
     move_comp(f3, 60)
@@ -273,8 +276,8 @@ def run(context):
                    tenon_axis="y", tenon_depth_expr="rleg_dia + str_td",
                    tenon_diam_expr="str_tn_dia", name="F4_TW", ev=ev)
 
-    sp.combine(f4, f4_str, f4_tenon, JOIN, False, "F4_Join")
-    sp.combine(f4, f4_leg, f4_str, CUT, True, "F4_Mortise")
+    sp.combine(f4_str, f4_tenon, JOIN, False, "F4_Join")
+    sp.combine(f4_leg, f4_str, CUT, True, "F4_Mortise")
 
     assert f4.bRepBodies.count == 3, f"F4: expected 3, got {f4.bRepBodies.count}"
     move_comp(f4, 90)
@@ -350,8 +353,8 @@ def run(context):
                    name="F5_TW", ev=ev)
 
     # JOIN tenon into leg, CUT slab
-    sp.combine(f5, f5_leg, f5_tenon, JOIN, False, "F5_Join")
-    sp.combine(f5, f5_slab, f5_leg, CUT, True, "F5_Mortise")
+    sp.combine(f5_leg, f5_tenon, JOIN, False, "F5_Join")
+    sp.combine(f5_slab, f5_leg, CUT, True, "F5_Mortise")
 
     assert f5.bRepBodies.count == 3, f"F5: expected 3, got {f5.bRepBodies.count}"
     move_comp(f5, 120)
@@ -441,22 +444,96 @@ def run(context):
                    name="F6_TW", ev=ev)
 
     # JOIN tenon into stretcher, CUT leg
-    sp.combine(f6, f6_str, f6_tenon, JOIN, False, "F6_Join")
-    sp.combine(f6, f6_leg, f6_str, CUT, True, "F6_Mortise")
+    sp.combine(f6_str, f6_tenon, JOIN, False, "F6_Join")
+    sp.combine(f6_leg, f6_str, CUT, True, "F6_Mortise")
 
     assert f6.bRepBodies.count == 3, f"F6: expected 3, got {f6.bRepBodies.count}"
     move_comp(f6, 150)
     print(f"F6 Compound angle (splay+rake): {f6.bRepBodies.count} bodies ✓")
 
+    # ══════════════════════════════════════════════════════════
+    #  F7: Cross-component — Seat, Spindle, and Tenon each in
+    #      their own root-level component. Exercises round_tenon()
+    #      routing its intersect-trim and CUT across components.
+    # ══════════════════════════════════════════════════════════
+    f7_seat = sp.make_comp(root, "F7_Seat").component
+    f7_spindle = sp.make_comp(root, "F7_Spindle").component
+    f7_tenon_c = sp.make_comp(root, "F7_Tenon").component
+
+    cx7, cy7 = ev("seat_l") / 2, ev("seat_w") / 2
+
+    # Seat in F7_Seat (flat plate like F2)
+    seat_pl7 = sp.off_plane(f7_seat, f7_seat.xYConstructionPlane,
+                             "sp_len", "F7_SeatPl")
+    _, pr = sp.sketch_rect_model(f7_seat, seat_pl7,
+        ("0 in", "0 in", "sp_len"),
+        {"x": "seat_l", "y": "seat_w"}, "F7_SeatSk", ev)
+    f7_seat_b = sp.ext_new(f7_seat, pr, "seat_t", "F7_Seat").bodies.item(0)
+    f7_seat_b.name = "F7_SeatBody"
+
+    # Spindle in F7_Spindle (at same world coords as F2's spindle)
+    sk_sp7 = f7_spindle.sketches.add(f7_spindle.xYConstructionPlane)
+    sp7_circle = sk_sp7.sketchCurves.sketchCircles.addByCenterRadius(
+        P3(cx7, cy7, 0), ev("sp_dia") / 2)
+    sk_sp7.sketchDimensions.addDiameterDimension(
+        sp7_circle, P3(cx7 + ev("sp_dia"), cy7, 0)
+    ).parameter.expression = "sp_dia"
+    sk_sp7.name = "F7_SpindleSk"
+    f7_spindle_b = sp.ext_new(f7_spindle, sp.smallest_profile(sk_sp7),
+        "sp_len", "F7_Spindle").bodies.item(0)
+    f7_spindle_b.name = "F7_SpindleBody"
+
+    # Tenon in F7_Tenon — each sub-component needs its OWN construction
+    # plane; Fusion rejects a sketch when the planar entity lives in a
+    # different component's assembly context.
+    tenon_pl7 = sp.off_plane(f7_tenon_c, f7_tenon_c.xYConstructionPlane,
+                             "sp_len", "F7_TenonPl")
+    sk_tn7 = f7_tenon_c.sketches.add(tenon_pl7)
+    tn7_circle = sk_tn7.sketchCurves.sketchCircles.addByCenterRadius(
+        P3(cx7, cy7, 0), ev("sp_tn_dia") / 2)
+    sk_tn7.sketchDimensions.addDiameterDimension(
+        tn7_circle, P3(cx7 + ev("sp_tn_dia"), cy7, 0)
+    ).parameter.expression = "sp_tn_dia"
+    sk_tn7.name = "F7_TenonSk"
+    f7_tenon_b = sp.ext_new(f7_tenon_c, sp.smallest_profile(sk_tn7),
+        "seat_t + sp_td", "F7_Tenon").bodies.item(0)
+    f7_tenon_b.name = "F7_TenonBody"
+
+    # round_tenon: tenon_body in F7_Tenon, mortise_body in F7_Seat —
+    # different components. Both intersect-trim and wedge CUT must
+    # route through combine to land at root with proxies.
+    tw.round_tenon(f7_tenon_c,
+                   tenon_body=f7_tenon_b, mortise_body=f7_seat_b,
+                   tenon_axis="z",
+                   tenon_depth_expr="seat_t + sp_td",
+                   tenon_diam_expr="sp_tn_dia",
+                   name="F7_TW", ev=ev)
+
+    # JOIN tenon into spindle; CUT seat with spindle (both cross-comp)
+    sp.combine(f7_spindle_b, f7_tenon_b, JOIN, False, "F7_Join")
+    sp.combine(f7_seat_b, f7_spindle_b, CUT, True, "F7_Mortise")
+
+    assert f7_seat.bRepBodies.count == 1, \
+        f"F7_Seat expected 1 body, got {f7_seat.bRepBodies.count}"
+    assert f7_spindle.bRepBodies.count == 1, \
+        f"F7_Spindle expected 1 body, got {f7_spindle.bRepBodies.count}"
+    assert f7_tenon_c.bRepBodies.count == 1, \
+        f"F7_Tenon expected 1 body (wedge only, tenon absorbed by JOIN), got {f7_tenon_c.bRepBodies.count}"
+    move_comp(f7_seat, 180)
+    move_comp(f7_spindle, 180)
+    move_comp(f7_tenon_c, 180)
+    print("F7 Cross-component round tenon: 3 bodies across 3 comps ✓")
+
     # ── Epilogue ──────────────────────────────────────────────
     total = sum(root.occurrences.item(i).component.bRepBodies.count
                 for i in range(root.occurrences.count))
-    print(f"\nTotal: {total} bodies across 6 fixtures")
+    n_fixtures = root.occurrences.count
+    print(f"\nTotal: {total} bodies across {n_fixtures} components")
 
     sp.apply_appearance("white oak")
     sp.apply_appearance("walnut", bodies=[
         "F1_TW_1", "F1_TW_2", "F2_TW", "F3_TW_1", "F3_TW_2",
-        "F4_TW", "F5_TW", "F6_TW"])
+        "F4_TW", "F5_TW", "F6_TW", "F7_TW"])
 
     for i in range(root.occurrences.count):
         c = root.occurrences.item(i).component

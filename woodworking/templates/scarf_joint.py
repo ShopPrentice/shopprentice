@@ -192,10 +192,10 @@ def kanawa_tsugi(comp, body_a, body_b, splice_face,
     features.append(scarf_ext)
 
     # ── STEP 2: CUT scarf zone from both timbers ────────────────
-    cut_a = sp.combine(comp, body_a, [scarf_body], CUT, True,
+    cut_a = sp.combine(body_a, [scarf_body], CUT, True,
                        f"{name}_CutZone_A")
     features.append(cut_a)
-    cut_b = sp.combine(comp, body_b, [scarf_body], CUT, True,
+    cut_b = sp.combine(body_b, [scarf_body], CUT, True,
                        f"{name}_CutZone_B")
     features.append(cut_b)
 
@@ -303,9 +303,9 @@ def kanawa_tsugi(comp, body_a, body_b, splice_face,
     key_tool.name = f"{name}_key_tool"
     features.append(key_ext)
 
-    sp.combine(comp, half_a_body, [key_tool], CUT, True,
+    sp.combine(half_a_body, [key_tool], CUT, True,
                f"{name}_Key_Cut_A")
-    sp.combine(comp, half_b_body, [key_tool], CUT, True,
+    sp.combine(half_b_body, [key_tool], CUT, True,
                f"{name}_Key_Cut_B")
 
     # ── STEP 6: Wedge body ──────────────────────────────────────
@@ -338,10 +338,10 @@ def kanawa_tsugi(comp, body_a, body_b, splice_face,
     wedge_body.name = f"{name}_wedge"
 
     # ── STEP 7: JOIN halves into timbers ────────────────────────
-    join_a = sp.combine(comp, body_a, [half_a_body], JOIN, False,
+    join_a = sp.combine(body_a, [half_a_body], JOIN, False,
                         f"{name}_Join_A")
     features.append(join_a)
-    join_b = sp.combine(comp, body_b, [half_b_body], JOIN, False,
+    join_b = sp.combine(body_b, [half_b_body], JOIN, False,
                         f"{name}_Join_B")
     features.append(join_b)
 

@@ -289,7 +289,7 @@ def run(context):
     # ======================================================================
     # CUT front case board with drawer front body (rule 6)
     drw_front_proxy = drw_front.createForAssemblyContext(drw_occ)
-    sp.combine(case_comp, front, [drw_front_proxy], CUT, True, "DrawerOpen_Cut")
+    sp.combine(front, [drw_front_proxy], CUT, True, "DrawerOpen_Cut")
 
     # ======================================================================
     # CROSS-COMPONENT: DOVETAILS (via template)
@@ -323,10 +323,10 @@ def run(context):
     # CROSS-COMPONENT: BOTTOM DADOS
     # ======================================================================
     bot_proxy = bottom.createForAssemblyContext(bot_occ)
-    sp.combine(case_comp, front, [bot_proxy], CUT, True, "BottomDado_Front")
-    sp.combine(case_comp, back, [bot_proxy], CUT, True, "BottomDado_Back")
-    sp.combine(case_comp, left, [bot_proxy], CUT, True, "BottomDado_Left")
-    sp.combine(case_comp, right, [bot_proxy], CUT, True, "BottomDado_Right")
+    sp.combine(front, [bot_proxy], CUT, True, "BottomDado_Front")
+    sp.combine(back, [bot_proxy], CUT, True, "BottomDado_Back")
+    sp.combine(left, [bot_proxy], CUT, True, "BottomDado_Left")
+    sp.combine(right, [bot_proxy], CUT, True, "BottomDado_Right")
 
     # ======================================================================
     # DETAILS: ARCH CUTOUTS ON BASE RAILS

@@ -582,8 +582,14 @@ def off_plane(comp, base, expr, name="Pl"):
     return p
 
 
-def combine(comp, target, tool_bodies, op, keep_tool, name="Comb"):
-    """Combine (CUT/JOIN) tool bodies into a target body.
+def _combine_in(comp, target, tool_bodies, op, keep_tool, name="Comb"):
+    """Low-level combine primitive — creates the feature in ``comp``.
+
+    Internal helper. Joinery templates and example scripts should call
+    :func:`combine` (which picks the right component automatically and
+    handles cross-component tool proxies). Use this directly only when
+    you have a specific reason to place the feature in a component
+    other than ``target.parentComponent``.
 
     Args:
         comp: Component owning the combine feature.
@@ -605,6 +611,78 @@ def combine(comp, target, tool_bodies, op, keep_tool, name="Comb"):
     f = comp.features.combineFeatures.add(inp)
     f.name = name
     return f
+
+
+def body_for_root(body, root):
+    """Return a body usable by a root-level feature.
+
+    If ``body`` is already in ``root``, returns it unchanged. Otherwise
+    walks ``root.allOccurrences`` for the occurrence whose component
+    matches ``body``'s owning component and returns a proxy via
+    ``createForAssemblyContext``.
+
+    Accepts either a native body or an existing assembly-context
+    proxy — proxies are unwrapped to their native body first (Fusion
+    rejects ``createForAssemblyContext`` on a body that is already a
+    proxy).
+
+    Use when placing a feature at root that must reference bodies living
+    in sub-components.
+    """
+    # Unwrap proxy → native so createForAssemblyContext works.
+    native = (body.nativeObject if body.assemblyContext else body)
+    comp = native.parentComponent
+    if comp == root:
+        return native
+    for i in range(root.allOccurrences.count):
+        occ = root.allOccurrences.item(i)
+        if occ.component == comp:
+            return native.createForAssemblyContext(occ)
+    raise ValueError(
+        f"No occurrence in root for body '{native.name}' "
+        f"(component '{comp.name}').")
+
+
+def combine(target, tool_bodies, op, keep_tool, name="Comb"):
+    """Combine (CUT / JOIN / Intersect) tool bodies into a target body.
+
+    The combine feature lives in ``target.parentComponent`` — the
+    natural home for a feature that modifies the target. Tool bodies
+    from other components are wrapped via ``createForAssemblyContext``
+    proxies automatically, so the same call works whether the tools
+    are native, already proxied, or in sibling components.
+
+    Args:
+        target: Target BRepBody. Must be a native body (not a proxy) —
+            the combine feature is created in its parent component.
+        tool_bodies: Single BRepBody or list of BRepBody. Native bodies
+            in other components are proxied automatically.
+        op: FeatureOperations enum
+            (CutFeatureOperation / JoinFeatureOperation / IntersectFeatureOperation).
+        keep_tool: Whether to keep tool bodies after the operation.
+        name: Feature name.
+    """
+    tools = tool_bodies if isinstance(tool_bodies, list) else [tool_bodies]
+    # Unwrap the target proxy → native. The feature is created in
+    # the native's parent component regardless of what assembly
+    # context the caller happened to pass in.
+    tgt = target.nativeObject if target.assemblyContext else target
+    tgt_comp = tgt.parentComponent
+    root = tgt_comp.parentDesign.rootComponent
+
+    # For tool bodies: if they live in tgt_comp (same component as
+    # target), use their native directly. Otherwise wrap in a
+    # root-occurrence proxy via body_for_root (which handles the
+    # unwrap-then-rewrap step for already-proxied tools).
+    tool_refs = []
+    for b in tools:
+        native_b = b.nativeObject if b.assemblyContext else b
+        if native_b.parentComponent == tgt_comp:
+            tool_refs.append(native_b)
+        else:
+            tool_refs.append(body_for_root(b, root))
+
+    return _combine_in(tgt_comp, tgt, tool_refs, op, keep_tool, name)
 
 
 def mirror_body(comp, body, plane, name="Mirror"):
@@ -1068,7 +1146,7 @@ def classify_bodies(bodies, reference, direction=None):
 
         groups = sp.classify_bodies(fragments, leg_body)
         for b in groups['inside']:
-            sp.combine(comp, stretcher, b, JOIN, False)  # tenon interior
+            sp.combine(stretcher, b, JOIN, False)  # tenon interior
         for b in groups['outside']:
             comp.features.removeFeatures.add(b)  # excess tip
     """

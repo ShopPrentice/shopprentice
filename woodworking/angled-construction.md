@@ -156,7 +156,7 @@ For a leg at `leg_inset_y` with depth `leg_d`, the inner edge (toward seat cente
 After both splay operations, the leg top protrudes into the seat body at an angle. CUT the seat from the leg to create a clean angled surface:
 
 ```python
-sp.combine(root, leg_body, [seat_body], CUT, True, "LegTrim_NL")
+sp.combine(leg_body, [seat_body], CUT, True, "LegTrim_NL")
 ```
 
 **Do this BEFORE mirroring** — one CUT instead of four. Mirror propagates the trim.
@@ -323,7 +323,7 @@ The front stretcher (mirror of back across YMid) and right stretcher (mirror of 
 Tilting a stretcher can push its surface into adjacent bodies. **Always run `check_interference` after adding splay moves.** Common case: a footrest sitting directly above the front stretcher — the tilted stretcher's top edge rises by `str_w/2 × sin(splay_angle)` and may intersect the footrest. Fix with a trim CUT:
 
 ```python
-sp.combine(root, footrest_body, [front_stretcher], CUT, True, "FR_FStrTrim")
+sp.combine(footrest_body, [front_stretcher], CUT, True, "FR_FStrTrim")
 ```
 
 ### Build Order
@@ -383,7 +383,7 @@ for frag in fragments:
 # classify_bodies — batch classification
 groups = sp.classify_bodies(fragments, leg_body)
 for b in groups['inside']:
-    sp.combine(comp, stretcher, b, JOIN, False)  # tenon interior
+    sp.combine(stretcher, b, JOIN, False)  # tenon interior
 for b in groups['outside']:
     comp.features.removeFeatures.add(b)  # excess tip
 ```
@@ -645,8 +645,8 @@ def tilted_rail_domino(plane, center_x, rail_z_center, rail_body, leg_body, name
     ext = root.features.extrudeFeatures.add(ext_inp)
     dm_body = ext.bodies.item(0)
     # CUT into both bodies
-    sp.combine(root, rail_body, [dm_body], CUT, True, f"{name}_CutRail")
-    sp.combine(root, leg_body, [dm_body], CUT, True, f"{name}_CutLeg")
+    sp.combine(rail_body, [dm_body], CUT, True, f"{name}_CutRail")
+    sp.combine(leg_body, [dm_body], CUT, True, f"{name}_CutLeg")
 ```
 
 This creates a domino whose long axis follows the tilted backrest direction, properly aligning with the rail cross-section at the post interface.

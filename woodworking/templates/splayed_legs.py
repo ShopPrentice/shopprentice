@@ -260,7 +260,7 @@ def build(root_comp, inset_x_expr="leg_inset_x", inset_y_expr="leg_inset_y",
 
     # ── Step 4: Trim CUT against seat/top ──
     if seat_body is not None:
-        sp.combine(root_comp, nl_body, seat_body, CUT, True, "LegTrim_NL")
+        sp.combine(nl_body, seat_body, CUT, True, "LegTrim_NL")
         nl_body = _find_body(root_comp, "Leg_NL")
 
     # ── Step 5: Mirror NL → NR across YMid ──

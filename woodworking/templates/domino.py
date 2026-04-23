@@ -123,8 +123,11 @@ def single(comp, plane, center, long_axis, long_expr, short_expr,
     void_body.name = name
 
     if cut:
-        sp.combine(comp, body_a, void_body, CUT, True, f"{name}_CutA")
-        sp.combine(comp, body_b, void_body, CUT, True, f"{name}_CutB")
+        # combine places the CUT intra-component when body_a /
+        # body_b share a component with the void, or at root with
+        # assembly proxies when they don't.
+        sp.combine(body_a, void_body, CUT, True, f"{name}_CutA")
+        sp.combine(body_b, void_body, CUT, True, f"{name}_CutB")
 
     return void_body
 
@@ -182,11 +185,12 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
         for i in range(pat.bodies.count):
             void_bodies.append(pat.bodies.item(i))
 
-    # Bulk CUT all voids into target bodies
+    # Bulk CUT all voids into target bodies (combine handles
+    # cross-component routing when body_a / body_b live elsewhere).
     if cut and void_bodies:
-        sp.combine(comp, body_a, void_bodies, CUT, True, f"{name}_CutA")
+        sp.combine(body_a, void_bodies, CUT, True, f"{name}_CutA")
         if body_b is not None and body_b != body_a:
-            sp.combine(comp, body_b, void_bodies, CUT, True, f"{name}_CutB")
+            sp.combine(body_b, void_bodies, CUT, True, f"{name}_CutB")
 
     return void_bodies
 
@@ -392,11 +396,11 @@ def between(comp, plane, body_a, body_b, interface_axis,
         void_bodies.append(void)
         sk.isVisible = False
 
-    # Bulk CUT into both bodies
+    # Bulk CUT into both bodies (combine routes cross-component).
     if cut and void_bodies:
-        sp.combine(comp, body_a, void_bodies, CUT, True, f"{name}_CutA")
+        sp.combine(body_a, void_bodies, CUT, True, f"{name}_CutA")
         if body_b is not None and body_b != body_a:
-            sp.combine(comp, body_b, void_bodies, CUT, True, f"{name}_CutB")
+            sp.combine(body_b, void_bodies, CUT, True, f"{name}_CutB")
 
     # Validate containment — domino must be fully inside both bodies
     all_ok = True
@@ -467,15 +471,17 @@ def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
 
     all_voids = [nl_body, nr_body, fl_body, fr_body]
 
-    # 4. CUT all into top/seat
-    sp.combine(comp, top_body, all_voids, CUT, True, f"{name}_Top_Cut")
+    # 4. CUT all into top/seat — combine routes cross-comp when
+    # top_body lives in a different component than the voids.
+    sp.combine(top_body, all_voids, CUT, True, f"{name}_Top_Cut")
 
-    # 5. CUT each into its leg (keepTool=True on all)
+    # 5. CUT each into its leg (keepTool=True on all). Each leg may
+    # live in its own component.
     leg_nl, leg_nr, leg_fl, leg_fr = leg_bodies
-    sp.combine(comp, leg_nl, [nl_body], CUT, True, f"{name}_Leg_NL")
-    sp.combine(comp, leg_nr, [nr_body], CUT, True, f"{name}_Leg_NR")
-    sp.combine(comp, leg_fl, [fl_body], CUT, True, f"{name}_Leg_FL")
-    sp.combine(comp, leg_fr, [fr_body], CUT, True, f"{name}_Leg_FR")
+    sp.combine(leg_nl, [nl_body], CUT, True, f"{name}_Leg_NL")
+    sp.combine(leg_nr, [nr_body], CUT, True, f"{name}_Leg_NR")
+    sp.combine(leg_fl, [fl_body], CUT, True, f"{name}_Leg_FL")
+    sp.combine(leg_fr, [fr_body], CUT, True, f"{name}_Leg_FR")
 
     return all_voids
 

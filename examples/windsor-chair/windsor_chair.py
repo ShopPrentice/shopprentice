@@ -1403,6 +1403,350 @@ def run(context):
             fil_bf.name = "Seat_Fil_Bot"
             print("Seat fillet bottom: " + str(bot_edges.count) + " edges")
 
+    # ══════════════════════════════════════════════════════════════
+    # TRIM ALL THROUGH-TENONS
+    # Done after scoops + fillets so the split follows the final seat
+    # surface. Follows the Esherick pattern: SplitBody → body_side →
+    # remove tips → rejoin interiors → CUT mortise + wedge pockets.
+    # ══════════════════════════════════════════════════════════════
+    from helpers import sp as _sp_trim
+    CUT_t  = adsk.fusion.FeatureOperations.CutFeatureOperation
+    JOIN_t = adsk.fusion.FeatureOperations.JoinFeatureOperation
+
+    # Re-find component references
+    _legs_c = _legs_occ2 = None
+    for _oi in range(root.occurrences.count):
+        _occ = root.occurrences.item(_oi)
+        if _occ.component.name == "Legs":
+            _legs_c = _occ.component; _legs_occ2 = _occ; break
+    _seat_c = _seat_occ = _seat_b = None
+    for _oi in range(root.occurrences.count):
+        _occ = root.occurrences.item(_oi)
+        if _occ.component.name == "Seat":
+            _seat_occ = _occ; _seat_c = _occ.component
+            for _bi in range(_seat_c.bRepBodies.count):
+                if _seat_c.bRepBodies.item(_bi).name == "Seat":
+                    _seat_b = _seat_c.bRepBodies.item(_bi); break
+            break
+
+    def _find_best(comp, prefix):
+        """Find the largest body whose name matches prefix or prefix + ' ('.
+        Falls back to the largest body whose name contains prefix as a
+        substring — handles Fusion's auto-renaming after mirror
+        recompute where 'Leg_FL' becomes 'Leg_FL (2)' then '(2) (1)'.
+        """
+        best = None; best_vol = 0
+        # Exact or starts-with
+        for k in range(comp.bRepBodies.count):
+            b = comp.bRepBodies.item(k)
+            if b.name == prefix or b.name.startswith(prefix + " ("):
+                if b.volume > best_vol:
+                    best = b; best_vol = b.volume
+        if best:
+            return best
+        # Fallback: contains prefix
+        for k in range(comp.bRepBodies.count):
+            b = comp.bRepBodies.item(k)
+            if prefix in b.name:
+                if b.volume > best_vol:
+                    best = b; best_vol = b.volume
+        return best
+
+    def _find_all(comp, prefix):
+        """All bodies matching prefix (name ==, startswith, or contains)."""
+        out = []
+        for k in range(comp.bRepBodies.count):
+            b = comp.bRepBodies.item(k)
+            if b.name == prefix or b.name.startswith(prefix + " (") \
+               or prefix in b.name:
+                out.append(b)
+        return out
+
+    def _split_trim(comp, occ, prefixes, tool, tool_occ, direction, label):
+        """Split bodies at tool surface, remove far-side, rejoin, rename."""
+        tp = tool.createForAssemblyContext(tool_occ)
+
+        # Split every matching body (use _find_all for robust matching
+        # after Fusion renames mirror-regenerated bodies).
+        for p in prefixes:
+            for b in _find_all(comp, p):
+                try:
+                    si = root.features.splitBodyFeatures.createInput(
+                        b.createForAssemblyContext(occ), tp, True)
+                    root.features.splitBodyFeatures.add(si)
+                except Exception:
+                    pass
+
+        # Remove far-side fragments
+        removed = 0
+        for bi in range(comp.bRepBodies.count - 1, -1, -1):
+            b = comp.bRepBodies.item(bi)
+            if not any(p in b.name for p in prefixes):
+                continue
+            if _sp_trim.body_side(b, tool, direction) == 'outside':
+                try:
+                    root.features.removeFeatures.add(
+                        b.createForAssemblyContext(occ))
+                    removed += 1
+                except Exception:
+                    pass
+
+        # Rejoin per prefix: find largest body for each prefix,
+        # rename it to the canonical name, join smaller fragments.
+        for p in prefixes:
+            bodies = _find_all(comp, p)
+            if not bodies:
+                continue
+            bodies.sort(key=lambda b: b.volume, reverse=True)
+            main = bodies[0]
+            main.name = p
+            if len(bodies) > 1:
+                mp = main.createForAssemblyContext(occ)
+                for f in bodies[1:]:
+                    try:
+                        _sp_trim.combine(
+                            mp, f.createForAssemblyContext(occ),
+                            JOIN_t, False, f"{p}_Rejoin")
+                    except Exception:
+                        pass
+        print(f"  {label}: {removed} tips removed")
+
+    if _legs_c and _seat_b:
+        # ── A) Leg tenons through seat ──────────────────────────
+        # Position-based approach: splitting mirror-source bodies
+        # causes Fusion to regenerate the mirror, losing FL/BL names.
+        # Instead of name-matching, use Z-height to classify fragments.
+        seat_top_z = ev("seat_h")
+        seat_bot_z = seat_top_z - ev("seat_t")
+        _sp = _seat_b.createForAssemblyContext(_seat_occ)
+
+        # 1. Split all leg + wedge bodies at seat surface.
+        #    (Skip stretchers — they don't go through the seat.)
+        for bi in range(_legs_c.bRepBodies.count - 1, -1, -1):
+            b = _legs_c.bRepBodies.item(bi)
+            if "Str" in b.name:
+                continue
+            try:
+                si = root.features.splitBodyFeatures.createInput(
+                    b.createForAssemblyContext(_legs_occ2), _sp, True)
+                root.features.splitBodyFeatures.add(si)
+            except Exception:
+                pass
+
+        # 2. Remove fragments on the +Z side of the seat (proud tips).
+        #    Uses body_side (not Z-threshold) so the scooped surface
+        #    is accounted for correctly.
+        removed = 0
+        for bi in range(_legs_c.bRepBodies.count - 1, -1, -1):
+            b = _legs_c.bRepBodies.item(bi)
+            if "Str" in b.name:
+                continue
+            if _sp_trim.body_side(b, _seat_b, (0, 0, 1)) == 'outside':
+                try:
+                    root.features.removeFeatures.add(
+                        b.createForAssemblyContext(_legs_occ2))
+                    removed += 1
+                except Exception:
+                    pass
+
+        # 3. Rejoin LEG interior fragments only (tenon pieces inside
+        #    the seat). Group by XY quadrant. SKIP wedge bodies (TW_)
+        #    — they must stay as separate bodies (contrasting wood).
+        mid_x = ev("mid_x")
+        mid_y = ev("mid_y")
+        quadrants = {}
+        for bi in range(_legs_c.bRepBodies.count):
+            b = _legs_c.bRepBodies.item(bi)
+            if "Str" in b.name or "TW" in b.name:
+                continue
+            com = b.physicalProperties.centerOfMass
+            qx = "L" if com.x < mid_x else "R"
+            qy = "F" if com.y < mid_y else "B"
+            q = qx + qy
+            quadrants.setdefault(q, []).append(b)
+
+        for q, bodies in quadrants.items():
+            if len(bodies) <= 1:
+                continue
+            bodies.sort(key=lambda b: b.volume, reverse=True)
+            main = bodies[0]
+            mp = main.createForAssemblyContext(_legs_occ2)
+            for frag in bodies[1:]:
+                try:
+                    _sp_trim.combine(
+                        mp, frag.createForAssemblyContext(_legs_occ2),
+                        JOIN_t, False, f"Leg_{q}_Rejoin")
+                except Exception:
+                    pass
+        print(f"  Legs → Seat: {removed} tips removed, fragments rejoined")
+
+        # 4. CUT seat mortises with ALL leg + wedge bodies.
+        for bi in range(_legs_c.bRepBodies.count):
+            b = _legs_c.bRepBodies.item(bi)
+            if "Str" in b.name:
+                continue
+            bb = b.boundingBox
+            # Only use bodies that reach INTO the seat (overlap seat Z range)
+            if bb.maxPoint.z > seat_bot_z and bb.minPoint.z < seat_top_z:
+                try:
+                    _sp_trim.combine(
+                        _sp, b.createForAssemblyContext(_legs_occ2),
+                        CUT_t, True, f"{b.name}_Mort")
+                except Exception:
+                    pass
+        print("  Seat mortises + wedge pockets cut")
+
+        # ── B) Side stretcher tenons through legs ───────────────
+        # Find legs by XY quadrant position (names unreliable after
+        # mirror recompute in section A).
+        def _find_leg(comp, qx, qy):
+            """Find the largest leg body in XY quadrant qx/qy."""
+            best = None; bv = 0
+            for bi in range(comp.bRepBodies.count):
+                b = comp.bRepBodies.item(bi)
+                if "Str" in b.name: continue
+                if "TW_S" in b.name: continue
+                bb = b.boundingBox
+                z_extent = bb.maxPoint.z - bb.minPoint.z
+                if z_extent < 5 * 2.54: continue  # skip non-leg-sized bodies
+                com = b.physicalProperties.centerOfMass
+                if qx == "L" and com.x >= mid_x: continue
+                if qx == "R" and com.x < mid_x: continue
+                if qy == "F" and com.y >= mid_y: continue
+                if qy == "B" and com.y < mid_y: continue
+                if b.volume > bv:
+                    best = b; bv = b.volume
+            return best
+
+        for sname, wnames, leg_qs in [
+            ("Str_Left",  ["TW_SL_FL", "TW_SL_BL"], [("L","F"), ("L","B")]),
+            ("Str_Right", ["TW_SR_0", "TW_SR_1"],    [("R","F"), ("R","B")]),
+        ]:
+            sb = _find_best(_legs_c, sname)
+            if not sb: continue
+            sc = sb.physicalProperties.centerOfMass
+            for qx, qy in leg_qs:
+                leg = _find_leg(_legs_c, qx, qy)
+                if not leg: continue
+                lc = leg.physicalProperties.centerOfMass
+                d = (lc.x - sc.x, lc.y - sc.y, 0)
+                _split_trim(_legs_c, _legs_occ2,
+                    [sname] + wnames, leg, _legs_occ2, d,
+                    f"{sname} → {qx}{qy}")
+
+            # Mortises: CUT leg with stretcher
+            sb = _find_best(_legs_c, sname)
+            if sb:
+                for qx, qy in leg_qs:
+                    leg = _find_leg(_legs_c, qx, qy)
+                    if leg:
+                        try:
+                            _sp_trim.combine(leg, sb, CUT_t, True,
+                                             f"{sname}_{qx}{qy}_Mort")
+                        except Exception: pass
+                for wn in wnames:
+                    wb = _find_best(_legs_c, wn)
+                    if not wb: continue
+                    for qx, qy in leg_qs:
+                        leg = _find_leg(_legs_c, qx, qy)
+                        if leg:
+                            try:
+                                _sp_trim.combine(leg, wb, CUT_t, True,
+                                                 f"{wn}_{qx}{qy}_Mort")
+                            except Exception: pass
+
+        # ── C) Cross stretcher through side stretchers ──────────
+        xb = _find_best(_legs_c, "Str_Cross")
+        if xb:
+            xc = xb.physicalProperties.centerOfMass
+            for ss_name, wn in [("Str_Left", "TW_SC_L"),
+                                ("Str_Right", "TW_SC_R")]:
+                ss = _find_best(_legs_c, ss_name)
+                if not ss: continue
+                ssc = ss.physicalProperties.centerOfMass
+                d = (ssc.x - xc.x, ssc.y - xc.y, 0)
+                _split_trim(_legs_c, _legs_occ2,
+                    ["Str_Cross", wn], ss, _legs_occ2, d,
+                    f"Str_Cross → {ss_name}")
+            xb = _find_best(_legs_c, "Str_Cross")
+            if xb:
+                for ss_name in ["Str_Left", "Str_Right"]:
+                    ss = _find_best(_legs_c, ss_name)
+                    if ss:
+                        try:
+                            _sp_trim.combine(ss, xb, CUT_t, True,
+                                             f"SC_{ss_name}_Mort")
+                        except Exception: pass
+                for wn in ["TW_SC_L", "TW_SC_R"]:
+                    wb = _find_best(_legs_c, wn)
+                    if wb:
+                        for ss_name in ["Str_Left", "Str_Right"]:
+                            ss = _find_best(_legs_c, ss_name)
+                            if ss:
+                                try:
+                                    _sp_trim.combine(ss, wb, CUT_t, True,
+                                                     f"{wn}_Mort")
+                                except Exception: pass
+
+        # ── D) Final cleanup: split + trim remaining stretcher wedges ──
+        # Mirror recompute renames TW_SL_* → TW_SR_*, so section B
+        # misses them. Split each remaining TW body below the seat
+        # with every leg, then remove fragments on the far side.
+        # Collect leg AND stretcher bodies as potential split tools.
+        # Cross-stretcher wedges protrude past side stretchers (not legs).
+        leg_bodies = []
+        str_tool_bodies = []
+        for bi in range(_legs_c.bRepBodies.count):
+            b = _legs_c.bRepBodies.item(bi)
+            if "TW" in b.name:
+                continue
+            bb = b.boundingBox
+            z_ext = bb.maxPoint.z - bb.minPoint.z
+            if z_ext > 5 * 2.54 and "Str" not in b.name:
+                leg_bodies.append(b)
+            elif "Str" in b.name:
+                str_tool_bodies.append(b)
+        all_tools = leg_bodies + str_tool_bodies
+
+        # Collect stretcher-height TW bodies (below the seat)
+        INTERSECT_OP = adsk.fusion.FeatureOperations.IntersectFeatureOperation
+        tw_below = []
+        for bi in range(_legs_c.bRepBodies.count):
+            b = _legs_c.bRepBodies.item(bi)
+            if "TW" in b.name and b.boundingBox.maxPoint.z < seat_bot_z:
+                tw_below.append(b)
+
+        # For each wedge, Intersect with the nearest leg or stretcher.
+        # This trims the wedge to only the portion INSIDE the receiving
+        # body — the protruding tip vanishes. More reliable than
+        # split + body_side for tiny wedge bodies.
+        final_trimmed = 0
+        for tw_body in tw_below:
+            bcom = tw_body.physicalProperties.centerOfMass
+            closest = None; closest_d = 1e10
+            for tool in all_tools:
+                tcom = tool.physicalProperties.centerOfMass
+                d2 = ((bcom.x-tcom.x)**2 + (bcom.y-tcom.y)**2
+                      + (bcom.z-tcom.z)**2)
+                if d2 < closest_d:
+                    closest_d = d2; closest = tool
+            if closest:
+                try:
+                    coll = adsk.core.ObjectCollection.create()
+                    coll.add(closest)
+                    inp = _legs_c.features.combineFeatures.createInput(
+                        tw_body, coll)
+                    inp.operation = INTERSECT_OP
+                    inp.isKeepToolBodies = True
+                    _legs_c.features.combineFeatures.add(inp)
+                    final_trimmed += 1
+                except Exception:
+                    pass
+        if final_trimmed:
+            print(f"  Final cleanup: {final_trimmed} wedges intersect-trimmed")
+
+    print("All through-tenons trimmed, mortises + wedge pockets cut")
+
     # ── HIDE CONSTRUCTION ─────────────────────────────────────────
     def _hide_construction(c):
         for si in range(c.sketches.count):

@@ -139,7 +139,7 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         horiz_body = hp_ext.bodies.item(0)
         horiz_body.name = f"{name}_H"
 
-        sp.combine(comp, vert_body, horiz_body, JOIN, False, f"{name}_Join")
+        sp.combine(vert_body, horiz_body, JOIN, False, f"{name}_Join")
         vert_body.name = name
 
     elif face_axis == "x":
@@ -166,7 +166,7 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         horiz_body = hp_ext.bodies.item(0)
         horiz_body.name = f"{name}_H"
 
-        sp.combine(comp, vert_body, horiz_body, JOIN, False, f"{name}_Join")
+        sp.combine(vert_body, horiz_body, JOIN, False, f"{name}_Join")
         vert_body.name = name
 
     # Apply steel appearance

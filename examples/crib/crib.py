@@ -411,17 +411,17 @@ def run(context):
 
     # 8 bulk CUTs (one per rail)
     if front_sp:
-        sp.combine(root, fbr_p, front_sp, CUT, True, "SpindleCut_FBot")
-        sp.combine(root, ftr_p, front_sp, CUT, True, "SpindleCut_FTop")
+        sp.combine(fbr_p, front_sp, CUT, True, "SpindleCut_FBot")
+        sp.combine(ftr_p, front_sp, CUT, True, "SpindleCut_FTop")
     if back_sp:
-        sp.combine(root, bbr_p, back_sp, CUT, True, "SpindleCut_BBot")
-        sp.combine(root, btr_p, back_sp, CUT, True, "SpindleCut_BTop")
+        sp.combine(bbr_p, back_sp, CUT, True, "SpindleCut_BBot")
+        sp.combine(btr_p, back_sp, CUT, True, "SpindleCut_BTop")
     if left_sp:
-        sp.combine(root, lbr_p, left_sp, CUT, True, "SpindleCut_LBot")
-        sp.combine(root, ltr_p, left_sp, CUT, True, "SpindleCut_LTop")
+        sp.combine(lbr_p, left_sp, CUT, True, "SpindleCut_LBot")
+        sp.combine(ltr_p, left_sp, CUT, True, "SpindleCut_LTop")
     if right_sp:
-        sp.combine(root, rbr_p, right_sp, CUT, True, "SpindleCut_RBot")
-        sp.combine(root, rtr_p, right_sp, CUT, True, "SpindleCut_RTop")
+        sp.combine(rbr_p, right_sp, CUT, True, "SpindleCut_RBot")
+        sp.combine(rtr_p, right_sp, CUT, True, "SpindleCut_RTop")
 
     print(">>> Spindle mortises: 8 bulk CUTs into rails")
 
@@ -432,11 +432,11 @@ def run(context):
     post_bl_p = post_bl.createForAssemblyContext(post_occ)
     post_br_p = post_br.createForAssemblyContext(post_occ)
 
-    sp.combine(root, post_fl_p, [srl_p], CUT, True, "SupRailMort_FL")
-    sp.combine(root, post_bl_p, [srl_p], CUT, True, "SupRailMort_BL")
+    sp.combine(post_fl_p, [srl_p], CUT, True, "SupRailMort_FL")
+    sp.combine(post_bl_p, [srl_p], CUT, True, "SupRailMort_BL")
     if srr_p:
-        sp.combine(root, post_fr_p, [srr_p], CUT, True, "SupRailMort_FR")
-        sp.combine(root, post_br_p, [srr_p], CUT, True, "SupRailMort_BR")
+        sp.combine(post_fr_p, [srr_p], CUT, True, "SupRailMort_FR")
+        sp.combine(post_br_p, [srr_p], CUT, True, "SupRailMort_BR")
     print(">>> Support rail mortises: CUT into 4 posts")
 
     # --- Slats → support rails (dominos at each slat end) ---
@@ -461,9 +461,9 @@ def run(context):
         body_a=None, body_b=None, name="DM_SlatR", ev=ev, cut=False)
 
     # Bulk CUT all domino voids into support rails (all overlap the long rail)
-    sp.combine(root, srl_p, left_voids, CUT, True, "DM_SlatL_CutRail")
+    sp.combine(srl_p, left_voids, CUT, True, "DM_SlatL_CutRail")
     if srr_p:
-        sp.combine(root, srr_p, right_voids, CUT, True, "DM_SlatR_CutRail")
+        sp.combine(srr_p, right_voids, CUT, True, "DM_SlatR_CutRail")
 
     # Collect slat proxies and bulk CUT all voids into each slat
     # (only the domino at each slat's Y position actually intersects)
@@ -475,7 +475,7 @@ def run(context):
 
     all_voids = left_voids + right_voids
     for sp in slat_bodies_proxies:
-        sp.combine(root, sp, all_voids, CUT, True, "DM_Slat_Cut")
+        sp.combine(sp, all_voids, CUT, True, "DM_Slat_Cut")
     print(f">>> Slat dominos: {int(ev('n_slats')) * 2} joints (into support rails)")
 
     # ================================================================
