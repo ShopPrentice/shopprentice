@@ -32,7 +32,7 @@ One command — no clone needed:
 curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash
 ```
 
-This installs the `/woodworking` skill for Claude Code and optionally sets up the MCP server for live Fusion 360 execution. For installer flags, OpenClaw users, and local clone installs, see [DEVELOPMENT.md](DEVELOPMENT.md#install-options).
+This installs the woodworking skill for supported clients it detects, including Claude Code and Codex, and optionally sets up the MCP server for live Fusion 360 execution. For installer flags, OpenClaw users, and local clone installs, see [DEVELOPMENT.md](DEVELOPMENT.md#install-options).
 
 ## Usage
 
@@ -40,6 +40,8 @@ This installs the `/woodworking` skill for Claude Code and optionally sets up th
 /woodworking
 Build a 48" x 18" coffee table with tapered legs and a slatted top
 ```
+
+In Codex, invoke the `woodworking` skill instead of using the Claude-style slash command.
 
 The agent can also work from images — show it a photo or sketch of a piece and it will extract dimensions, proportions, and joint types to generate the parametric model.
 
@@ -119,7 +121,8 @@ All joinery uses the **combine-based** approach: build the tenon/tail as a body,
 
 ```
 shopprentice/
-  commands/            Claude Code skill definitions
+  commands/            Canonical woodworking instructions + Claude Code entrypoint
+  codex/               Codex skill wrapper(s)
   woodworking/         Skill topic files + joinery reference guides + templates
   helpers/             Standalone script library (sp.py)
   addin/               Fusion 360 add-in (MCP server + tools + parameter palette)

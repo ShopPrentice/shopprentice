@@ -7,16 +7,19 @@ Installer options, model compatibility, and MCP tooling reference. For the proje
 The one-line installer supports a few flags:
 
 ```bash
-# skill only
+# Claude Code skill only
 curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash -s -- --claude-code
+
+# Codex skill only
+curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash -s -- --codex
 
 # MCP server only
 curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash -s -- --mcp
 
-# skill + MCP
+# all supported clients + MCP
 curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash -s -- --all
 
-# no flags = auto-detect installed tools + MCP
+# no flags = auto-detect installed clients + MCP
 curl -sSL https://raw.githubusercontent.com/ShopPrentice/shopprentice/main/install.sh | bash
 ```
 
@@ -40,6 +43,8 @@ cd shopprentice
 
 The installer creates a `~/.shopprentice/repo` symlink pointing at your clone, so any `git pull` in the clone immediately updates the installed skill.
 
+For Codex, the installer creates a symlink at `~/.codex/skills/woodworking` pointing back into the repo. It refuses to overwrite an existing non-ShopPrentice Codex skill at that path.
+
 ## Model Compatibility
 
 This skill requires a frontier-level LLM with strong long-context reasoning, code generation, and instruction-following abilities.
@@ -48,6 +53,7 @@ This skill requires a frontier-level LLM with strong long-context reasoning, cod
 |-------|--------|-------|
 | **Claude Opus** | ✅ Tested | Developed and tested with this model via Claude Code |
 | **Claude Sonnet** | ✅ Tested | Works for most builds; Opus preferred for complex joinery |
+| **Codex** | ⚠️ Integration added | Codex installer + skill wrapper supported; end-to-end model performance still depends on the selected model |
 | **Other frontier models** | ⚠️ Untested | May work but expect limitations |
 | **Smaller / open-source models** | ❌ Not recommended | Fails to follow the multi-step procedural instructions across long context |
 
