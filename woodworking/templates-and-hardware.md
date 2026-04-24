@@ -15,7 +15,6 @@ Reference for available reusable templates and hardware. Check this before writi
 | `finger_joint` | `from helpers.templates import finger_joint` | Tested | — |
 | `splayed_legs` | `from helpers.templates import splayed_legs` | Tested | counter-stool, stool-rebuild |
 | `scarf_joint` | `from woodworking.templates import scarf_joint` | WIP | pergola |
-| `butt_hinge` | `from helpers.templates import butt_hinge` | Tested | tv-console |
 | `pull` | `from helpers.templates import pull` | Draft | — |
 | `chest_lock` | `from helpers.templates import chest_lock` | Draft | — |
 
@@ -23,7 +22,7 @@ Reference for available reusable templates and hardware. Check this before writi
 
 | Hardware | Function | Status |
 |----------|----------|--------|
-| Butt hinge (McMaster catalog) | `hardware.install_butt_hinge()` | Tested |
+| Butt hinge (McMaster catalog) | `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` | Tested |
 | Screw holes | `hardware.cut_screw_holes()` | Tested |
 
 ## Needed Templates (by type)

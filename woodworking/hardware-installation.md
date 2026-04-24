@@ -139,5 +139,5 @@ Split STEP files retain the original generator coordinates, including spacing of
 | Hardware | Template | STEP Files | Status |
 |----------|----------|-----------|--------|
 | Bed rail fastener | `woodworking/templates/bed_rail_fastener.py` | `~/.shopprentice/hardware/bed_rail_fastener/` | Tested (queen + twin beds) |
-| Butt hinge | `woodworking/templates/butt_hinge.py` | Inline (parametric, no STEP) | Tested (pencil box, wrap box) |
+| Butt hinge | `helpers/hardware.py` via `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` | Imported STEP hardware from catalog | Tested |
 | Bowtie inlay | `woodworking/templates/bowtie.py` | Inline (parametric, no STEP) | Tested (twin bed) |

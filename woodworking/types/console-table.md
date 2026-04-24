@@ -44,14 +44,14 @@ Back panel closes the rear
 | Cleat to frame rail | Blind tenon through rail | inline |
 | Cleat to case bottom | Dominos | `domino` |
 | Drawer boxes | Half-blind front, through back | `dovetailed_drawer` |
-| Doors to case | Butt hinges with rebate mortise | `butt_hinge` |
+| Doors to case | Butt hinges with rebate mortise | `hardware.install_butt_hinge()` |
 | Back panel | Rabbet in sides | inline |
 
 ## Hardware Checklist
 
 | Hardware | When needed | Template/catalog |
 |----------|------------|-----------------|
-| Door hinges | When doors exist | `butt_hinge` or Euro hinge |
+| Door hinges | When doors exist | `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` or Euro hinge |
 | Drawer pulls | When drawers exist | `pull` or knob hardware |
 | Door catches | When doors exist | magnetic catch |
 

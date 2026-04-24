@@ -37,13 +37,13 @@ Lid sits on top or slides in grooves
 | Case corners (4) | Through dovetails or box/finger joints | `dovetail` or `finger_joint` |
 | Bottom to case | Panel in grooves (rabbeted edges) | inline (panel CUT into boards) |
 | Lid (sliding) | Grooves in 3 sides, open on 4th | inline (lid CUT into boards) |
-| Lid (hinged) | Butt hinges at back | `butt_hinge` |
+| Lid (hinged) | Butt hinges at back | `hardware.install_butt_hinge()` |
 
 ## Hardware Checklist
 
 | Hardware | When needed | Template/catalog |
 |----------|------------|-----------------|
-| Hinges | When lid is hinged (not sliding) | `butt_hinge` |
+| Hinges | When lid is hinged (not sliding) | `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` |
 | Lock/clasp | For keepsake or jewelry boxes | `chest_lock` |
 
 ## Build Order

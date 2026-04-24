@@ -46,7 +46,7 @@ Back panel sits in rabbet in case sides
 |-----------|-----------|----------|
 | Case corners (4) | Through dovetails | `dovetail` |
 | Bottom to case | Dados in all 4 case boards | inline (bottom CUTs case boards) |
-| Lid to case | Butt hinges at back edge | `butt_hinge` |
+| Lid to case | Butt hinges at back edge | `hardware.install_butt_hinge()` |
 | Lid cleats to lid | Dominos or M&T | `domino` or `mortise_tenon` |
 | Base to case | Glue, screws, or dominos | `domino` or inline |
 | Drawer box | Half-blind front, through back dovetails | `dovetailed_drawer` |
@@ -56,7 +56,7 @@ Back panel sits in rabbet in case sides
 
 | Hardware | When needed | Template/catalog |
 |----------|------------|-----------------|
-| Lid hinges (2) | Always | `butt_hinge` |
+| Lid hinges (2) | Always | `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` |
 | Lid stay/chain | Recommended (prevents lid slamming) | lid_stay hardware |
 | Drawer pull/knob | When drawer exists | `pull` or knob hardware |
 | Lock/hasp | Optional (hope chests, valuable storage) | `chest_lock` |
