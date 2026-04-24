@@ -21,6 +21,10 @@ Then load only the supporting references you need from the ShopPrentice repo:
 
 ## Codex Notes
 
+- Before collecting build details or reading deep references, do a Fusion MCP preflight for ShopPrentice requests. If the Codex session is network-sandboxed (for example `CODEX_SANDBOX_NETWORK_DISABLED=1`), stop immediately and tell the user how to continue based on client:
+  App: enable full access when prompted, then continue.
+  CLI: relaunch the same session with `codex resume <SESSION_ID> --dangerously-bypass-approvals-and-sandbox -C __REPO_DIR__`.
+  Use the current Codex session/thread id as `<SESSION_ID>`.
 - Preserve the rules and workflow from `WOODWORKING.md`; do not substitute a shorter generic summary if the detailed rule exists there.
 - Treat `__REPO_DIR__/woodworking/` as the reference library backing the core instructions.
 - If the Fusion MCP server is available, use its tools in the mode prescribed by `WOODWORKING.md`.
