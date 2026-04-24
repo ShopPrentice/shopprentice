@@ -298,29 +298,28 @@ def run(context):
     p3 = Point3D.create(bt, hp + tw - delta, 0)
     p4 = Point3D.create(bt, hp + delta, 0)
 
-    l1 = dtl.addByTwoPoints(p1, p2)
-    l2 = dtl.addByTwoPoints(l1.endSketchPoint, p3)
-    l3 = dtl.addByTwoPoints(l2.endSketchPoint, p4)
-    l4 = dtl.addByTwoPoints(l3.endSketchPoint, l1.startSketchPoint)
+    l_short = dtl.addByTwoPoints(p4, p3)
+    l_back = dtl.addByTwoPoints(l_short.endSketchPoint, p2)
+    l_wide = dtl.addByTwoPoints(l_back.endSketchPoint, p1)
+    l_front = dtl.addByTwoPoints(l_wide.endSketchPoint, l_short.startSketchPoint)
 
-    sk_dt.geometricConstraints.addVertical(l1)
-    sk_dt.geometricConstraints.addVertical(l3)
+    sk_dt.geometricConstraints.addVertical(l_short)
+    sk_dt.geometricConstraints.addVertical(l_wide)
     d = sk_dt.sketchDimensions
     H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
     V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
-    d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
-        V, Point3D.create(-1, hp + tw / 2, 0)).parameter.expression = "dt_tail_w"
-    d.addDistanceDimension(l3.startSketchPoint, l3.endSketchPoint,
+    d.addDistanceDimension(l_short.startSketchPoint, l_short.endSketchPoint,
         V, Point3D.create(bt + 1, hp + tw / 2, 0)).parameter.expression = "dt_narrow_w"
-    d.addDistanceDimension(l1.startSketchPoint, l3.endSketchPoint,
+    d.addDistanceDimension(l_short.startSketchPoint, l_wide.endSketchPoint,
         H, Point3D.create(bt / 2, hp - 1, 0)).parameter.expression = "board_thick"
-    d.addDistanceDimension(sk_dt.originPoint, l1.startSketchPoint,
-        V, Point3D.create(-1, hp / 2, 0)).parameter.expression = "dt_half_pin"
-    d.addDistanceDimension(sk_dt.originPoint, l1.startSketchPoint,
-        H, Point3D.create(0, hp - 2, 0)).parameter.expression = "0 in"
-    d.addDistanceDimension(sk_dt.originPoint, l3.endSketchPoint,
+    d.addDistanceDimension(sk_dt.originPoint, l_short.startSketchPoint,
         V, Point3D.create(bt + 2, (hp + delta) / 2, 0)
     ).parameter.expression = "dt_half_pin + board_thick * tan(dt_angle)"
+    d.addDistanceDimension(sk_dt.originPoint, l_short.startSketchPoint,
+        H, Point3D.create(0, hp - 2, 0)).parameter.expression = "board_thick"
+    d.addAngularDimension(
+        l_front, l_short, Point3D.create(bt / 2, hp + tw / 2, 0)
+    ).parameter.expression = "90 deg - dt_angle"
 
     ext_dt_l = sp.ext_new(top_c, sk_dt.profiles.item(0), "board_thick", "DT_Left")
     left_tail = ext_dt_l.bodies.item(0)

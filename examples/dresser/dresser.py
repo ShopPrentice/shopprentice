@@ -787,39 +787,38 @@ def _run(app):
         s4 = m(P(x_narrow, hp + delta,      0))
 
         ln = sk.sketchCurves.sketchLines
-        l1 = ln.addByTwoPoints(P(s1.x, s1.y, 0), P(s2.x, s2.y, 0))
-        l2 = ln.addByTwoPoints(l1.endSketchPoint, P(s3.x, s3.y, 0))
-        l3 = ln.addByTwoPoints(l2.endSketchPoint, P(s4.x, s4.y, 0))
-        l4 = ln.addByTwoPoints(l3.endSketchPoint, l1.startSketchPoint)
+        l_short = ln.addByTwoPoints(P(s4.x, s4.y, 0), P(s3.x, s3.y, 0))
+        l_back = ln.addByTwoPoints(l_short.endSketchPoint, P(s2.x, s2.y, 0))
+        l_wide = ln.addByTwoPoints(l_back.endSketchPoint, P(s1.x, s1.y, 0))
+        l_front = ln.addByTwoPoints(l_wide.endSketchPoint, l_short.startSketchPoint)
 
         if va == "y":
-            sk.geometricConstraints.addVertical(l1)
-            sk.geometricConstraints.addVertical(l3)
+            sk.geometricConstraints.addVertical(l_short)
+            sk.geometricConstraints.addVertical(l_wide)
         else:
-            sk.geometricConstraints.addHorizontal(l1)
-            sk.geometricConstraints.addHorizontal(l3)
+            sk.geometricConstraints.addHorizontal(l_short)
+            sk.geometricConstraints.addHorizontal(l_wide)
 
         d = sk.sketchDimensions
         yb = "dt_pin_w / 2"
 
-        d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
-            of("y"), P(s1.x - 1, (s1.y + s2.y) / 2, 0)
-        ).parameter.expression = "dt_tail_w"
-        d.addDistanceDimension(l3.startSketchPoint, l3.endSketchPoint,
+        d.addDistanceDimension(l_short.startSketchPoint, l_short.endSketchPoint,
             of("y"), P(s3.x + 1, (s3.y + s4.y) / 2, 0)
         ).parameter.expression = "dt_narrow_w"
-        d.addDistanceDimension(l1.startSketchPoint, l3.endSketchPoint,
+        d.addDistanceDimension(l_short.startSketchPoint, l_wide.endSketchPoint,
             of("x"), P((s1.x + s4.x) / 2, s1.y - 1, 0)
         ).parameter.expression = thick_e
-        d.addDistanceDimension(sk.originPoint, l1.startSketchPoint,
-            of("y"), P(s1.x - 2, s1.y / 2, 0)
-        ).parameter.expression = yb
-        d.addDistanceDimension(sk.originPoint, l1.startSketchPoint,
-            of("x"), P(s1.x / 2, s1.y - 2, 0)
-        ).parameter.expression = x_wide_e
-        d.addDistanceDimension(sk.originPoint, l3.endSketchPoint,
+        d.addDistanceDimension(sk.originPoint, l_short.startSketchPoint,
             of("y"), P(s4.x + 2, s4.y / 2, 0)
         ).parameter.expression = yb + " + " + thick_e + " * tan(dt_angle)"
+        short_x_expr = (f"{x_wide_e} + {thick_e}"
+                        if x_narrow >= x_wide else f"{x_wide_e} - {thick_e}")
+        d.addDistanceDimension(sk.originPoint, l_short.startSketchPoint,
+            of("x"), P(s1.x / 2, s1.y - 2, 0)
+        ).parameter.expression = short_x_expr
+        d.addAngularDimension(
+            l_front, l_short, P((s1.x + s4.x) / 2, (s1.y + s4.y) / 2, 0)
+        ).parameter.expression = "90 deg - dt_angle"
 
         pr = sk.profiles.item(0)
 
