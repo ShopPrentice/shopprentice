@@ -13,7 +13,7 @@ Reusable Python templates in `addin/helpers/templates/` encapsulate complex join
 | `domino` | `from helpers.templates import domino` | `single()`, `grid()`, `four_corners()` | M&T replacement, edge jointing, case T-joints |
 | `finger_joint` | `from helpers.templates import finger_joint` | `define_params()`, `box()` | Boxes, drawers, decorative corners |
 | `dovetail` | `from helpers.templates import dovetail` | `define_params()`, `corner()`, `box()` | Box corners, drawer fronts |
-| `half_blind_dovetail` | `from helpers.templates import half_blind_dovetail` | `define_params()`, `box()` | Drawer fronts (hides end grain) |
+| `half_blind_dovetail` | `from helpers.templates import half_blind_dovetail` | `define_params()`, `corner()`, `box()` | Drawer fronts (hides end grain) |
 | `splayed_legs` | `from helpers.templates import splayed_legs` | `define_params()`, `build()`, `splay_offset()` | 4 compound-splayed legs with floor trim |
 | `dovetailed_drawer` | `from helpers.templates import dovetailed_drawer` | `define_params()`, `build()`, `pattern()` | Complete drawer box |
 

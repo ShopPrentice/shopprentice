@@ -20,6 +20,14 @@ Usage:
         joint_h_expr="box_h", pin_thick_expr="front_thick",
         lap="0.25 in")
 
+    result = half_blind_dovetail.corner(
+        pin_body=front_body, tail_body=side_body,
+        plane=side_body.parentComponent.yZConstructionPlane,
+        x_model=0, y_wide=0.25, y_narrow=0.75,
+        y_wide_expr="0.25 in", socket_depth_expr="front_thick - 0.25 in",
+        dist_expr="side_thick", name="HBD_FL", ev=ctx.ev,
+    )
+
     result = half_blind_dovetail.box(comp, front, left,
         x_mid, y_mid,
         pin_thick_expr="front_thick", tail_thick_expr="side_thick",
@@ -57,6 +65,79 @@ METADATA = {
         "hbd_half_pin": "Derived: pin_w / 2",
     },
 }
+
+
+def _trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
+                      socket_depth_expr, joint_expr, wide_base_expr,
+                      prefix, name):
+    """Build the shared half-blind dovetail trapezoid sketch.
+
+    The model-space points define the half-blind tail profile:
+      m1 = wide-side joint-base corner at socket bottom
+      m2 = wide-side joint-top corner at socket bottom
+      m3 = narrow-side joint-top corner at socket opening
+      m4 = narrow-side joint-base corner at socket opening
+    """
+    p = prefix
+    sk = comp.sketches.add(plane)
+    sk.name = f"{name}_Sk"
+    m = sk.modelToSketchSpace
+
+    m1 = m(m1_pt)
+    m2 = m(m2_pt)
+    m3 = m(m3_pt)
+    m4 = m(m4_pt)
+
+    lines = sk.sketchCurves.sketchLines
+    l_wide = lines.addByTwoPoints(
+        Point3D.create(m1.x, m1.y, 0), Point3D.create(m2.x, m2.y, 0))
+    l_back = lines.addByTwoPoints(
+        l_wide.endSketchPoint, Point3D.create(m3.x, m3.y, 0))
+    l_short = lines.addByTwoPoints(
+        l_back.endSketchPoint, Point3D.create(m4.x, m4.y, 0))
+    l_front = lines.addByTwoPoints(
+        l_short.endSketchPoint, l_wide.startSketchPoint)
+
+    joint_is_sketch_h = abs(m3.x - m4.x) > abs(m3.y - m4.y)
+
+    gc = sk.geometricConstraints
+    if joint_is_sketch_h:
+        gc.addHorizontal(l_short)
+        gc.addHorizontal(l_wide)
+    else:
+        gc.addVertical(l_short)
+        gc.addVertical(l_wide)
+
+    joint_dim = H if joint_is_sketch_h else V
+    thick_dim = V if joint_is_sketch_h else H
+
+    d = sk.sketchDimensions
+    d.addDistanceDimension(
+        l_wide.startSketchPoint, l_wide.endSketchPoint,
+        joint_dim, Point3D.create(m1.x - 0.5, (m1.y + m2.y) / 2, 0)
+    ).parameter.expression = f"{p}_tail_w"
+    d.addDistanceDimension(
+        l_short.startSketchPoint, l_short.endSketchPoint,
+        joint_dim, Point3D.create(m3.x + 0.5, (m3.y + m4.y) / 2, 0)
+    ).parameter.expression = f"{p}_narrow_w"
+    d.addDistanceDimension(
+        l_wide.startSketchPoint, l_front.startSketchPoint,
+        thick_dim, Point3D.create((m1.x + m4.x) / 2, m1.y - 0.5, 0)
+    ).parameter.expression = socket_depth_expr
+    d.addDistanceDimension(
+        sk.originPoint, l_wide.startSketchPoint,
+        joint_dim, Point3D.create(m1.x - 1, m1.y / 2, 0)
+    ).parameter.expression = joint_expr
+    d.addDistanceDimension(
+        sk.originPoint, l_wide.startSketchPoint,
+        thick_dim, Point3D.create(m1.x / 2, m1.y - 1, 0)
+    ).parameter.expression = wide_base_expr
+    d.addDistanceDimension(
+        sk.originPoint, l_short.startSketchPoint,
+        joint_dim, Point3D.create(m4.x + 1, m4.y / 2, 0)
+    ).parameter.expression = f"{joint_expr} + {socket_depth_expr} * tan({p}_angle)"
+
+    return sp.smallest_profile(sk)
 
 
 def define_params(params, prefix="hbd", angle="8 deg", tail_w="0.5 in",
@@ -114,6 +195,88 @@ def define_params(params, prefix="hbd", angle="8 deg", tail_w="0.5 in",
         "pitch": f"{p}_pitch",
         "narrow_w": f"{p}_narrow_w",
         "half_pin": f"{p}_half_pin",
+    }
+
+
+def corner(pin_body, tail_body, plane,
+           x_model, y_wide, y_narrow,
+           y_wide_expr, socket_depth_expr, dist_expr,
+           name="HBD", prefix="hbd", ev=None,
+           pattern_axis=None, z_base_expr=None):
+    """Create a half-blind dovetail joint at one corner.
+
+    Works for both same-component and cross-component cases. The sketch,
+    JOIN extrude, and pattern always live in ``tail_body``'s component;
+    the final CUT combine is routed intra-component or at root
+    automatically by ``sp.combine``.
+
+    Args:
+        pin_body: Pin board body that receives the sockets.
+        tail_body: Tail board body that receives the JOIN extrude.
+        plane: Sketch plane in ``tail_body``'s component.
+        x_model: Model X coordinate of the sketch plane position.
+        y_wide: Model coordinate of the wide face at socket bottom.
+        y_narrow: Model coordinate of the narrow face at socket opening.
+        y_wide_expr: Parametric expression for the wide-face position.
+        socket_depth_expr: Parametric expression for socket depth.
+        dist_expr: Extrude distance expression.
+        name: Feature name prefix.
+        prefix: Parameter prefix (e.g. ``"hbd"``).
+        ev: Evaluator function.
+        pattern_axis: Construction axis for the tail pattern.
+        z_base_expr: Expression for joint-axis offset of the first
+            half-pin. Default: ``f"{prefix}_pin_w / 2"``.
+
+    Returns:
+        Dict with keys: ``join_feat``, ``pattern``, ``cut_combine``.
+    """
+    if ev is None:
+        ev = sp._make_ev()
+
+    p = prefix
+    socket_depth = ev(socket_depth_expr)
+    tw = ev(f"{p}_tail_w")
+    delta = socket_depth * math.tan(ev(f"{p}_angle"))
+
+    comp_tail = tail_body.parentComponent
+
+    if z_base_expr is None:
+        z_base = ev(f"{p}_half_pin")
+        z_dim_expr = f"{p}_pin_w / 2"
+    else:
+        z_base = ev(z_base_expr)
+        z_dim_expr = z_base_expr
+
+    m1_pt = Point3D.create(x_model, y_wide, z_base)
+    m2_pt = Point3D.create(x_model, y_wide, z_base + tw)
+    m3_pt = Point3D.create(x_model, y_narrow, z_base + tw - delta)
+    m4_pt = Point3D.create(x_model, y_narrow, z_base + delta)
+
+    prof = _trapezoid_sketch(
+        comp_tail, plane,
+        m1_pt, m2_pt, m3_pt, m4_pt,
+        socket_depth_expr=socket_depth_expr,
+        joint_expr=z_dim_expr,
+        wide_base_expr=y_wide_expr,
+        prefix=prefix, name=name)
+
+    join_feat = sp.ext_op(comp_tail, prof, dist_expr, JOIN, tail_body,
+                          f"{name}_Join")
+
+    if pattern_axis is None:
+        pattern_axis = comp_tail.zConstructionAxis
+
+    pattern = sp.feat_pattern(comp_tail, join_feat, pattern_axis,
+                              f"{p}_tail_count", f"{p}_pitch",
+                              f"{name}_Pat")
+
+    cut_combine = sp.combine(pin_body, tail_body, CUT, True,
+                             f"{name}_Cut")
+
+    return {
+        "join_feat": join_feat,
+        "pattern": pattern,
+        "cut_combine": cut_combine,
     }
 
 
@@ -208,78 +371,21 @@ def box(comp, front, left,
     else:
         px = 0.0
 
-    # Single trapezoid sketch
-    sk = comp.sketches.add(fl_plane)
-    sk.name = f"{name}_Sk"
-    m = sk.modelToSketchSpace
-
-    m1 = m(_pt3(px, f_wide, j_base))
-    m2 = m(_pt3(px, f_wide, j_base + tw))
-    m3 = m(_pt3(px, f_narrow, j_base + tw - delta))
-    m4 = m(_pt3(px, f_narrow, j_base + delta))
-
-    lines = sk.sketchCurves.sketchLines
-    l1 = lines.addByTwoPoints(
-        Point3D.create(m1.x, m1.y, 0), Point3D.create(m2.x, m2.y, 0))
-    l2 = lines.addByTwoPoints(
-        l1.endSketchPoint, Point3D.create(m3.x, m3.y, 0))
-    l3 = lines.addByTwoPoints(
-        l2.endSketchPoint, Point3D.create(m4.x, m4.y, 0))
-    l4 = lines.addByTwoPoints(
-        l3.endSketchPoint, l1.startSketchPoint)
-
-    joint_h = abs(m2.x - m1.x) > abs(m2.y - m1.y)
-    gc = sk.geometricConstraints
-    if joint_h:
-        gc.addHorizontal(l1); gc.addHorizontal(l3)
-    else:
-        gc.addVertical(l1); gc.addVertical(l3)
-
-    JD = H if joint_h else V
-    TD = V if joint_h else H
-    d = sk.sketchDimensions
-
-    # Dim 1: tail_w (wide side length along joint axis)
-    d.addDistanceDimension(
-        l1.startSketchPoint, l1.endSketchPoint,
-        JD, Point3D.create(m1.x - 0.5, (m1.y + m2.y) / 2, 0)
-    ).parameter.expression = f"{p}_tail_w"
-
-    # Dim 2: narrow_w (narrow side length along joint axis)
-    d.addDistanceDimension(
-        l3.startSketchPoint, l3.endSketchPoint,
-        JD, Point3D.create(m3.x + 0.5, (m3.y + m4.y) / 2, 0)
-    ).parameter.expression = f"{p}_narrow_w"
-
-    # Dim 3: socket_depth (trapezoid thickness across thick_axis)
-    d.addDistanceDimension(
-        l1.startSketchPoint, l4.startSketchPoint,
-        TD, Point3D.create((m1.x + m4.x) / 2, m1.y - 0.5, 0)
-    ).parameter.expression = f"{p}_socket_depth"
-
-    # Dim 4: origin -> wide face start along joint axis
-    d.addDistanceDimension(
-        sk.originPoint, l1.startSketchPoint,
-        JD, Point3D.create(m1.x - 1, m1.y / 2, 0)
-    ).parameter.expression = j_expr
-
-    # Dim 5: origin -> wide face along thick_axis = front + lap
     if front_expr == "0 in":
         wide_face_expr = f"{p}_lap"
     else:
         wide_face_expr = f"{front_expr} + {p}_lap"
-    d.addDistanceDimension(
-        sk.originPoint, l1.startSketchPoint,
-        TD, Point3D.create(m1.x / 2, m1.y - 1, 0)
-    ).parameter.expression = wide_face_expr
 
-    # Dim 6: origin -> narrow face start along joint axis (angle offset)
-    d.addDistanceDimension(
-        sk.originPoint, l4.startSketchPoint,
-        JD, Point3D.create(m4.x + 1, m4.y / 2, 0)
-    ).parameter.expression = j_expr + f" + {p}_socket_depth * tan({p}_angle)"
-
-    prof = sp.smallest_profile(sk)
+    prof = _trapezoid_sketch(
+        comp, fl_plane,
+        _pt3(px, f_wide, j_base),
+        _pt3(px, f_wide, j_base + tw),
+        _pt3(px, f_narrow, j_base + tw - delta),
+        _pt3(px, f_narrow, j_base + delta),
+        socket_depth_expr=f"{p}_socket_depth",
+        joint_expr=j_expr,
+        wide_base_expr=wide_face_expr,
+        prefix=prefix, name=name)
 
     # ext_op JOIN into tail boards
     tail_boards = [left, right] if right is not None else [left]

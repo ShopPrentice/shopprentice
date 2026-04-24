@@ -80,9 +80,9 @@ METADATA = {
 
 
 def _trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
-                      thick_expr, z_dim_expr, thick_base_expr,
+                      thick_expr, short_joint_expr, short_base_expr,
                       prefix, name):
-    """Build the shared through-dovetail trapezoid sketch with 6 parametric dims.
+    """Build the shared through-dovetail trapezoid sketch from the short face.
 
     The four model-space corner points define the trapezoid geometry:
       m1 = wide-side joint-base corner          (outer face, low end)
@@ -97,10 +97,10 @@ def _trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
         m1_pt, m2_pt, m3_pt, m4_pt: Point3D in model space.
         thick_expr: Parametric expression for board thickness
             (dim across thickness axis between wide and narrow faces).
-        z_dim_expr: Parametric expression for origin → l1.start along
-            the joint axis (half-pin offset).
-        thick_base_expr: Parametric expression for origin → l1.start
-            along the thickness axis (wide-face position).
+        short_joint_expr: Parametric expression for origin → short-face
+            low endpoint along the joint axis.
+        short_base_expr: Parametric expression for origin → short-face
+            low endpoint along the thickness axis.
         prefix: Parameter-name prefix (e.g. ``"dt"``). Used to compose
             ``{prefix}_tail_w``, ``{prefix}_narrow_w``, and
             ``{prefix}_angle`` references inside the sketch dims.
@@ -120,60 +120,56 @@ def _trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
     m4 = m(m4_pt)
 
     lines = sk.sketchCurves.sketchLines
-    l1 = lines.addByTwoPoints(
-        Point3D.create(m1.x, m1.y, 0), Point3D.create(m2.x, m2.y, 0))
-    l2 = lines.addByTwoPoints(
-        l1.endSketchPoint, Point3D.create(m3.x, m3.y, 0))
-    l3 = lines.addByTwoPoints(
-        l2.endSketchPoint, Point3D.create(m4.x, m4.y, 0))
-    l4 = lines.addByTwoPoints(
-        l3.endSketchPoint, l1.startSketchPoint)
+    l_short = lines.addByTwoPoints(
+        Point3D.create(m4.x, m4.y, 0), Point3D.create(m3.x, m3.y, 0))
+    l_back = lines.addByTwoPoints(
+        l_short.endSketchPoint, Point3D.create(m2.x, m2.y, 0))
+    l_wide = lines.addByTwoPoints(
+        l_back.endSketchPoint, Point3D.create(m1.x, m1.y, 0))
+    l_front = lines.addByTwoPoints(
+        l_wide.endSketchPoint, l_short.startSketchPoint)
 
     # Detect whether the joint axis maps to sketch-H or sketch-V
-    joint_is_sketch_h = abs(m2.x - m1.x) > abs(m2.y - m1.y)
+    joint_is_sketch_h = abs(m3.x - m4.x) > abs(m3.y - m4.y)
 
     gc = sk.geometricConstraints
     if joint_is_sketch_h:
-        gc.addHorizontal(l1)
-        gc.addHorizontal(l3)
+        gc.addHorizontal(l_short)
+        gc.addHorizontal(l_wide)
     else:
-        gc.addVertical(l1)
-        gc.addVertical(l3)
+        gc.addVertical(l_short)
+        gc.addVertical(l_wide)
 
     JOINT_DIM = H if joint_is_sketch_h else V
     THICK_DIM = V if joint_is_sketch_h else H
 
     d = sk.sketchDimensions
-    # Dim 1: l1 length = tail_w  (along joint axis)
+    # Dim 1: short face length = narrow_w.
     d.addDistanceDimension(
-        l1.startSketchPoint, l1.endSketchPoint,
-        JOINT_DIM, Point3D.create(m1.x - 0.5, (m1.y + m2.y) / 2, 0)
-    ).parameter.expression = f"{p}_tail_w"
-    # Dim 2: l3 length = narrow_w  (along joint axis)
-    d.addDistanceDimension(
-        l3.startSketchPoint, l3.endSketchPoint,
-        JOINT_DIM, Point3D.create(m3.x + 0.5, (m3.y + m4.y) / 2, 0)
+        l_short.startSketchPoint, l_short.endSketchPoint,
+        JOINT_DIM, Point3D.create(m4.x + 0.5, (m4.y + m3.y) / 2, 0)
     ).parameter.expression = f"{p}_narrow_w"
-    # Dim 3: l1→l4 distance = board_thick  (across thickness axis)
+    # Dim 2: wide ↔ short face separation = pin-board thickness.
     d.addDistanceDimension(
-        l1.startSketchPoint, l4.startSketchPoint,
-        THICK_DIM, Point3D.create((m1.x + m4.x) / 2, m1.y - 0.5, 0)
+        l_short.startSketchPoint, l_wide.endSketchPoint,
+        THICK_DIM, Point3D.create((m1.x + m4.x) / 2, (m1.y + m4.y) / 2, 0)
     ).parameter.expression = thick_expr
-    # Dim 4: origin → l1.start along joint axis = half_pin offset
+    # Dim 3: origin → short-face low endpoint along joint axis.
     d.addDistanceDimension(
-        sk.originPoint, l1.startSketchPoint,
-        JOINT_DIM, Point3D.create(m1.x - 1, m1.y / 2, 0)
-    ).parameter.expression = z_dim_expr
-    # Dim 5: origin → l1.start along thickness axis = wide-face position
-    d.addDistanceDimension(
-        sk.originPoint, l1.startSketchPoint,
-        THICK_DIM, Point3D.create(m1.x / 2, m1.y - 1, 0)
-    ).parameter.expression = thick_base_expr
-    # Dim 6: origin → l4.start along joint axis = half_pin + taper offset
-    d.addDistanceDimension(
-        sk.originPoint, l4.startSketchPoint,
+        sk.originPoint, l_short.startSketchPoint,
         JOINT_DIM, Point3D.create(m4.x + 1, m4.y / 2, 0)
-    ).parameter.expression = z_dim_expr + f" + {thick_expr} * tan({p}_angle)"
+    ).parameter.expression = short_joint_expr
+    # Dim 4: origin → short-face low endpoint along thickness axis.
+    d.addDistanceDimension(
+        sk.originPoint, l_short.startSketchPoint,
+        THICK_DIM, Point3D.create(m4.x / 2, m4.y + 1, 0)
+    ).parameter.expression = short_base_expr
+
+    # Dim 5: one flank angle. ``dt_angle`` is defined off the thickness axis,
+    # so the angle to the joint-axis short face is its complement.
+    d.addAngularDimension(
+        l_front, l_short, Point3D.create((m1.x + m4.x) / 2, (m1.y + m4.y) / 2, 0)
+    ).parameter.expression = f"90 deg - {p}_angle"
 
     return sp.smallest_profile(sk)
 
@@ -343,8 +339,8 @@ def corner(pin_body, tail_body, plane,
         comp_tail, plane,
         m1_pt, m2_pt, m3_pt, m4_pt,
         thick_expr=thick_expr,
-        z_dim_expr=z_dim_expr,
-        thick_base_expr=y_wide_expr,
+        short_joint_expr=f"{z_dim_expr} + {thick_expr} * tan({p}_angle)",
+        short_base_expr=f"{y_wide_expr} + {thick_expr}",
         prefix=prefix, name=name)
 
     # JOIN into tail_body (intra-component)
@@ -490,8 +486,11 @@ def box(comp, front, left,
         comp, fl_plane,
         m1_pt, m2_pt, m3_pt, m4_pt,
         thick_expr=thick_expr,
-        z_dim_expr=j_expr,
-        thick_base_expr=front_expr,
+        short_joint_expr=f"{j_expr} + {thick_expr} * tan({p}_angle)",
+        short_base_expr=(
+            f"({front_expr}) + {thick_expr}" if thick_dir >= 0
+            else f"({front_expr}) - {thick_expr}"
+        ),
         prefix=prefix, name=name)
 
     # ── ext_op JOIN with participantBodies ──
@@ -549,4 +548,3 @@ def box(comp, front, left,
         "join_fl": join_fl, "pattern": pat,
         "cut_front": cut_front, "cut_back": cut_back,
     }
-

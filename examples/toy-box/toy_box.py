@@ -432,47 +432,46 @@ def run(context):
         s4 = m(Point3D.create(mx, yn, fz + hp + delta))
 
         ln = sk.sketchCurves.sketchLines
-        l1 = ln.addByTwoPoints(Point3D.create(s1.x, s1.y, 0),
-                                Point3D.create(s2.x, s2.y, 0))
-        l2 = ln.addByTwoPoints(l1.endSketchPoint,
-                                Point3D.create(s3.x, s3.y, 0))
-        l3 = ln.addByTwoPoints(l2.endSketchPoint,
-                                Point3D.create(s4.x, s4.y, 0))
-        l4 = ln.addByTwoPoints(l3.endSketchPoint, l1.startSketchPoint)
+        l_short = ln.addByTwoPoints(Point3D.create(s4.x, s4.y, 0),
+                                    Point3D.create(s3.x, s3.y, 0))
+        l_back = ln.addByTwoPoints(l_short.endSketchPoint,
+                                   Point3D.create(s2.x, s2.y, 0))
+        l_wide = ln.addByTwoPoints(l_back.endSketchPoint,
+                                   Point3D.create(s1.x, s1.y, 0))
+        l_front = ln.addByTwoPoints(l_wide.endSketchPoint,
+                                    l_short.startSketchPoint)
 
         if va == "z":
-            sk.geometricConstraints.addVertical(l1)
-            sk.geometricConstraints.addVertical(l3)
+            sk.geometricConstraints.addVertical(l_short)
+            sk.geometricConstraints.addVertical(l_wide)
         else:
-            sk.geometricConstraints.addHorizontal(l1)
-            sk.geometricConstraints.addHorizontal(l3)
+            sk.geometricConstraints.addHorizontal(l_short)
+            sk.geometricConstraints.addHorizontal(l_wide)
 
         dd = sk.sketchDimensions
 
-        dd.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
-            of("z"), Point3D.create(s1.x + (-1 if of("z") == V else 0),
-                                     s1.y + (0 if of("z") == V else -1), 0)
-        ).parameter.expression = "dt_tail_w"
-        dd.addDistanceDimension(l3.startSketchPoint, l3.endSketchPoint,
+        dd.addDistanceDimension(l_short.startSketchPoint, l_short.endSketchPoint,
             of("z"), Point3D.create(s3.x + (1 if of("z") == V else 0),
                                      s3.y + (0 if of("z") == V else 1), 0)
         ).parameter.expression = "dt_narrow_w_z"
-        dd.addDistanceDimension(l1.startSketchPoint, l3.endSketchPoint,
+        dd.addDistanceDimension(l_short.startSketchPoint, l_wide.endSketchPoint,
             of("y"), Point3D.create((s1.x + s4.x) / 2,
                                      (s1.y + s4.y) / 2 + (-1 if of("y") == V else 0), 0)
         ).parameter.expression = "board_thick"
-        dd.addDistanceDimension(sk.originPoint, l1.startSketchPoint,
-            of("z"), Point3D.create(s1.x + (-1 if of("z") == V else 0),
-                                     s1.y / 2, 0)
-        ).parameter.expression = "foot_h + dt_pin_w_z / 2"
-        dd.addDistanceDimension(sk.originPoint, l1.startSketchPoint,
-            of("y"), Point3D.create(s1.x / 2,
-                                     s1.y + (-2 if of("y") == V else 0), 0)
-        ).parameter.expression = y_wide_expr
-        dd.addDistanceDimension(sk.originPoint, l3.endSketchPoint,
+        dd.addDistanceDimension(sk.originPoint, l_short.startSketchPoint,
             of("z"), Point3D.create(s4.x + (2 if of("z") == V else 0),
                                      s4.y / 2, 0)
         ).parameter.expression = "foot_h + dt_pin_w_z / 2 + board_thick * tan(dt_angle)"
+        short_y_expr = (f"{y_wide_expr} + board_thick"
+                        if yn >= yw else f"{y_wide_expr} - board_thick")
+        dd.addDistanceDimension(sk.originPoint, l_short.startSketchPoint,
+            of("y"), Point3D.create(s1.x / 2,
+                                     s1.y + (-2 if of("y") == V else 0), 0)
+        ).parameter.expression = short_y_expr
+        dd.addAngularDimension(
+            l_front, l_short,
+            Point3D.create((s1.x + s4.x) / 2, (s1.y + s4.y) / 2, 0)
+        ).parameter.expression = "90 deg - dt_angle"
 
         prof = sk.profiles.item(0)
 

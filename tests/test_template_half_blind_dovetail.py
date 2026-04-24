@@ -1,10 +1,13 @@
 """Test fixture for half-blind dovetail joint template.
 
-Tests define_params and box() with 4 configurations:
+Tests define_params and box() with 4 configurations plus direct
+corner() coverage:
   B1: 1-corner half-blind (2 boards: front + left)
   B2: 2-corner half-blind (3 boards: front + left + right)
   B3: 4-corner half-blind (4 boards)
   B4: 4-corner half-blind, different dimensions
+  C1: direct corner() inside one component
+  C2: direct corner() across two components
 
 Layout: 2x2 grid
   Row 0 (y=0):      B1 (8x6),   B2 (10x5)
@@ -12,6 +15,7 @@ Layout: 2x2 grid
 """
 import adsk.core
 import adsk.fusion
+import sys
 
 
 def build_box(root, prefix, l_expr, w_expr, h_expr,
@@ -164,6 +168,12 @@ def build_box(root, prefix, l_expr, w_expr, h_expr,
 def run(context):
     app = adsk.core.Application.get()
 
+    for name in list(sys.modules):
+        if name == "helpers" or name.startswith("helpers."):
+            del sys.modules[name]
+        if name == "woodworking" or name.startswith("woodworking."):
+            del sys.modules[name]
+
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
 
@@ -272,6 +282,111 @@ def run(context):
     print("Box 4: PASS\n")
 
     # ================================================================
+    # C1: corner() — intra-component
+    # ================================================================
+    print("=" * 50)
+    print("C1: corner() intra-component")
+    print("=" * 50)
+
+    params.add("c1_l", VI("8 in"), "in", "C1 length")
+    params.add("c1_w", VI("6 in"), "in", "C1 width")
+    params.add("c1_h", VI("4 in"), "in", "C1 height")
+    params.add("c1_ft", VI("0.75 in"), "in", "C1 front thickness")
+    params.add("c1_st", VI("0.5 in"), "in", "C1 side thickness")
+    params.add("c1_lap", VI("0.25 in"), "in", "C1 lap")
+    params.add("c1_x", VI("b4_x + b4_l + 2 in"), "in", "C1 X offset")
+    params.add("c1_y", VI("0 in"), "in", "C1 Y offset")
+
+    half_blind_dovetail.define_params(params, prefix="hbdc1",
+        angle="8 deg", tail_w="0.75 in", tail_count="3",
+        joint_h_expr="c1_h", pin_thick_expr="c1_ft", lap="c1_lap")
+
+    c1_occ = sp.make_comp(root, "C1")
+    c1_comp = c1_occ.component
+    c1_front_pl = sp.off_plane(c1_comp, c1_comp.xZConstructionPlane,
+                               "c1_y", "C1_FrontYPl")
+    sk, pr = sp.sketch_rect_model(c1_comp, c1_front_pl,
+        ("c1_x", "c1_y", "0 in"),
+        {"x": "c1_l", "z": "c1_h"}, "C1_Front_Sk", ctx.ev)
+    c1_front = sp.ext_new(c1_comp, pr, "c1_ft", "C1_Front").bodies.item(0)
+    c1_front.name = "C1_Front"
+
+    c1_left_pl = sp.off_plane(c1_comp, c1_comp.yZConstructionPlane,
+                              "c1_x", "C1_LeftXPl")
+    sk, pr = sp.sketch_rect_model(c1_comp, c1_left_pl,
+        ("c1_x", "c1_ft", "0 in"),
+        {"y": "c1_w - 2 * c1_ft", "z": "c1_h"}, "C1_Left_Sk", ctx.ev)
+    c1_left = sp.ext_new(c1_comp, pr, "c1_st", "C1_Left").bodies.item(0)
+    c1_left.name = "C1_Left"
+
+    half_blind_dovetail.corner(
+        pin_body=c1_front, tail_body=c1_left, plane=c1_left_pl,
+        x_model=ctx.ev("c1_x"),
+        y_wide=ctx.ev("c1_lap"),
+        y_narrow=ctx.ev("c1_ft"),
+        y_wide_expr="c1_lap",
+        socket_depth_expr="hbdc1_socket_depth",
+        dist_expr="c1_st",
+        name="C1_HBD", prefix="hbdc1", ev=ctx.ev)
+    assert c1_comp.bRepBodies.count == 2, \
+        f"C1: expected 2 bodies, got {c1_comp.bRepBodies.count}"
+    print("C1: PASS (intra-component corner)\n")
+
+    # ================================================================
+    # C2: corner() — cross-component
+    # ================================================================
+    print("=" * 50)
+    print("C2: corner() cross-component")
+    print("=" * 50)
+
+    params.add("c2_l", VI("8 in"), "in", "C2 length")
+    params.add("c2_w", VI("6 in"), "in", "C2 width")
+    params.add("c2_h", VI("4 in"), "in", "C2 height")
+    params.add("c2_ft", VI("0.75 in"), "in", "C2 front thickness")
+    params.add("c2_st", VI("0.5 in"), "in", "C2 side thickness")
+    params.add("c2_lap", VI("0.25 in"), "in", "C2 lap")
+    params.add("c2_x", VI("c1_x + c1_l + 2 in"), "in", "C2 X offset")
+    params.add("c2_y", VI("0 in"), "in", "C2 Y offset")
+
+    half_blind_dovetail.define_params(params, prefix="hbdc2",
+        angle="8 deg", tail_w="0.75 in", tail_count="3",
+        joint_h_expr="c2_h", pin_thick_expr="c2_ft", lap="c2_lap")
+
+    c2_fo = sp.make_comp(root, "C2_Front")
+    c2_fc = c2_fo.component
+    c2_fp = sp.off_plane(c2_fc, c2_fc.xZConstructionPlane,
+                         "c2_y", "C2_FrontYPl")
+    sk, pr = sp.sketch_rect_model(c2_fc, c2_fp,
+        ("c2_x", "c2_y", "0 in"),
+        {"x": "c2_l", "z": "c2_h"}, "C2_Front_Sk", ctx.ev)
+    c2_front = sp.ext_new(c2_fc, pr, "c2_ft", "C2_Front").bodies.item(0)
+    c2_front.name = "C2_Front"
+
+    c2_lo = sp.make_comp(root, "C2_Left")
+    c2_lc = c2_lo.component
+    c2_lp = sp.off_plane(c2_lc, c2_lc.yZConstructionPlane,
+                         "c2_x", "C2_LeftXPl")
+    sk, pr = sp.sketch_rect_model(c2_lc, c2_lp,
+        ("c2_x", "c2_ft", "0 in"),
+        {"y": "c2_w - 2 * c2_ft", "z": "c2_h"}, "C2_Left_Sk", ctx.ev)
+    c2_left = sp.ext_new(c2_lc, pr, "c2_st", "C2_Left").bodies.item(0)
+    c2_left.name = "C2_Left"
+
+    half_blind_dovetail.corner(
+        pin_body=c2_front, tail_body=c2_left, plane=c2_lp,
+        x_model=ctx.ev("c2_x"),
+        y_wide=ctx.ev("c2_lap"),
+        y_narrow=ctx.ev("c2_ft"),
+        y_wide_expr="c2_lap",
+        socket_depth_expr="hbdc2_socket_depth",
+        dist_expr="c2_st",
+        name="C2_HBD", prefix="hbdc2", ev=ctx.ev)
+    c2_total = c2_fc.bRepBodies.count + c2_lc.bRepBodies.count
+    assert c2_total == 2, \
+        f"C2: expected 2 bodies across 2 comps, got {c2_total}"
+    print("C2: PASS (cross-component corner)\n")
+
+    # ================================================================
     # Summary
     # ================================================================
     print("=" * 50)
@@ -286,8 +401,8 @@ def run(context):
         print(f"  {c.name}: {n} bodies -> {names}")
         total += n
 
-    # B1: 2, B2: 3, B3: 4, B4: 4 = 13
-    expected = 2 + 3 + 4 + 4
+    # B1: 2, B2: 3, B3: 4, B4: 4, C1: 2, C2: 2 = 17
+    expected = 2 + 3 + 4 + 4 + 2 + 2
     status = "PASS" if total == expected else "FAIL"
     print(f"\n{status}: expected {expected} bodies, got {total}")
 
