@@ -49,7 +49,7 @@ How each component attaches to its neighbors. Every connection needs a mechanica
 |-----------|-----------|----------|
 | _Example: Case corners_ | _Through dovetails_ | `dovetail` |
 | _Example: Bottom to case_ | _Dado_ | inline |
-| _Example: Lid to case_ | _Butt hinge_ | `butt_hinge` |
+| _Example: Lid to case_ | _Butt hinge_ | `hardware.install_butt_hinge()` |
 | _Example: Feet to case_ | _Glue + screws or dominos_ | `domino` |
 
 ## Hardware Checklist
@@ -58,7 +58,7 @@ What hardware this type typically needs. The style file determines which specifi
 
 | Hardware | When needed | Template/catalog |
 |----------|------------|-----------------|
-| _Example: Lid hinge_ | _When lid opens_ | `butt_hinge` or Euro hinge |
+| _Example: Lid hinge_ | _When lid opens_ | `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` or Euro hinge |
 | _Example: Lid stay_ | _When lid should hold open_ | lid_stay |
 | _Example: Drawer pull_ | _When drawer exists_ | `pull` or knob |
 

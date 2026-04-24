@@ -52,15 +52,14 @@ Joinery files live at: `~/.shopprentice/repo/joinery/` (or the repo's `joinery/`
 | `splayed_legs.py` | Tested | counter stool |
 | `dovetailed_drawer.py` | Tested | dresser |
 
-#### Hardware templates
+#### Inline hardware templates
 
 | Template | Status | Used In |
 |----------|--------|---------|
-| `butt_hinge.py` | Tested | (test fixture) |
 | `pull.py` | Tested | (test fixture) |
 | `chest_lock.py` | Tested | (test fixture) |
 
-Templates encapsulate complex joinery (4+ features with variant logic) into single function calls. Simple joints (dado/rabbet, T&G) are written inline. Hardware templates create mortise pockets + visual hardware bodies using the "if it fits, it CUTs" principle.
+Templates encapsulate complex joinery (4+ features with variant logic) into single function calls. Simple joints (dado/rabbet, T&G) are written inline. Inline hardware templates are limited to non-hinge fixtures such as pulls and chest locks; hinges should use the imported hardware flow in `helpers/hardware.py`.
 
 ### Context from the build
 

@@ -45,7 +45,7 @@ Base below case
 | Case corners | Dados, rabbets, or dovetails | inline or `dovetail` |
 | Face frame | Dominos or pocket screws to case | `domino` |
 | Face frame corners | Blind M&T | `mortise_tenon` |
-| Doors to case/frame | Hinges (butt or Euro concealed) | `butt_hinge` or Euro |
+| Doors to case/frame | Hinges (butt or Euro concealed) | `hardware.install_butt_hinge()` or Euro |
 | Fixed shelves | Dados | inline |
 | Adjustable shelves | Shelf pins | `shelf_pins` |
 | Drawer boxes | Half-blind front, through back | `dovetailed_drawer` |
@@ -55,7 +55,7 @@ Base below case
 
 | Hardware | When needed | Template/catalog |
 |----------|------------|-----------------|
-| Door hinges | Always | `butt_hinge` (traditional) or Euro hinge (modern) |
+| Door hinges | Always | `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` (traditional) or Euro hinge (modern) |
 | Door catches | Usually (unless push-to-open) | Magnetic catch |
 | Door pulls/knobs | Usually | Knob or pull hardware |
 | Drawer pulls | When drawers exist | Knob or pull hardware |

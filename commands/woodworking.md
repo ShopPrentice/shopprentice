@@ -473,7 +473,7 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 
 **Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `woodworking/joinery/README.md`.
 
-**Hardware:** `butt_hinge`, `pull`, `chest_lock` templates + STEP import via `hardware.install_butt_hinge()`. See `woodworking/hardware-installation.md`.
+**Hardware:** use `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` for hinges, plus the `pull` and `chest_lock` templates for non-hinge hardware. See `woodworking/hardware-installation.md`.
 
 ## Incremental Build Strategy
 
@@ -587,4 +587,3 @@ Name every feature and body for a readable timeline and easy debugging:
 6. Verify no overlapping joints at corners
 7. Body count matches expected (diagnostic print confirms no accidental merges or orphans)
 8. **`validate_design` → passed.** Single call checks connectivity (1 cluster) + interference (0 real overlaps). Fix disconnected clusters by adding mechanical joinery; fix interferences by checking CUT operations.
-
