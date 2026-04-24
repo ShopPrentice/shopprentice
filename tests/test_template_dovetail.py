@@ -547,6 +547,58 @@ def run(context):
     print("B13: PASS (placed at creation)\n")
 
     # ================================================================
+    # B14 @ (0,3): 1-corner 8x6x4 with pad=1/8" — edge padding demo
+    # Same thin-pin geometry as B12 (3 tails × 1.2" on a 4" board,
+    # inner pin ~0.1"), but with dt_pad=0.125" so the end pins grow
+    # to pad + pin_w/2 ≈ 0.175" — robust enough not to break.
+    # Verifies:
+    #   - pin_w shrinks because effective board = h - 2*pad
+    #   - first tail z-base shifts by pad (corner() codepath)
+    #   - body count matches expected
+    # ================================================================
+    print("=" * 50 + "\nB14 @ (0,3): 1-corner with pad=1/8\" — edge padding\n" + "=" * 50)
+    b14_x, b14_y = slot(0, 3)
+    _add_param("b14_l", "8 in", "in", "B14 length")
+    _add_param("b14_w", "6 in", "in", "B14 width")
+    _add_param("b14_h", "4 in", "in", "B14 height")
+    _add_param("b14_t", "0.5 in", "in", "B14 thickness")
+    dovetail.define_params(params, prefix="dt14",
+        angle="8 deg", tail_w="1.2 in", tail_count="3",
+        joint_h_expr="b14_h", thick_expr="b14_t",
+        pad="0.125 in")
+    # With pad: pin_w = (4 - 0.25) / 3 - 1.2 = 0.05", edge = pad + pin_w/2 = 0.15"
+    # Without pad would be: pin_w = 4/3 - 1.2 = 0.133", edge half-pin = 0.066"
+    pin_w_v = ctx.ev("dt14_pin_w") / 2.54
+    edge_pin_v = (ctx.ev("dt14_pad") + ctx.ev("dt14_half_pin")) / 2.54
+    assert edge_pin_v > 2 * pin_w_v, (
+        f"B14: edge pin ({edge_pin_v:.3f}) should be > 2× inner ({pin_w_v:.3f})")
+    r14 = build_box(root, "B14", "b14_l", "b14_w", "b14_h", "b14_t",
+                    b14_x, "dt14", ctx.ev, y_off_expr=b14_y, corners=1)
+    assert r14["count"] == 2, f"B14: expected 2, got {r14['count']}"
+    print(f"B14: PASS (inner pin {pin_w_v:.3f}\", edge pin {edge_pin_v:.3f}\")\n")
+
+    # ================================================================
+    # B15 @ (1,3): 4-corner with pad=1/16" — exercises box() j_base
+    # Standard 4-corner box but with pad=0.0625". Verifies that
+    # box()'s j_base = pad + half_pin path produces a valid mirror +
+    # pattern layout on all four corners.
+    # ================================================================
+    print("=" * 50 + "\nB15 @ (1,3): 4-corner 8x5x5 with pad=1/16\"\n" + "=" * 50)
+    b15_x, b15_y = slot(1, 3)
+    _add_param("b15_l", "8 in", "in", "B15 length")
+    _add_param("b15_w", "5 in", "in", "B15 width")
+    _add_param("b15_h", "5 in", "in", "B15 height")
+    _add_param("b15_t", "0.5 in", "in", "B15 thickness")
+    dovetail.define_params(params, prefix="dt15",
+        angle="8 deg", tail_w="0.5 in", tail_count="4",
+        joint_h_expr="b15_h", thick_expr="b15_t",
+        pad="0.0625 in")
+    r15 = build_box(root, "B15", "b15_l", "b15_w", "b15_h", "b15_t",
+                    b15_x, "dt15", ctx.ev, y_off_expr=b15_y, corners=4)
+    assert r15["count"] == 4, f"B15: expected 4, got {r15['count']}"
+    print("B15: PASS (pad propagates through box() + 4 mirrors)\n")
+
+    # ================================================================
     # C1 @ (3,2): dovetail.corner() — intra-component
     # Exercises the unified corner() API with pin + tail bodies in the
     # same component (simplest case).
@@ -654,12 +706,12 @@ def run(context):
         print(f"  {c.name}: {n} bodies -> {names}")
         total += n
 
-    # B1, B2, B12     : 2 bodies each (1-corner)     = 6
+    # B1, B2, B12, B14: 2 bodies each (1-corner)     = 8
     # B3, B4          : 3 bodies each (2-corner)     = 6
-    # B5, B6, B9, B10, B11, B13: 4 bodies each       = 24
+    # B5, B6, B9, B10, B11, B13, B15: 4 bodies each  = 28
     # C1              : 2 bodies (corner intra)      = 2
     # C2_Front, C2_Left: 1 body each (corner cross)  = 2
-    expected = 2 * 3 + 3 * 2 + 4 * 6 + 2 + 2  # = 40
+    expected = 2 * 4 + 3 * 2 + 4 * 7 + 2 + 2  # = 46
     status = "PASS" if total == expected else "FAIL"
     print(f"\n{status}: expected {expected} bodies, got {total}")
 

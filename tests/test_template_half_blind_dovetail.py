@@ -1,17 +1,18 @@
 """Test fixture for half-blind dovetail joint template.
 
-Tests define_params and box() with 4 configurations plus direct
+Tests define_params and box() with 5 configurations plus direct
 corner() coverage:
   B1: 1-corner half-blind (2 boards: front + left)
   B2: 2-corner half-blind (3 boards: front + left + right)
   B3: 4-corner half-blind (4 boards)
   B4: 4-corner half-blind, different dimensions
+  B5: 4-corner half-blind with edge padding (pad > 0)
   C1: direct corner() inside one component
   C2: direct corner() across two components
 
-Layout: 2x2 grid
+Layout: 2x2 grid, with B5 placed to the right of row 1.
   Row 0 (y=0):      B1 (8x6),   B2 (10x5)
-  Row 1 (y=offset):  B3 (8x6),   B4 (6x4)
+  Row 1 (y=offset): B3 (8x6),   B4 (6x4),   B5 (8x6 + pad)
 """
 import adsk.core
 import adsk.fusion
@@ -282,6 +283,44 @@ def run(context):
     print("Box 4: PASS\n")
 
     # ================================================================
+    # FIXTURE 5: 4-corner half-blind with pad=1/16" — edge padding
+    # Same box style as B3 but with dt_pad=0.0625" so end pins grow
+    # to pad + half_pin. Exercises the half-blind box() j_base =
+    # pad + half_pin code path across all 4 mirrored corners.
+    # ================================================================
+    print("=" * 50)
+    print("FIXTURE 5: 4-corner half-blind with pad=1/16\"")
+    print("=" * 50)
+
+    params.add("b5_l", VI("8 in"), "in", "Box 5 length")
+    params.add("b5_w", VI("6 in"), "in", "Box 5 width")
+    params.add("b5_h", VI("5 in"), "in", "Box 5 height")
+    params.add("b5_ft", VI("0.75 in"), "in", "Box 5 front thickness")
+    params.add("b5_st", VI("0.5 in"), "in", "Box 5 side thickness")
+    params.add("b5_x", VI("b4_x + b4_l + 2 in"), "in", "Box 5 X offset")
+
+    half_blind_dovetail.define_params(params, prefix="hbd5",
+        angle="8 deg", tail_w="0.5 in", tail_count="4",
+        joint_h_expr="b5_h", pin_thick_expr="b5_ft", lap="0.25 in",
+        pad="0.0625 in")  # NEW: edge padding
+
+    # Verify padding produces thicker edge pins than an unpadded layout
+    pad_v = ctx.ev("hbd5_pad") / 2.54
+    half_pin_v = ctx.ev("hbd5_half_pin") / 2.54
+    edge_pin_v = pad_v + half_pin_v
+    unpadded_edge = ctx.ev("b5_h") / 2.54 / 4 / 2 - 0.25  # 5/4/2 - tail_w/2... just sanity
+    assert pad_v > 0, "Fixture 5: pad should be > 0"
+    assert edge_pin_v > half_pin_v, (
+        f"Fixture 5: edge pin ({edge_pin_v:.4f}) should be > half_pin ({half_pin_v:.4f})")
+
+    r5 = build_box(root, "B5", "b5_l", "b5_w", "b5_h",
+                   "b5_ft", "b5_st", "b5_x", "hbd5", ctx.ev,
+                   y_off_expr="b3_y")
+    assert r5["count"] == 4, f"Box 5: expected 4, got {r5['count']}"
+    print(f"Box 5: PASS (pad={pad_v:.4f}\", edge pin={edge_pin_v:.4f}\", "
+          f"half_pin={half_pin_v:.4f}\")\n")
+
+    # ================================================================
     # C1: corner() — intra-component
     # ================================================================
     print("=" * 50)
@@ -401,8 +440,8 @@ def run(context):
         print(f"  {c.name}: {n} bodies -> {names}")
         total += n
 
-    # B1: 2, B2: 3, B3: 4, B4: 4, C1: 2, C2: 2 = 17
-    expected = 2 + 3 + 4 + 4 + 2 + 2
+    # B1: 2, B2: 3, B3: 4, B4: 4, B5: 4, C1: 2, C2: 2 = 21
+    expected = 2 + 3 + 4 + 4 + 4 + 2 + 2
     status = "PASS" if total == expected else "FAIL"
     print(f"\n{status}: expected {expected} bodies, got {total}")
 

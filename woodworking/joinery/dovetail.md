@@ -62,6 +62,68 @@ params.add("dt_narrow_w", adsk.core.ValueInput.createByString("dt_tail_w - 2 * d
 params.add("dt_half_pin", adsk.core.ValueInput.createByString("dt_pin_w / 2"), "in", "Half-pin width")
 ```
 
+## Proportions & Defaults
+
+Use these rules when picking parameters from scratch. Defaults in the template `define_params` / `add_params` calls already follow them — override only when the piece demands it.
+
+### Angle (`dt_angle`)
+| Wood | Angle | Ratio | Rationale |
+|------|-------|-------|-----------|
+| Hardwood (oak, walnut, cherry, maple) | 7-9° | ~1:7 | Firm fibers hold a shallower taper |
+| Softwood (pine, cedar, fir) | 10-14° | ~1:5 | Softer fibers need deeper mechanical engagement; glue grabs less reliably |
+| **Default** | **8°** | **1:7** | Good all-purpose value for hardwoods |
+
+Limits: **< 7°** risks the joint pulling apart (insufficient mechanical lock). **> 14°** creates short-grain at tail tips that breaks under stress.
+
+### Tail Count (`dt_tail_count`)
+Scale with board height, not stock thickness:
+
+| Use case | Tails per inch of `board_h` | Example (6" board) |
+|----------|----------------------------|---------------------|
+| Fine box / jewelry work | ~1 tail / 1" | 5-6 tails |
+| Casework, drawers | ~1 tail / 1.5-2" | 3-4 tails |
+| Utility | ~1 tail / 2.5-3" | 2-3 tails |
+
+- **Minimum: 3 tails** for visual balance (unless the piece is under 3" tall).
+- **Maximum** is bounded by `pin_w > 0`: if `board_h / tail_count - tail_w` goes negative, reduce `tail_count` or `tail_w`.
+
+### Tail : Pin Ratio (visual)
+`pin_w` is derived — it's whatever fills the remaining height after tails. The ratio you see is implicit in your `tail_w` + `tail_count` choice.
+
+| Style | Ratio (tail : pin) | Effect |
+|-------|-------------------|--------|
+| Classic fine work (handcut look) | 3:1 to 4:1 | Tails dominant, pins read as thin vertical lines |
+| Modern / utilitarian | 2:1 | Pins more prominent, machine-cut aesthetic |
+| Router-jig box-joint look | 1:1 | Equal-width tails and pins |
+
+### Half-Blind Lap (`dt_lap`)
+Only relevant for half-blind dovetails. The lap is the material hiding the joint from the outer face.
+
+- **Typical:** 1/3 of pin board thickness. For 3/4" stock, `lap = 1/4"` → `socket_depth = 1/2"`.
+- **Minimum:** 1/4" (0.25"). Thinner laps blow out when glue swells the wood or the joint is tapped home.
+- **Maximum:** 1/2 of pin thickness. More than half leaves insufficient socket depth for the tail to grip.
+
+Verify `socket_depth > tail_w / 2` (roughly) for adequate mechanical grip around each tail.
+
+### Edge Padding (`dt_pad`)
+Extra material beyond half a normal pin on each end of the board. End pin width becomes `pad + pin_w/2` instead of just `pin_w/2`.
+
+- **Default: 0** — classic symmetric-half-pin layout.
+- **Use when** `pin_w` gets thin (< ~1/8" / 3mm) and the unpadded half-pins would crack off easily. Common trigger: ultra-dense pins from high `tail_count` or wide `tail_w` near the pin_w > 0 limit.
+- **Typical values:** 1/16" (1.5mm) to 3/16" (5mm). Keep below `tail_w / 2` so the edge pin doesn't visually dominate.
+- **Effect:** tail pattern now packs into `board_h - 2·pad` instead of `board_h`. Inner pitch and inner `pin_w` shrink slightly; end pins grow by `pad`.
+
+### Houndstooth Void (`dt_ht_small_w`, `dt_ht_depth`)
+The void is decorative. It should read as a slot inside each tail, not as a competing feature.
+
+| Param | Default | Range | Never |
+|-------|---------|-------|-------|
+| `ht_small_w` (free) | `tail_w / 7` | `tail_w / 10` (hairline) to `tail_w / 4` (bold) | > `tail_w / 3` — void starts overpowering the tail |
+| `ht_depth` (free) | `tail_w * 3/5` | `tail_w / 2` (subtle) to `tail_w` (dramatic) | > `thick` (through) or `> socket_depth * 0.9` (half-blind) — void punches through |
+| `ht_inset` (derived) | `(tail_w - ht_small_w) / 2` | — | Not user-tunable; auto-centers |
+
+Since the void shares the main dovetail angle, a deeper void widens more at its far end. `ht_depth > tail_w` is allowed geometrically but the widening gets hard to control.
+
 ## Geometry Workflow
 
 Dovetails require trapezoidal sketch profiles rather than simple rectangles. The key is sketching the full trapezoid in a single sketch so one extrude produces the complete dovetail shape — no separate CUT features needed.
