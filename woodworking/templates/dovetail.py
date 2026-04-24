@@ -22,6 +22,49 @@ Usage:
 
     # Select the right variant for a purpose
     variant = dovetail.select_variant("drawer_front")  # → "half_blind"
+
+Proportions & defaults
+----------------------
+These rules of thumb produce joints that look right and work mechanically.
+Start with the defaults; override when the piece demands it.
+
+**dt_angle** — dovetail angle, measured off the perpendicular to the face:
+  - Hardwood (oak, walnut, cherry, maple): 7-9°. Default 8° (≈ 1:7).
+  - Softwood (pine, cedar): 10-14°. Softer fibers need more mechanical
+    engagement since glue grabs less reliably.
+  - Never < 7°: the joint can pull apart — insufficient lock.
+  - Never > 14°: the tail tips become short-grain and break off easily.
+
+**dt_tail_count** — choose from board_h, not stock thickness:
+  - Fine work / small boxes: ~1 tail per 1" of board height.
+  - Casework / drawers: ~1 tail per 1.5-2".
+  - Minimum 3 tails for visual balance, unless the piece is < 3" tall.
+  - Validate: the derived `{prefix}_pin_w` must stay > 0. If not,
+    reduce tail_count or tail_w.
+
+**tail : pin width ratio** (visual, derived from count + tail_w):
+  - Classic fine work: 3:1 to 4:1 (tails dominant, pins look like thin
+    vertical lines). This is the "handcut dovetail" aesthetic.
+  - Modern / utilitarian: 2:1 (machine-cut look, pins more prominent).
+  - Machine-cut router jig: often 1:1 (box-joint-like).
+  - The ratio is implicit: given count and tail_w, pin_w is whatever
+    fills the remaining board height.
+
+**Pin width is derived, not a parameter.**
+`pin_w = (board_h - 2 * pad) / count - tail_w`. Always pick `tail_w`
+and `tail_count`; the pin width follows from the geometry so tails +
+inner pins + edge pins always fill the board exactly.
+
+**dt_pad** — edge padding. Extra material added to the end pins
+beyond half a normal pin, on both board edges.
+  - Default 0 (classic symmetric-half-pin layout).
+  - Use when `pin_w` is very thin (< ~1/8" / 3mm) and the unpadded
+    half-pins at the board edges would be fragile — e.g. 7+ tails
+    on a 6" board with 3/4" tail_w (pin_w ≈ 0.1").
+  - Typical values: 1/16" (1.5mm) to 3/16" (5mm). Keep below tail_w/2
+    so edge pins don't visually dominate.
+  - With pad > 0 the tail pattern still spaces evenly — only the end
+    pins grow. Inner layout (count, tail_w, inner pin_w) is unaffected.
 """
 
 import adsk.core
@@ -78,100 +121,13 @@ METADATA = {
 
 # ── Private helpers ──────────────────────────────────────────────────
 
-
-def _trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
-                      thick_expr, short_joint_expr, short_base_expr,
-                      prefix, name):
-    """Build the shared through-dovetail trapezoid sketch from the short face.
-
-    The four model-space corner points define the trapezoid geometry:
-      m1 = wide-side joint-base corner          (outer face, low end)
-      m2 = wide-side joint-top corner           (outer face, high end)
-      m3 = narrow-side joint-top corner         (inner face, high end - δ)
-      m4 = narrow-side joint-base corner        (inner face, low end + δ)
-    where δ = ``thick_expr * tan({prefix}_angle)``.
-
-    Args:
-        comp: Component that owns the sketch.
-        plane: Construction plane / face to sketch on.
-        m1_pt, m2_pt, m3_pt, m4_pt: Point3D in model space.
-        thick_expr: Parametric expression for board thickness
-            (dim across thickness axis between wide and narrow faces).
-        short_joint_expr: Parametric expression for origin → short-face
-            low endpoint along the joint axis.
-        short_base_expr: Parametric expression for origin → short-face
-            low endpoint along the thickness axis.
-        prefix: Parameter-name prefix (e.g. ``"dt"``). Used to compose
-            ``{prefix}_tail_w``, ``{prefix}_narrow_w``, and
-            ``{prefix}_angle`` references inside the sketch dims.
-        name: Sketch name prefix (sketch will be named ``{name}_Sk``).
-
-    Returns:
-        The selected profile (smallest_profile).
-    """
-    p = prefix
-    sk = comp.sketches.add(plane)
-    sk.name = f"{name}_Sk"
-    m = sk.modelToSketchSpace
-
-    m1 = m(m1_pt)
-    m2 = m(m2_pt)
-    m3 = m(m3_pt)
-    m4 = m(m4_pt)
-
-    lines = sk.sketchCurves.sketchLines
-    l_short = lines.addByTwoPoints(
-        Point3D.create(m4.x, m4.y, 0), Point3D.create(m3.x, m3.y, 0))
-    l_back = lines.addByTwoPoints(
-        l_short.endSketchPoint, Point3D.create(m2.x, m2.y, 0))
-    l_wide = lines.addByTwoPoints(
-        l_back.endSketchPoint, Point3D.create(m1.x, m1.y, 0))
-    l_front = lines.addByTwoPoints(
-        l_wide.endSketchPoint, l_short.startSketchPoint)
-
-    # Detect whether the joint axis maps to sketch-H or sketch-V
-    joint_is_sketch_h = abs(m3.x - m4.x) > abs(m3.y - m4.y)
-
-    gc = sk.geometricConstraints
-    if joint_is_sketch_h:
-        gc.addHorizontal(l_short)
-        gc.addHorizontal(l_wide)
-    else:
-        gc.addVertical(l_short)
-        gc.addVertical(l_wide)
-
-    JOINT_DIM = H if joint_is_sketch_h else V
-    THICK_DIM = V if joint_is_sketch_h else H
-
-    d = sk.sketchDimensions
-    # Dim 1: short face length = narrow_w.
-    d.addDistanceDimension(
-        l_short.startSketchPoint, l_short.endSketchPoint,
-        JOINT_DIM, Point3D.create(m4.x + 0.5, (m4.y + m3.y) / 2, 0)
-    ).parameter.expression = f"{p}_narrow_w"
-    # Dim 2: wide ↔ short face separation = pin-board thickness.
-    d.addDistanceDimension(
-        l_short.startSketchPoint, l_wide.endSketchPoint,
-        THICK_DIM, Point3D.create((m1.x + m4.x) / 2, (m1.y + m4.y) / 2, 0)
-    ).parameter.expression = thick_expr
-    # Dim 3: origin → short-face low endpoint along joint axis.
-    d.addDistanceDimension(
-        sk.originPoint, l_short.startSketchPoint,
-        JOINT_DIM, Point3D.create(m4.x + 1, m4.y / 2, 0)
-    ).parameter.expression = short_joint_expr
-    # Dim 4: origin → short-face low endpoint along thickness axis.
-    d.addDistanceDimension(
-        sk.originPoint, l_short.startSketchPoint,
-        THICK_DIM, Point3D.create(m4.x / 2, m4.y + 1, 0)
-    ).parameter.expression = short_base_expr
-
-    # Dim 5: one flank angle. ``dt_angle`` is defined off the thickness axis,
-    # so the angle to the joint-axis short face is its complement.
-    d.addAngularDimension(
-        l_front, l_short, Point3D.create((m1.x + m4.x) / 2, (m1.y + m4.y) / 2, 0)
-    ).parameter.expression = f"90 deg - {p}_angle"
-
-    return sp.smallest_profile(sk)
+# The trapezoid sketch is shared with the half-blind template — through
+# dovetails are the special case where the tail penetrates the full pin
+# thickness (equivalent to half-blind with lap = 0). Keeping the sketch
+# in one place means fixes propagate to both joint types.
+from woodworking.templates._dovetail_common import (
+    trapezoid_sketch as _trapezoid_sketch,
+)
 
 
 # ── Public API ───────────────────────────────────────────────────────
@@ -199,7 +155,7 @@ def select_variant(purpose):
 
 def define_params(params, prefix="dt", angle="8 deg", tail_w="0.5 in",
                   tail_count="3", joint_h_expr="open_height",
-                  thick_expr="board_thick"):
+                  thick_expr="board_thick", pad="0 in"):
     """Define all dovetail parameters with proper derivations.
 
     Creates user parameters for the independent values and derived
@@ -215,6 +171,13 @@ def define_params(params, prefix="dt", angle="8 deg", tail_w="0.5 in",
         joint_h_expr: Expression for the joint height (board dimension along
             which tails are distributed).
         thick_expr: Board thickness expression (for narrow width calc).
+        pad: Edge padding — extra material added to the board's end
+            half-pins (on both edges) beyond half a normal pin. Default
+            "0 in" reproduces the classic symmetric-half-pin layout.
+            With pad > 0, the joint-axis space used for the tail pattern
+            shrinks by ``2 * pad`` and the end pins grow to
+            ``pad + pin_w / 2``. Useful when ``pin_w`` is very thin
+            (sub-3mm) and the unpadded half-pins would be fragile.
 
     Returns:
         Dict of parameter names for use in corner().
@@ -226,25 +189,29 @@ def define_params(params, prefix="dt", angle="8 deg", tail_w="0.5 in",
     params.add(f"{p}_angle", VI(angle), "deg", "Dovetail angle")
     params.add(f"{p}_tail_w", VI(tail_w), "in", "Tail width at wide face")
     params.add(f"{p}_tail_count", VI(tail_count), "", "Number of tails")
+    params.add(f"{p}_pad", VI(pad), "in",
+               "Edge padding — extra end-pin material beyond half a normal pin")
 
-    # Derived params
+    # Derived params — tail pattern fits in (joint_h - 2*pad)
     params.add(f"{p}_pin_w",
-               VI(f"{joint_h_expr} / {p}_tail_count - {p}_tail_w"),
-               "in", "Pin width (derived)")
+               VI(f"({joint_h_expr} - 2 * {p}_pad) / {p}_tail_count"
+                  f" - {p}_tail_w"),
+               "in", "Inner pin width (derived)")
     params.add(f"{p}_pitch",
-               VI(f"{joint_h_expr} / {p}_tail_count"),
+               VI(f"({joint_h_expr} - 2 * {p}_pad) / {p}_tail_count"),
                "in", "Tail pitch (derived)")
     params.add(f"{p}_narrow_w",
                VI(f"{p}_tail_w - 2 * {thick_expr} * tan({p}_angle)"),
                "in", "Narrow face width (derived)")
     params.add(f"{p}_half_pin",
                VI(f"{p}_pin_w / 2"),
-               "in", "Half-pin at edges (derived)")
+               "in", "Inner half-pin — edge pins are pad + half_pin (derived)")
 
     return {
         "angle": f"{p}_angle",
         "tail_w": f"{p}_tail_w",
         "tail_count": f"{p}_tail_count",
+        "pad": f"{p}_pad",
         "pin_w": f"{p}_pin_w",
         "pitch": f"{p}_pitch",
         "narrow_w": f"{p}_narrow_w",
@@ -321,10 +288,10 @@ def corner(pin_body, tail_body, plane,
     # Sketch, extrude, and pattern live in the tail board's component
     comp_tail = tail_body.parentComponent
 
-    # Joint-axis offset and expression for the first half-pin
+    # Joint-axis offset of the first tail. Edge pin = pad + half_pin.
     if z_base_expr is None:
-        z_base = hp
-        z_dim_expr = f"{p}_pin_w / 2"
+        z_base = ev(f"{p}_pad") + hp
+        z_dim_expr = f"{p}_pad + {p}_pin_w / 2"
     else:
         z_base = ev(z_base_expr)
         z_dim_expr = z_base_expr
@@ -455,14 +422,17 @@ def box(comp, front, left,
     tw = ev(f"{p}_tail_w")
     delta = bt * math.tan(ev(f"{p}_angle"))
 
-    # Joint-axis base offset (for boards offset along joint axis)
+    # Joint-axis base offset (for boards offset along joint axis).
+    # Edge pin = pad + half_pin; first tail lands at this offset past the
+    # board edge.
+    pad_val = ev(f"{p}_pad")
     if joint_base_expr is not None:
         j_base_val = ev(joint_base_expr)
-        j_base = j_base_val + hp
-        j_expr = f"{joint_base_expr} + {p}_pin_w / 2"
+        j_base = j_base_val + pad_val + hp
+        j_expr = f"{joint_base_expr} + {p}_pad + {p}_pin_w / 2"
     else:
-        j_base = hp
-        j_expr = f"{p}_pin_w / 2"
+        j_base = pad_val + hp
+        j_expr = f"{p}_pad + {p}_pin_w / 2"
 
     # Front face values along thick_axis (wide = outer, narrow = inner)
     # thick_dir=1: narrow at front_expr + thick (standard front dovetails)

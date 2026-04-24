@@ -34,6 +34,31 @@ Usage:
         right=right, back=back,
         prefix="hbd", name="HBD", ev=ctx.ev,
         fl_plane=left_pl, front_expr="0 in")
+
+Proportions & defaults
+----------------------
+Inherits all proportion rules from the through-dovetail template for
+``{prefix}_angle``, ``{prefix}_tail_count``, and ``{prefix}_tail_w``.
+Half-blind adds one more parameter:
+
+**{prefix}_lap** — material remaining on the pin board's outer face:
+  - Typical: 1/3 of pin board thickness. For 3/4" stock, 1/4" lap
+    leaves 1/2" socket depth — a good default.
+  - Minimum: 1/4" (0.25"). Thinner laps tend to blow out when glue
+    swells the wood or when the joint is tapped home.
+  - Maximum: 1/2 of pin thickness. More than half leaves insufficient
+    socket depth for the tail to grip.
+  - Design intent: the lap exists to HIDE the joint from the outer
+    face. Keep it as thin as practical while staying above the
+    blowout minimum.
+
+Socket depth (derived): `socket_depth = pin_thick - lap`. The tail
+penetrates this far into the pin board. Verify `socket_depth >
+tail_w / 2` (roughly) so the tail has enough material around it for
+mechanical grip.
+
+Best for: drawer fronts, case tops — anywhere one face must look
+clean. Not worth the effort for utility boxes; use through instead.
 """
 
 import adsk.core
@@ -67,82 +92,18 @@ METADATA = {
 }
 
 
-def _trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
-                      socket_depth_expr, joint_expr, wide_base_expr,
-                      prefix, name):
-    """Build the shared half-blind dovetail trapezoid sketch.
-
-    The model-space points define the half-blind tail profile:
-      m1 = wide-side joint-base corner at socket bottom
-      m2 = wide-side joint-top corner at socket bottom
-      m3 = narrow-side joint-top corner at socket opening
-      m4 = narrow-side joint-base corner at socket opening
-    """
-    p = prefix
-    sk = comp.sketches.add(plane)
-    sk.name = f"{name}_Sk"
-    m = sk.modelToSketchSpace
-
-    m1 = m(m1_pt)
-    m2 = m(m2_pt)
-    m3 = m(m3_pt)
-    m4 = m(m4_pt)
-
-    lines = sk.sketchCurves.sketchLines
-    l_wide = lines.addByTwoPoints(
-        Point3D.create(m1.x, m1.y, 0), Point3D.create(m2.x, m2.y, 0))
-    l_back = lines.addByTwoPoints(
-        l_wide.endSketchPoint, Point3D.create(m3.x, m3.y, 0))
-    l_short = lines.addByTwoPoints(
-        l_back.endSketchPoint, Point3D.create(m4.x, m4.y, 0))
-    l_front = lines.addByTwoPoints(
-        l_short.endSketchPoint, l_wide.startSketchPoint)
-
-    joint_is_sketch_h = abs(m3.x - m4.x) > abs(m3.y - m4.y)
-
-    gc = sk.geometricConstraints
-    if joint_is_sketch_h:
-        gc.addHorizontal(l_short)
-        gc.addHorizontal(l_wide)
-    else:
-        gc.addVertical(l_short)
-        gc.addVertical(l_wide)
-
-    joint_dim = H if joint_is_sketch_h else V
-    thick_dim = V if joint_is_sketch_h else H
-
-    d = sk.sketchDimensions
-    d.addDistanceDimension(
-        l_wide.startSketchPoint, l_wide.endSketchPoint,
-        joint_dim, Point3D.create(m1.x - 0.5, (m1.y + m2.y) / 2, 0)
-    ).parameter.expression = f"{p}_tail_w"
-    d.addDistanceDimension(
-        l_short.startSketchPoint, l_short.endSketchPoint,
-        joint_dim, Point3D.create(m3.x + 0.5, (m3.y + m4.y) / 2, 0)
-    ).parameter.expression = f"{p}_narrow_w"
-    d.addDistanceDimension(
-        l_wide.startSketchPoint, l_front.startSketchPoint,
-        thick_dim, Point3D.create((m1.x + m4.x) / 2, m1.y - 0.5, 0)
-    ).parameter.expression = socket_depth_expr
-    d.addDistanceDimension(
-        sk.originPoint, l_wide.startSketchPoint,
-        joint_dim, Point3D.create(m1.x - 1, m1.y / 2, 0)
-    ).parameter.expression = joint_expr
-    d.addDistanceDimension(
-        sk.originPoint, l_wide.startSketchPoint,
-        thick_dim, Point3D.create(m1.x / 2, m1.y - 1, 0)
-    ).parameter.expression = wide_base_expr
-    d.addDistanceDimension(
-        sk.originPoint, l_short.startSketchPoint,
-        joint_dim, Point3D.create(m4.x + 1, m4.y / 2, 0)
-    ).parameter.expression = f"{joint_expr} + {socket_depth_expr} * tan({p}_angle)"
-
-    return sp.smallest_profile(sk)
+# Half-blind is the same trapezoid sketch as through, only with tail
+# penetration set to ``socket_depth`` instead of full board thickness.
+# Share the sketch so fixes propagate to both joint types.
+from woodworking.templates._dovetail_common import (
+    trapezoid_sketch as _trapezoid_sketch,
+)
 
 
 def define_params(params, prefix="hbd", angle="8 deg", tail_w="0.5 in",
                   tail_count="3", joint_h_expr="open_height",
-                  pin_thick_expr="front_thick", lap="0.25 in"):
+                  pin_thick_expr="front_thick", lap="0.25 in",
+                  pad="0 in"):
     """Define all half-blind dovetail parameters.
 
     Args:
@@ -155,6 +116,10 @@ def define_params(params, prefix="hbd", angle="8 deg", tail_w="0.5 in",
             along which tails are distributed).
         pin_thick_expr: Pin board thickness expression (thicker board).
         lap: Lap expression (material remaining on outer face).
+        pad: Edge padding — extra end-pin material beyond half a normal
+            pin. Default "0 in" keeps the classic symmetric-half-pin
+            layout. With pad > 0 the tail pattern packs into
+            ``joint_h - 2*pad`` and edge pins grow to ``pad + pin_w/2``.
 
     Returns:
         Dict of parameter names.
@@ -167,29 +132,33 @@ def define_params(params, prefix="hbd", angle="8 deg", tail_w="0.5 in",
     params.add(f"{p}_tail_w", VI(tail_w), "in", "Tail width at wide face")
     params.add(f"{p}_tail_count", VI(tail_count), "", "Number of tails")
     params.add(f"{p}_lap", VI(lap), "in", "Lap (outer face material)")
+    params.add(f"{p}_pad", VI(pad), "in",
+               "Edge padding — extra end-pin material beyond half a normal pin")
 
-    # Derived
+    # Derived — tail pattern fits in (joint_h - 2*pad)
     params.add(f"{p}_socket_depth",
                VI(f"{pin_thick_expr} - {p}_lap"),
                "in", "Socket depth (derived)")
     params.add(f"{p}_pin_w",
-               VI(f"{joint_h_expr} / {p}_tail_count - {p}_tail_w"),
-               "in", "Pin width (derived)")
+               VI(f"({joint_h_expr} - 2 * {p}_pad) / {p}_tail_count"
+                  f" - {p}_tail_w"),
+               "in", "Inner pin width (derived)")
     params.add(f"{p}_pitch",
-               VI(f"{joint_h_expr} / {p}_tail_count"),
+               VI(f"({joint_h_expr} - 2 * {p}_pad) / {p}_tail_count"),
                "in", "Tail pitch (derived)")
     params.add(f"{p}_narrow_w",
                VI(f"{p}_tail_w - 2 * {p}_socket_depth * tan({p}_angle)"),
                "in", "Narrow face width (derived)")
     params.add(f"{p}_half_pin",
                VI(f"{p}_pin_w / 2"),
-               "in", "Half-pin at edges (derived)")
+               "in", "Inner half-pin — edge pins are pad + half_pin (derived)")
 
     return {
         "angle": f"{p}_angle",
         "tail_w": f"{p}_tail_w",
         "tail_count": f"{p}_tail_count",
         "lap": f"{p}_lap",
+        "pad": f"{p}_pad",
         "socket_depth": f"{p}_socket_depth",
         "pin_w": f"{p}_pin_w",
         "pitch": f"{p}_pitch",
@@ -241,8 +210,9 @@ def corner(pin_body, tail_body, plane,
     comp_tail = tail_body.parentComponent
 
     if z_base_expr is None:
-        z_base = ev(f"{p}_half_pin")
-        z_dim_expr = f"{p}_pin_w / 2"
+        # Edge pin = pad + half_pin; first tail's joint-axis base = pad + half_pin
+        z_base = ev(f"{p}_pad") + ev(f"{p}_half_pin")
+        z_dim_expr = f"{p}_pad + {p}_pin_w / 2"
     else:
         z_base = ev(z_base_expr)
         z_dim_expr = z_base_expr
@@ -255,9 +225,10 @@ def corner(pin_body, tail_body, plane,
     prof = _trapezoid_sketch(
         comp_tail, plane,
         m1_pt, m2_pt, m3_pt, m4_pt,
-        socket_depth_expr=socket_depth_expr,
-        joint_expr=z_dim_expr,
-        wide_base_expr=y_wide_expr,
+        thick_expr=socket_depth_expr,
+        short_joint_expr=(
+            f"{z_dim_expr} + {socket_depth_expr} * tan({p}_angle)"),
+        short_base_expr=f"({y_wide_expr}) + ({socket_depth_expr})",
         prefix=prefix, name=name)
 
     join_feat = sp.ext_op(comp_tail, prof, dist_expr, JOIN, tail_body,
@@ -351,13 +322,14 @@ def box(comp, front, left,
     delta = socket_depth * math.tan(ev(f"{p}_angle"))
 
     # Joint-axis base offset
+    pad_val = ev(f"{p}_pad")
     if joint_base_expr is not None:
         j_base_val = ev(joint_base_expr)
-        j_base = j_base_val + hp
-        j_expr = f"{joint_base_expr} + {p}_pin_w / 2"
+        j_base = j_base_val + pad_val + hp
+        j_expr = f"{joint_base_expr} + {p}_pad + {p}_pin_w / 2"
     else:
-        j_base = hp
-        j_expr = f"{p}_pin_w / 2"
+        j_base = pad_val + hp
+        j_expr = f"{p}_pad + {p}_pin_w / 2"
 
     # Wide face at SOCKET BOTTOM (toward outer face) — mechanical lock
     f_front = ev(front_expr) if front_expr != "0 in" else 0.0
@@ -382,9 +354,9 @@ def box(comp, front, left,
         _pt3(px, f_wide, j_base + tw),
         _pt3(px, f_narrow, j_base + tw - delta),
         _pt3(px, f_narrow, j_base + delta),
-        socket_depth_expr=f"{p}_socket_depth",
-        joint_expr=j_expr,
-        wide_base_expr=wide_face_expr,
+        thick_expr=f"{p}_socket_depth",
+        short_joint_expr=f"{j_expr} + {p}_socket_depth * tan({p}_angle)",
+        short_base_expr=f"({wide_face_expr}) + ({p}_socket_depth)",
         prefix=prefix, name=name)
 
     # ext_op JOIN into tail boards
