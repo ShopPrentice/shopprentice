@@ -41,7 +41,7 @@ def run(context):
         ("groove_width",      "0.375 in", "in"),
         ("groove_depth",      "0.375 in", "in"),
         ("frame_tongue_thick","0.34 in",  "in"),
-        ("bottom_thickness",  "0.75 in",  "in"),
+        ("bottom_thickness",  "4 in",     "in"),
         ("slat_width",        "4 in",     "in"),
         ("slat_thickness",    "0.5 in",   "in"),
         ("slat_tg_width",     "0.25 in",  "in"),
@@ -64,7 +64,7 @@ def run(context):
         ("body_z",         "leg_below_body + rail_height",                             "in"),
         ("body_h",         "total_height - 2 * rail_height - leg_below_body",          "in"),
         ("full_slat_h",    "total_height - 2 * rail_height + 2 * groove_depth - leg_below_body", "in"),
-        ("groove_span",    "total_height - leg_below_body",                            "in"),
+        ("groove_span",    "total_height - rail_height - leg_below_body",               "in"),
         ("mid_x",          "planter_length / 2",                                       "in"),
         ("mid_y",          "planter_width / 2",                                        "in"),
         ("bottom_slat_spacing", "bottom_thickness + drainage_gap",                     "in"),
@@ -789,7 +789,11 @@ def run(context):
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{comp_name}: {len(names)} bodies -> {names}")
 
-    sp.apply_appearance("cedar")
+    sp.apply_appearance("teak a", bodies=[leg_c.bRepBodies.item(i).name for i in range(leg_c.bRepBodies.count)])
+    sp.apply_appearance("teak b", bodies=[lr_c.bRepBodies.item(i).name for i in range(lr_c.bRepBodies.count)])
+    sp.apply_appearance("teak c", bodies=[sr_c.bRepBodies.item(i).name for i in range(sr_c.bRepBodies.count)])
+    sp.apply_appearance("teak d", bodies=[sl_c.bRepBodies.item(i).name for i in range(sl_c.bRepBodies.count)])
+    sp.apply_appearance("teak",   bodies=[bt_c.bRepBodies.item(i).name for i in range(bt_c.bRepBodies.count)])
 
     cam = app.activeViewport.camera
     cam.isFitView = True
