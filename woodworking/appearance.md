@@ -156,3 +156,133 @@ For single-species models where the auto-detected grain is correct, calling `sp.
 ### Reference Example
 
 `examples/esherick-stool/esherick_stool.py` uses this convention: oak baseline, walnut on the seat + all tenon wedges, with a grain override on the seat (X). See the block at the top of that file.
+
+## Custom Photo Textures (1:1 mapping)
+
+When you need to map a specific photo onto one face exactly once (no tiling) — e.g. mapping a real photograph of a finished desk top onto the model's `top` body — there are two Fusion-API gotchas to know about:
+
+### Gotcha 1: `texture_RealWorldScale*` and `texture_RealWorldOffset*` are stored in **INCHES**, not cm
+
+The rest of the Fusion API uses cm internally (positions, parameters, body geometry), so it is natural to set a 47 cm desk-width scale as `47.0`. **It will not work.** Fusion stores these particular four properties in inches. You must convert:
+
+```python
+def cm_to_in(cm): return cm * 0.3937   # 1 cm = 0.3937 in
+
+setf("texture_RealWorldScaleX",  cm_to_in(47.0))   # body width  in cm → 18.5 in
+setf("texture_RealWorldScaleY",  cm_to_in(108.0))  # body length in cm → 42.5 in
+setf("texture_RealWorldOffsetX", cm_to_in(-23.5))  # body min-X  → -9.25 in
+setf("texture_RealWorldOffsetY", cm_to_in(-54.0))  # body min-Y  → -21.26 in
+```
+
+**`_SPECIES_TEXTURE` config values are in INCHES, matching their texture filenames.** For example `teak_15.8x60.3.jpg` is a 15.8 in × 60.3 in board sample — a real-world board roughly 16" wide × 5' long. The species config stores `scale_x=15.8, scale_y=60.3` and `_apply_custom_texture` writes those values directly to Fusion (which expects inches). **No cm-to-in conversion is performed inside the species wrappers** — the values are already in Fusion's storage unit.
+
+When you need a custom texture sized to a specific body (e.g. mapping a desk-top photograph 1:1 onto a 47×108 cm body), you do the conversion at the call site:
+
+```python
+custom_cfg = dict(sp._SPECIES_TEXTURE["teak"])
+custom_cfg["texture"] = "teak_desk_top.jpg"
+custom_cfg["scale_x"] = 47.0 / 2.54     # body width  cm → 18.5 in
+custom_cfg["scale_y"] = 108.0 / 2.54    # body length cm → 42.5 in
+sp._SPECIES_TEXTURE["teak_top"] = custom_cfg
+```
+
+Historical note: an earlier version of `_apply_custom_texture` multiplied `scale_x`/`scale_y` by `_CM_TO_TEX_IN`, on the (incorrect) assumption that the species config was in cm. The wood textures actually came from inch-sized board scans, so that conversion shrank every veneer by 2.54× — masquerading as fine grain on slats, but showing up as visible "stitch" seams on bodies longer than the shrunk period (e.g. a 105 cm apron with `scale_y = 77 cm` instead of `77 in = 196 cm`). Fix: drop the conversion in the wrappers; species values stay as inches.
+
+### Gotcha 2: Photo on one face only → Box+grain projection on the body, photo on a face appearance
+
+The body's `textureMapControl` (TMC) is a single shared config — all appearances on the body share its projection mode and transform. So a body cannot mix Planar projection for the photo face with Box projection for the side faces; one TMC governs all.
+
+Two projection modes were considered for a desk top with a photo on the top face only and tiled teak on the sides:
+
+| TMC mode | Photo face | Side faces |
+|----------|-----------|-----------|
+| `PlanarTextureMapProjection` from +Z | 1:1 photo (face point XY → texture UV) | Wrong: side face has constant X (or Y), so the projected UV barely varies along the face — the photo collapses into a thin striped/smeared band running the length of the side. |
+| `BoxTextureMapProjection` + grain rotation + bbox-min translate | 1:1 photo (top face is the +Z box-side projection) | Correct: side face gets the ±X box-side projection — image axes span the side's Y and Z, so the tiled species on the body renders as normal wood grain. |
+
+**Use Box, not Planar.** Planar produces the side-face smearing the user sees as "split along length / sides look wrong." Box projects each face from its closest box-side, so each face gets a clean projection in the appropriate axes.
+
+**Seam-at-center fix:** the default Box transform has texture origin at world origin. When the body is centered on world origin (e.g. a desk top spanning ±23.5 cm × ±54 cm), the texture coordinate `0` lands at the body center, and with `period == body extent` the seam (texture edge at coord 0 and at coord `period`) falls down the body's middle — visible as a vertical/horizontal split with the "two original ends meeting at center" pattern. **Fix:** translate the TMC transform so the texture origin lands at the body's bbox-min corner. The seam then falls at a body edge, where it's invisible.
+
+```python
+def box_grain_at_bbox_min(body):
+    grain_vec = sp._grain_vector(body)         # principal-axes-of-inertia
+    m = sp._grain_transform(grain_vec)         # rotation only
+    bb = body.boundingBox
+    m.setCell(0, 3, bb.minPoint.x)             # add translate to bbox-min
+    m.setCell(1, 3, bb.minPoint.y)
+    m.setCell(2, 3, bb.minPoint.z)
+    ptmc = adsk.core.ProjectedTextureMapControl.cast(body.textureMapControl)
+    ptmc.projectedTextureMapType = (
+        adsk.core.ProjectedTextureMapTypes.BoxTextureMapProjection)
+    ptmc.transform = m
+```
+
+This recipe is validated on the teak desk slats, top, legs, aprons, and round side stretchers — no visible seams, grain runs along each body's long axis, and a 47×108 cm photo lands exactly once on the 47×108 cm top face.
+
+### Gotcha 3: Repeat off + a body smaller than one period → black borders
+
+Setting `texture_URepeat = False` and `texture_VRepeat = False` clamps UVs outside `[0,1]` — anything past the texture edge becomes black. Combine this with the Gotcha-1 cm-vs-inch bug and you end up seeing the top face with the texture stretched (because it covered only ~39% of one period) plus mirrored/black borders where the body extended beyond the period.
+
+When using `repeat=False` for a 1:1 mapping, also pad the source image by a few pixels of edge-extended content so any near-boundary UV sample doesn't hit black. Or stay with `repeat=True` once your scale is correct — visually identical because the period exactly equals the body size.
+
+### Recipe: Photo on top face + tiled species on the rest of the body
+
+For a desk top (or any body where one face shows a 1:1 photographic texture and the rest shows a tiled wood species):
+
+```python
+# 1. Pick a tile veneer (e.g. teak b: 13.9 × 89.2 cm period) for the body.
+sp.apply_appearance("teak b", bodies=["top"])
+
+# 2. Override the body TMC to Box projection with bbox-min translate.
+#    Use IDENTITY rotation on the photo body — a grain rotation rotates the
+#    photo image axes 90° relative to world X/Y and the photo no longer lands
+#    1:1. Other (tiled) bodies use the grain rotation so their image-Y axis
+#    follows the body's long axis; the photo body is the special case.
+m = adsk.core.Matrix3D.create()                    # identity rotation
+bb = top_body.boundingBox
+m.setCell(0, 3, bb.minPoint.x)                     # translate cm
+m.setCell(1, 3, bb.minPoint.y)
+m.setCell(2, 3, bb.minPoint.z)
+ptmc = adsk.core.ProjectedTextureMapControl.cast(top_body.textureMapControl)
+ptmc.projectedTextureMapType = (
+    adsk.core.ProjectedTextureMapTypes.BoxTextureMapProjection)
+ptmc.transform = m
+
+# 3. Register the photo as a custom species (period = body bbox extent).
+custom_cfg = dict(sp._SPECIES_TEXTURE["teak"])     # inherit reflectance etc.
+custom_cfg["texture"] = "teak_desk_top.jpg"
+custom_cfg["scale_x"] = 47.0                        # cm — body width
+custom_cfg["scale_y"] = 108.0                       # cm — body length
+sp._SPECIES_TEXTURE["teak_top"] = custom_cfg
+
+# 4. Create SP_teak_top by copying the tile and swapping in the photo.
+photo_app = design.appearances.addByCopy(
+    design.appearances.itemByName("SP_teak b"), "SP_teak_top")
+sp._apply_custom_texture(photo_app, "teak_top")
+
+# 5. CRITICAL: also set the PHOTO's RealWorldOffset to bbox-min in INCHES.
+#    The body TMC translate alone is NOT enough for a non-tiling photo —
+#    Fusion's Box projection adds the appearance's RealWorldOffset on top of
+#    the TMC translate, and a stale or default offset shows up as a hard seam
+#    at body center (because period == body extent for a 1:1 photo).
+CM_TO_IN = 1.0 / 2.54
+cp = adsk.core.ColorProperty.cast(
+    photo_app.appearanceProperties.itemById("opaque_albedo"))
+tex = cp.connectedTexture
+def setf(name, val):
+    p = tex.properties.itemById(name)
+    adsk.core.FloatProperty.cast(p).value = val
+setf("texture_RealWorldOffsetX", bb.minPoint.x * CM_TO_IN)
+setf("texture_RealWorldOffsetY", bb.minPoint.y * CM_TO_IN)
+setf("texture_UOffset", 0.0)
+setf("texture_VOffset", 0.0)
+setf("texture_WAngle", 0.0)
+
+# 6. Apply the photo to the top BRepFace only.
+top_face = ...  # the +Z planar face at z = bbox_max.z
+top_face.appearance = photo_app
+```
+
+The body shows the tile veneer everywhere except the top face, which shows the photo at 1:1. Both share the body's Box TMC, which is what enables the mixed appearance.
+
+**Why both offsets matter (and why slats only need the TMC translate):** A tiled veneer has period much smaller than the body. The slat veneers wrap many times along their length, and any sub-period offset just shifts where the (visually identical) repeat lands — not perceptible. The desk-top photo has period == body extent. Any offset modulo period shows up as a hard, visible seam, and any sub-pixel mismatch shows up as a fractional shift of unique photo features. Empirically: setting only the body TMC translate left a stale `RealWorldOffset = -1 period` on the appearance from earlier sessions; modulo a period that is mathematically zero, but Fusion's float arithmetic put the seam ~0.27 mm inside the body. Forcing `RealWorldOffsetX/Y = bbox.minPoint × CM_TO_IN` aligns the photo content edges exactly to the body bbox edges, with no seam visible on any face.

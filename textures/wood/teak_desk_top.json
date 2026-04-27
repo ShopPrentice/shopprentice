@@ -1,0 +1,31 @@
+{
+  "description": "Teak desk top texture (perspective-warped real photo, padded for clamp safety)",
+  "physical_size_mm": {
+    "width": 470,
+    "height": 1080
+  },
+  "image_size_px": {
+    "width": 1434,
+    "height": 3264
+  },
+  "core_image_px": {
+    "width": 1410,
+    "height": 3240
+  },
+  "edge_padding_px": 12,
+  "px_per_mm": 3,
+  "dpi": 76.2,
+  "fusion_scale_in": {
+    "x": 18.5039,
+    "y": 42.5196
+  },
+  "fusion_offset_in": {
+    "x": -9.2519,
+    "y": -21.2598
+  },
+  "padding_uv_offset": {
+    "x_in": 0.1575,
+    "y_in": 0.1575
+  },
+  "note": "Apply scale & offset above; with reflect-padding, any near-boundary UV sample lands on real wood color, never on black."
+}
