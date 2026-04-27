@@ -1529,27 +1529,47 @@ _SPECIES_MAP = {
 # "reflectance" overrides opaque_f0 (higher = shinier).
 #
 # To add a new species: drop a .jpg in textures/wood/ and add an entry here.
+# scale_x / scale_y are the natural sample size (per filename / EXIF) in
+# `natural_unit`. px_w / px_h are the JPEG pixel dimensions — with the natural
+# size they let us compute pixel density and decide whether to apply the
+# per-body compress-fit rule (see `fit_scale_y_cm` below).
 _SPECIES_TEXTURE = {
     "teak":              {"base": "Mahogany", "texture": "teak.jpg",
-                          "scale_x": 9.9, "scale_y": 20.1, "reflectance": 0.035,
+                          "scale_x": 9.9, "scale_y": 20.1, "natural_unit": "in",
+                          "px_w": 1560, "px_h": 3160,
+                          "reflectance": 0.035,
                           "endgrain": "teak_endgrain.jpg",
-                          "eg_scale_x": 5.9, "eg_scale_y": 1.8},
-    "teak a":            {"base": "Mahogany", "texture": "teak_15.8x60.3.jpg",
-                          "scale_x": 15.8, "scale_y": 60.3, "reflectance": 0.035,
+                          "eg_scale_x": 5.9, "eg_scale_y": 1.8,
+                          "eg_natural_unit": "in",
+                          "eg_px_w": 1040, "eg_px_h": 310},
+    "teak a":            {"base": "Mahogany", "texture": "teak_a.jpg",
+                          "scale_x": 15.8, "scale_y": 60.3, "natural_unit": "in",
+                          "px_w": 400, "px_h": 1451,
+                          "reflectance": 0.035,
                           "endgrain": "teak_endgrain.jpg",
-                          "eg_scale_x": 5.9, "eg_scale_y": 1.8},
-    "teak b":            {"base": "Mahogany", "texture": "teak_13.9x89.2.jpg",
-                          "scale_x": 13.9, "scale_y": 89.2, "reflectance": 0.035,
+                          "eg_scale_x": 5.9, "eg_scale_y": 1.8,
+                          "eg_natural_unit": "in"},
+    "teak b":            {"base": "Mahogany", "texture": "teak_b.jpg",
+                          "scale_x": 13.9, "scale_y": 89.2, "natural_unit": "in",
+                          "px_w": 272, "px_h": 1630,
+                          "reflectance": 0.035,
                           "endgrain": "teak_endgrain.jpg",
-                          "eg_scale_x": 5.9, "eg_scale_y": 1.8},
-    "teak c":            {"base": "Mahogany", "texture": "teak_11.5x77.0.jpg",
-                          "scale_x": 11.5, "scale_y": 77.0, "reflectance": 0.035,
+                          "eg_scale_x": 5.9, "eg_scale_y": 1.8,
+                          "eg_natural_unit": "in"},
+    "teak c":            {"base": "Mahogany", "texture": "teak_c.jpg",
+                          "scale_x": 11.5, "scale_y": 77.0, "natural_unit": "in",
+                          "px_w": 263, "px_h": 1655,
+                          "reflectance": 0.035,
                           "endgrain": "teak_endgrain.jpg",
-                          "eg_scale_x": 5.9, "eg_scale_y": 1.8},
-    "teak d":            {"base": "Mahogany", "texture": "teak_10.1x62.9.jpg",
-                          "scale_x": 10.1, "scale_y": 62.9, "reflectance": 0.035,
+                          "eg_scale_x": 5.9, "eg_scale_y": 1.8,
+                          "eg_natural_unit": "in"},
+    "teak d":            {"base": "Mahogany", "texture": "teak_d.jpg",
+                          "scale_x": 10.1, "scale_y": 62.9, "natural_unit": "in",
+                          "px_w": 254, "px_h": 1535,
+                          "reflectance": 0.035,
                           "endgrain": "teak_endgrain.jpg",
-                          "eg_scale_x": 5.9, "eg_scale_y": 1.8},
+                          "eg_scale_x": 5.9, "eg_scale_y": 1.8,
+                          "eg_natural_unit": "in"},
     "brazilian rosewood": {"base": "Walnut",  "texture": "brazilian_rosewood.jpg",
                           "scale_x": 8.1, "scale_y": 19.8, "reflectance": 0.06,
                           "endgrain": "brazilian_rosewood_endgrain.jpg",
@@ -1575,13 +1595,99 @@ _TEXTURE_DIR = _os.path.join(
     "textures", "wood"
 )
 
+# Fusion's `texture_RealWorldScaleX/Y` and `texture_RealWorldOffsetX/Y`
+# properties are stored in INCHES, regardless of the design's units (which
+# are cm in this skill). The scale_x / scale_y / eg_scale_x / eg_scale_y
+# values in `_SPECIES_TEXTURE` above are stored in CM (the physical sample
+# size of the wood photograph at the source image's pixel density — e.g.
+# teak_15.8x60.3.jpg is 400×1451 px representing a 15.8×60.3 cm board sample
+# at ~25 px/cm). The wrappers multiply by `_CM_TO_TEX_IN` before writing so
+# the world-space period matches the configured cm value 1:1.
+#
+# Note: `teak.jpg` (the base species, 1560×3160 px) is a higher-resolution
+# scan with sample size 9.9×20.1 in (= 25×51 cm at 158 dpi). Despite the
+# inch-natural source, its config scale_x=9.9, scale_y=20.1 is stored as cm
+# for consistency — the wrapper converts uniformly. So teak.jpg renders at
+# ~9.9-cm period, much smaller than its true 25-cm physical size; the trade-
+# off keeps the wrapper convention simple.
+_CM_TO_TEX_IN = 1.0 / 2.54
 
-def _apply_custom_texture(local_appearance, species_key):
+
+def _natural_size_cm(cfg, axis, eg=False):
+    """Return cfg["scale_<axis>"] (or eg_scale_<axis>) converted to cm
+    based on cfg["natural_unit"] (or eg_natural_unit). Default unit cm."""
+    if eg:
+        val = cfg.get(f"eg_scale_{axis}", 0)
+        unit = cfg.get("eg_natural_unit", cfg.get("natural_unit", "cm"))
+    else:
+        val = cfg.get(f"scale_{axis}", 0)
+        unit = cfg.get("natural_unit", "cm")
+    if unit == "in":
+        return val * 2.54
+    return val
+
+
+def fit_scale_y_cm(body, species_key,
+                    ppi_threshold_per_cm=20.0, seam_buffer=0.50):
+    """Per-body compress-fit rule for the grain-direction (scale_y) period.
+
+    For LOW-RESOLUTION species only (px_per_cm < threshold). When the body's
+    grain extent is shorter than the image natural size, condense the image
+    so one period plus a small buffer covers the body — but not past 50% of
+    the natural size (avoid over-condensing). Never stretches: if the body
+    is BIGGER than the natural image, the natural period is returned
+    unchanged (caller accepts the resulting tile/stitch).
+
+    The seam_buffer (default +10%) makes the returned period slightly
+    larger than the body's grain extent so that — when the body's TMC
+    translate along the grain axis is also recentered (caller's job) — the
+    period boundary (visible "seam" between two image instances) falls just
+    off the body instead of right at a tip.
+
+    Args:
+        body: Fusion BRepBody — bbox is read for grain extent.
+        species_key: key into _SPECIES_TEXTURE (must have px_h field).
+        ppi_threshold_per_cm: pixel-per-cm density above which the image
+            is considered sharp enough at natural size; the rule is a no-op.
+            Default 20 px/cm (~50 dpi).
+        seam_buffer: extra fraction added to body length when compressing
+            (period = body × (1 + seam_buffer), capped at 50% natural).
+            Default 50% — chosen empirically because legs and stretchers
+            need substantial off-body margin or the period boundary creeps
+            back onto the body via floating-point drift in the TMC.
+
+    Returns:
+        Recommended scale_y in cm (or natural cm if rule doesn't apply).
+    """
+    cfg = _SPECIES_TEXTURE.get(species_key)
+    if not cfg:
+        return None
+    natural_cm = _natural_size_cm(cfg, "y")
+    px_h = cfg.get("px_h")
+    if not px_h or natural_cm <= 0:
+        return natural_cm
+    px_per_cm = px_h / natural_cm
+    if px_per_cm >= ppi_threshold_per_cm:
+        return natural_cm   # source image is sharp enough at natural size
+    bb = body.boundingBox
+    body_grain_cm = max(bb.maxPoint.x - bb.minPoint.x,
+                         bb.maxPoint.y - bb.minPoint.y,
+                         bb.maxPoint.z - bb.minPoint.z)
+    if body_grain_cm >= natural_cm:
+        return natural_cm   # body bigger than natural — never stretches
+    target = body_grain_cm * (1.0 + seam_buffer)
+    return max(target, 0.5 * natural_cm)
+
+
+def _apply_custom_texture(local_appearance, species_key, body=None):
     """Swap texture bitmap and tune properties for a custom species.
 
     Args:
         local_appearance: Design-local copy of a Fusion appearance.
         species_key: Key into _SPECIES_TEXTURE.
+        body: Optional BRepBody. When provided, the per-body fit rule
+            (fit_scale_y_cm) is applied to scale_y instead of the natural
+            value.
 
     Returns:
         True if texture was applied, False if texture file not found.
@@ -1605,13 +1711,20 @@ def _apply_custom_texture(local_appearance, species_key):
         if fp and not fp.isReadOnly:
             fp.value = tex_path
 
-    # Set texture scale
+    # Compute scales in cm — natural for X (cross-grain), fit-rule for Y when
+    # a body is supplied. Fusion stores RealWorldScale* in inches: multiply
+    # by _CM_TO_TEX_IN before writing.
+    sx_cm = _natural_size_cm(cfg, "x")
+    if body is not None:
+        sy_cm = fit_scale_y_cm(body, species_key)
+    else:
+        sy_cm = _natural_size_cm(cfg, "y")
     sx_prop = tex.properties.itemById("texture_RealWorldScaleX")
     sy_prop = tex.properties.itemById("texture_RealWorldScaleY")
-    if sx_prop and cfg.get("scale_x"):
-        adsk.core.FloatProperty.cast(sx_prop).value = cfg["scale_x"]
-    if sy_prop and cfg.get("scale_y"):
-        adsk.core.FloatProperty.cast(sy_prop).value = cfg["scale_y"]
+    if sx_prop and sx_cm:
+        adsk.core.FloatProperty.cast(sx_prop).value = sx_cm * _CM_TO_TEX_IN
+    if sy_prop and sy_cm:
+        adsk.core.FloatProperty.cast(sy_prop).value = sy_cm * _CM_TO_TEX_IN
 
     # Set reflectance
     if cfg.get("reflectance"):
@@ -1648,12 +1761,15 @@ def _apply_endgrain_texture(local_appearance, species_key):
         if fp and not fp.isReadOnly:
             fp.value = tex_path
 
+    # End grain scale — uses eg_scale_* + eg_natural_unit (or natural_unit).
+    sx_cm = _natural_size_cm(cfg, "x", eg=True)
+    sy_cm = _natural_size_cm(cfg, "y", eg=True)
     sx_prop = tex.properties.itemById("texture_RealWorldScaleX")
     sy_prop = tex.properties.itemById("texture_RealWorldScaleY")
-    if sx_prop and cfg.get("eg_scale_x"):
-        adsk.core.FloatProperty.cast(sx_prop).value = cfg["eg_scale_x"]
-    if sy_prop and cfg.get("eg_scale_y"):
-        adsk.core.FloatProperty.cast(sy_prop).value = cfg["eg_scale_y"]
+    if sx_prop and sx_cm:
+        adsk.core.FloatProperty.cast(sx_prop).value = sx_cm * _CM_TO_TEX_IN
+    if sy_prop and sy_cm:
+        adsk.core.FloatProperty.cast(sy_prop).value = sy_cm * _CM_TO_TEX_IN
 
     if cfg.get("reflectance"):
         f0 = props.itemById("opaque_f0")
