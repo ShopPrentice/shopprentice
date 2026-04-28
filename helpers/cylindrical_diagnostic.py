@@ -29,8 +29,12 @@ Empirical findings (Fusion 360, April 2026):
     3. scale_y  = circumference   (N=1 - see "circ multiplier" note below).
     4. offset_x = bbox_min_axial - (period_axial - body_axial)/2
                   (recenters axial seam off-body, as in Box).
-    5. offset_y = optional azimuthal offset (e.g. circ/2) to rotate the
-                  one-and-only circumferential seam off the visible side.
+    5. offset_y = 0.25 * circumference  (pushes the single azimuthal seam
+                  to the back, +Y direction). Empirical mapping:
+                    fraction 0.0  -> seam at +X
+                    fraction 0.25 -> seam at +Y (back)
+                    fraction 0.5  -> seam at -X
+                    fraction 0.75 -> seam at -Y (front)
     6. WAngle   = 0 (no effect anyway).
     7. TMC transform: rotate texture-local +Z to body's long-axis vector;
                       no translate baked in.
@@ -40,14 +44,31 @@ Empirical findings (Fusion 360, April 2026):
   is filled by Fusion's repeat -> MULTIPLE seams visible. With N=1, image
   edges meet at exactly ONE azimuthal angle, choosable via offset_y.
 
+Seam summary (validated visually with red/green marker bitmaps):
+  - AXIAL seams (green markers): fully eliminated on bodies shorter than the
+    natural texture by the recenter rule (body * 1.05 period + centered
+    translate). Bodies longer than natural MUST tile and accept axial seams
+    at each period boundary -- same as Box projection.
+  - AZIMUTHAL seam (red markers): CANNOT be eliminated, only relocated.
+    With N=1, the bitmap wraps exactly once around the cylinder, producing
+    one vertical seam line where the left and right edges of the
+    (pre-rotated) image meet. Default offset_y = 0.25 * circumference
+    pushes this seam to the +Y (back) side. The seam spans ~(2 * stripe_px
+    / image_height_px) fraction of the circumference; for teak.jpg that is
+    ~2.5% of the circumference (< 9 degrees of arc), so it is invisible
+    from front, left, and right views.
+  - ENDCAP faces: cylindrical projection produces radial/cross-hatch
+    artifacts on flat endcaps. In practice, endcaps receive a separate
+    endgrain appearance, so this is not a concern.
+
 Practical recommendation: use Box+grain (with 45-deg rotation for curved
-revolved bodies). Cylindrical works only with the pre-rotated-bitmap
-hack, and even at N=1 leaves one visible azimuthal seam where the photo's
-left/right edges discontinuously meet. Box+45 hides the equivalent
-direction-transition behind curvature shading and uses the natural
-bitmap. This module exists for completeness and for the rare case where
-a body is so close to a perfect cylinder that the user wants the texture
-to wrap exactly once around it.
+revolved bodies) as the primary projection for round bars. Cylindrical
+works only with the pre-rotated-bitmap hack, and even at N=1 leaves one
+azimuthal seam that can only be relocated (not eliminated). Box+45 hides
+the equivalent direction-transition behind curvature shading and uses the
+natural bitmap. This module exists for completeness and for the rare case
+where a body is so close to a perfect cylinder that the user wants the
+texture to wrap exactly once around it.
 
 All units cm unless suffixed _in.
 """
@@ -166,7 +187,7 @@ def make_axial_bitmap(src_path, dst_path=None, marker=False):
 def apply_cylindrical_recipe(body, species_key, sp_module,
                               circ_multiplier=1, seam_buffer=0.05,
                               ppi_threshold=20.0,
-                              azimuth_offset_fraction=0.5):
+                              azimuth_offset_fraction=0.25):
     """Apply the deterministic Cylindrical+grain recipe to a round body.
 
     body: BRepBody. Its body axis is taken from `sp._grain_vector(body)`
@@ -175,8 +196,14 @@ def apply_cylindrical_recipe(body, species_key, sp_module,
     circ_multiplier: N. Use 1 unless you know what you're doing.
     seam_buffer: as in Box rule. 0.05 is the validated default.
     ppi_threshold: pixels-per-cm threshold for "sharp source" branch.
-    azimuth_offset_fraction: 0.0 = seam at TMC theta=0; 0.5 = seam at 180.
-        Practical default is 0.5 (away from default front-view camera).
+    azimuth_offset_fraction: Fraction of circumference to rotate the
+        azimuthal seam away from TMC theta=0 (+X direction).
+        Empirical mapping (identity TMC transform, Z-axis body):
+          0.0  -> seam at +X  (visible from front and right)
+          0.25 -> seam at +Y  (back, hidden from default front camera)
+          0.5  -> seam at -X  (visible from front and left)
+          0.75 -> seam at -Y  (front, worst position)
+        Default 0.25 pushes the single azimuthal seam behind the body.
 
     The bitmap is pre-rotated 90 deg and saved to /tmp before being
     assigned to the body's appearance. Returns a dict with the analytical
