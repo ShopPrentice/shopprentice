@@ -1,0 +1,69 @@
+{
+  "description": "Teak E veneer texture (rectified, cropped, teak color graded)",
+  "source_image": ".context/veneer_rectify_test/31580_source.jpg",
+  "output_image": "textures/wood/teak_e.jpg",
+  "source_corners_px_tl_tr_br_bl": [
+    [
+      25.0,
+      19.0
+    ],
+    [
+      331.0,
+      16.0
+    ],
+    [
+      334.0,
+      1774.0
+    ],
+    [
+      31.0,
+      1778.0
+    ]
+  ],
+  "input_physical_size": {
+    "width": 12.5,
+    "height": 75.5,
+    "unit": "in"
+  },
+  "rectified_size_px": {
+    "width": 1904,
+    "height": 11506
+  },
+  "crop_px": {
+    "left": 48,
+    "top": 72,
+    "right": 48,
+    "bottom": 1120
+  },
+  "edge_padding_px": 24,
+  "core_image_px": {
+    "width": 1808,
+    "height": 10314
+  },
+  "image_size_px": {
+    "width": 1856,
+    "height": 10362
+  },
+  "physical_size_mm_after_crop": {
+    "width": 301.5,
+    "height": 1719.0333
+  },
+  "px_per_mm": 6.0,
+  "dpi": 152.4,
+  "fusion_scale_in": {
+    "x": 11.8701,
+    "y": 67.6785
+  },
+  "fusion_offset_in_centered": {
+    "x": -5.935,
+    "y": -33.8392
+  },
+  "note": "Fusion scale values describe the cropped wood core. Edge padding is reflected clamp padding and should not be counted as real board size.",
+  "upscale": {
+    "method": "2x Lanczos/unsharp + native Real-ESRGAN x2 blend",
+    "realesrgan_model": "realesr-animevideov3",
+    "scale": 2,
+    "realesrgan_weight": 0.6,
+    "generic_lanczos_weight": 0.4
+  }
+}

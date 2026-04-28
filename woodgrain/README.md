@@ -6,7 +6,7 @@ Custom high-resolution wood textures for 5 exotic/specialty species not availabl
 
 | Species | Base Appearance | Pixels (WxH) | Physical Size | Reflectance |
 |---------|----------------|---------------|---------------|-------------|
-| Teak | Mahogany | 1560x3160 | 9.9" x 20.1" | 0.035 |
+| Teak | Mahogany | 3120x6320 | 9.9" x 20.1" | 0.035 |
 | Brazilian Rosewood | Walnut | 1400x3440 | 8.1" x 19.8" | 0.06 |
 | Cocobolo | Walnut | 1460x3120 | 9.8" x 20.8" | 0.07 |
 | Ziricote | Walnut | 1330x3520 | 9.0" x 23.9" | 0.05 |
@@ -54,8 +54,8 @@ Textures are deployed to `textures/wood/` in the project root. At runtime, `sp.p
 
 ```
 textures/wood/
-  teak.jpg                   # face grain (used by _apply_custom_texture)
-  teak_endgrain.jpg          # end grain (used by _apply_endgrain_texture)
+  teak.jpg                   # final face grain (used by _apply_custom_texture)
+  teak_endgrain.jpg          # final end grain (used by _apply_endgrain_texture)
   ... (same pattern for all 5 species)
 ```
 
@@ -79,6 +79,108 @@ Scale values and base appearances are defined in `helpers/sp.py` → `_SPECIES_T
 - **Minimum 1200px wide**: smaller images produce visible repetition on furniture-scale bodies.
 - **Source photos**: product shots from wood veneer retailers with visible rulers or labeled dimensions for accurate scale calculation.
 
+## Asset Management Policy
+
+Keep only final, canonical texture assets in `textures/wood/`. Raw photos, rectification attempts, color-grade variants, model comparisons, and upscaling candidates belong outside the tracked skill texture directory, under `.context/wood_texture_pipeline/`.
+
+For example:
+
+```
+.context/wood_texture_pipeline/
+  teak/
+    raw/                # source/cropped/color-graded inputs
+    final_candidates/   # generated candidates such as *_2x_blend40
+```
+
+When a candidate is accepted, copy it into `textures/wood/` using the canonical filename (`teak_a.jpg`, not `teak_a_2x_blend40.jpg`) and update `helpers/sp.py` metadata if the pixel dimensions changed. Physical scale values do not change when an image is upscaled.
+
+## Production Pipeline
+
+Use this pipeline for new veneer/board photos and for refreshing existing teak variants.
+
+### 1. Crop and rectify
+
+Perspective-correct the source photo to a physical board rectangle:
+
+```bash
+scripts/wood_veneer_rectify.py \
+  source.jpg .context/wood_texture_pipeline/species/raw/species_variant_rectified.jpg \
+  --corners "TLx,TLy TRx,TRy BRx,BRy BLx,BLy" \
+  --physical-size "width,height" \
+  --unit in \
+  --px-per-mm 3 \
+  --crop-px "left,top,right,bottom" \
+  --reflect-pad-px 12
+```
+
+This writes the texture and a JSON sidecar containing physical size, Fusion scale, DPI, and reflected edge padding metadata.
+
+### 2. Color grade
+
+Normalize low-frequency color/reflection without destroying grain detail:
+
+```bash
+scripts/wood_texture_color_grade.py \
+  .context/wood_texture_pipeline/species/raw/species_variant_rectified.jpg \
+  .context/wood_texture_pipeline/species/final_candidates/species_variant_color.jpg \
+  --reference-image textures/wood/reference.jpg \
+  --reference-rect "x,y,w,h" \
+  --target-mode auto \
+  --ignore-padding 12 \
+  --regenerate-padding \
+  --preview .context/species_variant_color_preview.jpg
+```
+
+For teak variants, use a known-good teak region as the reference and preserve horizontal color variation with `auto`/`per-x` where the reference spans enough board width.
+
+### 3. Upscale with the 40% blend
+
+The default final teak upscale is:
+
+- 60% native Real-ESRGAN x2 (`realesr-animevideov3`, NCNN/Vulkan)
+- 40% generic 2x Lanczos + mild unsharp mask
+
+Run:
+
+```bash
+scripts/wood_texture_upscale_blend.py \
+  .context/wood_texture_pipeline/species/final_candidates/species_variant_color.jpg
+```
+
+By default the output is written outside the tracked texture directory:
+
+```
+.context/wood_texture_pipeline/candidates/species_variant_2x_blend40.jpg
+```
+
+If the source has a JSON sidecar, the script writes a matching sidecar with doubled pixel dimensions/DPI while preserving the same physical board size and Fusion scale.
+
+Batch example for teak candidates from archived source/corrected images:
+
+```bash
+scripts/wood_texture_upscale_blend.py \
+  --output-dir .context/wood_texture_pipeline/teak/final_candidates \
+  .context/wood_texture_pipeline/teak/raw/teak.jpg \
+  .context/wood_texture_pipeline/teak/raw/teak_a.jpg \
+  .context/wood_texture_pipeline/teak/raw/teak_b.jpg \
+  .context/wood_texture_pipeline/teak/raw/teak_c.jpg \
+  .context/wood_texture_pipeline/teak/raw/teak_d.jpg \
+  .context/wood_texture_pipeline/teak/raw/teak_e.jpg \
+  .context/wood_texture_pipeline/teak/raw/teak_desk_top.jpg \
+  .context/wood_texture_pipeline/teak/raw/teak_endgrain.jpg
+```
+
+### 4. Promote the accepted final
+
+Copy the accepted candidate into `textures/wood/` using the canonical filename:
+
+```bash
+cp .context/wood_texture_pipeline/candidates/species_variant_2x_blend40.jpg \
+   textures/wood/species_variant.jpg
+```
+
+If the candidate has a JSON sidecar, promote it too and set `output_image` to the canonical texture path. Then update `helpers/sp.py` → `_SPECIES_TEXTURE` with the final `px_w`/`px_h`. Do not change `texture`, `scale_x`, or `scale_y` unless the final asset filename or physical source board changed. Upscaling increases pixel density, not physical board size.
+
 ## Usage in Scripts
 
 ```python
@@ -89,6 +191,6 @@ sp.apply_appearance("cocobolo", bodies=["Top"])      # specific body
 
 ## TODO
 
-- [ ] End grain textures are still the original small versions — find larger replacements
+- [ ] Find true higher-resolution end grain photos; current teak end grain is AI-assisted 2x, not a new source photo
 - [ ] Consider adding more species (purpleheart, wenge, padauk, bubinga)
 - [ ] Investigate seamless tiling for very large surfaces (panels > 24")
