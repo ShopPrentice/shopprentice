@@ -1,211 +1,310 @@
-"""Diagnostic / non-recommendation module for SphericalTextureMapProjection.
+"""Reliable helpers for SphericalTextureMapProjection on parametric bodies.
 
 Companion to `helpers/box_diagnostic.py` and `cylindrical_diagnostic.py`.
 
-Empirical finding (Fusion 360, April 2026): SphericalTextureMapProjection
-is **not useful** for any wood-furniture body shape we tested. The
-projection has two intrinsic problems that no parameter sweep can fix
-when the source is a real wood photograph:
+Empirical finding (Fusion 360, April 2026 — refined twice): Spherical
+projection works ONLY for bodies whose shape is close to a sphere
+(aspect ≈ 1) or has a geometric pinch point that hides the projection's
+polar singularity (e.g. a cone tapering to a tip). For other curved
+revolved bodies (cylinders, ellipsoids, hemispheres, bullets, squat
+disks), the polar pinching surface artifact persists at every value
+of `pole_clearance_factor` because Fusion's spherical projection maps
+image-Y to LATITUDE ANGLE, not meridian arc length — so increasing
+scale_y just relocates pinch stripes, never eliminates them.
 
-  1. Polar pinching. The projection collapses an entire image-Y row to
-     a single point at each pole (top and bottom of the texture sphere).
-     A wood photo shows a triangular wedge of color radiating from each
-     pole. Visible on every sphere as a "hub" with radial streaks,
-     however the sphere is oriented.
+Recipe (for sphere-like bodies only):
 
-  2. Equatorial seam. The image-Y top/bottom edges (the longest rows of
-     the photo) wrap around the equator of the texture sphere. On a real
-     wood photo these edges are unrelated -> a strong horizontal band of
-     color discontinuity.
+    scale_x  = body_circumference                       # one azimuthal wrap
+    scale_y  = body_axial_extent × N    where N >= 3    # default 3
+    offset_x = scale_x / 2                              # azimuthal seam to back
+    offset_y = scale_y / 2                              # body centered on equator
+    TMC translate = body bbox center
+    Projection axis = body's long axis
 
-  3. Grain direction is not constant. On a flat wood photo, grain runs
-     along image-Y. The spherical mapping turns each "image-Y line" into
-     a meridian (pole-to-pole arc), so grain points to the poles - a
-     visual signal woodworkers parse as "this object isn't real wood".
+Body shape → recommended projection:
 
-Test bodies we ran the projection on:
-  - Sphere R=5 cm: pole pinch + equatorial seam visible at every angle.
-  - Hemisphere R=5 cm (flat-bottom): pole pinch on top, equatorial seam
-    cut at the flat-bottom edge.
-  - Bullet (cyl + half-sphere top): cylindrical body gets one wrap of
-    the photo (badly distorted), spherical cap pinches at apex.
-  - Lathe-turned leg (revolved profile, ~70 cm): user has previously
-    rejected this configuration ("looks really bad").
+  | Shape                                | Projection      |
+  |--------------------------------------|-----------------|
+  | Sphere (aspect ≈ 1)                  | Spherical, N=3 |
+  | Cone (tapers to a tip)               | Spherical, N=5 |
+  | Cylinder (any aspect)                | Cylindrical     |
+  | Hemisphere / bullet / ellipsoid      | Box+grain       |
+  | Squat disk (radius > axial)          | Box+grain       |
 
-Recommendation: do not use SphericalTextureMapProjection for wood. For
-spheres / hemispheres / bullets, prefer Box+grain (period_y = bbox
-along grain, period_x = natural cross). The Box projection picks one
-of six box-side projections at every surface point - on a sphere this
-gives six visible "patches" with a direction transition between them,
-but each patch shows correctly-oriented grain and no polar singularity.
-For specifically rounded shapes (knobs, finials, drawer pulls), the user
-might instead select the rendered shot's camera angle to hide a Box
-patch transition along a silhouette edge.
+`is_body_sphere_like(axial, radius)` returns True iff the body's aspect
+ratio (axial / 2·radius) is within ±15% of 1 — the empirical heuristic
+for Spherical reliability.
 
-This module exists for two reasons:
+`apply_spherical_recipe()` accepts a `warn_if_not_sphere_like` flag
+(default True) which prints a warning when the heuristic fails.
 
-  - To provide a diagnostic `apply_spherical_marker()` so a future Fusion
-    release with a fixed spherical projection can be re-evaluated using
-    the same red/green-stripe oracle as Box.
-  - To give a single canonical place to record the rejection reasoning,
-    so later runs of this skill don't try Spherical again from scratch.
+This module mirrors the shape of `box_diagnostic.py` and
+`cylindrical_diagnostic.py`:
 
-All units cm unless suffixed _in.
+  - Pure-math recipe calculation (`recommend_spherical_periods_cm`).
+  - Sphere-shape heuristic (`is_body_sphere_like`).
+  - Marker-image generation (delegates to box_diagnostic).
+  - High-level applier (`apply_spherical_recipe`).
+  - Calibration sweep (`calibrate_pole_clearance`) for re-deriving the
+    minimum N if Fusion changes behavior.
 """
 import math
 import os
 
 
-# ---------------------------------------------------------------------
-# Pure-math (such as it is)
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────
+# Pure-math rules
+# ─────────────────────────────────────────────────────────────────────
 
-def recommend_sphere_periods_cm(body_radius_cm, natural_axial_cm,
-                                 natural_cross_cm):
-    """Return (period_x_cm, period_y_cm) for a spherical body.
+def recommend_spherical_periods_cm(body_axial_cm, body_radius_cm,
+                                     pole_clearance_factor=3.0,
+                                     azimuthal_seam_offset_fraction=0.5):
+    """Return (scale_x_cm, scale_y_cm, offset_x_cm, offset_y_cm, rule_used).
 
-    Naive and not validated. Sets period to natural-image dimensions.
-    Even the "best" parameter choice produces an unacceptable result -
-    see module docstring. Provided so calibrate_sphere() can still set
-    SOMETHING for visual inspection.
+    `pole_clearance_factor` (N) controls how far each pole sits from
+    the body. N >= 5 is reliably seam-free across body shapes tested;
+    smaller N leaves polar pinching visible at the body's axial ends.
 
-    period_x = natural axial   (image-X row wraps the sphere meridian)
-    period_y = natural cross   (image-Y col wraps the sphere parallel)
+    `azimuthal_seam_offset_fraction` controls where the one inevitable
+    image-X wrap-around lands around the body. 0.5 puts it at the back
+    (180° from the texture origin). Set to 0.0 if you want the seam at
+    the front (e.g. for testing).
     """
-    return (natural_cross_cm or 1.0,
-            natural_axial_cm or 1.0)
+    if body_axial_cm <= 0 or body_radius_cm <= 0:
+        return 0.0, 0.0, 0.0, 0.0, "invalid input"
+    circumference = 2.0 * math.pi * body_radius_cm
+    scale_x_cm = circumference                                  # one wrap around
+    scale_y_cm = body_axial_cm * pole_clearance_factor
+    offset_x_cm = scale_x_cm * azimuthal_seam_offset_fraction
+    offset_y_cm = scale_y_cm / 2.0                               # center on equator
+    return (scale_x_cm, scale_y_cm, offset_x_cm, offset_y_cm,
+            f"equatorial band, N={pole_clearance_factor}")
 
 
-# ---------------------------------------------------------------------
-# Diagnostic applier (NOT RECOMMENDED FOR PRODUCTION USE)
-# ---------------------------------------------------------------------
+def is_body_sphere_like(body_axial_cm, body_radius_cm, aspect_tolerance=0.15):
+    """Heuristic: True if the body's aspect ratio (axial / 2·radius) is
+    within ±aspect_tolerance of 1.0. Spherical projection is reliable for
+    sphere-like bodies and unreliable for everything else (use Cylindrical
+    or Box+grain instead — see module docstring)."""
+    if body_radius_cm <= 0 or body_axial_cm <= 0:
+        return False
+    aspect = body_axial_cm / (2.0 * body_radius_cm)
+    return abs(aspect - 1.0) <= aspect_tolerance
 
-def apply_spherical_marker(body, species_key, sp_module,
-                            scale_x_cm=None, scale_y_cm=None):
-    """Apply SphericalTextureMapProjection with a marker bitmap, for the
-    sole purpose of confirming the polar-pinching + equatorial-seam
-    failure modes are still present in the current Fusion build.
 
-    On success returns a dict with the configuration; the caller is
-    expected to take a screenshot, observe the seam/pinch, and not ship
-    this projection mode to users.
+def analytical_pole_distance_cm(body_axial_cm, scale_y_cm):
+    """How far past the body's axial end does each pole sit (cm)?
 
-    To dispute this diagnosis, run the function on a sphere body, take
-    screenshots from top and side, and verify both failure modes are
-    visible. If a future Fusion update has fixed them, this module
-    should be expanded into a real recipe - and box_diagnostic + the
-    Cylindrical module updated to recognize spherical as an option for
-    sphere/hemisphere bodies.
+    Returns the polar clearance — the distance from the body's axial
+    boundary to the nearest pole on the projection sphere. Negative
+    means the pole is on or inside the body (= polar pinching visible).
+    Positive >= 0 means clean.
+
+    With scale_y_cm = body_axial_cm × N: clearance = body_axial × (N-1) / 2.
+    """
+    return (scale_y_cm - body_axial_cm) / 2.0
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Marker generation (delegates to box_diagnostic)
+# ─────────────────────────────────────────────────────────────────────
+
+def make_marker_image(*args, **kwargs):
+    """Re-export of box_diagnostic.make_marker_image for convenience."""
+    from helpers import box_diagnostic
+    return box_diagnostic.make_marker_image(*args, **kwargs)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Applier — equatorial-band recipe
+# ─────────────────────────────────────────────────────────────────────
+
+def apply_spherical_recipe(body, species_key, sp_module,
+                            pole_clearance_factor=3.0,
+                            projection_axis_idx=None,
+                            warn_if_not_sphere_like=True):
+    """Apply the equatorial-band Spherical recipe to a body.
+
+    Args:
+        body: BRepBody. Should be a sphere, cylinder, hemisphere, or
+            similar revolved body. The "axial extent" is the body's
+            extent along its long axis; the "radius" is half the
+            largest cross-section.
+        species_key: key into sp_module._SPECIES_TEXTURE.
+        sp_module: imported helpers.sp.
+        pole_clearance_factor: N. scale_y = body_axial × N. Default 5.
+        projection_axis_idx: 0=X, 1=Y, 2=Z. If None, picks the body's
+            longest bbox axis.
+
+    Returns dict with applied state (scale_x_cm, scale_y_cm,
+    offset_x/y_cm, projection_axis, pole_distance_cm).
     """
     import adsk.core, adsk.fusion
-    CM_TO_IN = 1.0 / 2.54
-    cfg = sp_module._SPECIES_TEXTURE.get(species_key)
-    if not cfg:
-        raise ValueError("Unknown species: %s" % species_key)
-    natural_axial_cm = sp_module._natural_size_cm(cfg, "y")
-    natural_cross_cm = sp_module._natural_size_cm(cfg, "x")
-    if scale_x_cm is None or scale_y_cm is None:
-        sx, sy = recommend_sphere_periods_cm(
-            (body.boundingBox.maxPoint.x - body.boundingBox.minPoint.x) / 2.0,
-            natural_axial_cm, natural_cross_cm)
-        if scale_x_cm is None:
-            scale_x_cm = sx
-        if scale_y_cm is None:
-            scale_y_cm = sy
-
-    # Marker bitmap (re-uses box_diagnostic - red/green edge stripes).
-    try:
-        from helpers import box_diagnostic
-    except ImportError:
-        import sys as _sys, os as _os
-        _sys.path.insert(0, _os.path.dirname(_os.path.dirname(
-            _os.path.abspath(__file__))))
-        from helpers import box_diagnostic
-    src_path = os.path.join(sp_module._TEXTURE_DIR, cfg["texture"])
-    marker_path = box_diagnostic.make_marker_image(
-        src_path,
-        "/tmp/%s_marker.jpg" % species_key.replace(' ', '_'))
-
-    # Per-body local appearance
-    app = adsk.core.Application.get()
-    design = adsk.fusion.Design.cast(app.activeProduct)
-    src_app = design.appearances.itemByName("SP_%s" % species_key)
+    bb = body.boundingBox
+    spans = (bb.maxPoint.x - bb.minPoint.x,
+             bb.maxPoint.y - bb.minPoint.y,
+             bb.maxPoint.z - bb.minPoint.z)
+    if projection_axis_idx is None:
+        projection_axis_idx = spans.index(max(spans))
+    body_axial_cm = spans[projection_axis_idx]
+    body_radius_cm = max(s for i, s in enumerate(spans)
+                          if i != projection_axis_idx) / 2.0
+    sphere_like = is_body_sphere_like(body_axial_cm, body_radius_cm)
+    if warn_if_not_sphere_like and not sphere_like:
+        aspect = body_axial_cm / (2.0 * body_radius_cm)
+        print(f"WARN apply_spherical_recipe: '{body.name}' aspect "
+              f"{aspect:.2f} is not sphere-like (≈1.00 ±0.15); "
+              f"expect polar pinching. Use Cylindrical or Box+grain.")
+    sx, sy, ox, oy, rule = recommend_spherical_periods_cm(
+        body_axial_cm, body_radius_cm, pole_clearance_factor)
+    cm_to_in = 1.0 / 2.54
+    cx = (bb.minPoint.x + bb.maxPoint.x) / 2.0
+    cy = (bb.minPoint.y + bb.maxPoint.y) / 2.0
+    cz = (bb.minPoint.z + bb.maxPoint.z) / 2.0
+    # Per-body appearance
+    design = adsk.fusion.Design.cast(adsk.core.Application.get().activeProduct)
+    src_app = design.appearances.itemByName(f"SP_{species_key}")
     if src_app is None:
-        sp_module.apply_appearance(species_key)
-        src_app = design.appearances.itemByName("SP_%s" % species_key)
-    local_name = "SP_%s_%s" % (species_key, body.name)
+        cfg = sp_module._SPECIES_TEXTURE.get(species_key, {})
+        base_name = cfg.get("base", "Mahogany")
+        base_app = None
+        for li in range(adsk.core.Application.get().materialLibraries.count):
+            lib = adsk.core.Application.get().materialLibraries.item(li)
+            for ai in range(lib.appearances.count):
+                a = lib.appearances.item(ai)
+                if a.name == base_name and not a.name.startswith("3D "):
+                    if "appearance" in lib.name.lower():
+                        base_app = a
+                        break
+                    if base_app is None:
+                        base_app = a
+            if base_app and "appearance" in lib.name.lower():
+                break
+        if base_app is None:
+            raise RuntimeError(
+                f"Cannot seed SP_{species_key}: base '{base_name}' not found")
+        src_app = design.appearances.addByCopy(base_app, f"SP_{species_key}")
+        sp_module._apply_custom_texture(src_app, species_key)
+    local_name = f"SP_{species_key}_{body.name}_sph"
     local = design.appearances.itemByName(local_name)
-    if not local and src_app:
+    if not local:
         local = design.appearances.addByCopy(src_app, local_name)
-    body.appearance = local
-
+    sp_module._apply_custom_texture(local, species_key)
     cp = adsk.core.ColorProperty.cast(
         local.appearanceProperties.itemById("opaque_albedo"))
     if cp and cp.hasConnectedTexture:
         tex = cp.connectedTexture
-        bp = tex.properties.itemById("unifiedbitmap_Bitmap")
-        fp = adsk.core.FilenameProperty.cast(bp)
-        if fp and not fp.isReadOnly:
-            fp.value = marker_path
-        def setf(name, val):
-            p = tex.properties.itemById(name)
-            if p:
-                adsk.core.FloatProperty.cast(p).value = val
-        def setb(name, val):
-            p = tex.properties.itemById(name)
-            if p:
-                adsk.core.BooleanProperty.cast(p).value = val
-        setb("texture_ScaleLock", False)
-        setf("texture_RealWorldScaleX", scale_x_cm * CM_TO_IN)
-        setf("texture_RealWorldScaleY", scale_y_cm * CM_TO_IN)
-        setf("texture_RealWorldOffsetX", 0.0)
-        setf("texture_RealWorldOffsetY", 0.0)
-        setf("texture_WAngle", 0.0)
-
-    m = adsk.core.Matrix3D.create()  # identity TMC
+        for prop, val in (
+            ("texture_RealWorldScaleX", sx * cm_to_in),
+            ("texture_RealWorldScaleY", sy * cm_to_in),
+            ("texture_RealWorldOffsetX", ox * cm_to_in),
+            ("texture_RealWorldOffsetY", oy * cm_to_in),
+            ("texture_WAngle", 0.0),
+        ):
+            p = tex.properties.itemById(prop)
+            v = adsk.core.FloatProperty.cast(p) if p else None
+            if v: v.value = val
+    body.appearance = local
+    # TMC: rotation aligning texture-local +Z to projection axis, translate
+    # to body center.
+    m = adsk.core.Matrix3D.create()
+    if projection_axis_idx == 0:    # +X
+        m.setToRotation(math.pi / 2,
+                         adsk.core.Vector3D.create(0, 1, 0),
+                         adsk.core.Point3D.create(0, 0, 0))
+    elif projection_axis_idx == 1:  # +Y
+        m.setToRotation(-math.pi / 2,
+                         adsk.core.Vector3D.create(1, 0, 0),
+                         adsk.core.Point3D.create(0, 0, 0))
+    # axis 2 (Z): identity
+    m.setCell(0, 3, cx)
+    m.setCell(1, 3, cy)
+    m.setCell(2, 3, cz)
     ptmc = adsk.core.ProjectedTextureMapControl.cast(body.textureMapControl)
     if ptmc:
         ptmc.projectedTextureMapType = (
             adsk.core.ProjectedTextureMapTypes.SphericalTextureMapProjection)
         ptmc.transform = m
-
     return {
         "species": species_key,
-        "scale_x_cm": scale_x_cm,
-        "scale_y_cm": scale_y_cm,
-        "marker_bitmap": marker_path,
-        "appearance": local.name if local else None,
-        "expected_failures": [
-            "polar_pinch_top",
-            "polar_pinch_bottom",
-            "equatorial_seam",
-            "non_uniform_grain_direction",
-        ],
+        "appearance": local.name,
+        "projection_axis": "xyz"[projection_axis_idx],
+        "body_axial_cm": body_axial_cm,
+        "body_radius_cm": body_radius_cm,
+        "sphere_like": sphere_like,
+        "scale_x_cm": sx,
+        "scale_y_cm": sy,
+        "offset_x_cm": ox,
+        "offset_y_cm": oy,
+        "pole_distance_cm": analytical_pole_distance_cm(body_axial_cm, sy),
+        "rule_used": rule,
     }
 
 
-def calibrate_sphere(body, species_key, sp_module,
-                      screenshot_fn=None, oracle_fn=None):
-    """Detect whether spherical projection has stopped being a failure.
+# ─────────────────────────────────────────────────────────────────────
+# Calibration — re-derive min pole-clearance factor after Fusion changes
+# ─────────────────────────────────────────────────────────────────────
 
-    Applies the marker spherical projection and asks `oracle_fn` if any
-    of the four expected failures (polar_pinch_top/bottom, equatorial_
-    seam, non_uniform_grain) are visible. Returns a dict listing which
-    failures persist. If all four come back False, the Fusion behavior
-    has changed and this module needs to be promoted from "diagnostic
-    only" to a real recipe.
+def calibrate_pole_clearance(body, species_key, sp_module,
+                              n_candidates=(2.0, 3.0, 4.0, 5.0, 7.0, 10.0),
+                              screenshot_fn=None, oracle_fn=None,
+                              marker_dir="/tmp"):
+    """Sweep `pole_clearance_factor` (N) ascending and return the smallest
+    value that's seam-free per `oracle_fn(image, N)`.
+
+    Mirrors box_diagnostic.calibrate_seam_buffer's contract: applies marker
+    bitmap, screenshots at each N, restores original bitmap on cleanup.
     """
-    applied = apply_spherical_marker(body, species_key, sp_module)
-    if screenshot_fn is None:
-        return {"applied": applied, "failures_observed": None}
-    shot = screenshot_fn()
-    failures = {}
-    if oracle_fn is None:
-        return {"applied": applied, "screenshot": shot,
-                "failures_observed": "no oracle"}
-    for failure in applied["expected_failures"]:
-        failures[failure] = bool(oracle_fn(shot, failure))
-    applied["screenshot"] = shot
-    applied["failures_observed"] = failures
-    applied["all_failures_resolved"] = not any(failures.values())
-    return applied
+    import adsk.core, adsk.fusion
+    cfg = sp_module._SPECIES_TEXTURE.get(species_key) or {}
+    src_path = os.path.join(sp_module._TEXTURE_DIR, cfg.get("texture", ""))
+    if not os.path.isfile(src_path):
+        raise FileNotFoundError(f"Texture not found: {src_path}")
+    marker_path = make_marker_image(
+        src_path,
+        os.path.join(marker_dir, f"{species_key.replace(' ','_')}_sph_marker.jpg"))
+    results = {"min_seam_free_N": None, "screenshots": {},
+               "analytical_results": {}, "scratch_appearances": []}
+    orig_appearance = body.appearance
+    scratch_state = []
+    try:
+        for N in n_candidates:
+            applied = apply_spherical_recipe(body, species_key, sp_module,
+                                              pole_clearance_factor=N)
+            results["analytical_results"][N] = applied
+            ap = body.appearance
+            cp = adsk.core.ColorProperty.cast(
+                ap.appearanceProperties.itemById("opaque_albedo"))
+            orig_bitmap = None
+            if cp and cp.hasConnectedTexture:
+                tex = cp.connectedTexture
+                bp = tex.properties.itemById("unifiedbitmap_Bitmap")
+                fp = adsk.core.FilenameProperty.cast(bp)
+                if fp and not fp.isReadOnly:
+                    orig_bitmap = fp.value
+                    fp.value = marker_path
+            if not any(s[0] is ap for s in scratch_state):
+                scratch_state.append((ap, orig_bitmap))
+                results["scratch_appearances"].append(ap.name)
+            if screenshot_fn is not None:
+                shot = screenshot_fn()
+                results["screenshots"][N] = shot
+                if oracle_fn is not None and oracle_fn(shot, N):
+                    results["min_seam_free_N"] = N
+                    break
+    finally:
+        for ap, orig_bitmap in scratch_state:
+            if orig_bitmap:
+                cp = adsk.core.ColorProperty.cast(
+                    ap.appearanceProperties.itemById("opaque_albedo"))
+                if cp and cp.hasConnectedTexture:
+                    tex = cp.connectedTexture
+                    bp = tex.properties.itemById("unifiedbitmap_Bitmap")
+                    fp = adsk.core.FilenameProperty.cast(bp)
+                    if fp and not fp.isReadOnly:
+                        fp.value = orig_bitmap
+        try:
+            body.appearance = orig_appearance
+        except Exception:
+            pass
+    return results

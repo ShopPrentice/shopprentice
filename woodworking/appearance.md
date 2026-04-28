@@ -415,17 +415,33 @@ offset_circ  = circumference / 2          # rotate the one seam to back
 
 **Recommendation: prefer Box+45° for curved revolved bodies.** Box+45° hides the projection direction-transition in the curvature shading, uses the natural bitmap unrotated, and avoids the one inevitable azimuthal seam where the photo's image-Y top and bottom rows meet on the cylinder. Cylindrical is included for completeness and for cases where the user specifically wants the texture to wrap exactly once around a perfect cylinder.
 
-### Spherical (`SphericalTextureMapProjection`) — do not use for wood furniture
+### Spherical (`SphericalTextureMapProjection`) — sphere-only recipe
 
-Tested on a literal sphere (R=5), hemisphere (R=5), bullet (cylinder + half-sphere), and the 70 cm tall post. **All four exhibit the same intrinsic failures** that no buffer / rotation / translate can fix:
+Spherical projection works **only for bodies whose shape is close to a sphere** (aspect ≈ 1) or has a geometric pinch point that hides the polar singularity (e.g. a cone tapering to a tip). For other curved revolved bodies — cylinders, ellipsoids, hemispheres, bullets, squat disks — the polar pinching artifact persists at every value of `pole_clearance_factor` because Fusion's spherical projection maps image-Y to **latitude angle**, not meridian arc length. Increasing scale_y just relocates the pinch stripes; it doesn't eliminate them. (This was a corrected understanding from the initial "equatorial band" hypothesis, which was wrong.)
 
-1. **Polar pinching** — image-Y rows collapse to a single point at each pole, producing triangular wedges of color radiating from the apex. Visible on every sphere/dome from a top-down angle.
-2. **Equatorial seam** — image-Y top and bottom rows are unrelated parts of a wood photo; mapping them to the same equator line creates a strong horizontal color discontinuity.
-3. **Non-uniform grain direction** — every "image-Y line" becomes a meridian, so the grain direction points to the poles. Wrong for any wood part.
+Recipe (sphere-like bodies only):
 
-For sphere-like furniture parts (knobs, finials, drawer pulls), use **Box+grain**. The 6-sided box patches show correctly oriented grain, and the patch transitions on a curved surface get masked by Fusion's curvature shading the same way Box+45° works on legs.
+```
+scale_x  = body_circumference                 # one azimuthal wrap
+scale_y  = body_axial_extent × N (>= 3)       # default 3
+offset_x = scale_x / 2                        # azimuthal seam to back
+offset_y = scale_y / 2                        # body centered on equator
+TMC translate = body bbox center
+Projection axis = body's long axis
+```
 
-`helpers/spherical_diagnostic.py` exists as a regression-checker only: it documents the four failure modes and exposes `calibrate_sphere(...)` that returns a `failures_observed` dict. If a future Fusion update returns `all_failures_resolved: True`, the module can be promoted from diagnostic to recipe.
+Body shape → recommended projection:
+
+| Shape | Projection |
+|-------|-----------|
+| Sphere (aspect ≈ 1) | Spherical, N=3 |
+| Cone (tapers to a tip) | Spherical, N=5 (apex pinch hides in geometric tip) |
+| Cylinder (any aspect) | Cylindrical |
+| Hemisphere / bullet / ellipsoid / squat disk | Box+grain |
+
+`is_body_sphere_like(axial, radius)` returns True iff aspect ratio is within ±15% of 1 — the empirical heuristic for Spherical reliability. `apply_spherical_recipe()` accepts `warn_if_not_sphere_like` (default True) which prints a warning when the heuristic fails.
+
+Implementation: `helpers/spherical_diagnostic.apply_spherical_recipe(body, species, sp_module, pole_clearance_factor=3.0)`. Use `calibrate_pole_clearance(...)` to re-derive the minimum `N` after Fusion updates.
 
 ## Which projection to use — quick reference
 
