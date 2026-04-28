@@ -193,16 +193,33 @@ def apply_box_grain_recipe(body, species_key, sp_module,
     translate_xyz[gi] = translate_grain
     for axis_idx, val in enumerate(translate_xyz):
         m.setCell(axis_idx, 3, val)
-    # Per-body appearance with computed scale_y
-    src_app = adsk.fusion.Design.cast(
-        adsk.core.Application.get().activeProduct
-    ).appearances.itemByName(f"SP_{species_key}")
-    if src_app is None:
-        sp_module.apply_appearance(species_key)
-        src_app = adsk.fusion.Design.cast(
-            adsk.core.Application.get().activeProduct
-        ).appearances.itemByName(f"SP_{species_key}")
+    # Per-body appearance with computed scale_y. To avoid the global
+    # side-effect of calling sp.apply_appearance (which would re-paint
+    # every body in the design), seed SP_<species> directly from the
+    # material library if it doesn't yet exist.
     design = adsk.fusion.Design.cast(adsk.core.Application.get().activeProduct)
+    src_app = design.appearances.itemByName(f"SP_{species_key}")
+    if src_app is None:
+        cfg = sp_module._SPECIES_TEXTURE.get(species_key, {})
+        base_name = cfg.get("base", "Mahogany")
+        base_app = None
+        for li in range(adsk.core.Application.get().materialLibraries.count):
+            lib = adsk.core.Application.get().materialLibraries.item(li)
+            for ai in range(lib.appearances.count):
+                a = lib.appearances.item(ai)
+                if a.name == base_name and not a.name.startswith("3D "):
+                    if "appearance" in lib.name.lower():
+                        base_app = a
+                        break
+                    if base_app is None:
+                        base_app = a
+            if base_app and "appearance" in lib.name.lower():
+                break
+        if base_app is None:
+            raise RuntimeError(
+                f"Cannot seed SP_{species_key}: base '{base_name}' not found")
+        src_app = design.appearances.addByCopy(base_app, f"SP_{species_key}")
+        sp_module._apply_custom_texture(src_app, species_key)
     local_name = f"SP_{species_key}_{body.name}"
     local = design.appearances.itemByName(local_name)
     if not local and src_app:
@@ -271,29 +288,55 @@ def calibrate_seam_buffer(body, species_key, sp_module,
         src_path,
         os.path.join(marker_dir, f"{species_key.replace(' ','_')}_marker.jpg"))
     results = {"min_seam_free_buffer": None, "screenshots": {},
-               "analytical_results": {}}
-    # Point this body's appearance at the marker. Save original.
+               "analytical_results": {}, "scratch_appearances": []}
     orig_appearance = body.appearance
-    # Apply a per-body appearance with marker bitmap, then sweep buffer.
-    for buf in buffer_candidates:
-        applied = apply_box_grain_recipe(body, species_key, sp_module,
-                                          seam_buffer=buf)
-        # Swap bitmap to the marker for the duration of this iteration.
-        cp = adsk.core.ColorProperty.cast(
-            body.appearance.appearanceProperties.itemById("opaque_albedo"))
-        if cp and cp.hasConnectedTexture:
-            tex = cp.connectedTexture
-            bp = tex.properties.itemById("unifiedbitmap_Bitmap")
-            fp = adsk.core.FilenameProperty.cast(bp)
-            if fp and not fp.isReadOnly:
-                fp.value = marker_path
-        results["analytical_results"][buf] = applied
-        if screenshot_fn is not None:
-            shot = screenshot_fn()
-            results["screenshots"][buf] = shot
-            if oracle_fn is not None and oracle_fn(shot, buf):
-                results["min_seam_free_buffer"] = buf
-                break  # ascending candidates → smallest passing is the answer
-    # Restore original appearance so the caller's session continues clean.
-    body.appearance = orig_appearance
+    # Track scratch per-body appearances so we can restore each one's
+    # bitmap (and optionally remove them) in the finally block.
+    scratch_state = []   # list of (appearance, original_bitmap_path)
+    try:
+        for buf in buffer_candidates:
+            applied = apply_box_grain_recipe(body, species_key, sp_module,
+                                              seam_buffer=buf)
+            results["analytical_results"][buf] = applied
+            ap = body.appearance
+            cp = adsk.core.ColorProperty.cast(
+                ap.appearanceProperties.itemById("opaque_albedo"))
+            orig_bitmap = None
+            if cp and cp.hasConnectedTexture:
+                tex = cp.connectedTexture
+                bp = tex.properties.itemById("unifiedbitmap_Bitmap")
+                fp = adsk.core.FilenameProperty.cast(bp)
+                if fp and not fp.isReadOnly:
+                    orig_bitmap = fp.value
+                    fp.value = marker_path
+            if not any(s[0] is ap for s in scratch_state):
+                scratch_state.append((ap, orig_bitmap))
+                results["scratch_appearances"].append(ap.name)
+            if screenshot_fn is not None:
+                shot = screenshot_fn()
+                results["screenshots"][buf] = shot
+                if oracle_fn is not None and oracle_fn(shot, buf):
+                    results["min_seam_free_buffer"] = buf
+                    break
+    finally:
+        # Restore each scratch appearance's bitmap to its pre-calibration
+        # source, and restore body.appearance to whatever it was before.
+        # We do NOT delete the per-body appearance copies — that's an
+        # explicit caller responsibility, since they may want to keep the
+        # converged result. They can `design.appearances.itemByName(...).deleteMe()`
+        # afterwards using the names in `results["scratch_appearances"]`.
+        for ap, orig_bitmap in scratch_state:
+            if orig_bitmap:
+                cp = adsk.core.ColorProperty.cast(
+                    ap.appearanceProperties.itemById("opaque_albedo"))
+                if cp and cp.hasConnectedTexture:
+                    tex = cp.connectedTexture
+                    bp = tex.properties.itemById("unifiedbitmap_Bitmap")
+                    fp = adsk.core.FilenameProperty.cast(bp)
+                    if fp and not fp.isReadOnly:
+                        fp.value = orig_bitmap
+        try:
+            body.appearance = orig_appearance
+        except Exception:
+            pass
     return results

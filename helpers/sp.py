@@ -1660,14 +1660,21 @@ def fit_scale_y_cm(body, species_key,
     if not cfg:
         return None
     natural_cm = _natural_size_cm(cfg, "y")
-    px_h = cfg.get("px_h") or 0
     if natural_cm <= 0:
+        return natural_cm
+    px_h = cfg.get("px_h")
+    # If the species doesn't carry pixel metadata (older custom textures
+    # like brazilian_rosewood / cocobolo / ziricote / spalted_maple), we
+    # have no way to compute pixel density; treat the source as already
+    # natural-scale and skip the compression branch. Returning the natural
+    # period is the safe no-op behavior.
+    if not px_h:
         return natural_cm
     bb = body.boundingBox
     body_grain_cm = max(bb.maxPoint.x - bb.minPoint.x,
                          bb.maxPoint.y - bb.minPoint.y,
                          bb.maxPoint.z - bb.minPoint.z)
-    ppi = (px_h / natural_cm) if natural_cm > 0 else 0
+    ppi = px_h / natural_cm
     # Lazy import to avoid load-time cycle.
     from helpers import box_diagnostic
     period_cm, _rule = box_diagnostic.recommend_period_cm(

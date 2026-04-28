@@ -378,3 +378,68 @@ In our experience Box+grain works for nearly every body shape (flat panels, lath
 | Spherical | None we found that beat Box+45° | Looked worse on legs (compressed pole regions) |
 
 If you find a future case where Box doesn't work, use the red-marker method to verify whether it's a period seam (fixable with buffer/translate) or a direction transition (needs rotation or alternative projection).
+
+## Cylindrical and Spherical projection — corrected findings
+
+Empirically validated against Fusion 360 (April 2026) using the red-marker
+method. The previous notes elsewhere in the codebase had errors; the rules
+below are correct.
+
+### Cylindrical (`CylindricalTextureMapProjection`)
+
+| Property | What it actually controls |
+|----------|---------------------------|
+| `texture_RealWorldScaleX` | Period along the cylinder axis (V direction) |
+| `texture_RealWorldScaleY` | Period around the circumference (U direction) |
+| `texture_WAngle` | **Silently ignored** by Cylindrical in this Fusion build |
+| image-X (left/right edges) | Maps to axial direction |
+| image-Y (top/bottom edges) | Maps to circumferential direction |
+
+The mapping is **opposite** of the natural reading. Two consequences:
+
+1. **Wood photos store grain along image-Y, but Cylindrical maps image-Y around the cylinder.** Native, the grain wraps perpendicular to the bar's length. To get grain along the cylinder axis, you must **pre-rotate the bitmap 90°** on disk (since WAngle has no effect). `helpers/cylindrical_diagnostic.make_axial_bitmap()` does this.
+
+2. **For circumferential period, use N=1 (one wrap).** Higher N (e.g. 4) does NOT hide seams — it makes them MULTIPLY. With N>1 the natural bitmap fills only `1/N` of one period and the rest is filled by Fusion's repeat, producing N visible seam bands instead of one.
+
+Recipe (validated on bars R=1, 1.3, 2, 3 cm × 38 cm and a 70 cm × 1.7 cm post):
+
+```python
+# helpers/cylindrical_diagnostic.py — apply_cylindrical_recipe(...)
+period_axial = body_axial × 1.05          # Box rule: 5% buffer
+period_circ  = circumference              # N=1 single wrap
+offset_axial = bbox_min_axial − (period_axial − body_axial) / 2  # recenter
+offset_circ  = circumference / 2          # rotate the one seam to back
+# WAngle = 0 (ignored anyway)
+# TMC: rotate texture-local +Z to body's long-axis vector; no translate
+```
+
+**Recommendation: prefer Box+45° for curved revolved bodies.** Box+45° hides the projection direction-transition in the curvature shading, uses the natural bitmap unrotated, and avoids the one inevitable azimuthal seam where the photo's image-Y top and bottom rows meet on the cylinder. Cylindrical is included for completeness and for cases where the user specifically wants the texture to wrap exactly once around a perfect cylinder.
+
+### Spherical (`SphericalTextureMapProjection`) — do not use for wood furniture
+
+Tested on a literal sphere (R=5), hemisphere (R=5), bullet (cylinder + half-sphere), and the 70 cm tall post. **All four exhibit the same intrinsic failures** that no buffer / rotation / translate can fix:
+
+1. **Polar pinching** — image-Y rows collapse to a single point at each pole, producing triangular wedges of color radiating from the apex. Visible on every sphere/dome from a top-down angle.
+2. **Equatorial seam** — image-Y top and bottom rows are unrelated parts of a wood photo; mapping them to the same equator line creates a strong horizontal color discontinuity.
+3. **Non-uniform grain direction** — every "image-Y line" becomes a meridian, so the grain direction points to the poles. Wrong for any wood part.
+
+For sphere-like furniture parts (knobs, finials, drawer pulls), use **Box+grain**. The 6-sided box patches show correctly oriented grain, and the patch transitions on a curved surface get masked by Fusion's curvature shading the same way Box+45° works on legs.
+
+`helpers/spherical_diagnostic.py` exists as a regression-checker only: it documents the four failure modes and exposes `calibrate_sphere(...)` that returns a `failures_observed` dict. If a future Fusion update returns `all_failures_resolved: True`, the module can be promoted from diagnostic to recipe.
+
+## Which projection to use — quick reference
+
+| Body shape | Use |
+|------------|-----|
+| Flat panel (top, slat, apron) | Box+grain + per-body fit + recenter (`helpers/box_diagnostic.apply_box_grain_recipe`) |
+| Photo on one face only | Box+identity + photo `RealWorldOffset = bbox_min × CM_TO_IN` |
+| Curved revolved body (legs, posts) | Box+grain with TMC rotated 45° around grain axis, scale_y = body × 3 (see "Box on curved bodies" above) |
+| Round bar / dowel where exact one-wrap-around is desired | Cylindrical with `helpers/cylindrical_diagnostic.apply_cylindrical_recipe` (pre-rotated bitmap, N=1, recentered axial translate) |
+| Sphere / dome / hemisphere | Box+grain (Spherical is unusable — see above) |
+
+## When `sp.apply_appearance()` vs `box_diagnostic.apply_box_grain_recipe()`
+
+- `sp.apply_appearance(species, bodies=...)` is the **simple shared-species flow**: assigns one design-level appearance to one or more bodies, sets each body's TMC to Box+grain rotation. **Does NOT do per-body fit, does NOT recenter the translate.** Suitable for small bodies where the texture's natural period covers the body comfortably (e.g. dovetail blocks, hardware).
+- `box_diagnostic.apply_box_grain_recipe(body, species, sp_module)` is the **deterministic seam-free recipe**: per-body appearance copy, computed period via `recommend_period_cm`, recentered translate. Use when the body's grain extent approaches or exceeds 50% of the species' natural period (e.g. aprons on `teak c`).
+
+Project scripts that want full seam control should call `apply_box_grain_recipe()` directly per body — that's how `teak_desk.py`'s `_apply_textures()` operates.
