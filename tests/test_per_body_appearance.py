@@ -1,3 +1,4 @@
+import os
 """Tests for sp.per_body_appearance and the _apply_custom_texture guard.
 
 These tests run OUTSIDE Fusion (no adsk module). They verify the pure-logic
@@ -33,7 +34,7 @@ def test_species_texture_has_base():
     """Every species in _SPECIES_TEXTURE must have a 'base' key for
     per_body_appearance to copy from."""
     import re
-    with open("/Users/frankzha/conductor/workspaces/shopprentice/worcester/helpers/sp.py") as f:
+    with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "helpers", "sp.py")) as f:
         src = f.read()
     # Find all species entries and verify each has "base":
     entries = re.findall(r'"(teak[^"]*)":\s*\{[^}]*"base":\s*"([^"]*)"', src)

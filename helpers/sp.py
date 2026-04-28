@@ -1684,7 +1684,7 @@ def fit_scale_y_cm(body, species_key,
     return period_cm
 
 
-def _apply_custom_texture(local_appearance, species_key, body=None):
+def _apply_custom_texture(local_appearance, species_key, body=None, _force=False):
     """Swap texture bitmap and tune properties for a custom species.
 
     Args:
@@ -1703,8 +1703,13 @@ def _apply_custom_texture(local_appearance, species_key, body=None):
     modified. Use sp.per_body_appearance(body, species) to get a safe
     per-body copy instead.
     """
-    # Guard: refuse to modify if multiple bodies reference this appearance
-    try:
+    # Guard: refuse to modify if multiple bodies reference this appearance.
+    # _force=True bypasses — used by sp.apply_appearance() which intentionally
+    # refreshes shared species appearances in the bulk assignment flow.
+    if _force:
+        pass  # skip guard
+    else:
+      try:
         _guard_app = adsk.core.Application.get()
         _guard_design = adsk.fusion.Design.cast(_guard_app.activeProduct)
         if _guard_design:
@@ -1731,10 +1736,10 @@ def _apply_custom_texture(local_appearance, species_key, body=None):
                     f"it is referenced by {ref_count} bodies. "
                     f"Use sp.per_body_appearance(body, species_key) to get "
                     f"a safe per-body copy first.")
-    except ValueError:
-        raise  # re-raise the guard error
-    except Exception:
-        pass  # if design isn't available (e.g. during tests), skip the guard
+      except ValueError:
+          raise  # re-raise the guard error
+      except Exception:
+          pass  # if design isn't available (e.g. during tests), skip the guard
 
     cfg = _SPECIES_TEXTURE[species_key]
     tex_path = _os.path.join(_TEXTURE_DIR, cfg["texture"])
@@ -1803,7 +1808,10 @@ def per_body_appearance(body, species_key):
     if not cfg:
         raise ValueError(f"Unknown species: {species_key!r}")
 
-    local_name = f"SP_{species_key}_{body.name}"
+    # Include component name to avoid collisions when bodies in different
+    # components share the same name (e.g. "Body1" in legs vs stretcher).
+    comp_name = body.parentComponent.name if body.parentComponent else "root"
+    local_name = f"SP_{species_key}_{comp_name}_{body.name}"
     local = design.appearances.itemByName(local_name)
     if not local:
         # Copy from library base directly -- skip shared SP_<species>
@@ -2031,7 +2039,7 @@ def apply_appearance(species="white oak", bodies=None):
                 return
             local = design.appearances.addByCopy(base_app, local_name)
         # Always re-apply texture (picks up file changes on disk)
-        if not _apply_custom_texture(local, species_lower):
+        if not _apply_custom_texture(local, species_lower, _force=True):
             print(f"WARNING: Texture file not found for '{species}' "
                   f"— using base {base_name}. "
                   f"Place {cfg['texture']} in textures/wood/")

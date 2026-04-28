@@ -354,5 +354,22 @@ def calibrate_circ_multiplier(body, species_key, sp_module,
             if oracle_fn is not None and oracle_fn(shot, N):
                 results["min_seam_free_n"] = N
                 break
-    body.appearance = orig_appearance
+    finally:
+        for ap, orig_bmp in scratch_state:
+            if orig_bmp:
+                try:
+                    cp = adsk.core.ColorProperty.cast(
+                        ap.appearanceProperties.itemById("opaque_albedo"))
+                    if cp and cp.hasConnectedTexture:
+                        tex = cp.connectedTexture
+                        bp = tex.properties.itemById("unifiedbitmap_Bitmap")
+                        fp = adsk.core.FilenameProperty.cast(bp)
+                        if fp and not fp.isReadOnly:
+                            fp.value = orig_bmp
+                except Exception:
+                    pass
+        try:
+            body.appearance = orig_appearance
+        except Exception:
+            pass
     return results
