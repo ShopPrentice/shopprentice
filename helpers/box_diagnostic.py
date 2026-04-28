@@ -193,38 +193,9 @@ def apply_box_grain_recipe(body, species_key, sp_module,
     translate_xyz[gi] = translate_grain
     for axis_idx, val in enumerate(translate_xyz):
         m.setCell(axis_idx, 3, val)
-    # Per-body appearance with computed scale_y. To avoid the global
-    # side-effect of calling sp.apply_appearance (which would re-paint
-    # every body in the design), seed SP_<species> directly from the
-    # material library if it doesn't yet exist.
-    design = adsk.fusion.Design.cast(adsk.core.Application.get().activeProduct)
-    src_app = design.appearances.itemByName(f"SP_{species_key}")
-    if src_app is None:
-        cfg = sp_module._SPECIES_TEXTURE.get(species_key, {})
-        base_name = cfg.get("base", "Mahogany")
-        base_app = None
-        for li in range(adsk.core.Application.get().materialLibraries.count):
-            lib = adsk.core.Application.get().materialLibraries.item(li)
-            for ai in range(lib.appearances.count):
-                a = lib.appearances.item(ai)
-                if a.name == base_name and not a.name.startswith("3D "):
-                    if "appearance" in lib.name.lower():
-                        base_app = a
-                        break
-                    if base_app is None:
-                        base_app = a
-            if base_app and "appearance" in lib.name.lower():
-                break
-        if base_app is None:
-            raise RuntimeError(
-                f"Cannot seed SP_{species_key}: base '{base_name}' not found")
-        src_app = design.appearances.addByCopy(base_app, f"SP_{species_key}")
-        sp_module._apply_custom_texture(src_app, species_key)
-    local_name = f"SP_{species_key}_{body.name}"
-    local = design.appearances.itemByName(local_name)
-    if not local and src_app:
-        local = design.appearances.addByCopy(src_app, local_name)
-    sp_module._apply_custom_texture(local, species_key)
+    # Per-body appearance via sp.per_body_appearance — safe, never touches
+    # a shared SP_<species> appearance.
+    local = sp_module.per_body_appearance(body, species_key)
     cp = adsk.core.ColorProperty.cast(
         local.appearanceProperties.itemById("opaque_albedo"))
     if cp and cp.hasConnectedTexture:

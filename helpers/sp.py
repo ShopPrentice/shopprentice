@@ -1696,7 +1696,46 @@ def _apply_custom_texture(local_appearance, species_key, body=None):
 
     Returns:
         True if texture was applied, False if texture file not found.
+
+    Safety: refuses to modify an appearance that is currently assigned to
+    more than one body in the active design. This prevents accidental
+    cross-body texture resets when a shared SP_<species> appearance is
+    modified. Use sp.per_body_appearance(body, species) to get a safe
+    per-body copy instead.
     """
+    # Guard: refuse to modify if multiple bodies reference this appearance
+    try:
+        _guard_app = adsk.core.Application.get()
+        _guard_design = adsk.fusion.Design.cast(_guard_app.activeProduct)
+        if _guard_design:
+            ref_count = 0
+            def _count_refs(comp):
+                nonlocal ref_count
+                for i in range(comp.bRepBodies.count):
+                    b = comp.bRepBodies.item(i)
+                    try:
+                        if b.appearance and b.appearance.name == local_appearance.name:
+                            ref_count += 1
+                            if ref_count > 1:
+                                return  # early exit
+                    except Exception:
+                        pass
+                for i in range(comp.occurrences.count):
+                    _count_refs(comp.occurrences.item(i).component)
+                    if ref_count > 1:
+                        return
+            _count_refs(_guard_design.rootComponent)
+            if ref_count > 1:
+                raise ValueError(
+                    f"Refusing to modify '{local_appearance.name}' — "
+                    f"it is referenced by {ref_count} bodies. "
+                    f"Use sp.per_body_appearance(body, species_key) to get "
+                    f"a safe per-body copy first.")
+    except ValueError:
+        raise  # re-raise the guard error
+    except Exception:
+        pass  # if design isn't available (e.g. during tests), skip the guard
+
     cfg = _SPECIES_TEXTURE[species_key]
     tex_path = _os.path.join(_TEXTURE_DIR, cfg["texture"])
     if not _os.path.isfile(tex_path):
@@ -1738,6 +1777,61 @@ def _apply_custom_texture(local_appearance, species_key, body=None):
             adsk.core.FloatProperty.cast(f0).value = cfg["reflectance"]
 
     return True
+
+
+def per_body_appearance(body, species_key):
+    """Get (or create) a per-body appearance for this specific body.
+
+    Copies from the Fusion material library base directly -- no shared
+    SP_<species> intermediate is created or modified. _apply_custom_texture
+    is only called on the per-body copy, so modifying scale/bitmap can
+    never affect another body.
+
+    Naming convention: SP_<species>_<body.name>
+
+    Args:
+        body: adsk.fusion.BRepBody
+        species_key: key into _SPECIES_TEXTURE (e.g. "teak b")
+
+    Returns:
+        The per-body appearance (adsk.core.Appearance), already assigned
+        to body.appearance and with the species texture applied.
+    """
+    app = adsk.core.Application.get()
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    cfg = _SPECIES_TEXTURE.get(species_key)
+    if not cfg:
+        raise ValueError(f"Unknown species: {species_key!r}")
+
+    local_name = f"SP_{species_key}_{body.name}"
+    local = design.appearances.itemByName(local_name)
+    if not local:
+        # Copy from library base directly -- skip shared SP_<species>
+        base_name = cfg.get("base", "Mahogany")
+        base_app = None
+        libs = app.materialLibraries
+        for li in range(libs.count):
+            lib = libs.item(li)
+            for ai in range(lib.appearances.count):
+                a = lib.appearances.item(ai)
+                if a.name == base_name and not a.name.startswith("3D "):
+                    if "appearance" in lib.name.lower():
+                        base_app = a
+                        break
+                    if base_app is None:
+                        base_app = a
+            if base_app and "appearance" in lib.name.lower():
+                break
+        if base_app is None:
+            raise RuntimeError(
+                f"Cannot create appearance for '{species_key}': "
+                f"base '{base_name}' not found in material libraries")
+        local = design.appearances.addByCopy(base_app, local_name)
+
+    # Apply species texture to the per-body copy only
+    _apply_custom_texture(local, species_key)
+    body.appearance = local
+    return local
 
 
 def _apply_endgrain_texture(local_appearance, species_key):

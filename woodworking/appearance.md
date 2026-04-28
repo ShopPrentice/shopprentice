@@ -459,3 +459,47 @@ Implementation: `helpers/spherical_diagnostic.apply_spherical_recipe(body, speci
 - `box_diagnostic.apply_box_grain_recipe(body, species, sp_module)` is the **deterministic seam-free recipe**: per-body appearance copy, computed period via `recommend_period_cm`, recentered translate. Use when the body's grain extent approaches or exceeds 50% of the species' natural period (e.g. aprons on `teak c`).
 
 Project scripts that want full seam control should call `apply_box_grain_recipe()` directly per body — that's how `teak_desk.py`'s `_apply_textures()` operates.
+
+## Per-body appearance safety
+
+**Rule: never modify a shared `SP_<species>` appearance after any body references it.**
+
+Shared appearances are mutable global state in Fusion — modifying one
+affects every body that references it. This caused accidental texture
+resets during the teak desk build: applying Cylindrical to the legs
+refreshed the shared `SP_teak b` appearance, which also reset the
+stretchers that were using the same shared appearance.
+
+### Enforcement
+
+1. **`sp.per_body_appearance(body, species_key)`** — the approved way to
+   get a modifiable appearance for a body. Creates `SP_<species>_<body.name>`
+   by copying from the Fusion material library base directly. No shared
+   `SP_<species>` is created or touched. The per-body copy is safe to
+   modify (scale, bitmap, reflectance) without affecting any other body.
+
+2. **Guard in `_apply_custom_texture`** — refuses to modify an appearance
+   referenced by more than one body. Raises `ValueError` with a message
+   pointing to `per_body_appearance()`.
+
+### Usage in recipe functions
+
+All three projection recipe functions use `per_body_appearance()`:
+
+```python
+# In apply_box_grain_recipe / apply_cylindrical_recipe / apply_spherical_recipe:
+local = sp_module.per_body_appearance(body, species_key)
+# Now safe to modify local's scale, bitmap, offsets:
+tex = local.connectedTexture...
+tex.properties.itemById("texture_RealWorldScaleY").value = ...
+```
+
+For Cylindrical projection (which needs a pre-rotated bitmap), call
+`per_body_appearance()` first (sets up the species texture), then
+override the bitmap path to the rotated version:
+
+```python
+local = sp_module.per_body_appearance(body, species_key)
+fp = ...get bitmap property...
+fp.value = "/tmp/teak_b_rot90.jpg"  # override to pre-rotated
+```

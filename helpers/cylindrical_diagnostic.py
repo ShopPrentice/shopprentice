@@ -239,17 +239,9 @@ def apply_cylindrical_recipe(body, species_key, sp_module,
     src_path = os.path.join(sp_module._TEXTURE_DIR, cfg["texture"])
     rotated_bitmap = make_axial_bitmap(src_path)
 
-    app = adsk.core.Application.get()
-    design = adsk.fusion.Design.cast(app.activeProduct)
-    src_app = design.appearances.itemByName("SP_%s" % species_key)
-    if src_app is None:
-        sp_module.apply_appearance(species_key)
-        src_app = design.appearances.itemByName("SP_%s" % species_key)
-    local_name = "SP_%s_%s" % (species_key, body.name)
-    local = design.appearances.itemByName(local_name)
-    if not local and src_app:
-        local = design.appearances.addByCopy(src_app, local_name)
-    body.appearance = local
+    # Per-body appearance via sp.per_body_appearance -- safe, never touches
+    # a shared SP_<species> appearance.
+    local = sp_module.per_body_appearance(body, species_key)
     cp = adsk.core.ColorProperty.cast(
         local.appearanceProperties.itemById("opaque_albedo"))
     if cp and cp.hasConnectedTexture:
