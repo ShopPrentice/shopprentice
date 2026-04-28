@@ -308,34 +308,46 @@ Implemented in `sp.fit_scale_y_cm(body, species, seam_buffer=0.05)` (period) plu
 
 **Curved revolved bodies (legs, dowels):** Box's *direction-transition* artifact is separate from the period seam — see "Box on curved bodies" below.
 
-### How this rule was derived (so we can re-establish it after Fusion changes)
+### How this rule was derived — and how to re-derive it
 
-Use the **red-marker method**:
+The methodology is codified in `helpers/box_diagnostic.py`. Don't iterate by hand if you can avoid it.
 
-1. Open a fresh empty document via `app.documents.add(...)`. Don't pollute the current design.
-2. Build several parametric test cuboids of representative sizes (e.g. `5×5×3, 30×30×3, 100×30×3, 200×30×3 cm`).
-3. Make a **marker bitmap** by adding bright stripes to the natural texture's image edges:
-   - **Red** (full-width strips at top/bottom rows) marks the **image-Y / period-along-grain** boundary
-   - **Green** (full-height strips at left/right columns) marks the **image-X / period-cross-grain** boundary
+**Modules and what they do:**
 
-   ```python
-   from PIL import Image, ImageDraw
-   src = Image.open("teak_b.jpg")
-   out = src.copy()
-   d = ImageDraw.Draw(out)
-   W, H = out.size
-   STRIPE = max(8, H // 80)
-   d.rectangle([0, 0, W, STRIPE], fill="red")             # image top edge
-   d.rectangle([0, H - STRIPE, W, H], fill="red")         # image bottom edge
-   d.rectangle([0, 0, STRIPE, H], fill="lime")            # image left edge
-   d.rectangle([W - STRIPE, 0, W, H], fill="lime")        # image right edge
-   out.save("/tmp/teak_b_marker.jpg", quality=92)
-   ```
+| Function | Purpose |
+|----------|---------|
+| `recommend_period_cm(body_grain, natural_grain, ppi, …)` | Pure-math: returns the recommended period and a label of which rule branch fired (sharp source / forced tile / compress with buffer / aesthetic floor). Use as the source of truth. |
+| `recenter_translate_grain_cm(bbox_min_grain, period, body_grain)` | Returns the grain-axis translate that places both period boundaries off-body. |
+| `analytical_seams(bbox_min, bbox_max, period, translate)` | Pure-math regression check. Lists period-boundary positions inside the body. Empty list = no seam *should* be visible. |
+| `make_marker_image(src_path, dst_path)` | Generates a copy of a wood texture with red stripes on image-Y edges and green stripes on image-X edges. Apply this bitmap to a body via `_apply_custom_texture` to make seam locations obvious in screenshots. |
+| `apply_box_grain_recipe(body, species, sp_module)` | High-level applier. Computes period via `recommend_period_cm`, sets a per-body appearance with that scale, builds the Box+grain TMC with the recentered translate, applies it. Returns a dict with the analytical state for logging. |
+| `calibrate_seam_buffer(body, species, sp_module, screenshot_fn, oracle_fn)` | Sweep procedure: tests an ascending list of buffer candidates, takes a screenshot at each (with the marker bitmap on the body), and asks an oracle (`oracle_fn(image, buffer) → bool`) whether seams are visible. Returns the smallest seam-free buffer. Use to re-derive the baseline after a Fusion update. |
 
-4. For each test body: apply Box+grain TMC, point the appearance bitmap at the marker file, sweep the parameter you want to test (period multiplier, translate strategy, etc).
-5. After each sweep step: `mcp__fusion360__get_screenshot(view="current")`, then `Read` the resulting PNG. Look for visible **red lines** (period-along-grain seam on body) and **green lines** (period-cross-grain seam on body).
-6. The smallest setting that produces zero red/green lines on body, across all test sizes, is your deterministic baseline.
-7. Once converged, restore natural bitmaps and verify the body still reads correctly.
+**Re-deriving the baseline after a Fusion change**
+
+If a Fusion update or a new species or a new body shape introduces visible seams that the analytical rule says should not exist, run `calibrate_seam_buffer()` against a scratch document with representative test cuboids:
+
+```python
+from helpers import sp, box_diagnostic as bd
+
+# scratch doc with parametric bodies of representative sizes already built
+results = bd.calibrate_seam_buffer(
+    body=test_body,
+    species_key="teak b",
+    sp_module=sp,
+    buffer_candidates=(0.005, 0.01, 0.025, 0.05, 0.10, 0.20),
+    screenshot_fn=lambda: mcp_get_screenshot("current"),  # returns image path
+    oracle_fn=lambda path, buf: agent_check_for_red_lines(path),
+)
+print("Min seam-free buffer:", results["min_seam_free_buffer"])
+```
+
+`oracle_fn` is the only step that requires a visual-classification step — supply either a multimodal-LLM call that reads the screenshot, or a hand-rolled image analysis. The rest is deterministic.
+
+The marker convention for `oracle_fn` to look for:
+- **Red horizontal lines on the body** = period-along-grain boundary on body (= seam, increase buffer).
+- **Green vertical lines on the body** = period-cross-grain boundary on body (= cross-grain too small, use natural).
+- **Vertical band with no marker correlation** = Box-direction transition on a curved surface. Buffer cannot fix; rotate TMC instead (see "Box on curved bodies" below).
 
 ### Box on curved revolved bodies (legs, turned posts)
 

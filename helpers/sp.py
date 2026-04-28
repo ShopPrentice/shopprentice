@@ -1638,33 +1638,20 @@ def fit_scale_y_cm(body, species_key,
                     ppi_threshold_per_cm=20.0, seam_buffer=0.05):
     """Per-body compress-fit rule for the grain-direction (scale_y) period.
 
-    For LOW-RESOLUTION species only (px_per_cm < threshold). When the body's
-    grain extent is shorter than the image natural size, condense the image
-    so one period plus a small buffer covers the body — but not past 50% of
-    the natural size (avoid over-condensing). Never stretches: if the body
-    is BIGGER than the natural image, the natural period is returned
-    unchanged (caller accepts the resulting tile/stitch).
-
-    The seam_buffer (default +10%) makes the returned period slightly
-    larger than the body's grain extent so that — when the body's TMC
-    translate along the grain axis is also recentered (caller's job) — the
-    period boundary (visible "seam" between two image instances) falls just
-    off the body instead of right at a tip.
+    Thin wrapper that reads body bbox + species cfg and delegates to
+    `box_diagnostic.recommend_period_cm()` for the actual rule. Kept
+    here for backwards compatibility; the rule itself lives in the
+    diagnostic module so it can be exercised + recalibrated separately.
 
     Args:
         body: Fusion BRepBody — bbox is read for grain extent.
         species_key: key into _SPECIES_TEXTURE (must have px_h field).
         ppi_threshold_per_cm: pixel-per-cm density above which the image
-            is considered sharp enough at natural size; the rule is a no-op.
-            Default 20 px/cm (~50 dpi).
-        seam_buffer: extra fraction added to body length when compressing
-            (period = body × (1 + seam_buffer), capped at 50% natural).
-            Default 5% — empirically the minimum margin reliably seam-free
-            across body sizes 5–100 cm with low-res veneer photos. The 50%
-            natural floor remains an aesthetic limit (texture not too
-            compressed); it is NOT needed for seam avoidance. See
-            "Box projection deterministic recipe" in
-            woodworking/appearance.md for how this was derived.
+            is considered sharp enough at natural size. Default 20 px/cm.
+        seam_buffer: extra fraction added to body length when compressing.
+            Default 5% — empirically smallest reliably seam-free margin
+            across body sizes 5–100 cm. See box_diagnostic.calibrate_seam_buffer
+            to re-derive after Fusion updates.
 
     Returns:
         Recommended scale_y in cm (or natural cm if rule doesn't apply).
@@ -1673,20 +1660,21 @@ def fit_scale_y_cm(body, species_key,
     if not cfg:
         return None
     natural_cm = _natural_size_cm(cfg, "y")
-    px_h = cfg.get("px_h")
-    if not px_h or natural_cm <= 0:
+    px_h = cfg.get("px_h") or 0
+    if natural_cm <= 0:
         return natural_cm
-    px_per_cm = px_h / natural_cm
-    if px_per_cm >= ppi_threshold_per_cm:
-        return natural_cm   # source image is sharp enough at natural size
     bb = body.boundingBox
     body_grain_cm = max(bb.maxPoint.x - bb.minPoint.x,
                          bb.maxPoint.y - bb.minPoint.y,
                          bb.maxPoint.z - bb.minPoint.z)
-    if body_grain_cm >= natural_cm:
-        return natural_cm   # body bigger than natural — never stretches
-    target = body_grain_cm * (1.0 + seam_buffer)
-    return max(target, 0.5 * natural_cm)
+    ppi = (px_h / natural_cm) if natural_cm > 0 else 0
+    # Lazy import to avoid load-time cycle.
+    from helpers import box_diagnostic
+    period_cm, _rule = box_diagnostic.recommend_period_cm(
+        body_grain_cm, natural_cm, ppi,
+        ppi_threshold=ppi_threshold_per_cm,
+        seam_buffer=seam_buffer)
+    return period_cm
 
 
 def _apply_custom_texture(local_appearance, species_key, body=None):
