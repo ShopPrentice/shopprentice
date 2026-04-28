@@ -334,26 +334,34 @@ def calibrate_circ_multiplier(body, species_key, sp_module,
                      "%s_cyl90_marker.jpg" % species_key.replace(' ', '_')),
         marker=True)
     results = {"min_seam_free_n": None, "screenshots": {},
-               "analytical_results": {}}
+               "analytical_results": {}, "scratch_appearances": []}
     orig_appearance = body.appearance
-    for N in n_candidates:
-        applied = apply_cylindrical_recipe(body, species_key, sp_module,
-                                            circ_multiplier=N)
-        cp = adsk.core.ColorProperty.cast(
-            body.appearance.appearanceProperties.itemById("opaque_albedo"))
-        if cp and cp.hasConnectedTexture:
-            tex = cp.connectedTexture
-            bp = tex.properties.itemById("unifiedbitmap_Bitmap")
-            fp = adsk.core.FilenameProperty.cast(bp)
-            if fp and not fp.isReadOnly:
-                fp.value = marker_rot
-        results["analytical_results"][N] = applied
-        if screenshot_fn is not None:
-            shot = screenshot_fn()
-            results["screenshots"][N] = shot
-            if oracle_fn is not None and oracle_fn(shot, N):
-                results["min_seam_free_n"] = N
-                break
+    scratch_state = []   # list of (appearance, original_bitmap_path)
+    try:
+        for N in n_candidates:
+            applied = apply_cylindrical_recipe(body, species_key, sp_module,
+                                                circ_multiplier=N)
+            results["analytical_results"][N] = applied
+            ap = body.appearance
+            cp = adsk.core.ColorProperty.cast(
+                ap.appearanceProperties.itemById("opaque_albedo"))
+            orig_bitmap = None
+            if cp and cp.hasConnectedTexture:
+                tex = cp.connectedTexture
+                bp = tex.properties.itemById("unifiedbitmap_Bitmap")
+                fp = adsk.core.FilenameProperty.cast(bp)
+                if fp and not fp.isReadOnly:
+                    orig_bitmap = fp.value
+                    fp.value = marker_rot
+            if not any(s[0] is ap for s in scratch_state):
+                scratch_state.append((ap, orig_bitmap))
+                results["scratch_appearances"].append(ap.name)
+            if screenshot_fn is not None:
+                shot = screenshot_fn()
+                results["screenshots"][N] = shot
+                if oracle_fn is not None and oracle_fn(shot, N):
+                    results["min_seam_free_n"] = N
+                    break
     finally:
         for ap, orig_bmp in scratch_state:
             if orig_bmp:
