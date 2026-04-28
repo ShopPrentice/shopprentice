@@ -171,8 +171,14 @@ def apply_box_grain_recipe(body, species_key, sp_module,
     if not cfg:
         raise ValueError(f"Unknown species: {species_key}")
     natural_grain_cm = sp_module._natural_size_cm(cfg, "y")
-    px_h = cfg.get("px_h") or 0
-    ppi = (px_h / natural_grain_cm) if natural_grain_cm > 0 else 0
+    px_h = cfg.get("px_h")
+    # Species without px_h metadata (brazilian rosewood, cocobolo, ziricote,
+    # spalted maple) are treated as natural-scale — no compression. Mirrors
+    # the fallback in sp.fit_scale_y_cm().
+    if not px_h or natural_grain_cm <= 0:
+        ppi = float("inf")   # above any threshold → natural-scale branch
+    else:
+        ppi = px_h / natural_grain_cm
     bb = body.boundingBox
     grain_vec = sp_module._grain_vector(body)
     comps = [abs(grain_vec.x), abs(grain_vec.y), abs(grain_vec.z)]
