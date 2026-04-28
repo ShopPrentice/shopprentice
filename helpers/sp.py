@@ -1620,6 +1620,47 @@ _TEXTURE_DIR = _os.path.join(
 _CM_TO_TEX_IN = 1.0 / 2.54
 
 
+def _jpeg_dimensions(path):
+    """Read pixel dimensions from a JPEG file header (no PIL dependency).
+    Returns (width, height) or (None, None) if unreadable."""
+    import struct as _struct
+    try:
+        with open(path, "rb") as f:
+            f.read(2)  # SOI marker
+            while True:
+                marker = f.read(2)
+                if len(marker) < 2:
+                    return None, None
+                if marker[0] != 0xFF:
+                    return None, None
+                if marker[1] in (0xC0, 0xC1, 0xC2):  # SOF markers
+                    f.read(3)  # length + precision
+                    h = _struct.unpack(">H", f.read(2))[0]
+                    w = _struct.unpack(">H", f.read(2))[0]
+                    return w, h
+                else:
+                    length = _struct.unpack(">H", f.read(2))[0]
+                    f.read(length - 2)
+    except Exception:
+        return None, None
+
+
+def _get_px_dims(cfg):
+    """Return (px_w, px_h) for a species config. Uses cfg["px_w"]/["px_h"]
+    if present, otherwise auto-detects from the JPEG file on disk. This
+    means new species only need a texture file — no manual pixel entries."""
+    px_w = cfg.get("px_w")
+    px_h = cfg.get("px_h")
+    if px_w and px_h:
+        return px_w, px_h
+    tex_path = _os.path.join(_TEXTURE_DIR, cfg.get("texture", ""))
+    if _os.path.isfile(tex_path):
+        w, h = _jpeg_dimensions(tex_path)
+        if w and h:
+            return w, h
+    return None, None
+
+
 def _natural_size_cm(cfg, axis, eg=False):
     """Return cfg["scale_<axis>"] (or eg_scale_<axis>) converted to cm
     based on cfg["natural_unit"] (or eg_natural_unit). Default unit cm."""
@@ -1662,12 +1703,9 @@ def fit_scale_y_cm(body, species_key,
     natural_cm = _natural_size_cm(cfg, "y")
     if natural_cm <= 0:
         return natural_cm
-    px_h = cfg.get("px_h")
-    # If the species doesn't carry pixel metadata (older custom textures
-    # like brazilian_rosewood / cocobolo / ziricote / spalted_maple), we
-    # have no way to compute pixel density; treat the source as already
-    # natural-scale and skip the compression branch. Returning the natural
-    # period is the safe no-op behavior.
+    _, px_h = _get_px_dims(cfg)
+    # If pixel dimensions can't be determined (no px_h in config AND JPEG
+    # file unreadable), treat as natural-scale — safe no-op.
     if not px_h:
         return natural_cm
     bb = body.boundingBox
