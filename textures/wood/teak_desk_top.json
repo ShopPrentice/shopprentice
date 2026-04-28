@@ -5,16 +5,16 @@
     "height": 1080
   },
   "image_size_px": {
-    "width": 1434,
-    "height": 3264
+    "width": 2868,
+    "height": 6528
   },
   "core_image_px": {
-    "width": 1410,
-    "height": 3240
+    "width": 2820,
+    "height": 6480
   },
-  "edge_padding_px": 12,
-  "px_per_mm": 3,
-  "dpi": 76.2,
+  "edge_padding_px": 24,
+  "px_per_mm": 6.0,
+  "dpi": 152.4,
   "fusion_scale_in": {
     "x": 18.5039,
     "y": 42.5196
@@ -27,5 +27,13 @@
     "x_in": 0.1575,
     "y_in": 0.1575
   },
-  "note": "Apply scale & offset above; with reflect-padding, any near-boundary UV sample lands on real wood color, never on black."
+  "note": "Apply scale & offset above; with reflect-padding, any near-boundary UV sample lands on real wood color, never on black.",
+  "output_image": "textures/wood/teak_desk_top.jpg",
+  "upscale": {
+    "method": "2x Lanczos/unsharp + native Real-ESRGAN x2 blend",
+    "realesrgan_model": "realesr-animevideov3",
+    "scale": 2,
+    "realesrgan_weight": 0.6,
+    "generic_lanczos_weight": 0.4
+  }
 }
