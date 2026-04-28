@@ -1635,7 +1635,7 @@ def _natural_size_cm(cfg, axis, eg=False):
 
 
 def fit_scale_y_cm(body, species_key,
-                    ppi_threshold_per_cm=20.0, seam_buffer=0.50):
+                    ppi_threshold_per_cm=20.0, seam_buffer=0.05):
     """Per-body compress-fit rule for the grain-direction (scale_y) period.
 
     For LOW-RESOLUTION species only (px_per_cm < threshold). When the body's
@@ -1659,9 +1659,12 @@ def fit_scale_y_cm(body, species_key,
             Default 20 px/cm (~50 dpi).
         seam_buffer: extra fraction added to body length when compressing
             (period = body × (1 + seam_buffer), capped at 50% natural).
-            Default 50% — chosen empirically because legs and stretchers
-            need substantial off-body margin or the period boundary creeps
-            back onto the body via floating-point drift in the TMC.
+            Default 5% — empirically the minimum margin reliably seam-free
+            across body sizes 5–100 cm with low-res veneer photos. The 50%
+            natural floor remains an aesthetic limit (texture not too
+            compressed); it is NOT needed for seam avoidance. See
+            "Box projection deterministic recipe" in
+            woodworking/appearance.md for how this was derived.
 
     Returns:
         Recommended scale_y in cm (or natural cm if rule doesn't apply).

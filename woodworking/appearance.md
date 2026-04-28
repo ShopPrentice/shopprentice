@@ -286,3 +286,83 @@ top_face.appearance = photo_app
 The body shows the tile veneer everywhere except the top face, which shows the photo at 1:1. Both share the body's Box TMC, which is what enables the mixed appearance.
 
 **Why both offsets matter (and why slats only need the TMC translate):** A tiled veneer has period much smaller than the body. The slat veneers wrap many times along their length, and any sub-period offset just shifts where the (visually identical) repeat lands — not perceptible. The desk-top photo has period == body extent. Any offset modulo period shows up as a hard, visible seam, and any sub-pixel mismatch shows up as a fractional shift of unique photo features. Empirically: setting only the body TMC translate left a stale `RealWorldOffset = -1 period` on the appearance from earlier sessions; modulo a period that is mathematically zero, but Fusion's float arithmetic put the seam ~0.27 mm inside the body. Forcing `RealWorldOffsetX/Y = bbox.minPoint × CM_TO_IN` aligns the photo content edges exactly to the body bbox edges, with no seam visible on any face.
+
+## Box projection deterministic recipe
+
+For tile-repeating veneer photos (low-resolution wood scans where `px/cm` is below the threshold for natural rendering), the goal is no visible "seam" — the line where one image period ends and the next begins — on any visible face of the body.
+
+### The rule (validated)
+
+For a flat body where the natural image size along the grain (`natural_y_cm`) is **>= the body's grain-axis extent**:
+
+```
+period_along_grain = body_grain_cm × (1 + seam_buffer)  # 5% buffer is sufficient
+period_cross_grain = natural_x_cm                        # leave at natural
+translate_grain    = bbox_min_grain - (period_along_grain - body_grain_cm) / 2
+translate_other    = bbox_min for those axes              # cross-grain at bbox-min
+```
+
+Implemented in `sp.fit_scale_y_cm(body, species, seam_buffer=0.05)` (period) plus the per-body recenter step in `_apply_textures()` (translate). With `seam_buffer = 0.05`, the period boundary lands ~2.5% of body length off-body on each side — small enough that float-precision drift does not push it back onto the body.
+
+**Edge case — `body_grain >= natural`:** the texture must tile (cannot avoid a period boundary on the body). Either use a seamless texture or apply the photo to a single face via face-level appearance.
+
+**Curved revolved bodies (legs, dowels):** Box's *direction-transition* artifact is separate from the period seam — see "Box on curved bodies" below.
+
+### How this rule was derived (so we can re-establish it after Fusion changes)
+
+Use the **red-marker method**:
+
+1. Open a fresh empty document via `app.documents.add(...)`. Don't pollute the current design.
+2. Build several parametric test cuboids of representative sizes (e.g. `5×5×3, 30×30×3, 100×30×3, 200×30×3 cm`).
+3. Make a **marker bitmap** by adding bright stripes to the natural texture's image edges:
+   - **Red** (full-width strips at top/bottom rows) marks the **image-Y / period-along-grain** boundary
+   - **Green** (full-height strips at left/right columns) marks the **image-X / period-cross-grain** boundary
+
+   ```python
+   from PIL import Image, ImageDraw
+   src = Image.open("teak_b.jpg")
+   out = src.copy()
+   d = ImageDraw.Draw(out)
+   W, H = out.size
+   STRIPE = max(8, H // 80)
+   d.rectangle([0, 0, W, STRIPE], fill="red")             # image top edge
+   d.rectangle([0, H - STRIPE, W, H], fill="red")         # image bottom edge
+   d.rectangle([0, 0, STRIPE, H], fill="lime")            # image left edge
+   d.rectangle([W - STRIPE, 0, W, H], fill="lime")        # image right edge
+   out.save("/tmp/teak_b_marker.jpg", quality=92)
+   ```
+
+4. For each test body: apply Box+grain TMC, point the appearance bitmap at the marker file, sweep the parameter you want to test (period multiplier, translate strategy, etc).
+5. After each sweep step: `mcp__fusion360__get_screenshot(view="current")`, then `Read` the resulting PNG. Look for visible **red lines** (period-along-grain seam on body) and **green lines** (period-cross-grain seam on body).
+6. The smallest setting that produces zero red/green lines on body, across all test sizes, is your deterministic baseline.
+7. Once converged, restore natural bitmaps and verify the body still reads correctly.
+
+### Box on curved revolved bodies (legs, turned posts)
+
+Box-projection direction transitions on a curved cylindrical surface produce visible vertical bands where one box-side projection ends and the next begins. The period seam rule above does **not** fix these.
+
+**Recipe:** use Box+grain with the TMC rotated **45° around the body's grain axis**, scaled `body_grain × 3` along grain and `max_cross × 5` cross-grain. The 45° rotation moves the box-side direction transitions onto the diagonals of the body, where Fusion's shading on the curved surface visually masks them. Empirically validated on 70 cm tall lathe-turned legs.
+
+```python
+m = adsk.core.Matrix3D.create()
+m.setToRotation(math.pi / 4.0,
+                adsk.core.Vector3D.create(0, 0, 1),  # grain axis (Z for legs)
+                adsk.core.Point3D.create(cx, cy, 0))  # body's center on the cross-grain plane
+m.setCell(2, 3, bbox_min_grain - (period_grain - body_grain) / 2.0)
+ptmc.projectedTextureMapType = adsk.core.ProjectedTextureMapTypes.BoxTextureMapProjection
+ptmc.transform = m
+```
+
+If you discover (via the red-marker method) that the band shifts visibly off the curved diagonal — for example because Fusion changed how Box-projection direction transitions are computed — sweep the rotation angle (try 0, π/8, π/4, π/3, π/2) and pick the angle that puts the band on the most-curved part of the surface.
+
+### When to use Box vs Cylindrical vs Spherical
+
+In our experience Box+grain works for nearly every body shape (flat panels, lathe-turned posts, square stretchers). Cylindrical and Spherical we tested but reverted:
+
+| Projection | When useful | Why we don't default to it |
+|------------|------------|---------------------------|
+| Box+grain (with 45° rotation for curved revolved bodies) | Default for everything | Works reliably; deterministic rule above |
+| Cylindrical along axis | Round bars where grain MUST run perfectly along the axis | Requires `texture_WAngle = π/2` to swap Fusion's image axes; visually similar to Box+45° on most bars; one more knob to remember |
+| Spherical | None we found that beat Box+45° | Looked worse on legs (compressed pole regions) |
+
+If you find a future case where Box doesn't work, use the red-marker method to verify whether it's a period seam (fixable with buffer/translate) or a direction transition (needs rotation or alternative projection).
