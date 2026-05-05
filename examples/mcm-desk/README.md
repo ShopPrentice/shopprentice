@@ -1,5 +1,7 @@
 # MCM Teak Desk
 
+![Rendered model](assets/rendered_model.png)
+
 Parametric recreation of a real mid-century modern teak writing desk, built from photographs of the actual piece. This example demonstrates applying **real wood photography** — not generic procedural textures — to a complex parametric model in Fusion 360.
 
 ![Reference photo](assets/reference_photo.jpg)
