@@ -1620,6 +1620,47 @@ _TEXTURE_DIR = _os.path.join(
 _CM_TO_TEX_IN = 1.0 / 2.54
 
 
+def _jpeg_dimensions(path):
+    """Read pixel dimensions from a JPEG file header (no PIL dependency).
+    Returns (width, height) or (None, None) if unreadable."""
+    import struct as _struct
+    try:
+        with open(path, "rb") as f:
+            f.read(2)  # SOI marker
+            while True:
+                marker = f.read(2)
+                if len(marker) < 2:
+                    return None, None
+                if marker[0] != 0xFF:
+                    return None, None
+                if marker[1] in (0xC0, 0xC1, 0xC2):  # SOF markers
+                    f.read(3)  # length + precision
+                    h = _struct.unpack(">H", f.read(2))[0]
+                    w = _struct.unpack(">H", f.read(2))[0]
+                    return w, h
+                else:
+                    length = _struct.unpack(">H", f.read(2))[0]
+                    f.read(length - 2)
+    except Exception:
+        return None, None
+
+
+def _get_px_dims(cfg):
+    """Return (px_w, px_h) for a species config. Uses cfg["px_w"]/["px_h"]
+    if present, otherwise auto-detects from the JPEG file on disk. This
+    means new species only need a texture file — no manual pixel entries."""
+    px_w = cfg.get("px_w")
+    px_h = cfg.get("px_h")
+    if px_w and px_h:
+        return px_w, px_h
+    tex_path = _os.path.join(_TEXTURE_DIR, cfg.get("texture", ""))
+    if _os.path.isfile(tex_path):
+        w, h = _jpeg_dimensions(tex_path)
+        if w and h:
+            return w, h
+    return None, None
+
+
 def _natural_size_cm(cfg, axis, eg=False):
     """Return cfg["scale_<axis>"] (or eg_scale_<axis>) converted to cm
     based on cfg["natural_unit"] (or eg_natural_unit). Default unit cm."""
@@ -1635,33 +1676,23 @@ def _natural_size_cm(cfg, axis, eg=False):
 
 
 def fit_scale_y_cm(body, species_key,
-                    ppi_threshold_per_cm=20.0, seam_buffer=0.50):
+                    ppi_threshold_per_cm=20.0, seam_buffer=0.05):
     """Per-body compress-fit rule for the grain-direction (scale_y) period.
 
-    For LOW-RESOLUTION species only (px_per_cm < threshold). When the body's
-    grain extent is shorter than the image natural size, condense the image
-    so one period plus a small buffer covers the body — but not past 50% of
-    the natural size (avoid over-condensing). Never stretches: if the body
-    is BIGGER than the natural image, the natural period is returned
-    unchanged (caller accepts the resulting tile/stitch).
-
-    The seam_buffer (default +10%) makes the returned period slightly
-    larger than the body's grain extent so that — when the body's TMC
-    translate along the grain axis is also recentered (caller's job) — the
-    period boundary (visible "seam" between two image instances) falls just
-    off the body instead of right at a tip.
+    Thin wrapper that reads body bbox + species cfg and delegates to
+    `box_diagnostic.recommend_period_cm()` for the actual rule. Kept
+    here for backwards compatibility; the rule itself lives in the
+    diagnostic module so it can be exercised + recalibrated separately.
 
     Args:
         body: Fusion BRepBody — bbox is read for grain extent.
         species_key: key into _SPECIES_TEXTURE (must have px_h field).
         ppi_threshold_per_cm: pixel-per-cm density above which the image
-            is considered sharp enough at natural size; the rule is a no-op.
-            Default 20 px/cm (~50 dpi).
-        seam_buffer: extra fraction added to body length when compressing
-            (period = body × (1 + seam_buffer), capped at 50% natural).
-            Default 50% — chosen empirically because legs and stretchers
-            need substantial off-body margin or the period boundary creeps
-            back onto the body via floating-point drift in the TMC.
+            is considered sharp enough at natural size. Default 20 px/cm.
+        seam_buffer: extra fraction added to body length when compressing.
+            Default 5% — empirically smallest reliably seam-free margin
+            across body sizes 5–100 cm. See box_diagnostic.calibrate_seam_buffer
+            to re-derive after Fusion updates.
 
     Returns:
         Recommended scale_y in cm (or natural cm if rule doesn't apply).
@@ -1670,23 +1701,28 @@ def fit_scale_y_cm(body, species_key,
     if not cfg:
         return None
     natural_cm = _natural_size_cm(cfg, "y")
-    px_h = cfg.get("px_h")
-    if not px_h or natural_cm <= 0:
+    if natural_cm <= 0:
         return natural_cm
-    px_per_cm = px_h / natural_cm
-    if px_per_cm >= ppi_threshold_per_cm:
-        return natural_cm   # source image is sharp enough at natural size
+    _, px_h = _get_px_dims(cfg)
+    # If pixel dimensions can't be determined (no px_h in config AND JPEG
+    # file unreadable), treat as natural-scale — safe no-op.
+    if not px_h:
+        return natural_cm
     bb = body.boundingBox
     body_grain_cm = max(bb.maxPoint.x - bb.minPoint.x,
                          bb.maxPoint.y - bb.minPoint.y,
                          bb.maxPoint.z - bb.minPoint.z)
-    if body_grain_cm >= natural_cm:
-        return natural_cm   # body bigger than natural — never stretches
-    target = body_grain_cm * (1.0 + seam_buffer)
-    return max(target, 0.5 * natural_cm)
+    ppi = px_h / natural_cm
+    # Lazy import to avoid load-time cycle.
+    from helpers import box_diagnostic
+    period_cm, _rule = box_diagnostic.recommend_period_cm(
+        body_grain_cm, natural_cm, ppi,
+        ppi_threshold=ppi_threshold_per_cm,
+        seam_buffer=seam_buffer)
+    return period_cm
 
 
-def _apply_custom_texture(local_appearance, species_key, body=None):
+def _apply_custom_texture(local_appearance, species_key, body=None, _force=False):
     """Swap texture bitmap and tune properties for a custom species.
 
     Args:
@@ -1698,7 +1734,51 @@ def _apply_custom_texture(local_appearance, species_key, body=None):
 
     Returns:
         True if texture was applied, False if texture file not found.
+
+    Safety: refuses to modify an appearance that is currently assigned to
+    more than one body in the active design. This prevents accidental
+    cross-body texture resets when a shared SP_<species> appearance is
+    modified. Use sp.per_body_appearance(body, species) to get a safe
+    per-body copy instead.
     """
+    # Guard: refuse to modify if multiple bodies reference this appearance.
+    # _force=True bypasses — used by sp.apply_appearance() which intentionally
+    # refreshes shared species appearances in the bulk assignment flow.
+    if _force:
+        pass  # skip guard
+    else:
+      try:
+        _guard_app = adsk.core.Application.get()
+        _guard_design = adsk.fusion.Design.cast(_guard_app.activeProduct)
+        if _guard_design:
+            ref_count = 0
+            def _count_refs(comp):
+                nonlocal ref_count
+                for i in range(comp.bRepBodies.count):
+                    b = comp.bRepBodies.item(i)
+                    try:
+                        if b.appearance and b.appearance.name == local_appearance.name:
+                            ref_count += 1
+                            if ref_count > 1:
+                                return  # early exit
+                    except Exception:
+                        pass
+                for i in range(comp.occurrences.count):
+                    _count_refs(comp.occurrences.item(i).component)
+                    if ref_count > 1:
+                        return
+            _count_refs(_guard_design.rootComponent)
+            if ref_count > 1:
+                raise ValueError(
+                    f"Refusing to modify '{local_appearance.name}' — "
+                    f"it is referenced by {ref_count} bodies. "
+                    f"Use sp.per_body_appearance(body, species_key) to get "
+                    f"a safe per-body copy first.")
+      except ValueError:
+          raise  # re-raise the guard error
+      except Exception:
+          pass  # if design isn't available (e.g. during tests), skip the guard
+
     cfg = _SPECIES_TEXTURE[species_key]
     tex_path = _os.path.join(_TEXTURE_DIR, cfg["texture"])
     if not _os.path.isfile(tex_path):
@@ -1740,6 +1820,64 @@ def _apply_custom_texture(local_appearance, species_key, body=None):
             adsk.core.FloatProperty.cast(f0).value = cfg["reflectance"]
 
     return True
+
+
+def per_body_appearance(body, species_key):
+    """Get (or create) a per-body appearance for this specific body.
+
+    Copies from the Fusion material library base directly -- no shared
+    SP_<species> intermediate is created or modified. _apply_custom_texture
+    is only called on the per-body copy, so modifying scale/bitmap can
+    never affect another body.
+
+    Naming convention: SP_<species>_<body.name>
+
+    Args:
+        body: adsk.fusion.BRepBody
+        species_key: key into _SPECIES_TEXTURE (e.g. "teak b")
+
+    Returns:
+        The per-body appearance (adsk.core.Appearance), already assigned
+        to body.appearance and with the species texture applied.
+    """
+    app = adsk.core.Application.get()
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    cfg = _SPECIES_TEXTURE.get(species_key)
+    if not cfg:
+        raise ValueError(f"Unknown species: {species_key!r}")
+
+    # Include component name to avoid collisions when bodies in different
+    # components share the same name (e.g. "Body1" in legs vs stretcher).
+    comp_name = body.parentComponent.name if body.parentComponent else "root"
+    local_name = f"SP_{species_key}_{comp_name}_{body.name}"
+    local = design.appearances.itemByName(local_name)
+    if not local:
+        # Copy from library base directly -- skip shared SP_<species>
+        base_name = cfg.get("base", "Mahogany")
+        base_app = None
+        libs = app.materialLibraries
+        for li in range(libs.count):
+            lib = libs.item(li)
+            for ai in range(lib.appearances.count):
+                a = lib.appearances.item(ai)
+                if a.name == base_name and not a.name.startswith("3D "):
+                    if "appearance" in lib.name.lower():
+                        base_app = a
+                        break
+                    if base_app is None:
+                        base_app = a
+            if base_app and "appearance" in lib.name.lower():
+                break
+        if base_app is None:
+            raise RuntimeError(
+                f"Cannot create appearance for '{species_key}': "
+                f"base '{base_name}' not found in material libraries")
+        local = design.appearances.addByCopy(base_app, local_name)
+
+    # Apply species texture to the per-body copy only
+    _apply_custom_texture(local, species_key)
+    body.appearance = local
+    return local
 
 
 def _apply_endgrain_texture(local_appearance, species_key):
@@ -1939,7 +2077,7 @@ def apply_appearance(species="white oak", bodies=None):
                 return
             local = design.appearances.addByCopy(base_app, local_name)
         # Always re-apply texture (picks up file changes on disk)
-        if not _apply_custom_texture(local, species_lower):
+        if not _apply_custom_texture(local, species_lower, _force=True):
             print(f"WARNING: Texture file not found for '{species}' "
                   f"— using base {base_name}. "
                   f"Place {cfg['texture']} in textures/wood/")
