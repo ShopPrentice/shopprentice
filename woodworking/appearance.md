@@ -219,6 +219,47 @@ def box_grain_at_bbox_min(body):
 
 This recipe is validated on the teak desk slats, top, legs, aprons, and round side stretchers — no visible seams, grain runs along each body's long axis, and a 47×108 cm photo lands exactly once on the 47×108 cm top face.
 
+### Thin veneer / ear bodies for projection isolation
+
+Fusion gives each body one `textureMapControl`. Face appearance overrides can
+change the bitmap/appearance on a face, but they do **not** give that face an
+independent projection transform. When one physical body needs incompatible
+projection modes on adjacent surfaces, split the visual surface into a separate
+thin body and apply the special appearance only to that body.
+
+Use this when:
+
+- A flat face needs Box projection for a 1:1 photo, but a neighboring fillet or
+  edge needs Cylindrical projection to wrap smoothly.
+- Face-level appearance overrides smear, stretch, or share the wrong body TMC.
+- Box, Planar, and Cylindrical cannot all be made correct on one body because
+  the body-level TMC is the limiting factor.
+
+Desk-top "ear" pattern:
+
+1. Keep the main desk-top body as the structural body. Use Box projection for
+   the flat faces and photo/top mapping.
+2. Select/copy the long-edge fillet faces that need smooth wrapped grain.
+3. Thicken those faces outward by a tiny amount, e.g. `0.001 cm` (0.01 mm), as
+   NewBody. Name them clearly, e.g. `ear_R`, `ear_L`.
+4. Assign each ear its own copied appearance object. Do not reuse one appearance
+   if you need to A/B test scale or offsets independently.
+5. Apply Cylindrical projection on the ear body only, with the cylinder axis
+   matching the fillet centerline.
+6. Hide or ignore the main body's underlying fillet appearance where the ear
+   covers it. The ear is a visual veneer, not a structural part.
+
+Rules:
+
+- The veneer body should sit just outside the real surface so it avoids z-fight
+  flicker. `0.01 mm` is usually enough.
+- Keep veneer bodies named and grouped with their source body so future agents
+  do not treat them as real joinery or stock.
+- Do not use the veneer body for interference, mass, or cut-list reasoning.
+- Prefer independent appearances per veneer body while debugging; Fusion may
+  report copied appearances with the same internal `Prism-*` id, so use
+  appearance names and `usedBy` to confirm independence.
+
 ### Gotcha 3: Repeat off + a body smaller than one period → black borders
 
 Setting `texture_URepeat = False` and `texture_VRepeat = False` clamps UVs outside `[0,1]` — anything past the texture edge becomes black. Combine this with the Gotcha-1 cm-vs-inch bug and you end up seeing the top face with the texture stretched (because it covered only ~39% of one period) plus mirrored/black borders where the body extended beyond the period.
@@ -414,6 +455,50 @@ offset_circ  = circumference / 2          # rotate the one seam to back
 ```
 
 **Recommendation: prefer Box+45° for curved revolved bodies.** Box+45° hides the projection direction-transition in the curvature shading, uses the natural bitmap unrotated, and avoids the one inevitable azimuthal seam where the photo's image-Y top and bottom rows meet on the cylinder. Cylindrical is included for completeness and for cases where the user specifically wants the texture to wrap exactly once around a perfect cylinder.
+
+### Cylindrical seam debugging with a baked bitmap marker
+
+When a cylindrical seam is still visible after the analytical offset looks
+right, do **not** draw Fusion overlay geometry as the seam marker. Overlay
+lines only mark where you think the seam is. Instead, bake a high-contrast
+stripe into the bitmap edge that participates in the repeat seam, apply that
+diagnostic bitmap, and use screenshots to see where Fusion actually projects
+the image boundary.
+
+Workflow:
+
+1. Identify which image axis maps to the physical direction you are debugging.
+   For Cylindrical, image-X / `texture_RealWorldScaleX` maps along the
+   cylinder axis, and image-Y / `texture_RealWorldScaleY` maps around the
+   circumference. If the bitmap was pre-rotated 90° to make grain axial, the
+   model's physical length direction may be controlled by
+   `texture_RealWorldOffsetX`, not `texture_RealWorldOffsetY`.
+2. Make a diagnostic copy of the bitmap with a thick red stripe on the relevant
+   image boundary. Mark both ends when debugging the repeat join; mark one end
+   when you need to track a single image edge.
+3. Apply the diagnostic bitmap to the same appearance. Do not change scale,
+   projection type, TMC axis, body geometry, or appearance assignment.
+4. Sweep only the offset property for that image axis. Take the same screenshot
+   view after each offset.
+5. Use visual inspection or a simple pixel scan for red pixels to pick the
+   offset where the red stripe leaves the visible body span or lands exactly on
+   the intended end/underside.
+6. Restore the clean bitmap and keep the winning offset.
+
+Example from the desk-edge ear fix:
+
+```python
+# The edge bitmap was rotated 90° so grain ran along the cylindrical axis.
+# Fusion cylindrical maps image-X to the physical Y/length direction, so the
+# lengthwise seam was moved with RealWorldOffsetX, even though the user-facing
+# intent was "move the seam along Y".
+setf("texture_RealWorldOffsetX", 30.0 / 2.54)  # 30 cm winning sweep value
+setf("texture_RealWorldOffsetY", 0.0)
+```
+
+Keep the diagnostic bitmap in `.context/` (not as a production texture) and
+name it clearly, e.g. `*_RED_BOLD_BOTH_X_BOUNDARIES.jpg`. The production model
+must be restored to the clean bitmap before final screenshots.
 
 ### Spherical (`SphericalTextureMapProjection`) — sphere-only recipe
 
