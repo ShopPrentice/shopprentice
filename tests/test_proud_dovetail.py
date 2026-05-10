@@ -265,12 +265,12 @@ def run(context):
     _add_param("b17_h", "5 in", "in", "B17 height")
     _add_param("b17_t", "0.5 in", "in", "B17 thickness")
     _add_param("b17_proud", "0.03 in", "in", "B17 proud offset")
-    dovetail.define_params(params, prefix="dp17",
+    dovetail.define_params(params, prefix="dv17",
         angle="8 deg", tail_w="0.625 in", tail_count="3",
         joint_h_expr="b17_h", thick_expr="b17_t",
         proud_offset="b17_proud")
     r17 = build_box(root, "B17", "b17_l", "b17_w", "b17_h", "b17_t",
-                    b17_x, "dp17", ctx.ev, y_off_expr=b17_y, corners=4,
+                    b17_x, "dv17", ctx.ev, y_off_expr=b17_y, corners=4,
                     proud_offset_expr="b17_proud")
     assert r17["count"] == 4, f"B17: expected 4, got {r17['count']}"
     print("B17 PROUD 4-corner: PASS\n")

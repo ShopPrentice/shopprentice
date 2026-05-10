@@ -493,21 +493,22 @@ def box(comp, front, left,
                         f"{name}_JoinFL")
 
     # ── Mirrors ──
-    feats = [join_fl]
+    src_feats = [join_fl]
+    feats = list(src_feats)
     if right is not None and back is not None:
         # 4-corner: 3 mirrors (FL→BL, FL→FR, FR→BR)
-        mir_bl = sp.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
-        mir_fr = sp.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
+        mir_bl = sp.mirror_feats(comp, src_feats, y_mid, f"{name}_MirBL")
+        mir_fr = sp.mirror_feats(comp, src_feats, x_mid, f"{name}_MirFR")
         mir_br = sp.mirror_feats(comp, [mir_fr], y_mid, f"{name}_MirBR")
-        feats = [join_fl, mir_bl, mir_fr, mir_br]
+        feats = src_feats + [mir_bl, mir_fr, mir_br]
     elif right is not None:
         # 2-corner: 1 mirror (FL→FR)
-        mir_fr = sp.mirror_feats(comp, [join_fl], x_mid, f"{name}_MirFR")
-        feats = [join_fl, mir_fr]
+        mir_fr = sp.mirror_feats(comp, src_feats, x_mid, f"{name}_MirFR")
+        feats = src_feats + [mir_fr]
     elif back is not None:
         # 2-corner: 1 mirror (FL→BL)
-        mir_bl = sp.mirror_feats(comp, [join_fl], y_mid, f"{name}_MirBL")
-        feats = [join_fl, mir_bl]
+        mir_bl = sp.mirror_feats(comp, src_feats, y_mid, f"{name}_MirBL")
+        feats = src_feats + [mir_bl]
     # else: 1-corner, no mirrors needed
 
     # ── Pattern along joint_axis ──
@@ -540,24 +541,135 @@ def box(comp, front, left,
     # The tail boards were extended by proud_offset in ext_axis direction
     # (toward the pin board ends). After the dovetail CUT carved the
     # sockets, trim the extension so only the proud pins remain.
-    # Sketch on the outer face and extrude CUT inward (flip=True).
+    # Select the outer face directly and extrude CUT inward (NegativeExtent).
     trim_feats = []
     if has_proud:
+        VI_trim = adsk.core.ValueInput.createByString
+        NEG = adsk.fusion.ExtentDirections.NegativeExtentDirection
         # Left board's outer face is at min ext_axis (-1),
         # right board's outer face is at max ext_axis (+1).
         trim_dirs = [-1, +1] if len(tail_boards) == 2 else [-1]
         for tb, trim_dir in zip(tail_boards, trim_dirs):
             trim_face = sp.find_face(tb, ext_axis, trim_dir)
-            sk = comp.sketches.add(trim_face)
-            sk.name = f"{name}_Trim_{tb.name}_Sk"
-            prof = sk.profiles.item(0)
-            trim_ext = sp.ext_op(comp, prof, proud_offset_expr, CUT,
-                                 [tb], f"{name}_Trim_{tb.name}",
-                                 flip=True)
+            ext_input = comp.features.extrudeFeatures.createInput(
+                trim_face, CUT)
+            ext_input.setOneSideExtent(
+                adsk.fusion.DistanceExtentDefinition.create(
+                    VI_trim(proud_offset_expr)),
+                NEG)
+            ext_input.participantBodies = [tb]
+            trim_ext = comp.features.extrudeFeatures.add(ext_input)
+            trim_ext.name = f"{name}_Trim_{tb.name}"
             trim_feats.append(trim_ext)
+
+    # ── Proud tail chamfer: after trim, chamfer all proud tail tip edges ──
+    # Each tail board has proud tails on BOTH sides (toward Front and Back
+    # pin boards). Check both thick_axis extremes.
+    #
+    # NOTE: The tail chamfer uses coordinate-based edge selection on the
+    # final geometry. It is NOT fully parametric with tail_count changes —
+    # increasing tail_count via Change Parameters adds new tails from the
+    # pattern, but the chamfer does not auto-apply to new tail edges.
+    # Re-run the script to re-apply chamfers after count changes. This is
+    # a Fusion limitation: chamfer features reference specific edge entities
+    # and don't re-select by coordinate on recompute. The pin chamfer
+    # adapts because the CUT recomputes the pin board's topology.
+    tail_chamfer_feats = []
+    if has_proud:
+        _thick_idx = {"x": 0, "y": 1, "z": 2}[thick_axis]
+        tol = 0.01
+        # Thresholds: front outer face and back outer face
+        thresholds = [f_wide]  # front side
+        if back is not None:
+            bb_back = back.boundingBox
+            back_outer = (getattr(bb_back.maxPoint, thick_axis) if thick_dir > 0
+                          else getattr(bb_back.minPoint, thick_axis))
+            thresholds.append(back_outer)
+
+        for tb in tail_boards:
+            edges = adsk.core.ObjectCollection.create()
+            seen = set()
+            for ei in range(tb.edges.count):
+                e = tb.edges.item(ei)
+                v1 = [e.startVertex.geometry.x, e.startVertex.geometry.y,
+                      e.startVertex.geometry.z][_thick_idx]
+                v2 = [e.endVertex.geometry.x, e.endVertex.geometry.y,
+                      e.endVertex.geometry.z][_thick_idx]
+                # Front side: past f_wide
+                if thick_dir > 0 and v1 < thresholds[0] - tol and v2 < thresholds[0] - tol:
+                    if e.tempId not in seen:
+                        edges.add(e); seen.add(e.tempId)
+                elif thick_dir < 0 and v1 > thresholds[0] + tol and v2 > thresholds[0] + tol:
+                    if e.tempId not in seen:
+                        edges.add(e); seen.add(e.tempId)
+                # Back side: past back outer face
+                if len(thresholds) > 1:
+                    if thick_dir > 0 and v1 > thresholds[1] + tol and v2 > thresholds[1] + tol:
+                        if e.tempId not in seen:
+                            edges.add(e); seen.add(e.tempId)
+                    elif thick_dir < 0 and v1 < thresholds[1] - tol and v2 < thresholds[1] - tol:
+                        if e.tempId not in seen:
+                            edges.add(e); seen.add(e.tempId)
+            if edges.count > 0:
+                ch_inp = comp.features.chamferFeatures.createInput2()
+                ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                    edges,
+                    adsk.core.ValueInput.createByString(
+                        f"{proud_offset_expr} * 0.4"),
+                    False)
+                ch = comp.features.chamferFeatures.add(ch_inp)
+                ch.name = f"{name}_TailCh_{tb.name}"
+                tail_chamfer_feats.append(ch)
+
+    # ── Proud pin chamfer: after CUT + trim, chamfer all proud pin edges ──
+    # Each pin board has proud pins at BOTH ext_axis ends (past left and
+    # right tail boards). Check both directions.
+    pin_chamfer_feats = []
+    if has_proud:
+        _ext_idx = {"x": 0, "y": 1, "z": 2}[ext_axis]
+        tol = 0.01
+        # Get tail board face positions (after trim = original faces)
+        left_face_val = getattr(
+            sp.find_face(left, ext_axis, -1).pointOnFace, ext_axis)
+        right_face_val = None
+        if right is not None:
+            right_face_val = getattr(
+                sp.find_face(right, ext_axis, +1).pointOnFace, ext_axis)
+
+        pin_boards = [front] + ([back] if back is not None else [])
+        for pb in pin_boards:
+            edges = adsk.core.ObjectCollection.create()
+            seen = set()
+            for ei in range(pb.edges.count):
+                e = pb.edges.item(ei)
+                v1 = [e.startVertex.geometry.x, e.startVertex.geometry.y,
+                      e.startVertex.geometry.z][_ext_idx]
+                v2 = [e.endVertex.geometry.x, e.endVertex.geometry.y,
+                      e.endVertex.geometry.z][_ext_idx]
+                # Left end: past left tail board face
+                if v1 < left_face_val - tol and v2 < left_face_val - tol:
+                    if e.tempId not in seen:
+                        edges.add(e); seen.add(e.tempId)
+                # Right end: past right tail board face
+                if right_face_val is not None:
+                    if v1 > right_face_val + tol and v2 > right_face_val + tol:
+                        if e.tempId not in seen:
+                            edges.add(e); seen.add(e.tempId)
+            if edges.count > 0:
+                ch_inp = comp.features.chamferFeatures.createInput2()
+                ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                    edges,
+                    adsk.core.ValueInput.createByString(
+                        f"{proud_offset_expr} * 0.4"),
+                    False)
+                ch = comp.features.chamferFeatures.add(ch_inp)
+                ch.name = f"{name}_PinCh_{pb.name}"
+                pin_chamfer_feats.append(ch)
 
     return {
         "join_fl": join_fl, "pattern": pat,
         "cut_front": cut_front, "cut_back": cut_back,
         "trim_feats": trim_feats,
+        "pin_chamfer_feats": pin_chamfer_feats,
+        "tail_chamfer_feats": tail_chamfer_feats,
     }
