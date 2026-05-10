@@ -590,9 +590,10 @@ def box(comp, front, left,
 
         for tb in tail_boards:
             all_tip_faces = []
-            # Front-side proud tails
+            # Front-side proud tails: offset in the outward normal direction
+            # (ref face normal points away from pin board → toward the proud tip)
             ff = sp.find_faces_at_offset(
-                tb, front_ref, -proud_cm,
+                tb, front_ref, proud_cm,
                 extent_axis=ext_axis, extent_val=bt_cm, extent_tol=0.05)
             all_tip_faces.extend(ff)
             # Back-side proud tails
@@ -627,9 +628,10 @@ def box(comp, front, left,
         pin_boards = [front] + ([back] if back is not None else [])
         for pb in pin_boards:
             all_pin_faces = []
-            # Left-end proud pins
+            # Left-end proud pins: ref face normal points away from tail
+            # board → toward the proud pin tip, so offset is positive
             lf = sp.find_faces_at_offset(
-                pb, left_ref, -proud_cm,
+                pb, left_ref, proud_cm,
                 extent_axis=thick_axis, extent_val=bt_cm, extent_tol=0.05)
             all_pin_faces.extend(lf)
             # Right-end proud pins
