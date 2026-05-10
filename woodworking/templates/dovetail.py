@@ -576,95 +576,78 @@ def box(comp, front, left,
     # adapts because the CUT recomputes the pin board's topology.
     tail_chamfer_feats = []
     if has_proud:
-        _thick_idx = {"x": 0, "y": 1, "z": 2}[thick_axis]
-        tol = 0.01
-        # Thresholds: front outer face and back outer face
-        thresholds = [f_wide]  # front side
-        if back is not None:
-            bb_back = back.boundingBox
-            back_outer = (getattr(bb_back.maxPoint, thick_axis) if thick_dir > 0
-                          else getattr(bb_back.minPoint, thick_axis))
-            thresholds.append(back_outer)
+        # Find proud tail tip faces: parallel to each pin board's outer
+        # face, offset by proud_offset, extent = board_thick along ext_axis.
+        bt_cm = ev(thick_expr)
+        proud_cm = proud_val
+        ch_val = adsk.core.ValueInput.createByString(
+            f"{proud_offset_expr} * 0.4")
+
+        # Front pin board outer face as reference
+        front_ref = sp.find_face(front, thick_axis, -thick_dir)
+        # Back pin board outer face (if 4-corner)
+        back_ref = sp.find_face(back, thick_axis, thick_dir) if back else None
 
         for tb in tail_boards:
-            edges = adsk.core.ObjectCollection.create()
-            seen = set()
-            for ei in range(tb.edges.count):
-                e = tb.edges.item(ei)
-                v1 = [e.startVertex.geometry.x, e.startVertex.geometry.y,
-                      e.startVertex.geometry.z][_thick_idx]
-                v2 = [e.endVertex.geometry.x, e.endVertex.geometry.y,
-                      e.endVertex.geometry.z][_thick_idx]
-                # Front side: past f_wide
-                if thick_dir > 0 and v1 < thresholds[0] - tol and v2 < thresholds[0] - tol:
-                    if e.tempId not in seen:
-                        edges.add(e); seen.add(e.tempId)
-                elif thick_dir < 0 and v1 > thresholds[0] + tol and v2 > thresholds[0] + tol:
-                    if e.tempId not in seen:
-                        edges.add(e); seen.add(e.tempId)
-                # Back side: past back outer face
-                if len(thresholds) > 1:
-                    if thick_dir > 0 and v1 > thresholds[1] + tol and v2 > thresholds[1] + tol:
-                        if e.tempId not in seen:
-                            edges.add(e); seen.add(e.tempId)
-                    elif thick_dir < 0 and v1 < thresholds[1] - tol and v2 < thresholds[1] - tol:
-                        if e.tempId not in seen:
-                            edges.add(e); seen.add(e.tempId)
-            if edges.count > 0:
-                ch_inp = comp.features.chamferFeatures.createInput2()
-                ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
-                    edges,
-                    adsk.core.ValueInput.createByString(
-                        f"{proud_offset_expr} * 0.4"),
-                    False)
-                ch = comp.features.chamferFeatures.add(ch_inp)
-                ch.name = f"{name}_TailCh_{tb.name}"
-                tail_chamfer_feats.append(ch)
+            all_tip_faces = []
+            # Front-side proud tails
+            ff = sp.find_faces_at_offset(
+                tb, front_ref, -proud_cm,
+                extent_axis=ext_axis, extent_val=bt_cm, extent_tol=0.05)
+            all_tip_faces.extend(ff)
+            # Back-side proud tails
+            if back_ref:
+                bf = sp.find_faces_at_offset(
+                    tb, back_ref, proud_cm,
+                    extent_axis=ext_axis, extent_val=bt_cm, extent_tol=0.05)
+                all_tip_faces.extend(bf)
 
-    # ── Proud pin chamfer: after CUT + trim, chamfer all proud pin edges ──
-    # Each pin board has proud pins at BOTH ext_axis ends (past left and
-    # right tail boards). Check both directions.
+            if all_tip_faces:
+                edges = sp.edges_from_faces(all_tip_faces)
+                if edges.count > 0:
+                    ch_inp = comp.features.chamferFeatures.createInput2()
+                    ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                        edges, ch_val, False)
+                    ch = comp.features.chamferFeatures.add(ch_inp)
+                    ch.name = f"{name}_TailCh_{tb.name}"
+                    tail_chamfer_feats.append(ch)
+
+    # ── Proud pin chamfer: find proud pin tip faces on each pin board ──
+    # Parallel to tail board outer faces, offset by proud_offset, extent
+    # = board_thick along thick_axis.
     pin_chamfer_feats = []
     if has_proud:
-        _ext_idx = {"x": 0, "y": 1, "z": 2}[ext_axis]
-        tol = 0.01
-        # Get tail board face positions (after trim = original faces)
-        left_face_val = getattr(
-            sp.find_face(left, ext_axis, -1).pointOnFace, ext_axis)
-        right_face_val = None
-        if right is not None:
-            right_face_val = getattr(
-                sp.find_face(right, ext_axis, +1).pointOnFace, ext_axis)
+        ch_val = adsk.core.ValueInput.createByString(
+            f"{proud_offset_expr} * 0.4")
+
+        # Tail board outer faces as references (after trim = original faces)
+        left_ref = sp.find_face(left, ext_axis, -1)
+        right_ref = sp.find_face(right, ext_axis, +1) if right else None
 
         pin_boards = [front] + ([back] if back is not None else [])
         for pb in pin_boards:
-            edges = adsk.core.ObjectCollection.create()
-            seen = set()
-            for ei in range(pb.edges.count):
-                e = pb.edges.item(ei)
-                v1 = [e.startVertex.geometry.x, e.startVertex.geometry.y,
-                      e.startVertex.geometry.z][_ext_idx]
-                v2 = [e.endVertex.geometry.x, e.endVertex.geometry.y,
-                      e.endVertex.geometry.z][_ext_idx]
-                # Left end: past left tail board face
-                if v1 < left_face_val - tol and v2 < left_face_val - tol:
-                    if e.tempId not in seen:
-                        edges.add(e); seen.add(e.tempId)
-                # Right end: past right tail board face
-                if right_face_val is not None:
-                    if v1 > right_face_val + tol and v2 > right_face_val + tol:
-                        if e.tempId not in seen:
-                            edges.add(e); seen.add(e.tempId)
-            if edges.count > 0:
-                ch_inp = comp.features.chamferFeatures.createInput2()
-                ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
-                    edges,
-                    adsk.core.ValueInput.createByString(
-                        f"{proud_offset_expr} * 0.4"),
-                    False)
-                ch = comp.features.chamferFeatures.add(ch_inp)
-                ch.name = f"{name}_PinCh_{pb.name}"
-                pin_chamfer_feats.append(ch)
+            all_pin_faces = []
+            # Left-end proud pins
+            lf = sp.find_faces_at_offset(
+                pb, left_ref, -proud_cm,
+                extent_axis=thick_axis, extent_val=bt_cm, extent_tol=0.05)
+            all_pin_faces.extend(lf)
+            # Right-end proud pins
+            if right_ref:
+                rf = sp.find_faces_at_offset(
+                    pb, right_ref, proud_cm,
+                    extent_axis=thick_axis, extent_val=bt_cm, extent_tol=0.05)
+                all_pin_faces.extend(rf)
+
+            if all_pin_faces:
+                edges = sp.edges_from_faces(all_pin_faces)
+                if edges.count > 0:
+                    ch_inp = comp.features.chamferFeatures.createInput2()
+                    ch_inp.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
+                        edges, ch_val, False)
+                    ch = comp.features.chamferFeatures.add(ch_inp)
+                    ch.name = f"{name}_PinCh_{pb.name}"
+                    pin_chamfer_feats.append(ch)
 
     return {
         "join_fl": join_fl, "pattern": pat,

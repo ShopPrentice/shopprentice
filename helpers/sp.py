@@ -95,16 +95,33 @@ def find_face_at(body, axis, position, tolerance=0.01):
     return None
 
 
-def find_faces_at_offset(body, ref_face, offset, tol=0.01):
+def _face_extent_along(face, axis_vec):
+    """Extent of a face's vertices projected onto a direction vector."""
+    vals = []
+    for ei in range(face.edges.count):
+        e = face.edges.item(ei)
+        for v in [e.startVertex.geometry, e.endVertex.geometry]:
+            vals.append(v.x * axis_vec.x + v.y * axis_vec.y + v.z * axis_vec.z)
+    return (max(vals) - min(vals)) if vals else 0.0
+
+
+def find_faces_at_offset(body, ref_face, offset, tol=0.01,
+                         extent_axis=None, extent_val=None, extent_tol=None):
     """Find all planar faces on body parallel to ref_face at a signed offset.
 
     Searches ``body`` for planar faces whose outward normal is parallel to
     ``ref_face``'s outward normal AND whose plane is ``offset`` cm from
     ``ref_face`` along that normal direction.
 
+    Optional extent filter: when ``extent_axis`` and ``extent_val`` are
+    provided, only return faces whose vertex span along ``extent_axis``
+    matches ``extent_val`` within ``extent_tol``. This filters out outlier
+    faces that happen to be at the right offset but have the wrong size
+    (e.g. a groove shelf vs. a proud dovetail tip).
+
     Use cases:
       - Find proud dovetail tip faces (parallel to pin board surface,
-        offset by proud_offset).
+        offset by proud_offset, extent = board_thick along ext_axis).
       - Find rabbet shelves (parallel to a reference face, offset by
         rabbet depth).
 
@@ -116,6 +133,11 @@ def find_faces_at_offset(body, ref_face, offset, tol=0.01):
             Positive = in the outward normal direction.
             Negative = opposite to the outward normal.
         tol: Tolerance in cm for position matching and angular check.
+        extent_axis: Optional axis name ("x", "y", "z") or Vector3D.
+            When set with ``extent_val``, filters faces by their vertex
+            span along this direction.
+        extent_val: Expected extent in cm along ``extent_axis``.
+        extent_tol: Tolerance for extent matching. Defaults to ``tol``.
 
     Returns:
         list of BRepFace objects on ``body`` that match.
@@ -126,6 +148,17 @@ def find_faces_at_offset(body, ref_face, offset, tol=0.01):
     ok2, ref_n = ref_face.evaluator.getNormalAtPoint(ref_pt)
     ref_pos = ref_pt.x * ref_n.x + ref_pt.y * ref_n.y + ref_pt.z * ref_n.z
     target_pos = ref_pos + offset
+
+    # Resolve extent filter axis to a Vector3D.
+    ext_vec = None
+    if extent_axis is not None and extent_val is not None:
+        if isinstance(extent_axis, str):
+            _m = {"x": (1,0,0), "y": (0,1,0), "z": (0,0,1)}
+            ext_vec = adsk.core.Vector3D.create(*_m[extent_axis])
+        else:
+            ext_vec = extent_axis
+        if extent_tol is None:
+            extent_tol = tol
 
     result = []
     for fi in range(body.faces.count):
@@ -141,8 +174,14 @@ def find_faces_at_offset(body, ref_face, offset, tol=0.01):
         # Position along reference normal
         fp = f.pointOnFace
         face_pos = fp.x * ref_n.x + fp.y * ref_n.y + fp.z * ref_n.z
-        if abs(face_pos - target_pos) < tol:
-            result.append(f)
+        if abs(face_pos - target_pos) >= tol:
+            continue
+        # Extent filter
+        if ext_vec is not None:
+            ext = _face_extent_along(f, ext_vec)
+            if abs(ext - extent_val) >= extent_tol:
+                continue
+        result.append(f)
     return result
 
 
