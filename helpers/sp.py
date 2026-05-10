@@ -95,6 +95,77 @@ def find_face_at(body, axis, position, tolerance=0.01):
     return None
 
 
+def find_faces_at_offset(body, ref_face, offset, tol=0.01):
+    """Find all planar faces on body parallel to ref_face at a signed offset.
+
+    Searches ``body`` for planar faces whose outward normal is parallel to
+    ``ref_face``'s outward normal AND whose plane is ``offset`` cm from
+    ``ref_face`` along that normal direction.
+
+    Use cases:
+      - Find proud dovetail tip faces (parallel to pin board surface,
+        offset by proud_offset).
+      - Find rabbet shelves (parallel to a reference face, offset by
+        rabbet depth).
+
+    Args:
+        body: BRepBody to search for matching faces.
+        ref_face: Reference BRepFace — defines the orientation and base
+            plane position. Can be on any body (not necessarily ``body``).
+        offset: Signed offset in cm along ref_face's outward normal.
+            Positive = in the outward normal direction.
+            Negative = opposite to the outward normal.
+        tol: Tolerance in cm for position matching and angular check.
+
+    Returns:
+        list of BRepFace objects on ``body`` that match.
+    """
+    # Reference face outward normal and position along that normal.
+    ok, ref_pt = ref_face.evaluator.getPointAtParameter(
+        adsk.core.Point2D.create(0.5, 0.5))
+    ok2, ref_n = ref_face.evaluator.getNormalAtPoint(ref_pt)
+    ref_pos = ref_pt.x * ref_n.x + ref_pt.y * ref_n.y + ref_pt.z * ref_n.z
+    target_pos = ref_pos + offset
+
+    result = []
+    for fi in range(body.faces.count):
+        f = body.faces.item(fi)
+        geom = f.geometry
+        if not isinstance(geom, adsk.core.Plane):
+            continue
+        # Parallel check: |dot(face_normal, ref_normal)| ≈ 1
+        fn = geom.normal
+        dot = fn.x * ref_n.x + fn.y * ref_n.y + fn.z * ref_n.z
+        if abs(abs(dot) - 1.0) > 0.01:
+            continue
+        # Position along reference normal
+        fp = f.pointOnFace
+        face_pos = fp.x * ref_n.x + fp.y * ref_n.y + fp.z * ref_n.z
+        if abs(face_pos - target_pos) < tol:
+            result.append(f)
+    return result
+
+
+def edges_from_faces(faces):
+    """Collect all unique edges from a list of BRepFaces.
+
+    Args:
+        faces: Iterable of BRepFace objects.
+
+    Returns:
+        adsk.core.ObjectCollection of unique BRepEdge objects.
+    """
+    coll = adsk.core.ObjectCollection.create()
+    seen = set()
+    for f in faces:
+        for ei in range(f.edges.count):
+            e = f.edges.item(ei)
+            if e.tempId not in seen:
+                coll.add(e)
+                seen.add(e.tempId)
+    return coll
+
+
 # ── Edge Queries ────────────────────────────────────────────────────
 
 def find_edges(body, axis):
