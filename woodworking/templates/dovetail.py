@@ -155,7 +155,8 @@ def select_variant(purpose):
 
 def define_params(params, prefix="dt", angle="8 deg", tail_w="0.5 in",
                   tail_count="3", joint_h_expr="open_height",
-                  thick_expr="board_thick", pad="0 in"):
+                  thick_expr="board_thick", pad="0 in",
+                  proud_offset="0 in"):
     """Define all dovetail parameters with proper derivations.
 
     Creates user parameters for the independent values and derived
@@ -184,6 +185,7 @@ def define_params(params, prefix="dt", angle="8 deg", tail_w="0.5 in",
     """
     VI = adsk.core.ValueInput.createByString
     p = prefix
+    has_proud = proud_offset != "0 in"
 
     # Independent params
     params.add(f"{p}_angle", VI(angle), "deg", "Dovetail angle")
@@ -191,6 +193,13 @@ def define_params(params, prefix="dt", angle="8 deg", tail_w="0.5 in",
     params.add(f"{p}_tail_count", VI(tail_count), "", "Number of tails")
     params.add(f"{p}_pad", VI(pad), "in",
                "Edge padding — extra end-pin material beyond half a normal pin")
+    if has_proud:
+        params.add(f"{p}_proud", VI(proud_offset), "in",
+                   "Proud offset (Krenov-style proud dovetails)")
+
+    # Effective thickness for narrow_w: includes proud_offset because
+    # the tail taper spans the full penetration depth.
+    eff_thick = f"({thick_expr} + {p}_proud)" if has_proud else thick_expr
 
     # Derived params — tail pattern fits in (joint_h - 2*pad)
     params.add(f"{p}_pin_w",
@@ -201,7 +210,7 @@ def define_params(params, prefix="dt", angle="8 deg", tail_w="0.5 in",
                VI(f"({joint_h_expr} - 2 * {p}_pad) / {p}_tail_count"),
                "in", "Tail pitch (derived)")
     params.add(f"{p}_narrow_w",
-               VI(f"{p}_tail_w - 2 * {thick_expr} * tan({p}_angle)"),
+               VI(f"{p}_tail_w - 2 * {eff_thick} * tan({p}_angle)"),
                "in", "Narrow face width (derived)")
     params.add(f"{p}_half_pin",
                VI(f"{p}_pin_w / 2"),
@@ -216,6 +225,7 @@ def define_params(params, prefix="dt", angle="8 deg", tail_w="0.5 in",
         "pitch": f"{p}_pitch",
         "narrow_w": f"{p}_narrow_w",
         "half_pin": f"{p}_half_pin",
+        "proud_offset": f"{p}_proud" if has_proud else None,
     }
 
 
@@ -343,7 +353,8 @@ def box(comp, front, left,
         front_expr="0 in",
         joint_axis="z", thick_axis="y",
         joint_base_expr=None,
-        thick_dir=1):
+        thick_dir=1,
+        proud_offset_expr=None):
     """Create through dovetails at box corners.
 
     Supports 1-corner, 2-corner, or 4-corner dovetails on any axis
@@ -417,10 +428,18 @@ def box(comp, front, left,
             f"Dovetails don't fit: {n} tails × {tw_in:.3f}in exceeds "
             f"joint height. Reduce {p}_tail_count or {p}_tail_w.")
 
+    has_proud = proud_offset_expr is not None
     bt = ev(thick_expr)
+    proud_val = ev(proud_offset_expr) if has_proud else 0.0
+    dt_bt = bt + proud_val
     hp = ev(f"{p}_half_pin")
     tw = ev(f"{p}_tail_w")
-    delta = bt * math.tan(ev(f"{p}_angle"))
+    delta = dt_bt * math.tan(ev(f"{p}_angle"))
+
+    # Effective thickness expressions for proud-aware dovetails.
+    # dt_thick covers board_thick + proud_offset (full tail penetration).
+    dt_thick_expr = (f"({thick_expr} + {proud_offset_expr})"
+                     if has_proud else thick_expr)
 
     # Joint-axis base offset (for boards offset along joint axis).
     # Edge pin = pad + half_pin; first tail lands at this offset past the
@@ -434,10 +453,11 @@ def box(comp, front, left,
         j_base = pad_val + hp
         j_expr = f"{p}_pad + {p}_pin_w / 2"
 
-    # Front face values along thick_axis (wide = outer, narrow = inner)
-    # thick_dir=1: narrow at front_expr + thick (standard front dovetails)
-    # thick_dir=-1: narrow at front_expr - thick (back dovetails)
+    # Front face values along thick_axis (wide = outer, narrow = inner).
+    # For proud dovetails, the wide face extends past the pin board outer
+    # face by proud_offset so the tails protrude.
     f_wide = ev(front_expr) if front_expr != "0 in" else 0.0
+    f_wide_actual = f_wide - thick_dir * proud_val
     f_narrow = f_wide + thick_dir * bt
 
     # ext_axis coordinate of sketch plane
@@ -447,16 +467,17 @@ def box(comp, front, left,
         px = 0.0
 
     # ── Single trapezoid sketch (axis-mapped corners → shared helper) ──
-    m1_pt = _pt3(px, f_wide,   j_base)
-    m2_pt = _pt3(px, f_wide,   j_base + tw)
-    m3_pt = _pt3(px, f_narrow, j_base + tw - delta)
-    m4_pt = _pt3(px, f_narrow, j_base + delta)
+    # Wide face at f_wide_actual (past pin board outer face by proud_offset).
+    m1_pt = _pt3(px, f_wide_actual, j_base)
+    m2_pt = _pt3(px, f_wide_actual, j_base + tw)
+    m3_pt = _pt3(px, f_narrow,      j_base + tw - delta)
+    m4_pt = _pt3(px, f_narrow,      j_base + delta)
 
     prof = _trapezoid_sketch(
         comp, fl_plane,
         m1_pt, m2_pt, m3_pt, m4_pt,
-        thick_expr=thick_expr,
-        short_joint_expr=f"{j_expr} + {thick_expr} * tan({p}_angle)",
+        thick_expr=dt_thick_expr,
+        short_joint_expr=f"{j_expr} + {dt_thick_expr} * tan({p}_angle)",
         short_base_expr=(
             f"({front_expr}) + {thick_expr}" if thick_dir >= 0
             else f"({front_expr}) - {thick_expr}"
@@ -466,8 +487,9 @@ def box(comp, front, left,
     # ── ext_op JOIN with participantBodies ──
     # At FL position the extrude touches left → merges into left.
     # When right is provided, mirrors across x_mid auto-target the right board.
+    # Extrude distance includes proud_offset (tail board is wider in ext_axis).
     tail_boards = [left, right] if right is not None else [left]
-    join_fl = sp.ext_op(comp, prof, thick_expr, JOIN, tail_boards,
+    join_fl = sp.ext_op(comp, prof, dt_thick_expr, JOIN, tail_boards,
                         f"{name}_JoinFL")
 
     # ── Mirrors ──
@@ -514,7 +536,28 @@ def box(comp, front, left,
         cut_back = sp.combine(back, tail_boards, CUT, True,
                               f"{name}_CutBack")
 
+    # ── Proud trim: cut tail boards back to original thickness ──
+    # The tail boards were extended by proud_offset in ext_axis direction
+    # (toward the pin board ends). After the dovetail CUT carved the
+    # sockets, trim the extension so only the proud pins remain.
+    # Sketch on the outer face and extrude CUT inward (flip=True).
+    trim_feats = []
+    if has_proud:
+        # Left board's outer face is at min ext_axis (-1),
+        # right board's outer face is at max ext_axis (+1).
+        trim_dirs = [-1, +1] if len(tail_boards) == 2 else [-1]
+        for tb, trim_dir in zip(tail_boards, trim_dirs):
+            trim_face = sp.find_face(tb, ext_axis, trim_dir)
+            sk = comp.sketches.add(trim_face)
+            sk.name = f"{name}_Trim_{tb.name}_Sk"
+            prof = sk.profiles.item(0)
+            trim_ext = sp.ext_op(comp, prof, proud_offset_expr, CUT,
+                                 [tb], f"{name}_Trim_{tb.name}",
+                                 flip=True)
+            trim_feats.append(trim_ext)
+
     return {
         "join_fl": join_fl, "pattern": pat,
         "cut_front": cut_front, "cut_back": cut_back,
+        "trim_feats": trim_feats,
     }
