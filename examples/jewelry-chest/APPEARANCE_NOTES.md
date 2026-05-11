@@ -143,13 +143,59 @@ The original notes stated "period ≈ scale / 2" with scaleX=26.6, claiming ~80%
 
 - **Oak scale must be set manually.** The design's Oak appearance had scaleX=80, scaleY=40 (way too large, causing blurry grain). Reset to 12x12 for proper resolution. This may have been caused by previous appearance operations corrupting the shared Oak appearance.
 
+## Panel Bottom Face (underside visible when lid is open)
+
+The -Z face of the panels has a different Box projection UV mapping than the +Z face (top), causing visible seams. Fix: apply a separate face-level appearance with a Y offset that pushes the seam off the panel.
+
+### Setup
+
+```python
+# Create bottom-specific appearance (copy of SP_spalted_land)
+bot_app = design.appearances.addByCopy(spalted, "SP_spalted_bottom")
+
+# Copy all texture properties from SP_spalted_land
+# Same bitmap, same scale, same WAngle, offsetX = 0
+# Key fix: offsetY = scaleY / 2 (half-period shift pushes Y seam off panel)
+tex.texture_RealWorldOffsetY = 4.88   # = 9.76 / 2
+
+# Apply to bottom faces only (outward normal z < -0.9)
+for panel in [panel_l, panel_r]:
+    for fi in range(panel.faces.count):
+        f = panel.faces.item(fi)
+        ok, pt = f.evaluator.getPointAtParameter(Point2D.create(0.5, 0.5))
+        ok2, n = f.evaluator.getNormalAtPoint(pt)
+        if n.z < -0.9:
+            f.appearance = bot_app
+```
+
+### Why offsetY = scaleY / 2
+
+The -Z Box projection maps Y differently from +Z, placing the texture period boundary (seam) within the visible panel area. A half-period Y offset shifts this seam to a position that falls outside the panel's Y extent. Confirmed with red/green diagnostic markers.
+
+Note: the bottom image is NOT identical to the top (it's the same texture at a different offset), but it's seamless. Making it truly identical would require a projection type that maps -Z faces the same as +Z, which Box projection cannot do.
+
+### Thin veneer bodies (optional, not needed)
+
+PanelL_Veneer and PanelR_Veneer exist in the Lid component (0.001 cm thick below the panels) but are hidden — they were an earlier attempt that didn't resolve the -Z projection issue. The face-level appearance approach above is simpler and works.
+
+## Hinge Appearance
+
+Two small flush brass hinges (1603A2, bare STEP) installed at the back:
+- Apply `Brass - Satin` from the Fusion 360 Appearance Library
+- Match by body name containing "hinge", "pin", "leaf", or "screw"
+
 ## Appearance Order (important)
 
-Apply in this exact order:
-1. `apply_appearance("white oak")` — all bodies
+Apply in this exact order after every `execute_script(clean=True)`:
+
+1. `sp.apply_appearance("white oak")` — all bodies
 2. Fix oak scale to 12x12
-3. Set Pull to `SP_ziricote` (not endgrain)
-4. Set Panel_L and Panel_R to `SP_spalted_land`
-5. Set spalted maple texture scale: 15.75 x 9.76
-6. Set TMC on both panels: identity + translate to Panel_L bbox-min
-7. Set all panel face overrides to SP_spalted_land
+3. `sp.apply_appearance("spalted maple", bodies=["Lid_Panel_L", "Lid_Panel_R"])` — creates base appearance
+4. Create `SP_spalted_land` by copying `SP_spalted maple`, swap bitmap to `spalted_maple_landscape.jpg`
+5. Set spalted maple texture scale: 15.75 x 9.76, offsets 0, WAngle 0
+6. Apply `SP_spalted_land` to both panels (body + all face overrides)
+7. Set TMC on both panels: Box projection, identity + translate to Panel_L bbox-min `(4.1275, 3.3972, 12.2238)`
+8. Create `SP_spalted_bottom` (copy of `SP_spalted_land`), set `offsetY = 4.88`
+9. Apply `SP_spalted_bottom` to panel bottom faces only (normal z < -0.9)
+10. Set Pull to `SP_ziricote` (not endgrain)
+11. Apply `Brass - Satin` to hinge bodies
