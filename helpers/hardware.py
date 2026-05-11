@@ -1012,14 +1012,15 @@ def _collect_all_body_proxies(comp, top_occ, coll):
 
 # ── Install (high-level) ─────────────────────────────────────────────
 
-def _import_assembly(part_id, part, comp):
+def _import_assembly(part_id, part, comp, bare=False):
     """Import a hinge assembly STEP (Pin + LeafA + LeafB sub-components).
 
     Returns (top_occ, child_occs, pin_bodies, leaf_a_bodies,
              leaf_b_bodies, all_bodies, body_occ_map).
     Falls back to bare hinge STEP if no assembly_step in catalog.
+    When bare=True, forces the simple STEP (no screws, fewer bodies).
     """
-    assembly_path = part.get("assembly_step")
+    assembly_path = part.get("assembly_step") if not bare else None
     if assembly_path:
         step_file = _resolve_step_path(assembly_path)
     else:
@@ -1165,6 +1166,7 @@ def install_butt_hinge(part_id, comp, back_body=None, lid_body=None,
                        style="lid_surface",
                        door_body=None, case_body=None,
                        gap=0, install_screws=False,
+                       bare=False,
                        ev=None, name="Hinge"):
     """Install a butt hinge with integrated rebate CUTs.
 
@@ -1207,7 +1209,8 @@ def install_butt_hinge(part_id, comp, back_body=None, lid_body=None,
 
     # ── Import assembly STEP ──
     (top_occ, child_occs, pin_bodies, leaf_a_bodies, leaf_b_bodies,
-     all_bodies, body_occ_map) = _import_assembly(part_id, part, comp)
+     all_bodies, body_occ_map) = _import_assembly(part_id, part, comp,
+                                                   bare=bare)
 
     # Leaf body = largest body in each leaf sub-component
     leaf_a = max(leaf_a_bodies, key=lambda b: b.volume)
@@ -1290,11 +1293,79 @@ def install_butt_hinge(part_id, comp, back_body=None, lid_body=None,
         # Screw holes are CUT separately below to avoid splitting boards
         # when screw heads extend past the board face.
         structural_bodies = [leaf_a, leaf_b, pin_bodies[0]] if pin_bodies else [leaf_a, leaf_b]
-        cuts = _cut_rebates(comp, style, top_occ, leaf_a, leaf_b,
+        # Use root for CUTs when target boards are in different components
+        # from the hinge import component — root can access all sub-components.
+        cut_comp = comp
+        if (board_a.parentComponent != comp or board_b.parentComponent != comp):
+            design = adsk.fusion.Design.cast(
+                adsk.core.Application.get().activeProduct)
+            cut_comp = design.rootComponent
+        cuts = _cut_rebates(cut_comp, style, top_occ, leaf_a, leaf_b,
                             structural_bodies,
                             board_a, board_b, pos, raw_pos,
                             plate_t_cm, barrel_d_cm, barrel_d_str, name, ev,
                             gap_cm=gap_cm, body_occ_map=body_occ_map)
+
+    # ── Distribute leaf bodies across components ──
+    # When boards are in different components, copy the "foreign" leaf
+    # into the other board's component so each leaf lives with its board.
+    if (board_a is not None and board_b is not None and
+            board_a.parentComponent != board_b.parentComponent):
+        design = adsk.fusion.Design.cast(
+            adsk.core.Application.get().activeProduct)
+        root_comp = design.rootComponent
+
+        # Find the full hinge occurrence in the root assembly tree
+        full_occ = None
+        for i in range(root_comp.allOccurrences.count):
+            occ_i = root_comp.allOccurrences.item(i)
+            if occ_i.component.name == top_occ.component.name:
+                full_occ = occ_i
+                break
+
+        if full_occ and len(leaf_bodies) == 2:
+            # Identify which leaf is closer to each board
+            p0 = leaf_bodies[0].createForAssemblyContext(full_occ)
+            p1 = leaf_bodies[1].createForAssemblyContext(full_occ)
+            bb_a = board_a.boundingBox
+            bb_b = board_b.boundingBox
+            a_center = [(bb_a.minPoint.x + bb_a.maxPoint.x) / 2,
+                        (bb_a.minPoint.y + bb_a.maxPoint.y) / 2,
+                        (bb_a.minPoint.z + bb_a.maxPoint.z) / 2]
+            l0_center = [(p0.boundingBox.minPoint.x + p0.boundingBox.maxPoint.x) / 2,
+                         (p0.boundingBox.minPoint.y + p0.boundingBox.maxPoint.y) / 2,
+                         (p0.boundingBox.minPoint.z + p0.boundingBox.maxPoint.z) / 2]
+            l1_center = [(p1.boundingBox.minPoint.x + p1.boundingBox.maxPoint.x) / 2,
+                         (p1.boundingBox.minPoint.y + p1.boundingBox.maxPoint.y) / 2,
+                         (p1.boundingBox.minPoint.z + p1.boundingBox.maxPoint.z) / 2]
+            dist0 = sum((a - b) ** 2 for a, b in zip(l0_center, a_center))
+            dist1 = sum((a - b) ** 2 for a, b in zip(l1_center, a_center))
+
+            if dist0 < dist1:
+                leaf_for_a, leaf_for_b = leaf_bodies[0], leaf_bodies[1]
+            else:
+                leaf_for_a, leaf_for_b = leaf_bodies[1], leaf_bodies[0]
+
+            # The hinge was imported into comp (board_a's or board_b's parent,
+            # or a neutral component). Whichever leaf is NOT in its board's
+            # component needs to be copied there.
+            for leaf, board in [(leaf_for_a, board_a), (leaf_for_b, board_b)]:
+                target_comp = board.parentComponent
+                if target_comp != comp:
+                    proxy = leaf.createForAssemblyContext(full_occ)
+                    coll = adsk.core.ObjectCollection.create()
+                    coll.add(proxy)
+                    copy_feat = target_comp.features.copyPasteBodies.add(coll)
+                    for bi in range(copy_feat.bodies.count):
+                        copy_feat.bodies.item(bi).name = f"{name}_Leaf"
+                    leaf.isVisible = False
+
+            # Name remaining visible bodies
+            for leaf in leaf_bodies:
+                if leaf.isVisible:
+                    leaf.name = f"{name}_Leaf"
+            if pin_bodies:
+                pin_bodies[0].name = f"{name}_Pin"
 
     result = {
         "occurrence": top_occ,
