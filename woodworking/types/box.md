@@ -67,6 +67,29 @@ Lid sits on top or slides in grooves
 | After panels | 6 (+ bottom + lid) | Panels fit in grooves |
 | Final | 6 | Zero interferences |
 
+## Lid Flip (Opening a Hinged Lid for Display)
+
+For hinged lids (not sliding), rotate the **Lid occurrence** around the hinge pin axis:
+
+```
+Hinge pin axis: X (runs left-right along the back edge)
+Pivot point: (0, box_width, open_height) — at the hinge barrel center
+Rotation: NEGATIVE angle around X axis (lid flips backward)
+Default open angle: -100°
+```
+
+```python
+pivot = Point3D.create(0, ev("box_width"), ev("open_height"))
+axis = Vector3D.create(1, 0, 0)
+rot = Matrix3D.create()
+rot.setToRotation(math.radians(-100), axis, pivot)
+lid_occurrence.transform2 = rot
+```
+
+**Direction rule:** The lid opens **backward** (away from the front, toward the back). Always a **negative** X rotation. To close: reset to identity matrix.
+
+This applies to any furniture with a hinged lid at the back edge — jewelry boxes, keepsake boxes, cases. The hinge pin position adapts to the specific `box_width` and `open_height` parameters.
+
 ## Common Mistakes
 
 - Forgetting to make one side shorter for sliding lid opening
