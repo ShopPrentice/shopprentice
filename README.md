@@ -1,5 +1,7 @@
 # ShopPrentice
 
+![Jewelry Chest — dovetailed case with spalted maple lid panels, mitered trays](examples/jewelry-chest/product_iso.png)
+
 Parametric furniture modeling for Fusion 360, driven by AI agents via MCP.
 
 Describe a piece of furniture in natural language (or show a photo) and ShopPrentice generates a Fusion 360 parametric model, executes it live in Fusion via MCP, and iterates with you until it's right.
