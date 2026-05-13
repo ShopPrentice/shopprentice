@@ -1,5 +1,9 @@
 # Dovetailed Jewelry Chest
 
+![Jewelry Chest](product_iso.png)
+
+![Lid Open](product_open.png)
+
 Parametric jewelry chest with through dovetails, frame-and-panel lid with spalted maple panels, 3 removable trays (1 upper + 2 lower), and support panels.
 
 ## Dimensions
