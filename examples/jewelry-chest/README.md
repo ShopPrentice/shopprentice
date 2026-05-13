@@ -48,4 +48,4 @@ Parametric jewelry chest with through dovetails, frame-and-panel lid with spalte
 
 ## Reference
 
-Built from `reference.png` (exploded view with dimensions) and `reference_photo.png` (finished piece).
+Design based on the jewelry chest from [Fine Woodworking issue #319](https://www.finewoodworking.com/2025/09/15/online-extras-from-fww-issue-319).
