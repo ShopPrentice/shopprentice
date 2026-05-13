@@ -1,6 +1,6 @@
 # Dovetailed Jewelry Chest
 
-Parametric jewelry chest built from reference design images. Through dovetails, frame-and-panel lid with spalted maple panels, removable tray.
+Parametric jewelry chest with through dovetails, frame-and-panel lid with spalted maple panels, 3 removable trays (1 upper + 2 lower), and support panels.
 
 ## Dimensions
 
@@ -10,31 +10,41 @@ Parametric jewelry chest built from reference design images. Through dovetails, 
 | box_width | 9 in | Overall depth (Y) |
 | case_height | 5.25 in | Total height including lid |
 | board_thick | 5/8 in | Case board thickness |
-| lid_frame_h | 9/16 in | Lid frame thickness |
-| lid_frame_w | 1-1/4 in | Lid frame piece width |
+| tray_height | 1-5/8 in | Upper tray side height |
+| tray_thick | 1/4 in | Tray side thickness |
+| lower_tray_height | 1-7/8 in | Lower tray side height |
+| bottom_full_thick | 1/2 in | Case bottom panel full thickness (rabbeted edges) |
+| support_thick | 1/8 in | Front/back support panel thickness |
 
-## Components (21 bodies)
+## Components (33 bodies)
 
-- **Case** (6): End_L, End_R, Front, Back, Runner_L, Runner_R
-- **Bottom** (1): Plywood panel in case board grooves
-- **Tray** (6): Front, Back, End_L, End_R, Bottom, center divider with handle slot
+- **Case** (6): End_L, End_R, Front, Back, Support_F, Support_B
+- **Bottom** (1): Rabbeted panel — 1/4" tongue in grooves, 1/2" thick center
+- **UpperTray** (6): Mitered sides, grooved bottom, divider with handle + arch notch
+- **LowerTrays** (12): 2 side-by-side trays, mitered sides, grooved bottoms, dividers with handles + arch notches
 - **Lid** (8): Rail_F, Rail_B, Stile_L, Stile_R, center Div, Panel_L, Panel_R, Pull
 
 ## Key Construction Details
 
-- **Dovetails**: Through dovetails at all 4 corners (dt_pad=0.75 for wide end pins). Dovetails run full case_height for equal top/bottom end pins. Back board trimmed, front board shaped after dovetails.
-- **End boards**: Extend to lid top level. Lid frame sits between them.
-- **Front board**: Outer-half lip (lid_rab = 60% of lid_frame_h) above open_height. Lid front rail recessed lid_rab behind the case front face. Pull notch CUT by the pull body.
-- **Lid frame**: Continuous groove approach — one groove per piece accepts both panel tongues (1/4" deep) and frame tenons (1/2" deep). Stile tenons recessed lid_tongue_l from inner edge so plow plane cuts through groove cleanly. Divider runs parallel to sides (Y direction), creating left/right panels.
-- **Tongue/tenon alignment**: Both 5/16" thick, sharing the same groove slot.
-- **Panels**: 7/16" thick spalted maple with edge rabbets creating thin tongues. Panel top flush with frame top.
-- **Pull**: 1-1/8" × 3/8" × 7/16" block protruding from front face, with tenon into front rail.
+- **Dovetails**: Through dovetails at all 4 corners, proud offset (Krenov-style)
+- **Tray miters**: Chamfer-based 45° miter joints at tray corners
+- **Tray grooves**: Bottom panels sit in grooves (if-it-fits-it-cuts)
+- **Tray dados**: Dividers held in dados in front/back sides
+- **Divider handles**: Extend above tray sides with arch-shaped finger notch below
+- **Support panels**: 1/8" panels on front/back inner faces, replacing runners. Lower trays fit between them; upper tray sits on top.
+- **Bottom panel**: Rabbeted edge design — thin tongue (1/4") fits in case groove, thicker center (1/2") extends below for rigidity
+- **Lid frame**: Continuous groove approach — panel tongues and frame tenons share one groove
 
 ## Appearance
 
-- White oak case and lid frame
-- Spalted maple lid panels (pre-rotated landscape image, continuous grain across both panels via shared TMC origin)
+- White oak case, lid frame, trays (scale 12×12)
+- Spalted maple lid panels via `helpers.veneer.apply_veneer_realsize` (12" × 7" real size, flipped bottom face)
 - Ziricote pull
+- See `APPEARANCE_NOTES.md` for the full recipe
+
+## TODO
+
+- Model the hemp twine cord wrapped around divider handles (needs Sweep along helix or coil feature)
 
 ## Reference
 
