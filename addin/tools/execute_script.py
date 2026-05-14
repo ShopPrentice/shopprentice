@@ -314,6 +314,39 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
     if sandbox:
         return _execute_sandbox(script)
 
+    # ── session-aware document provisioning ──
+    # When running under a session, ensure the session has a document.
+    # clean=True creates a fresh scratch doc; clean=False requires an
+    # existing bound document (or claim_document first).
+    from server.session_manager import SessionManager
+    sm = SessionManager.instance()
+    sid = sm.current_session_id
+
+    if sid:
+        session = sm.get_session(sid)
+        if session and session.document is None:
+            if clean or force_clean:
+                import adsk.fusion as _af
+                new_doc = app.documents.add(
+                    adsk.core.DocumentTypes.FusionDesignDocumentType)
+                _design = _af.Design.cast(app.activeProduct)
+                _design.designType = _af.DesignTypes.ParametricDesignType
+                sm.bind_document(sid, new_doc)
+            else:
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": (
+                            "No document is bound to this session. "
+                            "Use execute_script(clean=True) to create a "
+                            "new scratch document, or call claim_document "
+                            "to adopt an existing one first."
+                        ),
+                    }],
+                    "isError": True,
+                    "message": "No document bound to session",
+                }
+
     # Guard: clean=True destroys the timeline + user parameters. Only allow
     # it on documents the add-in knows were built by a tracked script AND
     # have no unsynced UI changes. force_clean=True bypasses the check for
@@ -400,6 +433,15 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
                 DocumentTracker._script_path = script_path
         except Exception:
             pass
+
+        # Bind document to session if not already bound
+        if sid:
+            _ses = sm.get_session(sid)
+            if _ses and _ses.document is None:
+                try:
+                    sm.bind_document(sid, app.activeDocument)
+                except Exception:
+                    pass
 
         # Set visual style to Shaded with Visible Edges after every build
         try:

@@ -79,6 +79,9 @@ def run(context):
         from server.action_log import ActionLog
         ActionLog.start()
 
+        from server.session_manager import SessionManager
+        SessionManager.instance().start()
+
         mcp, server, thread = start_mcp_server(
             host=HOST,
             port=PORT,
@@ -118,6 +121,12 @@ def stop(context):
 
         from palette.param_editor import ParamEditorPalette
         ParamEditorPalette.destroy()
+
+        try:
+            from server.session_manager import SessionManager
+            SessionManager.reset()
+        except Exception:
+            pass
 
         ActionLog.stop()
         TaskManager.stop()
