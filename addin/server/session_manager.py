@@ -67,6 +67,7 @@ class SessionManager:
         self._last_execution: float = 0.0
         self._current_session_id: Optional[str] = None
         self._doc_closing_handler = None
+        self._doc_counter: int = 0
 
     # ── singleton ──────────────────────────────────────────────────────
 
@@ -197,10 +198,13 @@ class SessionManager:
     # ── throttle gate ──────────────────────────────────────────────────
 
     def throttle_gate(self) -> None:
+        """Enforce minimum cooldown since the last tool FINISHED."""
         now = time.time()
         gap = now - self._last_execution
         if gap < self.MIN_COOLDOWN:
             time.sleep(self.MIN_COOLDOWN - gap)
+
+    def record_execution_end(self) -> None:
         self._last_execution = time.time()
 
     # ── claim / transfer ───────────────────────────────────────────────
@@ -433,7 +437,7 @@ class SessionManager:
                 pass
 
     def _tag_document(self, doc, session_id: str) -> None:
-        """Stamp the design with our session ID so we can verify later."""
+        """Stamp the design with our session ID and give it a readable name."""
         try:
             import adsk.fusion
             design = adsk.fusion.Design.cast(
@@ -441,6 +445,9 @@ class SessionManager:
             if design:
                 design.rootComponent.attributes.add(
                     "ShopPrentice", "sessionId", session_id)
+                self._doc_counter += 1
+                design.rootComponent.name = (
+                    f"SP Agent {self._doc_counter} ({session_id[:8]})")
         except Exception as e:
             app.log(f"[session] failed to tag document: {e}")
 

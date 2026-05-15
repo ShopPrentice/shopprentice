@@ -238,11 +238,13 @@ class SimpleMCPServer:
                     result_container['exception'] = e
                     result_container['completed'] = True
             finally:
-                if sm and session_id:
-                    sess = sm.get_session(session_id)
-                    if sess:
-                        sm._save_global_state(sess)
-                    sm.current_session_id = None
+                if sm:
+                    sm.record_execution_end()
+                    if session_id:
+                        sess = sm.get_session(session_id)
+                        if sess:
+                            sm._save_global_state(sess)
+                        sm.current_session_id = None
 
         if not TaskManager.is_running():
             if app:
