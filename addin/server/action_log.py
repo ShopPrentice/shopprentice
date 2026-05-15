@@ -286,12 +286,9 @@ class ActionLog:
             if cls._suppress:
                 return
 
-            # Gate 1: Only completed commands
-            # CompletedTerminationReason = 0
             if termination_reason != 0:
                 return
 
-            # Gate 2: Skip known read-only commands
             if command_id in SKIP_COMMANDS:
                 return
 
@@ -299,22 +296,47 @@ class ActionLog:
             if not design:
                 return
 
-            # Gate 3: Quick check — did timeline count or param hash change?
+            # Read the active document's docKey so we can scope
+            # the baseline/entries to the correct document.
+            doc_key = None
+            try:
+                dk_attr = design.rootComponent.attributes.itemByName(
+                    "ShopPrentice", "docKey")
+                if dk_attr:
+                    doc_key = dk_attr.value
+            except Exception:
+                pass
+
+            # If the active doc differs from whatever the MCP callback
+            # last loaded, swap globals to this doc's provenance first.
+            if doc_key:
+                try:
+                    import sys as _sys
+                    sm_mod = _sys.modules.get("server.session_manager")
+                    if sm_mod:
+                        sm = sm_mod.SessionManager.instance()
+                        sm.save_provenance()       # save outgoing
+                        sm._load_provenance(doc_key)  # load this doc
+                except Exception:
+                    pass
+
             tl_count = design.timeline.count
             param_hash = cls._compute_param_hash(design)
 
             if tl_count == cls._last_timeline_count and param_hash == cls._last_param_hash:
+                if doc_key:
+                    cls._save_back(doc_key)
                 return
 
-            # Gate 4: Full snapshot + diff
             if cls._baseline is None:
+                if doc_key:
+                    cls._save_back(doc_key)
                 return
 
             from tools.get_changes import _capture_snapshot, _diff_snapshots
             current = _capture_snapshot(design)
             diff = _diff_snapshots(cls._baseline, current)
 
-            # Check if diff is actually empty
             total = (len(diff["parameterChanges"]) +
                      len(diff["modelParameterChanges"]) +
                      len(diff["dimensionChanges"]) +
@@ -322,20 +344,11 @@ class ActionLog:
                      len(diff["bodyChanges"]["removed"]) +
                      abs(diff["featureCountDelta"]))
             if total == 0:
-                # Update cheap counters even if diff is empty
                 cls._last_timeline_count = tl_count
                 cls._last_param_hash = param_hash
+                if doc_key:
+                    cls._save_back(doc_key)
                 return
-
-            # Read active document's stable key (if tagged by SessionManager)
-            doc_key = None
-            try:
-                root = design.rootComponent
-                dk_attr = root.attributes.itemByName("ShopPrentice", "docKey")
-                if dk_attr:
-                    doc_key = dk_attr.value
-            except Exception:
-                pass
 
             entry = {
                 "id": str(uuid.uuid4()),
@@ -346,17 +359,18 @@ class ActionLog:
             }
             cls._entries.append(entry)
 
-            # Update baseline and cheap counters
             cls._baseline = current
             cls._last_timeline_count = tl_count
             cls._last_param_hash = param_hash
 
-            # Also update get_changes._baseline for backward compat
             try:
                 import tools.get_changes as gc
                 gc._baseline = current
             except Exception:
                 pass
+
+            if doc_key:
+                cls._save_back(doc_key)
 
             # Append to JSONL file
             cls._append_to_file(entry)
@@ -367,6 +381,18 @@ class ActionLog:
         except Exception as e:
             if app:
                 app.log(f"ActionLog: Error in _on_command_terminated - {e}\n{traceback.format_exc()}")
+
+    @classmethod
+    def _save_back(cls, doc_key):
+        """Save current ActionLog globals back to the provenance store."""
+        try:
+            import sys as _sys
+            sm_mod = _sys.modules.get("server.session_manager")
+            if sm_mod:
+                sm = sm_mod.SessionManager.instance()
+                sm.save_provenance(doc_key)
+        except Exception:
+            pass
 
     @classmethod
     def _compute_param_hash(cls, design):
