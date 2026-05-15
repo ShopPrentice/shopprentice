@@ -1,103 +1,33 @@
 """
 Tests for SessionManager — multi-agent document isolation.
 
-Runs outside Fusion 360 by mocking adsk and dependent modules.
+Runs outside Fusion 360 using shared mock fixtures.
 """
 
 import importlib.util
 import os
 import sys
-import types
 import unittest
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock
 
-
-# ── Mock adsk before importing SessionManager ──
-
-def _setup_mocks():
-    adsk = types.ModuleType("adsk")
-    adsk.core = types.ModuleType("adsk.core")
-    mock_app = MagicMock()
-    mock_app.documents = MagicMock()
-    mock_app.documents.count = 0
-    adsk.core.Application = MagicMock()
-    adsk.core.Application.get.return_value = mock_app
-    adsk.core.DocumentTypes = MagicMock()
-    adsk.core.DocumentEventHandler = type("DocumentEventHandler", (), {
-        "__init__": lambda self: None,
-        "notify": lambda self, args: None,
-    })
-    adsk.core.DocumentEventArgs = MagicMock()
-
-    adsk.fusion = types.ModuleType("adsk.fusion")
-    adsk.fusion.Design = MagicMock()
-    adsk.fusion.DesignTypes = MagicMock()
-
-    sys.modules["adsk"] = adsk
-    sys.modules["adsk.core"] = adsk.core
-    sys.modules["adsk.fusion"] = adsk.fusion
-
-    # Mock server package
-    server_pkg = types.ModuleType("server")
-    server_pkg.__path__ = []
-    sys.modules["server"] = server_pkg
-
-    # Mock ActionLog
-    action_log_mod = types.ModuleType("server.action_log")
-
-    class MockActionLog:
-        _entries = []
-        _baseline = None
-        _last_timeline_count = None
-        _last_param_hash = None
-        _last_read_cursor = None
-        _log_file = None
-
-        @classmethod
-        def get_latest_cursor(cls):
-            return cls._entries[-1]["id"] if cls._entries else None
-
-    action_log_mod.ActionLog = MockActionLog
-    sys.modules["server.action_log"] = action_log_mod
-
-    # Mock DocumentTracker
-    doc_tracker_mod = types.ModuleType("server.document_tracker")
-
-    class MockDocumentTracker:
-        _script_source = None
-        _script_path = None
-        _script_hash = None
-        _sync_cursor = None
-        _reference_model_params = None
-        _doc_ref = None
-        _restored = False
-
-        @classmethod
-        def _clear_memory(cls):
-            cls._script_source = None
-            cls._script_path = None
-            cls._script_hash = None
-            cls._sync_cursor = None
-            cls._reference_model_params = None
-            cls._doc_ref = None
-            cls._restored = False
-
-    doc_tracker_mod.DocumentTracker = MockDocumentTracker
-    sys.modules["server.document_tracker"] = doc_tracker_mod
-
-    return mock_app, MockActionLog, MockDocumentTracker
-
-
-mock_app, MockActionLog, MockDocTracker = _setup_mocks()
+# Shared mocks — compatible with test_document_tracker
+from tests.fixtures.mock_adsk import setup as _setup_mocks
+_m = _setup_mocks()
+mock_app = _m["app"]
+MockActionLog = _m["ActionLog"]
+MockDocTracker = _m["DocumentTracker"]
 
 # Import SessionManager
-spec = importlib.util.spec_from_file_location(
-    "server.session_manager",
-    os.path.join(os.path.dirname(__file__), "..", "addin", "server", "session_manager.py"),
-)
-mod = importlib.util.module_from_spec(spec)
-sys.modules["server.session_manager"] = mod
-spec.loader.exec_module(mod)
+if "server.session_manager" not in sys.modules:
+    spec = importlib.util.spec_from_file_location(
+        "server.session_manager",
+        os.path.join(os.path.dirname(__file__), "..", "addin", "server", "session_manager.py"),
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["server.session_manager"] = mod
+    spec.loader.exec_module(mod)
+else:
+    mod = sys.modules["server.session_manager"]
 
 SessionManager = mod.SessionManager
 Session = mod.Session
@@ -112,7 +42,6 @@ def _make_doc(name="Untitled"):
     root = MagicMock()
     root.attributes = MagicMock()
 
-    # Track attributes set on this doc
     doc._attrs = {}
 
     def add_attr(group, name, value):
@@ -129,8 +58,7 @@ def _make_doc(name="Untitled"):
     root.attributes.add = add_attr
     root.attributes.itemByName = get_attr
     design.rootComponent = root
-    adsk_fusion = sys.modules["adsk.fusion"]
-    adsk_fusion.Design.cast.side_effect = lambda x: x
+    sys.modules["adsk.fusion"].Design.cast.side_effect = lambda x: x
     products.itemByProductType.return_value = design
     doc.products = products
     return doc
@@ -238,75 +166,82 @@ class TestActivationGate(unittest.TestCase):
         self.assertEqual(result, "doc_gone")
 
 
+def _get_DT():
+    """Get the DocumentTracker class that _load_provenance actually writes to."""
+    return sys.modules["server.document_tracker"].DocumentTracker
+
+def _get_AL():
+    """Get the ActionLog class that _load_provenance actually writes to."""
+    return sys.modules["server.action_log"].ActionLog
+
+
 class TestDocumentKeyedProvenance(unittest.TestCase):
 
     def setUp(self):
         SessionManager.reset()
         self.sm = SessionManager.instance()
         self.sm._subscribe_document_events = lambda: None
-        MockDocTracker._clear_memory()
-        MockActionLog._entries = []
-        MockActionLog._baseline = None
+        _get_DT()._clear_memory()
+        AL = _get_AL()
+        AL._entries = []
+        AL._baseline = None
 
     def test_save_and_load_provenance(self):
+        DT, AL = _get_DT(), _get_AL()
         sid = self.sm.create_session()
         doc = _make_doc("Doc1")
         self.sm.bind_document(sid, doc)
         doc_key = self.sm.get_session(sid).doc_key
 
-        # Simulate tool setting tracker state
-        MockDocTracker._script_hash = "hash_A"
-        MockDocTracker._script_source = "script_A"
-        MockActionLog._entries = [{"id": "e1"}]
+        DT._script_hash = "hash_A"
+        DT._script_source = "script_A"
+        AL._entries = [{"id": "e1"}]
 
         self.sm.save_provenance(doc_key)
 
-        # Clear globals
-        MockDocTracker._clear_memory()
-        MockActionLog._entries = []
+        DT._clear_memory()
+        AL._entries = []
 
-        # Load should restore
         self.sm._load_provenance(doc_key)
-        self.assertEqual(MockDocTracker._script_hash, "hash_A")
-        self.assertEqual(MockDocTracker._script_source, "script_A")
-        self.assertEqual(MockActionLog._entries, [{"id": "e1"}])
+        self.assertEqual(DT._script_hash, "hash_A")
+        self.assertEqual(DT._script_source, "script_A")
+        self.assertEqual(AL._entries, [{"id": "e1"}])
 
     def test_load_unknown_key_clears_globals(self):
-        MockDocTracker._script_hash = "stale"
-        MockActionLog._entries = [{"id": "stale"}]
+        DT, AL = _get_DT(), _get_AL()
+        DT._script_hash = "stale"
+        AL._entries = [{"id": "stale"}]
 
         self.sm._load_provenance("nonexistent_key")
 
-        self.assertIsNone(MockDocTracker._script_hash)
-        self.assertEqual(MockActionLog._entries, [])
+        self.assertIsNone(DT._script_hash)
+        self.assertEqual(AL._entries, [])
 
     def test_provenance_follows_document_on_transfer(self):
         """When a document is transferred, its provenance follows it."""
+        DT = _get_DT()
         sid_a = self.sm.create_session()
         sid_b = self.sm.create_session()
         doc = _make_doc("SharedDoc")
 
-        # A builds on doc
         self.sm.bind_document(sid_a, doc)
         doc_key = self.sm.get_session(sid_a).doc_key
 
-        MockDocTracker._script_hash = "hash_from_A"
+        DT._script_hash = "hash_from_A"
         self.sm.save_provenance(doc_key)
 
-        # Transfer to B (simulating claim_document transfer)
         self.sm.unbind_document(sid_a)
         self.sm.bind_document(sid_b, doc)
         new_key = self.sm.get_session(sid_b).doc_key
 
-        # docKey should be the same — provenance follows
         self.assertEqual(new_key, doc_key)
 
-        # Load provenance for B's doc — should get A's state
-        MockDocTracker._clear_memory()
+        DT._clear_memory()
         self.sm._load_provenance(new_key)
-        self.assertEqual(MockDocTracker._script_hash, "hash_from_A")
+        self.assertEqual(DT._script_hash, "hash_from_A")
 
     def test_two_docs_independent_provenance(self):
+        DT = _get_DT()
         sid_a = self.sm.create_session()
         sid_b = self.sm.create_session()
         doc_a = _make_doc("DocA")
@@ -317,38 +252,34 @@ class TestDocumentKeyedProvenance(unittest.TestCase):
         key_a = self.sm.get_session(sid_a).doc_key
         key_b = self.sm.get_session(sid_b).doc_key
 
-        # Save A's provenance
-        MockDocTracker._script_hash = "hash_A"
+        DT._script_hash = "hash_A"
         self.sm.save_provenance(key_a)
 
-        # Save B's provenance
-        MockDocTracker._script_hash = "hash_B"
+        DT._script_hash = "hash_B"
         self.sm.save_provenance(key_b)
 
-        # Load A — should get A's hash
         self.sm._load_provenance(key_a)
-        self.assertEqual(MockDocTracker._script_hash, "hash_A")
+        self.assertEqual(DT._script_hash, "hash_A")
 
-        # Load B — should get B's hash
         self.sm._load_provenance(key_b)
-        self.assertEqual(MockDocTracker._script_hash, "hash_B")
+        self.assertEqual(DT._script_hash, "hash_B")
 
     def test_bind_does_not_clear_provenance(self):
         """bind_document should NOT wipe provenance for the document."""
+        DT = _get_DT()
         sid = self.sm.create_session()
         doc = _make_doc("Doc1")
         self.sm.bind_document(sid, doc)
         doc_key = self.sm.get_session(sid).doc_key
 
-        MockDocTracker._script_hash = "important_hash"
+        DT._script_hash = "important_hash"
         self.sm.save_provenance(doc_key)
 
-        # Rebind to a new session — provenance should survive
         sid2 = self.sm.create_session()
         self.sm.bind_document(sid2, doc)
 
         self.sm._load_provenance(doc_key)
-        self.assertEqual(MockDocTracker._script_hash, "important_hash")
+        self.assertEqual(DT._script_hash, "important_hash")
 
 
 class TestClaimDocument(unittest.TestCase):

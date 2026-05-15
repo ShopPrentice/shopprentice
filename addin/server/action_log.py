@@ -327,12 +327,22 @@ class ActionLog:
                 cls._last_param_hash = param_hash
                 return
 
-            # Record the entry
+            # Read active document's stable key (if tagged by SessionManager)
+            doc_key = None
+            try:
+                root = design.rootComponent
+                dk_attr = root.attributes.itemByName("ShopPrentice", "docKey")
+                if dk_attr:
+                    doc_key = dk_attr.value
+            except Exception:
+                pass
+
             entry = {
                 "id": str(uuid.uuid4()),
                 "commandId": command_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "diff": diff,
+                "docKey": doc_key,
             }
             cls._entries.append(entry)
 

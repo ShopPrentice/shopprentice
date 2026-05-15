@@ -131,16 +131,17 @@ class SessionManager:
         if session is None:
             return
 
-        if session.document_name and session.document_name in self._doc_to_session:
-            if self._doc_to_session[session.document_name] == session_id:
-                del self._doc_to_session[session.document_name]
+        # Unbind previous doc (by docKey, not name)
+        if session.doc_key and session.doc_key in self._doc_to_session:
+            if self._doc_to_session[session.doc_key] == session_id:
+                del self._doc_to_session[session.doc_key]
 
         session.document = doc
         session.status = "active"
         if doc is not None:
-            self._doc_to_session[doc.name] = session_id
             doc_key = self._tag_document(doc, session_id)
             session.doc_key = doc_key
+            self._doc_to_session[doc_key] = session_id
         else:
             session.doc_key = None
         app.log(
@@ -153,8 +154,8 @@ class SessionManager:
         session = self._sessions.get(session_id)
         if session is None:
             return
-        if session.document_name and session.document_name in self._doc_to_session:
-            del self._doc_to_session[session.document_name]
+        if session.doc_key and session.doc_key in self._doc_to_session:
+            del self._doc_to_session[session.doc_key]
         session.document = None
         session.doc_key = None
 
@@ -223,7 +224,8 @@ class SessionManager:
             return err
         doc_name = target_doc.name
 
-        owner_sid = self._doc_to_session.get(doc_name)
+        target_key = self._read_doc_key(target_doc)
+        owner_sid = self._doc_to_session.get(target_key) if target_key else None
         if owner_sid and owner_sid != session_id:
             owner = self._sessions.get(owner_sid)
             if owner and owner.status == "active":
@@ -251,14 +253,13 @@ class SessionManager:
                 except Exception:
                     valid = False
                 if not valid:
-                    old_name = session.document_name
-                    if old_name and old_name in self._doc_to_session:
-                        if self._doc_to_session[old_name] == sid:
-                            del self._doc_to_session[old_name]
+                    if session.doc_key and session.doc_key in self._doc_to_session:
+                        if self._doc_to_session[session.doc_key] == sid:
+                            del self._doc_to_session[session.doc_key]
                     session.status = "doc_gone"
                     session._doc_ref = None
                     session.document_name = None
-                    app.log(f"Document '{old_name}' closed — session {sid[:8]} marked doc_gone")
+                    app.log(f"Document closed — session {sid[:8]} marked doc_gone")
 
     # ── diagnostics ────────────────────────────────────────────────────
 
@@ -388,6 +389,21 @@ class SessionManager:
 
     # ── internals ──────────────────────────────────────────────────────
 
+    def _read_doc_key(self, doc) -> Optional[str]:
+        """Read the docKey attribute from a document without activating it."""
+        try:
+            import adsk.fusion
+            design = adsk.fusion.Design.cast(
+                doc.products.itemByProductType("DesignProductType"))
+            if design:
+                attr = design.rootComponent.attributes.itemByName(
+                    "ShopPrentice", "docKey")
+                if attr:
+                    return attr.value
+        except Exception:
+            pass
+        return None
+
     def _resolve_target_doc(self, name: Optional[str]):
         if name:
             for i in range(app.documents.count):
@@ -507,10 +523,9 @@ class SessionManager:
 
     def _mark_doc_gone(self, session) -> None:
         sid = session.session_id
-        old_name = session.document_name
-        if old_name and old_name in self._doc_to_session:
-            if self._doc_to_session[old_name] == sid:
-                del self._doc_to_session[old_name]
+        if session.doc_key and session.doc_key in self._doc_to_session:
+            if self._doc_to_session[session.doc_key] == sid:
+                del self._doc_to_session[session.doc_key]
         session.status = "doc_gone"
         session._doc_ref = None
         session.document_name = None
