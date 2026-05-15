@@ -199,8 +199,8 @@ class SimpleMCPServer:
             sm = _sm_mod.SessionManager.instance() if _sm_mod else None
             try:
                 if sm and session_id:
-                    sm.current_session_id = session_id
                     gate_result = sm.activate_document(session_id)
+                    sm.current_session_id = session_id
                     if gate_result == "doc_gone":
                         args = data.get('arguments', {})
                         can_recover = (
@@ -238,7 +238,10 @@ class SimpleMCPServer:
                     result_container['exception'] = e
                     result_container['completed'] = True
             finally:
-                if sm:
+                if sm and session_id:
+                    sess = sm.get_session(session_id)
+                    if sess:
+                        sm._save_global_state(sess)
                     sm.current_session_id = None
 
         if not TaskManager.is_running():

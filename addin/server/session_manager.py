@@ -175,13 +175,6 @@ class SessionManager:
                 "message": "Unknown session ID",
             }
 
-        # Save outgoing session's global state before switching
-        prev_sid = self._current_session_id
-        if prev_sid and prev_sid != session_id:
-            prev = self._sessions.get(prev_sid)
-            if prev:
-                self._save_global_state(prev)
-
         if session.status == "doc_gone":
             self._restore_global_state(session)
             return "doc_gone"
