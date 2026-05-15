@@ -32,6 +32,8 @@ class Session:
         self.status: str = "active"  # active | orphaned | doc_gone
         self.created_at: float = time.time()
         self.last_active: float = time.time()
+        self._tracker_state: Optional[dict] = None
+        self._action_log_state: Optional[dict] = None
 
     @property
     def document(self):
@@ -153,21 +155,48 @@ class SessionManager:
         document is gone (so the callback can short-circuit the tool).
         Does nothing when the session has no bound document — tools like
         execute_script handle that case themselves.
+
+        Also saves the outgoing session's ActionLog/DocumentTracker state
+        and restores the incoming session's, so each session has its own
+        provenance context.
         """
         session = self._sessions.get(session_id)
         if session is None:
-            return None
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": (
+                        "Unknown session ID — your session may have "
+                        "expired after an add-in restart. Reconnect by "
+                        "sending a new initialize request."
+                    ),
+                }],
+                "isError": True,
+                "message": "Unknown session ID",
+            }
+
+        # Save outgoing session's global state before switching
+        prev_sid = self._current_session_id
+        if prev_sid and prev_sid != session_id:
+            prev = self._sessions.get(prev_sid)
+            if prev:
+                self._save_global_state(prev)
 
         if session.status == "doc_gone":
+            self._restore_global_state(session)
             return "doc_gone"
 
         if session._doc_ref is None:
+            self._restore_global_state(session)
             return None  # no doc bound yet — let tool handle it
 
         # Scan open documents for our tag — don't trust proxy refs
         if not self._verify_and_activate(session):
             self._mark_doc_gone(session)
             return "doc_gone"
+
+        # Restore incoming session's provenance state
+        self._restore_global_state(session)
         return None
 
     # ── throttle gate ──────────────────────────────────────────────────
@@ -331,6 +360,82 @@ class SessionManager:
                 "session (you'll need to create or claim a different document)"
             ),
         }
+
+    # ── per-session provenance save/restore ──────────────────────────
+
+    def _save_global_state(self, session) -> None:
+        """Snapshot ActionLog + DocumentTracker globals into the session."""
+        try:
+            from server.document_tracker import DocumentTracker as DT
+            session._tracker_state = {
+                "script_source": DT._script_source,
+                "script_path": DT._script_path,
+                "script_hash": DT._script_hash,
+                "sync_cursor": DT._sync_cursor,
+                "reference_model_params": DT._reference_model_params,
+                "doc_ref": DT._doc_ref,
+                "restored": DT._restored,
+            }
+        except Exception:
+            pass
+        try:
+            from server.action_log import ActionLog as AL
+            session._action_log_state = {
+                "entries": list(AL._entries),
+                "baseline": AL._baseline,
+                "last_timeline_count": AL._last_timeline_count,
+                "last_param_hash": AL._last_param_hash,
+                "last_read_cursor": AL._last_read_cursor,
+                "log_file": AL._log_file,
+            }
+        except Exception:
+            pass
+
+    def _restore_global_state(self, session) -> None:
+        """Restore ActionLog + DocumentTracker globals from the session."""
+        if session._tracker_state is not None:
+            try:
+                from server.document_tracker import DocumentTracker as DT
+                s = session._tracker_state
+                DT._script_source = s["script_source"]
+                DT._script_path = s["script_path"]
+                DT._script_hash = s["script_hash"]
+                DT._sync_cursor = s["sync_cursor"]
+                DT._reference_model_params = s["reference_model_params"]
+                DT._doc_ref = s["doc_ref"]
+                DT._restored = s["restored"]
+            except Exception:
+                pass
+        else:
+            try:
+                from server.document_tracker import DocumentTracker as DT
+                DT._clear_memory()
+            except Exception:
+                pass
+
+        if session._action_log_state is not None:
+            try:
+                from server.action_log import ActionLog as AL
+                s = session._action_log_state
+                AL._entries = s["entries"]
+                AL._baseline = s["baseline"]
+                AL._last_timeline_count = s["last_timeline_count"]
+                AL._last_param_hash = s["last_param_hash"]
+                AL._last_read_cursor = s["last_read_cursor"]
+                AL._log_file = s["log_file"]
+            except Exception:
+                pass
+        else:
+            try:
+                from server.action_log import ActionLog as AL
+                AL._entries = []
+                AL._baseline = None
+                AL._last_timeline_count = None
+                AL._last_param_hash = None
+                AL._last_read_cursor = None
+                AL._log_file = None
+            except Exception:
+                pass
 
     def _tag_document(self, doc, session_id: str) -> None:
         """Stamp the design with our session ID so we can verify later."""
