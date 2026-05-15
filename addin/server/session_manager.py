@@ -67,7 +67,6 @@ class SessionManager:
         self._last_execution: float = 0.0
         self._current_session_id: Optional[str] = None
         self._doc_closing_handler = None
-        self._doc_counter: int = 0
 
     # ── singleton ──────────────────────────────────────────────────────
 
@@ -437,7 +436,7 @@ class SessionManager:
                 pass
 
     def _tag_document(self, doc, session_id: str) -> None:
-        """Stamp the design with our session ID and give it a readable name."""
+        """Stamp the design with our session ID via a hidden attribute."""
         try:
             import adsk.fusion
             design = adsk.fusion.Design.cast(
@@ -445,9 +444,6 @@ class SessionManager:
             if design:
                 design.rootComponent.attributes.add(
                     "ShopPrentice", "sessionId", session_id)
-                self._doc_counter += 1
-                design.rootComponent.name = (
-                    f"SP Agent {self._doc_counter} ({session_id[:8]})")
         except Exception as e:
             app.log(f"[session] failed to tag document: {e}")
 
