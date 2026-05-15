@@ -407,8 +407,10 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
                     doc = app.activeDocument
                     if doc and not doc.isSaved:
                         doc.close(False)
-                    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+                    new_doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
                     transacted_doc = app.activeDocument
+                    if sid:
+                        sm.bind_document(sid, new_doc)
                     app.executeTextCommand('PTransaction.Start "Execute Prompt Script"')
                     transaction_started = True
 

@@ -130,6 +130,8 @@ class SessionManager:
 
         session.document = doc
         session.status = "active"
+        session._tracker_state = None
+        session._action_log_state = None
         if doc is not None:
             self._doc_to_session[doc.name] = session_id
             self._tag_document(doc, session_id)

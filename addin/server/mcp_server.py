@@ -158,7 +158,7 @@ class SimpleMCPServer:
             if tool_item.run_on_main_thread:
                 result = await self._execute_on_main_thread(
                     tool_item.handler, arguments, request_id, "tool",
-                    session_id=session_id,
+                    session_id=session_id, tool_name=tool_name,
                 )
             else:
                 result = tool_item.handler(**arguments)
@@ -176,6 +176,7 @@ class SimpleMCPServer:
     async def _execute_on_main_thread(
         self, handler_func, arguments: Dict[str, Any], request_id: Any,
         operation_type: str = "operation", session_id: Optional[str] = None,
+        tool_name: Optional[str] = None,
     ) -> Any:
         """Execute a handler function on the main thread using TaskManager.
 
@@ -205,8 +206,7 @@ class SimpleMCPServer:
                         args = data.get('arguments', {})
                         can_recover = (
                             args.get('clean') or args.get('force_clean')
-                            or args.get('document_name') is not None
-                            or args.get('resolution') is not None
+                            or tool_name == "claim_document"
                         )
                         if not can_recover:
                             with result_lock:
