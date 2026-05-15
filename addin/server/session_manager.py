@@ -6,11 +6,18 @@ separate documents without stepping on each other.  The MCP server reads
 the Mcp-Session-Id HTTP header to identify the caller, then the
 SessionManager activates the correct document before every tool execution.
 
-Lifecycle:
-    initialize  →  SessionManager.create_session()  →  new UUID
-    tool call   →  SessionManager.activate_document(sid) → doc.activate()
-    disconnect  →  SessionManager.mark_orphaned(sid)
-    doc closed  →  SessionManager.on_document_closed(name)
+Architecture:
+    SessionManager  — maps session_id → document
+    _doc_provenance — maps doc_key   → ActionLog/DocumentTracker state
+
+    A session only determines which document is active.  Provenance is
+    loaded/saved by document identity so transferring or claiming a
+    document naturally carries its provenance with the document.
+
+Document identity:
+    Each document gets two hidden attributes on its root component:
+        ShopPrentice.docKey     — stable UUID, never changes (provenance key)
+        ShopPrentice.sessionId  — current owning session (changes on transfer)
 """
 
 import time
@@ -28,12 +35,11 @@ class Session:
     def __init__(self, session_id: str):
         self.session_id: str = session_id
         self.document_name: Optional[str] = None
+        self.doc_key: Optional[str] = None
         self._doc_ref = None
         self.status: str = "active"  # active | orphaned | doc_gone
         self.created_at: float = time.time()
         self.last_active: float = time.time()
-        self._tracker_state: Optional[dict] = None
-        self._action_log_state: Optional[dict] = None
 
     @property
     def document(self):
@@ -58,12 +64,13 @@ class SessionManager:
 
     _instance: Optional["SessionManager"] = None
 
-    MIN_COOLDOWN: float = 0.2  # seconds between main-thread executions
+    MIN_COOLDOWN: float = 0.2
     MAX_SESSIONS: int = 4
 
     def __init__(self):
         self._sessions: Dict[str, Session] = {}
-        self._doc_to_session: Dict[str, str] = {}  # doc_name → session_id
+        self._doc_to_session: Dict[str, str] = {}
+        self._doc_provenance: Dict[str, dict] = {}  # doc_key → state
         self._last_execution: float = 0.0
         self._current_session_id: Optional[str] = None
         self._doc_closing_handler = None
@@ -92,6 +99,7 @@ class SessionManager:
         self._unsubscribe_document_events()
         self._sessions.clear()
         self._doc_to_session.clear()
+        self._doc_provenance.clear()
         app.log("SessionManager stopped")
 
     # ── session CRUD ───────────────────────────────────────────────────
@@ -123,21 +131,22 @@ class SessionManager:
         if session is None:
             return
 
-        # unbind previous document — only delete OUR entry, not another session's
         if session.document_name and session.document_name in self._doc_to_session:
             if self._doc_to_session[session.document_name] == session_id:
                 del self._doc_to_session[session.document_name]
 
         session.document = doc
         session.status = "active"
-        session._tracker_state = None
-        session._action_log_state = None
         if doc is not None:
             self._doc_to_session[doc.name] = session_id
-            self._tag_document(doc, session_id)
+            doc_key = self._tag_document(doc, session_id)
+            session.doc_key = doc_key
+        else:
+            session.doc_key = None
         app.log(
             f"Session {session_id[:8]} bound to "
             f"{doc.name if doc else '(none)'}"
+            f" (doc_key={session.doc_key[:8] if session.doc_key else 'none'})"
         )
 
     def unbind_document(self, session_id: str) -> None:
@@ -147,20 +156,14 @@ class SessionManager:
         if session.document_name and session.document_name in self._doc_to_session:
             del self._doc_to_session[session.document_name]
         session.document = None
+        session.doc_key = None
 
     # ── document activation gate ───────────────────────────────────────
 
     def activate_document(self, session_id: str):
-        """Activate the session's document before a tool runs.
+        """Activate the session's document and load its provenance.
 
-        Returns None on success, or an error-result dict if the session's
-        document is gone (so the callback can short-circuit the tool).
-        Does nothing when the session has no bound document — tools like
-        execute_script handle that case themselves.
-
-        Also saves the outgoing session's ActionLog/DocumentTracker state
-        and restores the incoming session's, so each session has its own
-        provenance context.
+        Returns None on success, ``"doc_gone"`` sentinel, or an error dict.
         """
         session = self._sessions.get(session_id)
         if session is None:
@@ -178,26 +181,23 @@ class SessionManager:
             }
 
         if session.status == "doc_gone":
-            self._restore_global_state(session)
+            self._load_provenance(session.doc_key)
             return "doc_gone"
 
         if session._doc_ref is None:
-            self._restore_global_state(session)
-            return None  # no doc bound yet — let tool handle it
+            self._load_provenance(session.doc_key)
+            return None
 
-        # Scan open documents for our tag — don't trust proxy refs
         if not self._verify_and_activate(session):
             self._mark_doc_gone(session)
             return "doc_gone"
 
-        # Restore incoming session's provenance state
-        self._restore_global_state(session)
+        self._load_provenance(session.doc_key)
         return None
 
     # ── throttle gate ──────────────────────────────────────────────────
 
     def throttle_gate(self) -> None:
-        """Enforce minimum cooldown since the last tool FINISHED."""
         now = time.time()
         gap = now - self._last_execution
         if gap < self.MIN_COOLDOWN:
@@ -214,23 +214,15 @@ class SessionManager:
         document_name: Optional[str] = None,
         resolution: Optional[str] = None,
     ) -> dict:
-        """Attempt to claim a document for *session_id*.
-
-        Returns a result dict.  When the target doc belongs to a live
-        session and no *resolution* is given, returns a ``conflict`` dict
-        with available options.
-        """
         session = self._sessions.get(session_id)
         if session is None:
             return {"error": True, "message": "Session not found."}
 
-        # resolve target document
         target_doc, err = self._resolve_target_doc(document_name)
         if err:
             return err
         doc_name = target_doc.name
 
-        # check existing owner
         owner_sid = self._doc_to_session.get(doc_name)
         if owner_sid and owner_sid != session_id:
             owner = self._sessions.get(owner_sid)
@@ -238,11 +230,9 @@ class SessionManager:
                 return self._handle_conflict(
                     session_id, owner_sid, doc_name, target_doc, resolution
                 )
-            # orphaned or gone — safe to reclaim
             if owner:
                 self.unbind_document(owner_sid)
 
-        # unbind this session's old doc (if any)
         self.unbind_document(session_id)
         self.bind_document(session_id, target_doc)
         return {
@@ -254,7 +244,6 @@ class SessionManager:
     # ── document-closed event ──────────────────────────────────────────
 
     def on_document_closed(self) -> None:
-        """After a document closes, scan for sessions with stale refs."""
         for sid, session in self._sessions.items():
             if session._doc_ref is not None:
                 try:
@@ -279,11 +268,12 @@ class SessionManager:
             out.append({
                 "session_id": s.session_id[:8],
                 "document": s.document_name,
+                "doc_key": s.doc_key[:8] if s.doc_key else None,
                 "status": s.status,
             })
         return out
 
-    # ── current-session context (set by MCP server during execution) ──
+    # ── current-session context ────────────────────────────────────────
 
     @property
     def current_session_id(self) -> Optional[str]:
@@ -293,10 +283,112 @@ class SessionManager:
     def current_session_id(self, value: Optional[str]):
         self._current_session_id = value
 
+    # ── document-keyed provenance ──────────────────────────────────────
+
+    def save_provenance(self, doc_key: Optional[str] = None) -> None:
+        """Save current ActionLog + DocumentTracker globals for a document.
+
+        Called from the callback's finally block with the active doc's key.
+        """
+        if doc_key is None:
+            doc_key = self._active_doc_key()
+        if doc_key is None:
+            return
+        state = {}
+        try:
+            from server.document_tracker import DocumentTracker as DT
+            state["tracker"] = {
+                "script_source": DT._script_source,
+                "script_path": DT._script_path,
+                "script_hash": DT._script_hash,
+                "sync_cursor": DT._sync_cursor,
+                "reference_model_params": DT._reference_model_params,
+                "doc_ref": DT._doc_ref,
+                "restored": DT._restored,
+            }
+        except Exception:
+            pass
+        try:
+            from server.action_log import ActionLog as AL
+            state["action_log"] = {
+                "entries": list(AL._entries),
+                "baseline": AL._baseline,
+                "last_timeline_count": AL._last_timeline_count,
+                "last_param_hash": AL._last_param_hash,
+                "last_read_cursor": AL._last_read_cursor,
+                "log_file": AL._log_file,
+            }
+        except Exception:
+            pass
+        self._doc_provenance[doc_key] = state
+
+    def _load_provenance(self, doc_key: Optional[str]) -> None:
+        """Restore ActionLog + DocumentTracker globals for a document."""
+        state = self._doc_provenance.get(doc_key) if doc_key else None
+
+        tracker = state.get("tracker") if state else None
+        if tracker is not None:
+            try:
+                from server.document_tracker import DocumentTracker as DT
+                DT._script_source = tracker["script_source"]
+                DT._script_path = tracker["script_path"]
+                DT._script_hash = tracker["script_hash"]
+                DT._sync_cursor = tracker["sync_cursor"]
+                DT._reference_model_params = tracker["reference_model_params"]
+                DT._doc_ref = tracker["doc_ref"]
+                DT._restored = tracker["restored"]
+            except Exception:
+                pass
+        else:
+            try:
+                from server.document_tracker import DocumentTracker as DT
+                DT._clear_memory()
+            except Exception:
+                pass
+
+        action_log = state.get("action_log") if state else None
+        if action_log is not None:
+            try:
+                from server.action_log import ActionLog as AL
+                AL._entries = action_log["entries"]
+                AL._baseline = action_log["baseline"]
+                AL._last_timeline_count = action_log["last_timeline_count"]
+                AL._last_param_hash = action_log["last_param_hash"]
+                AL._last_read_cursor = action_log["last_read_cursor"]
+                AL._log_file = action_log["log_file"]
+            except Exception:
+                pass
+        else:
+            try:
+                from server.action_log import ActionLog as AL
+                AL._entries = []
+                AL._baseline = None
+                AL._last_timeline_count = None
+                AL._last_param_hash = None
+                AL._last_read_cursor = None
+                AL._log_file = None
+            except Exception:
+                pass
+
+    def _active_doc_key(self) -> Optional[str]:
+        """Read the docKey attribute from the currently active document."""
+        try:
+            import adsk.fusion
+            doc = app.activeDocument
+            design = adsk.fusion.Design.cast(
+                doc.products.itemByProductType("DesignProductType"))
+            if design:
+                attr = design.rootComponent.attributes.itemByName(
+                    "ShopPrentice", "docKey")
+                if attr:
+                    return attr.value
+        except Exception:
+            pass
+        return None
+
     # ── internals ──────────────────────────────────────────────────────
 
     def _resolve_target_doc(self, name: Optional[str]):
-        """Return (doc, None) or (None, error_dict)."""
         if name:
             for i in range(app.documents.count):
                 doc = app.documents.item(i)
@@ -342,7 +434,6 @@ class SessionManager:
                 "document_name": doc_name,
             }
 
-        # no resolution — present the conflict
         return {
             "conflict": True,
             "document_name": doc_name,
@@ -359,129 +450,59 @@ class SessionManager:
             ),
         }
 
-    # ── per-session provenance save/restore ──────────────────────────
+    def _tag_document(self, doc, session_id: str) -> str:
+        """Stamp the design with sessionId and a stable docKey.
 
-    def _save_global_state(self, session) -> None:
-        """Snapshot ActionLog + DocumentTracker globals into the session."""
-        try:
-            from server.document_tracker import DocumentTracker as DT
-            session._tracker_state = {
-                "script_source": DT._script_source,
-                "script_path": DT._script_path,
-                "script_hash": DT._script_hash,
-                "sync_cursor": DT._sync_cursor,
-                "reference_model_params": DT._reference_model_params,
-                "doc_ref": DT._doc_ref,
-                "restored": DT._restored,
-            }
-        except Exception:
-            pass
-        try:
-            from server.action_log import ActionLog as AL
-            session._action_log_state = {
-                "entries": list(AL._entries),
-                "baseline": AL._baseline,
-                "last_timeline_count": AL._last_timeline_count,
-                "last_param_hash": AL._last_param_hash,
-                "last_read_cursor": AL._last_read_cursor,
-                "log_file": AL._log_file,
-            }
-        except Exception:
-            pass
-
-    def _restore_global_state(self, session) -> None:
-        """Restore ActionLog + DocumentTracker globals from the session."""
-        if session._tracker_state is not None:
-            try:
-                from server.document_tracker import DocumentTracker as DT
-                s = session._tracker_state
-                DT._script_source = s["script_source"]
-                DT._script_path = s["script_path"]
-                DT._script_hash = s["script_hash"]
-                DT._sync_cursor = s["sync_cursor"]
-                DT._reference_model_params = s["reference_model_params"]
-                DT._doc_ref = s["doc_ref"]
-                DT._restored = s["restored"]
-            except Exception:
-                pass
-        else:
-            try:
-                from server.document_tracker import DocumentTracker as DT
-                DT._clear_memory()
-            except Exception:
-                pass
-
-        if session._action_log_state is not None:
-            try:
-                from server.action_log import ActionLog as AL
-                s = session._action_log_state
-                AL._entries = s["entries"]
-                AL._baseline = s["baseline"]
-                AL._last_timeline_count = s["last_timeline_count"]
-                AL._last_param_hash = s["last_param_hash"]
-                AL._last_read_cursor = s["last_read_cursor"]
-                AL._log_file = s["log_file"]
-            except Exception:
-                pass
-        else:
-            try:
-                from server.action_log import ActionLog as AL
-                AL._entries = []
-                AL._baseline = None
-                AL._last_timeline_count = None
-                AL._last_param_hash = None
-                AL._last_read_cursor = None
-                AL._log_file = None
-            except Exception:
-                pass
-
-    def _tag_document(self, doc, session_id: str) -> None:
-        """Stamp the design with our session ID via a hidden attribute."""
+        Returns the docKey (existing or newly created).
+        """
+        doc_key = None
         try:
             import adsk.fusion
             design = adsk.fusion.Design.cast(
                 doc.products.itemByProductType("DesignProductType"))
             if design:
-                design.rootComponent.attributes.add(
+                root = design.rootComponent
+                root.attributes.add(
                     "ShopPrentice", "sessionId", session_id)
+                existing = root.attributes.itemByName(
+                    "ShopPrentice", "docKey")
+                if existing:
+                    doc_key = existing.value
+                else:
+                    doc_key = uuid.uuid4().hex
+                    root.attributes.add(
+                        "ShopPrentice", "docKey", doc_key)
         except Exception as e:
             app.log(f"[session] failed to tag document: {e}")
+        return doc_key or uuid.uuid4().hex
 
     def _verify_and_activate(self, session) -> bool:
-        """Find this session's document by scanning for its attribute tag.
-
-        Does NOT trust proxy references (Fusion recycles them after close).
-        Scans all open documents, finds the one tagged with this session's
-        ID, updates ``_doc_ref`` to the current proxy, and activates it.
-        """
+        """Find this session's document by scanning for its sessionId tag."""
         import adsk.fusion
         target_sid = session.session_id
-        doc_count = app.documents.count
-        app.log(f"[verify] scanning {doc_count} docs for session {target_sid[:8]}")
-        for i in range(doc_count):
+        for i in range(app.documents.count):
             doc = app.documents.item(i)
             try:
                 design = adsk.fusion.Design.cast(
                     doc.products.itemByProductType("DesignProductType"))
                 if not design:
-                    app.log(f"[verify]   doc[{i}] '{doc.name}' — no design")
                     continue
                 attr = design.rootComponent.attributes.itemByName(
                     "ShopPrentice", "sessionId")
-                attr_val = attr.value if attr else None
-                app.log(f"[verify]   doc[{i}] '{doc.name}' — tag={attr_val}")
                 if attr and attr.value == target_sid:
                     session._doc_ref = doc
+                    dk = design.rootComponent.attributes.itemByName(
+                        "ShopPrentice", "docKey")
+                    if dk:
+                        session.doc_key = dk.value
                     try:
                         if app.activeDocument is not doc:
                             doc.activate()
                     except Exception:
                         pass
                     return True
-            except Exception as e:
-                app.log(f"[verify]   doc[{i}] exception: {e}")
+            except Exception:
                 continue
-        app.log(f"[verify] no match for {target_sid[:8]} — doc_gone")
         return False
 
     def _mark_doc_gone(self, session) -> None:
@@ -493,7 +514,6 @@ class SessionManager:
         session.status = "doc_gone"
         session._doc_ref = None
         session.document_name = None
-        app.log(f"[activate] {sid[:8]} marked doc_gone (was '{old_name}')")
 
     def _evict_oldest_orphan(self):
         oldest = None
@@ -521,6 +541,16 @@ class SessionManager:
             except Exception:
                 pass
             self._doc_closing_handler = None
+
+    # ── back-compat shims (called from mcp_server callback) ────────────
+
+    def _save_global_state(self, session) -> None:
+        """Save provenance keyed by the session's current document."""
+        self.save_provenance(session.doc_key)
+
+    def _restore_global_state(self, session) -> None:
+        """Load provenance for the session's current document."""
+        self._load_provenance(session.doc_key)
 
 
 class _DocClosedHandler(adsk.core.DocumentEventHandler):
