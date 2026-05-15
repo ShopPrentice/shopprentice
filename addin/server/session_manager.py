@@ -121,14 +121,16 @@ class SessionManager:
         if session is None:
             return
 
-        # unbind previous document
+        # unbind previous document — only delete OUR entry, not another session's
         if session.document_name and session.document_name in self._doc_to_session:
-            del self._doc_to_session[session.document_name]
+            if self._doc_to_session[session.document_name] == session_id:
+                del self._doc_to_session[session.document_name]
 
         session.document = doc
         session.status = "active"
         if doc is not None:
             self._doc_to_session[doc.name] = session_id
+            self._tag_document(doc, session_id)
         app.log(
             f"Session {session_id[:8]} bound to "
             f"{doc.name if doc else '(none)'}"
@@ -144,31 +146,29 @@ class SessionManager:
 
     # ── document activation gate ───────────────────────────────────────
 
-    def activate_document(self, session_id: str) -> None:
+    def activate_document(self, session_id: str):
         """Activate the session's document before a tool runs.
 
+        Returns None on success, or an error-result dict if the session's
+        document is gone (so the callback can short-circuit the tool).
         Does nothing when the session has no bound document — tools like
         execute_script handle that case themselves.
         """
         session = self._sessions.get(session_id)
         if session is None:
-            return
+            return None
 
-        doc = session.document  # property validates isValid
-        if doc is None:
-            if session.status != "doc_gone" and session.document_name:
-                session.status = "doc_gone"
-                if session.document_name in self._doc_to_session:
-                    del self._doc_to_session[session.document_name]
-            return
+        if session.status == "doc_gone":
+            return "doc_gone"
 
-        try:
-            current = app.activeDocument
-            if current is not doc:
-                doc.activate()
-        except Exception:
-            session.status = "doc_gone"
-            session._doc_ref = None
+        if session._doc_ref is None:
+            return None  # no doc bound yet — let tool handle it
+
+        # Scan open documents for our tag — don't trust proxy refs
+        if not self._verify_and_activate(session):
+            self._mark_doc_gone(session)
+            return "doc_gone"
+        return None
 
     # ── throttle gate ──────────────────────────────────────────────────
 
@@ -226,16 +226,23 @@ class SessionManager:
 
     # ── document-closed event ──────────────────────────────────────────
 
-    def on_document_closed(self, doc_name: str) -> None:
-        sid = self._doc_to_session.pop(doc_name, None)
-        if sid is None:
-            return
-        session = self._sessions.get(sid)
-        if session is not None:
-            session.status = "doc_gone"
-            session._doc_ref = None
-            session.document_name = None
-            app.log(f"Document '{doc_name}' closed — session {sid[:8]} marked doc_gone")
+    def on_document_closed(self) -> None:
+        """After a document closes, scan for sessions with stale refs."""
+        for sid, session in self._sessions.items():
+            if session._doc_ref is not None:
+                try:
+                    valid = session._doc_ref.isValid
+                except Exception:
+                    valid = False
+                if not valid:
+                    old_name = session.document_name
+                    if old_name and old_name in self._doc_to_session:
+                        if self._doc_to_session[old_name] == sid:
+                            del self._doc_to_session[old_name]
+                    session.status = "doc_gone"
+                    session._doc_ref = None
+                    session.document_name = None
+                    app.log(f"Document '{old_name}' closed — session {sid[:8]} marked doc_gone")
 
     # ── diagnostics ────────────────────────────────────────────────────
 
@@ -325,6 +332,66 @@ class SessionManager:
             ),
         }
 
+    def _tag_document(self, doc, session_id: str) -> None:
+        """Stamp the design with our session ID so we can verify later."""
+        try:
+            import adsk.fusion
+            design = adsk.fusion.Design.cast(
+                doc.products.itemByProductType("DesignProductType"))
+            if design:
+                design.rootComponent.attributes.add(
+                    "ShopPrentice", "sessionId", session_id)
+        except Exception as e:
+            app.log(f"[session] failed to tag document: {e}")
+
+    def _verify_and_activate(self, session) -> bool:
+        """Find this session's document by scanning for its attribute tag.
+
+        Does NOT trust proxy references (Fusion recycles them after close).
+        Scans all open documents, finds the one tagged with this session's
+        ID, updates ``_doc_ref`` to the current proxy, and activates it.
+        """
+        import adsk.fusion
+        target_sid = session.session_id
+        doc_count = app.documents.count
+        app.log(f"[verify] scanning {doc_count} docs for session {target_sid[:8]}")
+        for i in range(doc_count):
+            doc = app.documents.item(i)
+            try:
+                design = adsk.fusion.Design.cast(
+                    doc.products.itemByProductType("DesignProductType"))
+                if not design:
+                    app.log(f"[verify]   doc[{i}] '{doc.name}' — no design")
+                    continue
+                attr = design.rootComponent.attributes.itemByName(
+                    "ShopPrentice", "sessionId")
+                attr_val = attr.value if attr else None
+                app.log(f"[verify]   doc[{i}] '{doc.name}' — tag={attr_val}")
+                if attr and attr.value == target_sid:
+                    session._doc_ref = doc
+                    try:
+                        if app.activeDocument is not doc:
+                            doc.activate()
+                    except Exception:
+                        pass
+                    return True
+            except Exception as e:
+                app.log(f"[verify]   doc[{i}] exception: {e}")
+                continue
+        app.log(f"[verify] no match for {target_sid[:8]} — doc_gone")
+        return False
+
+    def _mark_doc_gone(self, session) -> None:
+        sid = session.session_id
+        old_name = session.document_name
+        if old_name and old_name in self._doc_to_session:
+            if self._doc_to_session[old_name] == sid:
+                del self._doc_to_session[old_name]
+        session.status = "doc_gone"
+        session._doc_ref = None
+        session.document_name = None
+        app.log(f"[activate] {sid[:8]} marked doc_gone (was '{old_name}')")
+
     def _evict_oldest_orphan(self):
         oldest = None
         for s in self._sessions.values():
@@ -338,29 +405,27 @@ class SessionManager:
 
     def _subscribe_document_events(self):
         try:
-            handler = _DocClosingHandler()
-            app.documentClosing.add(handler)
+            handler = _DocClosedHandler()
+            app.documentClosed.add(handler)
             self._doc_closing_handler = handler
         except Exception as e:
-            app.log(f"SessionManager: failed to subscribe documentClosing: {e}")
+            app.log(f"SessionManager: failed to subscribe documentClosed: {e}")
 
     def _unsubscribe_document_events(self):
         if self._doc_closing_handler is not None:
             try:
-                app.documentClosing.remove(self._doc_closing_handler)
+                app.documentClosed.remove(self._doc_closing_handler)
             except Exception:
                 pass
             self._doc_closing_handler = None
 
 
-class _DocClosingHandler(adsk.core.DocumentEventHandler):
+class _DocClosedHandler(adsk.core.DocumentEventHandler):
     def __init__(self):
         super().__init__()
 
     def notify(self, args: adsk.core.DocumentEventArgs):
         try:
-            doc = args.document
-            if doc:
-                SessionManager.instance().on_document_closed(doc.name)
+            SessionManager.instance().on_document_closed()
         except Exception:
             pass

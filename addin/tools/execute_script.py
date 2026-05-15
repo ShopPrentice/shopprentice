@@ -322,16 +322,22 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
     sm = SessionManager.instance()
     sid = sm.current_session_id
 
+    app.log(f"[exec] sid={sid[:8] if sid else 'None'} clean={clean} force_clean={force_clean}")
+
     if sid:
         session = sm.get_session(sid)
+        has_doc = session.document is not None if session else 'no_session'
+        app.log(f"[exec] session found={session is not None} has_doc={has_doc}")
         if session and session.document is None:
             if clean or force_clean:
-                import adsk.fusion as _af
+                import adsk.core as _ac, adsk.fusion as _af
+                app.log("[exec] creating new scratch doc for session")
                 new_doc = app.documents.add(
-                    adsk.core.DocumentTypes.FusionDesignDocumentType)
+                    _ac.DocumentTypes.FusionDesignDocumentType)
                 _design = _af.Design.cast(app.activeProduct)
                 _design.designType = _af.DesignTypes.ParametricDesignType
                 sm.bind_document(sid, new_doc)
+                app.log(f"[exec] bound doc={new_doc.name} docs_open={app.documents.count}")
             else:
                 return {
                     "content": [{
@@ -433,15 +439,6 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
                 DocumentTracker._script_path = script_path
         except Exception:
             pass
-
-        # Bind document to session if not already bound
-        if sid:
-            _ses = sm.get_session(sid)
-            if _ses and _ses.document is None:
-                try:
-                    sm.bind_document(sid, app.activeDocument)
-                except Exception:
-                    pass
 
         # Set visual style to Shaded with Visible Edges after every build
         try:

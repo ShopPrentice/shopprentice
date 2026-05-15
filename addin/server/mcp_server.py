@@ -191,12 +191,44 @@ class SimpleMCPServer:
         result_lock = threading.Lock()
 
         def callback(data):
-            sm = SessionManager.instance()
+            # Resolve SessionManager via sys.modules so we always get the
+            # current singleton, even after a hot-reload that replaced the
+            # module-level import.
+            import sys as _sys
+            _sm_mod = _sys.modules.get("server.session_manager")
+            sm = _sm_mod.SessionManager.instance() if _sm_mod else None
             try:
-                if session_id:
+                if sm and session_id:
                     sm.current_session_id = session_id
-                    sm.activate_document(session_id)
-                sm.throttle_gate()
+                    gate_result = sm.activate_document(session_id)
+                    if gate_result == "doc_gone":
+                        args = data.get('arguments', {})
+                        can_recover = (
+                            args.get('clean') or args.get('force_clean')
+                            or args.get('document_name') is not None
+                            or args.get('resolution') is not None
+                        )
+                        if not can_recover:
+                            with result_lock:
+                                result_container['result'] = {
+                                    "content": [{"type": "text", "text": (
+                                        "Your document was closed. Use "
+                                        "execute_script(clean=True) to create "
+                                        "a new one, or call claim_document to "
+                                        "adopt an existing document."
+                                    )}],
+                                    "isError": True,
+                                    "message": "Session document was closed",
+                                }
+                                result_container['completed'] = True
+                            return
+                    elif gate_result is not None:
+                        with result_lock:
+                            result_container['result'] = gate_result
+                            result_container['completed'] = True
+                        return
+                if sm:
+                    sm.throttle_gate()
                 result = handler_func(**data['arguments'])
                 with result_lock:
                     result_container['result'] = result
@@ -206,7 +238,8 @@ class SimpleMCPServer:
                     result_container['exception'] = e
                     result_container['completed'] = True
             finally:
-                sm.current_session_id = None
+                if sm:
+                    sm.current_session_id = None
 
         if not TaskManager.is_running():
             if app:
