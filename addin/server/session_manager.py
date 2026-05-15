@@ -71,6 +71,7 @@ class SessionManager:
         self._sessions: Dict[str, Session] = {}
         self._doc_to_session: Dict[str, str] = {}
         self._doc_provenance: Dict[str, dict] = {}  # doc_key → state
+        self._loaded_doc_key: Optional[str] = None   # which doc's state is in globals
         self._last_execution: float = 0.0
         self._current_session_id: Optional[str] = None
         self._doc_closing_handler = None
@@ -289,10 +290,13 @@ class SessionManager:
     def save_provenance(self, doc_key: Optional[str] = None) -> None:
         """Save current ActionLog + DocumentTracker globals for a document.
 
-        Called from the callback's finally block with the active doc's key.
+        When *doc_key* is omitted, saves under ``_loaded_doc_key`` (the key
+        whose state is currently in the globals), NOT the active document's
+        key.  This prevents saving A's globals under B when the user
+        switched documents in the Fusion UI.
         """
         if doc_key is None:
-            doc_key = self._active_doc_key()
+            doc_key = self._loaded_doc_key
         if doc_key is None:
             return
         state = {}
@@ -325,6 +329,7 @@ class SessionManager:
 
     def _load_provenance(self, doc_key: Optional[str]) -> None:
         """Restore ActionLog + DocumentTracker globals for a document."""
+        self._loaded_doc_key = doc_key
         state = self._doc_provenance.get(doc_key) if doc_key else None
 
         tracker = state.get("tracker") if state else None
@@ -370,22 +375,6 @@ class SessionManager:
                 AL._log_file = None
             except Exception:
                 pass
-
-    def _active_doc_key(self) -> Optional[str]:
-        """Read the docKey attribute from the currently active document."""
-        try:
-            import adsk.fusion
-            doc = app.activeDocument
-            design = adsk.fusion.Design.cast(
-                doc.products.itemByProductType("DesignProductType"))
-            if design:
-                attr = design.rootComponent.attributes.itemByName(
-                    "ShopPrentice", "docKey")
-                if attr:
-                    return attr.value
-        except Exception:
-            pass
-        return None
 
     # ── internals ──────────────────────────────────────────────────────
 
