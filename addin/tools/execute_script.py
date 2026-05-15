@@ -314,6 +314,45 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
     if sandbox:
         return _execute_sandbox(script)
 
+    # ── session-aware document provisioning ──
+    # When running under a session, ensure the session has a document.
+    # clean=True creates a fresh scratch doc; clean=False requires an
+    # existing bound document (or claim_document first).
+    from server.session_manager import SessionManager
+    sm = SessionManager.instance()
+    sid = sm.current_session_id
+
+    app.log(f"[exec] sid={sid[:8] if sid else 'None'} clean={clean} force_clean={force_clean}")
+
+    if sid:
+        session = sm.get_session(sid)
+        has_doc = session.document is not None if session else 'no_session'
+        app.log(f"[exec] session found={session is not None} has_doc={has_doc}")
+        if session and session.document is None:
+            if clean or force_clean:
+                import adsk.core as _ac, adsk.fusion as _af
+                app.log("[exec] creating new scratch doc for session")
+                new_doc = app.documents.add(
+                    _ac.DocumentTypes.FusionDesignDocumentType)
+                _design = _af.Design.cast(app.activeProduct)
+                _design.designType = _af.DesignTypes.ParametricDesignType
+                sm.bind_document(sid, new_doc)
+                app.log(f"[exec] bound doc={new_doc.name} docs_open={app.documents.count}")
+            else:
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": (
+                            "No document is bound to this session. "
+                            "Use execute_script(clean=True) to create a "
+                            "new scratch document, or call claim_document "
+                            "to adopt an existing one first."
+                        ),
+                    }],
+                    "isError": True,
+                    "message": "No document bound to session",
+                }
+
     # Guard: clean=True destroys the timeline + user parameters. Only allow
     # it on documents the add-in knows were built by a tracked script AND
     # have no unsynced UI changes. force_clean=True bypasses the check for
@@ -368,8 +407,10 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
                     doc = app.activeDocument
                     if doc and not doc.isSaved:
                         doc.close(False)
-                    app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+                    new_doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
                     transacted_doc = app.activeDocument
+                    if sid:
+                        sm.bind_document(sid, new_doc)
                     app.executeTextCommand('PTransaction.Start "Execute Prompt Script"')
                     transaction_started = True
 

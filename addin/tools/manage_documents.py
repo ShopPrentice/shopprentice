@@ -97,8 +97,20 @@ def handler(action: str = "list", name: str = "", index: int = -1) -> dict:
 
         elif action == "new":
             doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+            design = adsk.fusion.Design.cast(app.activeProduct)
+            if design:
+                design.designType = adsk.fusion.DesignTypes.ParametricDesignType
+            # Bind to current session if one is active
+            try:
+                from server.session_manager import SessionManager
+                sm = SessionManager.instance()
+                sid = sm.current_session_id
+                if sid:
+                    sm.bind_document(sid, doc)
+            except Exception:
+                pass
             return {
-                "content": [{"type": "text", "text": f"Created: {doc.name}"}],
+                "content": [{"type": "text", "text": f"Created and bound: {doc.name}"}],
                 "isError": False,
                 "message": f"Created: {doc.name}",
             }
