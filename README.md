@@ -75,7 +75,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 </tr>
 <tr>
 <td align="center"><a href="examples/pergola-rebuild/"><img src="examples/pergola-rebuild/screenshots/overview.png" width="200" /><br /><b>Pergola + Deck</b></a><br />43 bodies, scarf joints (rebuilt)</td>
-<td align="center"><a href="examples/hall_bench/"><img src="examples/hall_bench/screenshots/iso-top-right.png" width="200" /><br /><b>Hall Bench</b></a><br />Raked back, profiled posts, slab seat</td>
+<td align="center"><a href="examples/dresser/"><img src="examples/dresser/screenshots/iso-top-right.png" width="200" /><br /><b>Dresser</b></a><br />3-drawer, through dovetail case, maple + poplar</td>
 <td align="center"><a href="examples/chair/"><img src="examples/chair/screenshots/iso-top-right.png" width="200" /><br /><b>Dining Chair</b></a><br />Bent-back legs, vertical slats, tilted dominos</td>
 </tr>
 <tr>
