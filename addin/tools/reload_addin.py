@@ -149,4 +149,6 @@ tool = Tool.create_simple(
 
 item = Item.create_tool_item(tool=tool, handler=handler)
 
-register(item)
+import os
+if os.environ.get("SHOPPRENTICE_DEV"):
+    register(item)

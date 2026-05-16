@@ -3,6 +3,11 @@ MCP Server Module
 
 Simple MCP-compatible server implementation that runs within Fusion 360's
 Python environment. Implements MCP protocol over HTTP without external dependencies.
+
+Session isolation: the server reads/writes the ``Mcp-Session-Id`` HTTP
+header (MCP streamable-HTTP spec) so each connected agent gets its own
+Fusion 360 document.  Clients that omit the header fall back to
+single-session (legacy) behaviour.
 """
 
 import asyncio
@@ -16,6 +21,7 @@ from primitives.tool import Tool
 from primitives.resource import Resource
 from primitives.item import Item
 from .task_manager import TaskManager
+from .session_manager import SessionManager
 
 try:
     import adsk.core
@@ -64,30 +70,41 @@ class SimpleMCPServer:
         else:
             raise ValueError(f"Unknown item type: {item_type}")
 
-    async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle MCP protocol requests."""
+    async def handle_request(
+        self, request: Dict[str, Any], session_id: Optional[str] = None
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
+        """Handle MCP protocol requests.
+
+        Returns ``(response_dict, session_id)`` so the HTTP handler can
+        set the ``Mcp-Session-Id`` response header.
+        """
         try:
             method = request.get("method")
             request_id = request.get("id")
             params = request.get("params", {})
 
             if method == "initialize":
-                return self._handle_initialize(request_id, params)
+                sm = SessionManager.instance()
+                new_sid = sm.create_session()
+                resp = self._handle_initialize(request_id, params)
+                return resp, new_sid
             elif method == "tools/list":
-                return self._handle_tools_list(request_id)
+                return self._handle_tools_list(request_id), session_id
             elif method == "tools/call":
-                return await self._handle_tools_call(request_id, params)
+                resp = await self._handle_tools_call(request_id, params, session_id=session_id)
+                return resp, session_id
             elif method == "resources/list":
-                return self._handle_resources_list(request_id)
+                return self._handle_resources_list(request_id), session_id
             elif method == "resources/templates/list":
-                return self._handle_resources_templates_list(request_id)
+                return self._handle_resources_templates_list(request_id), session_id
             elif method == "resources/read":
-                return await self._handle_resources_read(request_id, params)
+                resp = await self._handle_resources_read(request_id, params)
+                return resp, session_id
             else:
-                return self._create_error_response(request_id, -32601, f"Method not found: {method}")
+                return self._create_error_response(request_id, -32601, f"Method not found: {method}"), session_id
 
         except Exception as e:
-            return self._create_error_response(request.get("id"), -32603, str(e))
+            return self._create_error_response(request.get("id"), -32603, str(e)), session_id
 
     def _handle_initialize(self, request_id: Any, _params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle initialize request."""
@@ -122,7 +139,9 @@ class SimpleMCPServer:
             "result": {"tools": tools}
         }
 
-    async def _handle_tools_call(self, request_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _handle_tools_call(
+        self, request_id: Any, params: Dict[str, Any], session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Handle tools/call request."""
         tool_name = params.get("name")
         arguments = params.get("arguments", {})
@@ -137,7 +156,10 @@ class SimpleMCPServer:
             tool_item = self.tools[tool_name]
 
             if tool_item.run_on_main_thread:
-                result = await self._execute_on_main_thread(tool_item.handler, arguments, request_id, "tool")
+                result = await self._execute_on_main_thread(
+                    tool_item.handler, arguments, request_id, "tool",
+                    session_id=session_id, tool_name=tool_name,
+                )
             else:
                 result = tool_item.handler(**arguments)
 
@@ -151,8 +173,17 @@ class SimpleMCPServer:
                 app.log(f"Tool execution error: {str(e)}")
             return self._create_error_response(request_id, -32603, f"Tool execution error: {str(e)}")
 
-    async def _execute_on_main_thread(self, handler_func, arguments: Dict[str, Any], request_id: Any, operation_type: str = "operation") -> Any:
-        """Execute a handler function on the main thread using TaskManager."""
+    async def _execute_on_main_thread(
+        self, handler_func, arguments: Dict[str, Any], request_id: Any,
+        operation_type: str = "operation", session_id: Optional[str] = None,
+        tool_name: Optional[str] = None,
+    ) -> Any:
+        """Execute a handler function on the main thread using TaskManager.
+
+        When *session_id* is provided the SessionManager activates the
+        correct document and sets ``current_session_id`` before calling
+        the handler so tools can read it without extra plumbing.
+        """
         import threading
         import time
         import asyncio
@@ -161,7 +192,80 @@ class SimpleMCPServer:
         result_lock = threading.Lock()
 
         def callback(data):
+            # Resolve SessionManager via sys.modules so we always get the
+            # current singleton, even after a hot-reload that replaced the
+            # module-level import.
+            import sys as _sys
+            _sm_mod = _sys.modules.get("server.session_manager")
+            sm = _sm_mod.SessionManager.instance() if _sm_mod else None
             try:
+                if sm and session_id:
+                    gate_result = sm.activate_document(session_id)
+                    sm.current_session_id = session_id
+                    if gate_result == "session_recovered":
+                        can_recover = (
+                            tool_name == "claim_document"
+                            or data.get('arguments', {}).get('clean')
+                            or data.get('arguments', {}).get('force_clean')
+                        )
+                        if not can_recover:
+                            import json as _json
+                            docs = [d for d in sm.list_available_documents()
+                                    if d.get("doc_key")]
+                            doc_list = "\n".join(
+                                f"  - '{d['name']}'  doc_key={d['doc_key']}  "
+                                f"bodies={d['body_count']}  "
+                                f"owner={d['owner_session'] or 'none'}  "
+                                f"status={d['owner_status']}"
+                                for d in docs
+                            ) or "  (no tagged documents found)"
+                            with result_lock:
+                                result_container['result'] = {
+                                    "content": [{"type": "text", "text": (
+                                        "Your session was restored after an "
+                                        "add-in restart, but you have no "
+                                        "document bound.\n\n"
+                                        "Open documents with ShopPrentice tags:\n"
+                                        f"{doc_list}\n\n"
+                                        "To reclaim your document, call "
+                                        "claim_document(doc_key='...') with the "
+                                        "key of the document you were working on. "
+                                        "If you're unsure which one, ask the user. "
+                                        "To start fresh, use "
+                                        "execute_script(clean=True)."
+                                    )}],
+                                    "isError": True,
+                                    "message": "Session restored — claim a document to continue",
+                                }
+                                result_container['completed'] = True
+                            return
+                    elif gate_result == "doc_gone":
+                        args = data.get('arguments', {})
+                        can_recover = (
+                            args.get('clean') or args.get('force_clean')
+                            or tool_name == "claim_document"
+                        )
+                        if not can_recover:
+                            with result_lock:
+                                result_container['result'] = {
+                                    "content": [{"type": "text", "text": (
+                                        "Your document was closed. Use "
+                                        "execute_script(clean=True) to create "
+                                        "a new one, or call claim_document to "
+                                        "adopt an existing document."
+                                    )}],
+                                    "isError": True,
+                                    "message": "Session document was closed",
+                                }
+                                result_container['completed'] = True
+                            return
+                    elif gate_result is not None:
+                        with result_lock:
+                            result_container['result'] = gate_result
+                            result_container['completed'] = True
+                        return
+                if sm:
+                    sm.throttle_gate()
                 result = handler_func(**data['arguments'])
                 with result_lock:
                     result_container['result'] = result
@@ -170,6 +274,14 @@ class SimpleMCPServer:
                 with result_lock:
                     result_container['exception'] = e
                     result_container['completed'] = True
+            finally:
+                if sm:
+                    sm.record_execution_end()
+                    if session_id:
+                        sess = sm.get_session(session_id)
+                        if sess:
+                            sm._save_global_state(sess)
+                        sm.current_session_id = None
 
         if not TaskManager.is_running():
             if app:
@@ -335,9 +447,16 @@ class MCPHandler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             request_data = json.loads(post_data.decode('utf-8'))
 
-            response = asyncio.run(self.mcp_server.handle_request(request_data))
+            session_id = self.headers.get('Mcp-Session-Id')
+            method = request_data.get("method", "?")
+            if app:
+                app.log(f"[session] {method} | header={session_id or '(none)'}")
 
-            self._send_json_response(response)
+            response, response_session_id = asyncio.run(
+                self.mcp_server.handle_request(request_data, session_id=session_id)
+            )
+
+            self._send_json_response(response, session_id=response_session_id)
         except json.JSONDecodeError:
             self.send_error(400, "Invalid JSON")
         except Exception as e:
@@ -358,11 +477,13 @@ class MCPHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404, "Not Found")
 
-    def _send_json_response(self, data):
-        """Send JSON response"""
+    def _send_json_response(self, data, session_id: str = None):
+        """Send JSON response, optionally including ``Mcp-Session-Id``."""
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
+        if session_id:
+            self.send_header('Mcp-Session-Id', session_id)
         self.end_headers()
 
         response_json = json.dumps(data, indent=2)

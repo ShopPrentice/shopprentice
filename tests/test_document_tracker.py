@@ -1,7 +1,7 @@
 """
 Tests for DocumentTracker singleton.
 
-Runs outside Fusion 360 by mocking the adsk module and ActionLog.
+Runs outside Fusion 360 using shared mock fixtures.
 """
 
 import hashlib
@@ -10,77 +10,26 @@ import json
 import os
 import sys
 import tempfile
-import types
 import unittest
 from unittest.mock import MagicMock
 
-
-# ── Mock adsk before importing DocumentTracker ──
-
-def _setup_mocks():
-    """Install fake adsk and ActionLog modules so document_tracker can import."""
-    # Mock adsk.core
-    adsk = types.ModuleType("adsk")
-    adsk.core = types.ModuleType("adsk.core")
-    mock_app = MagicMock()
-    adsk.core.Application = MagicMock()
-    adsk.core.Application.get.return_value = mock_app
-    # Mock adsk.fusion (needed by _capture_model_params)
-    adsk.fusion = types.ModuleType("adsk.fusion")
-    mock_design_cls = MagicMock()
-    # Default: Design.cast() returns None (no active design)
-    mock_design_cls.cast.return_value = None
-    adsk.fusion.Design = mock_design_cls
-    sys.modules["adsk"] = adsk
-    sys.modules["adsk.core"] = adsk.core
-    sys.modules["adsk.fusion"] = adsk.fusion
-
-    # Mock ActionLog as a class with classmethods
-    class MockActionLog:
-        _entries = []
-
-        @classmethod
-        def get_latest_cursor(cls):
-            if cls._entries:
-                return cls._entries[-1]["id"]
-            return None
-
-        @classmethod
-        def get_entries(cls, since=None):
-            if since is None:
-                return list(cls._entries)
-            for i, entry in enumerate(cls._entries):
-                if entry["id"] == since:
-                    return list(cls._entries[i + 1:])
-            return list(cls._entries)
-
-        @classmethod
-        def reset_entries(cls):
-            cls._entries = []
-
-    # Install the server package mock
-    server_pkg = types.ModuleType("server")
-    server_pkg.__path__ = []  # make it a package
-
-    action_log_mod = types.ModuleType("server.action_log")
-    action_log_mod.ActionLog = MockActionLog
-
-    sys.modules["server"] = server_pkg
-    sys.modules["server.action_log"] = action_log_mod
-
-    return mock_app, MockActionLog
-
-
-mock_app, MockActionLog = _setup_mocks()
+# Shared mocks — compatible with test_session_manager
+from tests.fixtures.mock_adsk import setup as _setup_mocks
+_m = _setup_mocks()
+mock_app = _m["app"]
+MockActionLog = _m["ActionLog"]
 
 # Import DocumentTracker from its file location
-spec = importlib.util.spec_from_file_location(
-    "server.document_tracker",
-    os.path.join(os.path.dirname(__file__), "..", "addin", "server", "document_tracker.py")
-)
-mod = importlib.util.module_from_spec(spec)
-sys.modules["server.document_tracker"] = mod
-spec.loader.exec_module(mod)
+if "server.document_tracker" not in sys.modules or not hasattr(sys.modules["server.document_tracker"], "_PROVENANCE_FILE"):
+    spec = importlib.util.spec_from_file_location(
+        "server.document_tracker",
+        os.path.join(os.path.dirname(__file__), "..", "addin", "server", "document_tracker.py")
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["server.document_tracker"] = mod
+    spec.loader.exec_module(mod)
+else:
+    mod = sys.modules["server.document_tracker"]
 
 DocumentTracker = mod.DocumentTracker
 
@@ -90,6 +39,9 @@ class TestDocumentTracker(unittest.TestCase):
     def setUp(self):
         DocumentTracker.reset()
         MockActionLog.reset_entries()
+        # Design.cast returns None by default (tests override per-test)
+        sys.modules["adsk.fusion"].Design.cast.side_effect = None
+        sys.modules["adsk.fusion"].Design.cast.return_value = None
         # Redirect provenance file to a temp location
         self._tmp_dir = tempfile.mkdtemp()
         self._orig_dir = mod._PROVENANCE_DIR
