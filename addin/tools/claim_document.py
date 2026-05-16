@@ -18,6 +18,7 @@ app = adsk.core.Application.get()
 
 def handler(
     document_name: str = None,
+    doc_key: str = None,
     resolution: str = None,
 ) -> dict:
     from server.session_manager import SessionManager
@@ -39,7 +40,10 @@ def handler(
             "isError": True,
         }
 
-    result = sm.claim_document(sid, document_name=document_name, resolution=resolution)
+    result = sm.claim_document(
+        sid, document_name=document_name, doc_key=doc_key,
+        resolution=resolution,
+    )
 
     if result.get("conflict"):
         return {
@@ -66,23 +70,35 @@ Claim (adopt) an existing open Fusion 360 document for this session.
 
 Use this when you want to work on a document that already exists — for
 example, one left by a previous agent session or opened by the user.
+Also use this after an add-in restart when your session was restored
+but has no document bound — the error message lists available documents
+with their doc_key values.
+
+Identify the target by doc_key (preferred — stable UUID, shown in the
+session-restored message) or document_name. If neither is given, claims
+the currently active document in the Fusion viewport.
 
 Each session can control at most one document.  If the target document is
 already bound to another *active* session, the tool returns a conflict
 with two resolution options.  Present both to the user and call again
-with the chosen resolution.
-
-If called without document_name, claims whichever document is currently
-active in the Fusion 360 viewport.
+with the chosen resolution. Do NOT auto-resolve — always ask the user.
 """
 
 tool = (
     Tool.create_simple(name="claim_document", description=TOOL_DESCRIPTION)
+    .add_input_property("doc_key", {
+        "type": "string",
+        "description": (
+            "Stable document UUID (shown in the session-restored "
+            "message). Preferred over document_name since names can "
+            "collide across unsaved documents."
+        ),
+    })
     .add_input_property("document_name", {
         "type": "string",
         "description": (
-            "Name of the open document to claim. "
-            "Omit to claim the currently active document."
+            "Name of the open document to claim. Use doc_key instead "
+            "when available. Omit both to claim the active document."
         ),
     })
     .add_input_property("resolution", {

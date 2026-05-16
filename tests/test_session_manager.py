@@ -149,7 +149,7 @@ class TestActivationGate(unittest.TestCase):
     def test_unknown_session_auto_recreated(self):
         """Stale session IDs are auto-recreated so agents survive add-in restarts."""
         result = self.sm.activate_document("nonexistent_id")
-        self.assertIsNone(result)  # no error — session recreated with no doc
+        self.assertEqual(result, "session_recovered")
         session = self.sm.get_session("nonexistent_id")
         self.assertIsNotNone(session)
         self.assertEqual(session.status, "active")
