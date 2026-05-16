@@ -146,11 +146,14 @@ class TestActivationGate(unittest.TestCase):
         self.sm = SessionManager.instance()
         self.sm._subscribe_document_events = lambda: None
 
-    def test_unknown_session_returns_error(self):
+    def test_unknown_session_auto_recreated(self):
+        """Stale session IDs are auto-recreated so agents survive add-in restarts."""
         result = self.sm.activate_document("nonexistent_id")
-        self.assertIsInstance(result, dict)
-        self.assertTrue(result["isError"])
-        self.assertIn("Unknown session", result["message"])
+        self.assertIsNone(result)  # no error — session recreated with no doc
+        session = self.sm.get_session("nonexistent_id")
+        self.assertIsNotNone(session)
+        self.assertEqual(session.status, "active")
+        self.assertIsNone(session.doc_key)
 
     def test_no_doc_returns_none(self):
         sid = self.sm.create_session()
