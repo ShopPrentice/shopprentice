@@ -169,18 +169,13 @@ class SessionManager:
         """
         session = self._sessions.get(session_id)
         if session is None:
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": (
-                        "Unknown session ID — your session may have "
-                        "expired after an add-in restart. Reconnect by "
-                        "sending a new initialize request."
-                    ),
-                }],
-                "isError": True,
-                "message": "Unknown session ID",
-            }
+            # Stale session (add-in restarted). Auto-recreate with the
+            # same ID so the client's cached header stays valid.  The
+            # session has no document — the agent must claim_document or
+            # execute_script(clean=True) to get one.
+            session = Session(session_id)
+            self._sessions[session_id] = session
+            app.log(f"Session {session_id[:8]} auto-recreated (stale)")
 
         if session.status == "doc_gone":
             self._load_provenance(session.doc_key)
