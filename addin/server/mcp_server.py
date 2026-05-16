@@ -210,12 +210,13 @@ class SimpleMCPServer:
                         )
                         if not can_recover:
                             import json as _json
-                            docs = sm.list_available_documents()
+                            docs = [d for d in sm.list_available_documents()
+                                    if d.get("doc_key")]
                             doc_list = "\n".join(
-                                f"  - '{d['name']}' (doc_key={d['doc_key'][:8]}..., "
-                                f"bodies={d['body_count']}, "
-                                f"owner={d['owner_session'] or 'none'}, "
-                                f"status={d['owner_status']})"
+                                f"  - '{d['name']}'  doc_key={d['doc_key']}  "
+                                f"bodies={d['body_count']}  "
+                                f"owner={d['owner_session'] or 'none'}  "
+                                f"status={d['owner_status']}"
                                 for d in docs
                             ) or "  (no tagged documents found)"
                             with result_lock:
