@@ -49,7 +49,6 @@ The agent can also work from images — show it a photo or sketch of a piece and
 
 <table>
 <tr>
-<td align="center"><a href="examples/jewelry-chest/"><img src="examples/jewelry-chest/product_iso.png" width="200" /><br /><b>Jewelry Chest</b></a><br />Dovetails, mitered trays, spalted maple veneer, frame-and-panel lid</td>
 <td align="center"><a href="examples/mcm-desk/"><img src="examples/mcm-desk/assets/rendered_model.png" width="200" /><br /><b>MCM Teak Desk</b></a><br />Real wood photography, entasis legs, ear fillet wrapping</td>
 <td align="center"><a href="examples/esherick-stool/"><img src="examples/esherick-stool/iso-top-right.png" width="200" /><br /><b>Esherick Stool</b></a><br />Lofted lens-profile seat, turned legs, wedged through-tenons</td>
 <td align="center"><a href="examples/roubo_workbench/"><img src="examples/roubo_workbench/screenshots/front.png" width="200" /><br /><b>Roubo Workbench</b></a><br />Leg vise, drawbore tenons, sliding deadman, dog holes</td>
@@ -82,7 +81,6 @@ The agent can also work from images — show it a photo or sketch of a piece and
 <tr>
 <td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a><br />Writing desk with aprons</td>
 <td align="center"><a href="examples/side-table/"><img src="examples/side-table/screenshots/iso-top-right.png" width="200" /><br /><b>Side Table</b></a><br />Walnut with spalted maple drawer front</td>
-<td align="center"><a href="examples/dresser/"><img src="examples/dresser/screenshots/iso-top-right.png" width="200" /><br /><b>Dresser</b></a><br />3-drawer, through dovetail case</td>
 </tr>
 </table>
 
