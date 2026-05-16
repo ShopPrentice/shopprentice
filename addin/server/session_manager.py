@@ -169,13 +169,10 @@ class SessionManager:
         """
         session = self._sessions.get(session_id)
         if session is None:
-            # Stale session (add-in restarted). Auto-recreate with the
-            # same ID so the client's cached header stays valid.  The
-            # session has no document — the agent must claim_document or
-            # execute_script(clean=True) to get one.
             session = Session(session_id)
             self._sessions[session_id] = session
             app.log(f"Session {session_id[:8]} auto-recreated (stale)")
+            return "session_recovered"
 
         if session.status == "doc_gone":
             self._load_provenance(session.doc_key)
@@ -209,13 +206,17 @@ class SessionManager:
         self,
         session_id: str,
         document_name: Optional[str] = None,
+        doc_key: Optional[str] = None,
         resolution: Optional[str] = None,
     ) -> dict:
         session = self._sessions.get(session_id)
         if session is None:
             return {"error": True, "message": "Session not found."}
 
-        target_doc, err = self._resolve_target_doc(document_name)
+        if doc_key:
+            target_doc, err = self._resolve_doc_by_key(doc_key)
+        else:
+            target_doc, err = self._resolve_target_doc(document_name)
         if err:
             return err
         doc_name = target_doc.name
@@ -269,6 +270,40 @@ class SessionManager:
                 "status": s.status,
             })
         return out
+
+    def list_available_documents(self) -> list:
+        """Return info about all open documents with ShopPrentice tags."""
+        import adsk.fusion
+        docs = []
+        for i in range(app.documents.count):
+            doc = app.documents.item(i)
+            try:
+                design = adsk.fusion.Design.cast(
+                    doc.products.itemByProductType("DesignProductType"))
+                if not design:
+                    continue
+                root = design.rootComponent
+                dk = root.attributes.itemByName("ShopPrentice", "docKey")
+                sid = root.attributes.itemByName("ShopPrentice", "sessionId")
+                doc_key = dk.value if dk else None
+                owner_sid = sid.value if sid else None
+                owner_session = self._sessions.get(owner_sid) if owner_sid else None
+                docs.append({
+                    "index": i,
+                    "name": doc.name,
+                    "doc_key": doc_key,
+                    "owner_session": owner_sid[:8] if owner_sid else None,
+                    "owner_status": owner_session.status if owner_session else "none",
+                    "body_count": sum(
+                        1 for _ in range(root.bRepBodies.count)
+                    ) + sum(
+                        occ.component.bRepBodies.count
+                        for occ in root.allOccurrences
+                    ),
+                })
+            except Exception:
+                continue
+        return docs
 
     # ── current-session context ────────────────────────────────────────
 
@@ -372,6 +407,27 @@ class SessionManager:
                 pass
 
     # ── internals ──────────────────────────────────────────────────────
+
+    def _resolve_doc_by_key(self, doc_key: str):
+        """Find an open document by its docKey attribute."""
+        import adsk.fusion
+        for i in range(app.documents.count):
+            doc = app.documents.item(i)
+            try:
+                design = adsk.fusion.Design.cast(
+                    doc.products.itemByProductType("DesignProductType"))
+                if not design:
+                    continue
+                attr = design.rootComponent.attributes.itemByName(
+                    "ShopPrentice", "docKey")
+                if attr and attr.value == doc_key:
+                    return doc, None
+            except Exception:
+                continue
+        return None, {
+            "error": True,
+            "message": f"No open document with doc_key '{doc_key[:8]}...'.",
+        }
 
     def _read_doc_key(self, doc) -> Optional[str]:
         """Read the docKey attribute from a document without activating it."""

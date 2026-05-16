@@ -202,7 +202,43 @@ class SimpleMCPServer:
                 if sm and session_id:
                     gate_result = sm.activate_document(session_id)
                     sm.current_session_id = session_id
-                    if gate_result == "doc_gone":
+                    if gate_result == "session_recovered":
+                        can_recover = (
+                            tool_name == "claim_document"
+                            or data.get('arguments', {}).get('clean')
+                            or data.get('arguments', {}).get('force_clean')
+                        )
+                        if not can_recover:
+                            import json as _json
+                            docs = sm.list_available_documents()
+                            doc_list = "\n".join(
+                                f"  - '{d['name']}' (doc_key={d['doc_key'][:8]}..., "
+                                f"bodies={d['body_count']}, "
+                                f"owner={d['owner_session'] or 'none'}, "
+                                f"status={d['owner_status']})"
+                                for d in docs
+                            ) or "  (no tagged documents found)"
+                            with result_lock:
+                                result_container['result'] = {
+                                    "content": [{"type": "text", "text": (
+                                        "Your session was restored after an "
+                                        "add-in restart, but you have no "
+                                        "document bound.\n\n"
+                                        "Open documents with ShopPrentice tags:\n"
+                                        f"{doc_list}\n\n"
+                                        "To reclaim your document, call "
+                                        "claim_document(doc_key='...') with the "
+                                        "key of the document you were working on. "
+                                        "If you're unsure which one, ask the user. "
+                                        "To start fresh, use "
+                                        "execute_script(clean=True)."
+                                    )}],
+                                    "isError": True,
+                                    "message": "Session restored — claim a document to continue",
+                                }
+                                result_container['completed'] = True
+                            return
+                    elif gate_result == "doc_gone":
                         args = data.get('arguments', {})
                         can_recover = (
                             args.get('clean') or args.get('force_clean')
