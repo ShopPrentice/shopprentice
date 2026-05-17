@@ -17,6 +17,7 @@ Reference for available reusable templates and hardware. Check this before writi
 | `scarf_joint` | `from woodworking.templates import scarf_joint` | WIP | pergola |
 | `pull` | `from helpers.templates import pull` | Draft | — |
 | `chest_lock` | `from helpers.templates import chest_lock` | Draft | — |
+| `frame_and_panel` | `from woodworking.templates import frame_and_panel` | Tested | — (fixture-validated: XZ door, XY lid, YZ side panel, 2×2 grid) |
 
 ## Hardware (`addin/helpers/hardware.py`)
 
@@ -32,7 +33,7 @@ Reference for available reusable templates and hardware. Check this before writi
 | `applied_base` | chest, dresser, cabinet, sideboard | Phase 2 | Foot boards wider than case + arch cutouts + transition molding |
 | `edge_banding` | chest, box | Phase 2 | Molding pieces around panel edges with profiled cross-section |
 | `breadboard_ends` | chest, table, desk | Phase 2 | M&T with elongated slots for wood movement |
-| `frame_and_panel` | cabinet, wardrobe, sideboard, door | Phase 2 | Frame with M&T + floating panel |
+| ~~`frame_and_panel`~~ | ~~cabinet, wardrobe, sideboard, door~~ | ~~Phase 2~~ | **Done** — see Build Templates table above |
 | `shelf_pins` | cabinet, bookshelf, wardrobe | Phase 2 | Adjustable shelf hole pattern |
 | `bed_rail` | bed-frame | Phase 3 | Rail-to-post connection with bed bolt hardware |
 | `slat_system` | bed-frame, bench | Phase 3 | Evenly spaced slats across rails |
