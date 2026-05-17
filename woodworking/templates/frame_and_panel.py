@@ -21,6 +21,10 @@ Usage:
         groove_w="fp_gw", groove_d="fp_gd",
         panel_t="fp_pt", tongue_l="fp_tl",
         prefix="FP", ev=ctx.ev)
+
+Note: Chinese mitered corners (格角榫), sliding dovetail battens (穿带),
+and flush_outer panel positioning are NOT included here — they require a
+dedicated template with different geometry and will be in a separate PR.
 """
 
 import adsk.core
@@ -96,34 +100,6 @@ def _make_size(a1, e1, a2, e2):
     return {a1: e1, a2: e2}
 
 
-def _miter_corner(comp, base_plane, ext_axis,
-                  v_outer, v_stile, v_inner,
-                  frame_t, rail_body, stile_body,
-                  name, ev):
-    P = adsk.core.Point3D
-    sk = comp.sketches.add(base_plane)
-    sk.name = f"{name}_Sk"
-    m2s = sk.modelToSketchSpace
-
-    p1 = m2s(P.create(ev(v_outer[0]), ev(v_outer[1]), ev(v_outer[2])))
-    p2 = m2s(P.create(ev(v_stile[0]), ev(v_stile[1]), ev(v_stile[2])))
-    p3 = m2s(P.create(ev(v_inner[0]), ev(v_inner[1]), ev(v_inner[2])))
-
-    lines = sk.sketchCurves.sketchLines
-    l1 = lines.addByTwoPoints(
-        P.create(p1.x, p1.y, 0), P.create(p2.x, p2.y, 0))
-    l2 = lines.addByTwoPoints(
-        l1.endSketchPoint, P.create(p3.x, p3.y, 0))
-    lines.addByTwoPoints(l2.endSketchPoint, l1.startSketchPoint)
-
-    prof = sp.smallest_profile(sk)
-    tri_ext = sp.ext_new(comp, prof, frame_t, f"{name}_Tri")
-    tri_body = tri_ext.bodies.item(0)
-
-    sp.combine(rail_body, tri_body, CUT, True, f"{name}_RailCut")
-    sp.combine(stile_body, tri_body, JOIN, False, f"{name}_StileJoin")
-
-
 def build(comp, base_plane, origin,
           rail_axis, rail_len,
           stile_axis, stile_len,
@@ -132,8 +108,6 @@ def build(comp, base_plane, origin,
           panel_t, tongue_l,
           div_along_stile=0,
           div_along_rail=0,
-          corner_joint="stub_tenon",
-          panel_position="centered",
           tenon_depth=None,
           tenon_shoulder=None,
           prefix="FP", ev=None):
@@ -153,8 +127,6 @@ def build(comp, base_plane, origin,
         tongue_l: Panel tongue protrusion.
         div_along_stile: Vertical dividers (parallel to stiles).
         div_along_rail: Horizontal dividers (parallel to rails).
-        corner_joint: "stub_tenon" or "mitered_mt".
-        panel_position: "centered" or "flush_outer" (Chinese style).
         tenon_depth: Stile tenon depth into rail. Defaults to frame_w*2/3.
         prefix: Name prefix.
         ev: Evaluator function.
@@ -192,11 +164,8 @@ def build(comp, base_plane, origin,
     s_mid = sp.off_plane(comp, perp_base[S],
                          f"({o_s}) + ({stile_len}) / 2", f"{prefix}_SMid")
 
-    # ── Groove position (plane only created if h-dividers need it) ─
-    if panel_position == "flush_outer":
-        groove_e = f"({frame_t}) - ({groove_w})"
-    else:
-        groove_e = f"({frame_t} - {groove_w}) / 2"
+    # ── Groove position (centered on frame thickness) ───────────────
+    groove_e = f"({frame_t} - {groove_w}) / 2"
     groove_plane = None
     if n_h > 0:
         groove_plane = sp.off_plane(comp, base_plane, groove_e, f"{prefix}_GPl")
@@ -389,11 +358,7 @@ def build(comp, base_plane, origin,
                 dividers_h.append(dh)
 
     # ── Panel(s) ──────────────────────────────────────────────────
-    # Panel position along ext axis
-    if panel_position == "flush_outer":
-        panel_e = f"({frame_t}) - ({panel_t})"
-    else:
-        panel_e = f"({frame_t} - {panel_t}) / 2"
+    panel_e = f"({frame_t} - {panel_t}) / 2"
     panel_plane = sp.off_plane(comp, base_plane, panel_e, f"{prefix}_PPl")
 
     n_cols = n_v + 1
@@ -550,44 +515,6 @@ def build(comp, base_plane, origin,
         sp.combine(dh, all_panels, CUT, True,
                    f"{prefix}_{dh.name}_Cut")
 
-    # ── Mitered corners (格角榫) ─────────────────────────────────
-    if corner_joint == "mitered_mt":
-        r_bot, r_top = rails[0], rails[1]
-        s_left, s_right = stiles[0], stiles[1]
-
-        _miter_corner(comp, base_plane, E,
-            _o(o_r, o_s, o_e),
-            _o(o_r, f"{o_s} + {frame_w}", o_e),
-            _o(f"{o_r} + {frame_w}", f"{o_s} + {frame_w}", o_e),
-            frame_t, r_bot, s_left, f"{prefix}_MBL", ev)
-
-        _miter_corner(comp, base_plane, E,
-            _o(f"{o_r} + {rail_len}", o_s, o_e),
-            _o(f"{o_r} + {rail_len}", f"{o_s} + {frame_w}", o_e),
-            _o(f"{o_r} + {rail_len} - {frame_w}",
-               f"{o_s} + {frame_w}", o_e),
-            frame_t, r_bot, s_right, f"{prefix}_MBR", ev)
-
-        _miter_corner(comp, base_plane, E,
-            _o(o_r, f"{o_s} + {stile_len}", o_e),
-            _o(o_r, f"{o_s} + {stile_len} - {frame_w}", o_e),
-            _o(f"{o_r} + {frame_w}",
-               f"{o_s} + {stile_len} - {frame_w}", o_e),
-            frame_t, r_top, s_left, f"{prefix}_MTL", ev)
-
-        _miter_corner(comp, base_plane, E,
-            _o(f"{o_r} + {rail_len}",
-               f"{o_s} + {stile_len}", o_e),
-            _o(f"{o_r} + {rail_len}",
-               f"{o_s} + {stile_len} - {frame_w}", o_e),
-            _o(f"{o_r} + {rail_len} - {frame_w}",
-               f"{o_s} + {stile_len} - {frame_w}", o_e),
-            frame_t, r_top, s_right, f"{prefix}_MTR", ev)
-
-        for stile in stiles:
-            sp.combine(stile, all_panels, CUT, True,
-                       f"{prefix}_{stile.name}_MiterGroove")
-
     all_bodies = rails + stiles + dividers_v + dividers_h + all_panels
 
     return {
@@ -601,105 +528,6 @@ def build(comp, base_plane, origin,
     }
 
 
-def add_battens(comp, panel_body, base_plane,
-                rail_axis, stile_axis,
-                rail_len, stile_len,
-                frame_w, frame_t, panel_t,
-                groove_d,
-                count=2,
-                batten_w="1 in",
-                slot_depth_ratio="0.4",
-                dovetail_angle_deg=12,
-                flush_bottom=False,
-                panel_position="centered",
-                prefix="BT", ev=None):
-    """Add sliding dovetail battens (穿带) to a panel underside.
-
-    When flush_bottom=True, the batten extends from the frame bottom
-    (base_plane) up into the panel — batten bottom flush with frame bottom.
-    """
-    if ev is None:
-        ev = sp._make_ev()
-
-    ext_axis = _third_axis(rail_axis, stile_axis)
-    R, S, E = rail_axis, stile_axis, ext_axis
-
-    def _o(r, s, e):
-        return _make_origin(R, S, E, r, s, e)
-    def _sz(a1, e1, a2, e2):
-        return _make_size(a1, e1, a2, e2)
-
-    slot_depth = f"({panel_t}) * ({slot_depth_ratio})"
-
-    if flush_bottom:
-        # Batten from frame bottom up into panel
-        batten_base_e = "0 in"
-        if panel_position == "flush_outer":
-            batten_height = f"({frame_t}) - ({panel_t}) + ({slot_depth})"
-        else:
-            batten_height = f"({frame_t} - {panel_t}) / 2 + ({slot_depth})"
-    else:
-        if panel_position == "flush_outer":
-            batten_base_e = f"({frame_t}) - ({panel_t})"
-        else:
-            batten_base_e = f"({frame_t} - {panel_t}) / 2"
-        batten_height = slot_depth
-
-    batten_plane = sp.off_plane(comp, base_plane, batten_base_e,
-                                f"{prefix}_BasePl")
-    batten_len = f"{stile_len} - 2 * {frame_w}"
-    inner_rail = f"{rail_len} - 2 * {frame_w}"
-
-    battens = []
-    for i in range(count):
-        spacing = f"({inner_rail}) / {count + 1}"
-        center_r = f"{frame_w} + ({spacing}) * {i + 1}"
-        start_r = f"({center_r}) - ({batten_w}) / 2"
-
-        bname = f"{prefix}_{i}"
-        sk, prof = sp.sketch_rect_model(
-            comp, batten_plane,
-            _o(start_r, f"{frame_w}", batten_base_e),
-            _sz(R, batten_w, S, batten_len),
-            f"{bname}_Sk", ev=ev)
-        bt_ext = sp.ext_new(comp, prof, batten_height, bname)
-        bt = bt_ext.bodies.item(0)
-        bt.name = f"{prefix}_Batten_{i}"
-
-        # Dovetail chamfer on the face closest to the panel surface.
-        # When flush_bottom: top face (inside panel groove).
-        # When not: bottom face (at panel surface = narrow opening).
-        if flush_bottom:
-            dt_face = sp.find_face(bt, ext_axis, +1)
-        else:
-            dt_face = sp.find_face(bt, ext_axis, -1)
-            if dt_face is None:
-                dt_face = sp.find_face(bt, ext_axis, +1)
-
-        dt_edges = adsk.core.ObjectCollection.create()
-        s_idx = _axis_index(stile_axis)
-        for j in range(dt_face.edges.count):
-            edge = dt_face.edges.item(j)
-            sp1 = edge.startVertex.geometry
-            sp2 = edge.endVertex.geometry
-            delta = [sp2.x - sp1.x, sp2.y - sp1.y, sp2.z - sp1.z]
-            length = sum(d * d for d in delta) ** 0.5
-            if length > 0.01 and abs(delta[s_idx]) / length > 0.9:
-                dt_edges.add(edge)
-
-        if dt_edges.count == 2:
-            ch_input = comp.features.chamferFeatures.createInput2()
-            d1 = adsk.core.ValueInput.createByString(
-                f"({slot_depth}) * tan({dovetail_angle_deg} * 1 deg)")
-            d2 = adsk.core.ValueInput.createByString(slot_depth)
-            ch_input.chamferEdgeSets.addTwoDistancesChamferEdgeSet(
-                dt_edges, d1, d2, False, False)
-            comp.features.chamferFeatures.add(ch_input)
-
-        sp.combine(panel_body, bt, CUT, True, f"{bname}_Groove")
-        battens.append(bt)
-
-    return battens
 
 
 def add_raised_bevel(comp, panel_bodies, panel_positions,
