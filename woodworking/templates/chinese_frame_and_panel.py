@@ -337,3 +337,121 @@ def run(context):
     # Through-groove already cut above; CUT rails with battens for mortises
     sp.combine(r_front, all_battens, CUT, True, "BT_FM")
     sp.combine(r_back, all_battens, CUT, True, "BT_BM")
+
+    # ── F2: Vertical door (XZ) ──────────────────────────────────
+    _p("door_w", "20 in", "in", "Door width")
+    _p("door_h", "36 in", "in", "Door height")
+
+    xf = adsk.core.Matrix3D.create()
+    xf.setCell(0, 3, ev("rail_len") + 25.4)
+    d_occ = root.occurrences.addNewComponent(xf)
+    d_occ.component.name = "ChineseDoor"
+    dc = d_occ.component
+    fw2 = ev("frame_w"); uz2 = ev("frame_t - third")
+
+    dr_mid = sp.off_plane(dc, dc.yZConstructionPlane, "door_w / 2", "D_RMid")
+    ds_mid = sp.off_plane(dc, dc.xYConstructionPlane, "door_h / 2", "D_SMid")
+
+    def door_miter_tri(plane, pz, name):
+        sk = dc.sketches.add(plane); sk.name = f"{name}_Sk"
+        m = sk.modelToSketchSpace; ori = sp.probe_orientations(sk, 0, pz, 0)
+        p1 = m(P.create(0, pz, 0)); p2 = m(P.create(0, pz, fw2))
+        p3 = m(P.create(fw2, pz, fw2))
+        ln = sk.sketchCurves.sketchLines
+        l1 = ln.addByTwoPoints(P.create(p1.x,p1.y,0), P.create(p2.x,p2.y,0))
+        l2 = ln.addByTwoPoints(l1.endSketchPoint, P.create(p3.x,p3.y,0))
+        ln.addByTwoPoints(l2.endSketchPoint, l1.startSketchPoint)
+        d = sk.sketchDimensions
+        d.addDistanceDimension(sk.originPoint, l1.endSketchPoint,
+            ori['z'], P.create(1,1,0)).parameter.expression = "frame_w"
+        d.addDistanceDimension(sk.originPoint, l2.endSketchPoint,
+            ori['x'], P.create(1,1,0)).parameter.expression = "frame_w"
+        return sk, sp.smallest_profile(sk)
+
+    # Rail_Bot
+    sk, prof = sp.sketch_rect_model(dc, dc.xZConstructionPlane,
+        ("0 in","0 in","0 in"), {"x":"door_w","z":"frame_w"},
+        "D_RBot_Sk", ev=ev)
+    dr_bot = sp.ext_new(dc, prof, "frame_t", "D_RBot").bodies.item(0)
+    dr_bot.name = "D_Rail_Bot"
+
+    # Miter CUTs
+    d_upl = sp.off_plane(dc, dc.xZConstructionPlane, "frame_t - third", "D_UPl")
+    sk, prof = door_miter_tri(d_upl, uz2, "D_MUL")
+    d_mul = sp.ext_op(dc, prof, "third", CUT, dr_bot, "D_MiterUL")
+    sk, prof = door_miter_tri(dc.xZConstructionPlane, 0, "D_MLL")
+    d_mll = sp.ext_op(dc, prof, "third + recess", CUT, dr_bot, "D_MiterLL")
+
+    # Tenon CUT
+    tst2 = ev("tenon_shoulder_top"); tsb2 = ev("tenon_shoulder_bot")
+    td2 = ev("tenon_depth")
+    sk = dc.sketches.add(d_upl); sk.name = "D_TenonL_Sk"
+    m2 = sk.modelToSketchSpace; ori2 = sp.probe_orientations(sk, 0, uz2, 0)
+    spts = [m2(P.create(px, uz2, pz)) for px,pz in
+            [(0,tsb2),(0,fw2-tst2),(td2,fw2-tst2),(td2,td2),(tsb2,tsb2)]]
+    ln = sk.sketchCurves.sketchLines
+    lA = ln.addByTwoPoints(P.create(spts[0].x,spts[0].y,0),
+                           P.create(spts[1].x,spts[1].y,0))
+    lD = ln.addByTwoPoints(lA.endSketchPoint, P.create(spts[2].x,spts[2].y,0))
+    lB = ln.addByTwoPoints(lD.endSketchPoint, P.create(spts[3].x,spts[3].y,0))
+    lDg = ln.addByTwoPoints(lB.endSketchPoint, P.create(spts[4].x,spts[4].y,0))
+    ln.addByTwoPoints(lDg.endSketchPoint, lA.startSketchPoint)
+    gc = sk.geometricConstraints
+    gc.addVertical(lA); gc.addHorizontal(lD)
+    gc.addVertical(lB); gc.addHorizontal(ln.item(ln.count-1))
+    d = sk.sketchDimensions; o = sk.originPoint
+    d.addDistanceDimension(o,lA.startSketchPoint,ori2['z'],
+        P.create(-1,-0.5,0)).parameter.expression = "tenon_shoulder_bot"
+    d.addDistanceDimension(o,lA.endSketchPoint,ori2['z'],
+        P.create(-1,-3,0)).parameter.expression = "frame_w - tenon_shoulder_top"
+    d.addDistanceDimension(o,lD.endSketchPoint,ori2['x'],
+        P.create(-1.5,-4,0)).parameter.expression = "tenon_depth"
+    d.addDistanceDimension(o,lB.endSketchPoint,ori2['z'],
+        P.create(-2,-1.5,0)).parameter.expression = "tenon_depth"
+    d.addDistanceDimension(o,lDg.endSketchPoint,ori2['x'],
+        P.create(-0.5,-0.5,0)).parameter.expression = "tenon_shoulder_bot"
+    d_tc = sp.ext_op(dc, sk.profiles.item(0), "-third", CUT, dr_bot, "D_TenonCut_L")
+
+    sp.mirror_feats(dc, [d_mul, d_mll, d_tc], dr_mid, "D_ShapeR_M")
+    dr_top = sp.mirror_body(dc, dr_bot, ds_mid, "D_RTop_M").bodies.item(0)
+    dr_top.name = "D_Rail_Top"
+
+    # Stiles
+    sk, prof = sp.sketch_rect_model(dc, dc.xZConstructionPlane,
+        ("0 in","0 in","0 in"), {"x":"frame_w","z":"door_h"},
+        "D_SL_Sk", ev=ev)
+    ds_l = sp.ext_new(dc, prof, "frame_t", "D_SL").bodies.item(0)
+    ds_l.name = "D_Stile_L"
+    ds_r = sp.mirror_body(dc, ds_l, dr_mid, "D_SR_M").bodies.item(0)
+    ds_r.name = "D_Stile_R"
+    sp.combine(ds_l, [dr_bot, dr_top], CUT, True, "D_SL_Cut")
+    sp.combine(ds_r, [dr_bot, dr_top], CUT, True, "D_SR_Cut")
+
+    # Panel
+    diw = "door_w - 2*frame_w"; dih = "door_h - 2*frame_w"
+    dpp = sp.off_plane(dc, dc.xZConstructionPlane, "panel_e", "D_PPl")
+    sk, prof = sp.sketch_rect_model(dc, dpp,
+        ("frame_w","panel_e","frame_w"), {"x":diw,"z":dih},
+        "D_Panel_Sk", ev=ev)
+    dp = sp.ext_new(dc, prof, "panel_t", "D_Panel").bodies.item(0)
+    dp.name = "D_Panel"
+
+    # Tongues (bot/top wider for corners)
+    ff = sp.find_face(dp, "z", -1)
+    sk,_ = sp.sketch_rect_model(dc, ff,
+        ("frame_w - tongue_l","panel_e","frame_w"),
+        {"x":diw+" + 2*tongue_l","y":"tongue_w"}, "D_PTgBot_Sk", ev=ev)
+    sp.refs_to_construction(sk)
+    dtgb = sp.ext_new(dc, sp.smallest_profile(sk), "tongue_l", "D_PTgBot")
+    dtgt = sp.mirror_body(dc, dtgb.bodies.item(0), ds_mid, "D_PTgTopM").bodies.item(0)
+    lf = sp.find_face(dp, "x", -1)
+    sk,_ = sp.sketch_rect_model(dc, lf,
+        ("frame_w","panel_e","frame_w"),
+        {"z":dih,"y":"tongue_w"}, "D_PTgL_Sk", ev=ev)
+    sp.refs_to_construction(sk)
+    dtgl = sp.ext_new(dc, sp.smallest_profile(sk), "tongue_l", "D_PTgL")
+    dtgr = sp.mirror_body(dc, dtgl.bodies.item(0), dr_mid, "D_PTgRM").bodies.item(0)
+    sp.combine(dp, [dtgb.bodies.item(0),dtgt,dtgl.bodies.item(0),dtgr],
+               JOIN, False, "D_PTgJ")
+    for fb in [dr_bot, dr_top, ds_l, ds_r]:
+        sp.combine(fb, dp, CUT, True, f"D_{fb.name}_PCut")
