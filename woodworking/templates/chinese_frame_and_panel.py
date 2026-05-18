@@ -210,8 +210,8 @@ def run(context):
     ff = sp.find_face(panel, "y", -1)
     sk, _ = sp.sketch_rect_model(
         comp, ff,
-        ("frame_w", "frame_w", "groove_e"),
-        {"x": iw, "z": "tongue_w"},
+        ("frame_w - tongue_l", "frame_w", "groove_e"),
+        {"x": iw + " + 2 * tongue_l", "z": "tongue_w"},
         "P_TgFr_Sk", ev=ev)
     sp.refs_to_construction(sk)
     tgf = sp.ext_new(comp, sp.smallest_profile(sk), "tongue_l", "P_TgFr")
@@ -275,6 +275,31 @@ def run(context):
         "stile_len - 2 * frame_w", "BT0").bodies.item(0)
     bt.name = "Batten_0"
 
+    # Tenons on batten ends (parameter expressions, not ev() values)
+    bt_cx = "frame_w + (rail_len - 2 * frame_w) / (batten_count + 1)"
+
+    front_face = sp.find_face(bt, "y", -1)
+    sk_tn, _ = sp.sketch_rect_model(comp, front_face,
+        (f"({bt_cx}) - batten_narrow / 2", "frame_w", "recess + third"),
+        {"x": "batten_narrow", "z": "third"},
+        "BT0_TnF_Sk", ev=ev)
+    sp.refs_to_construction(sk_tn)
+    tn_f = sp.ext_new(
+        comp, sp.smallest_profile(sk_tn), "batten_tenon_l", "BT0_TnF")
+    sp.combine(bt, tn_f.bodies.item(0), JOIN, False, "BT0_TnF_J")
+
+    back_face = sp.find_face(bt, "y", +1)
+    sk_tn2, _ = sp.sketch_rect_model(comp, back_face,
+        (f"({bt_cx}) - batten_narrow / 2", "stile_len - frame_w",
+         "recess + third"),
+        {"x": "batten_narrow", "z": "third"},
+        "BT0_TnB_Sk", ev=ev)
+    sp.refs_to_construction(sk_tn2)
+    tn_b = sp.ext_new(
+        comp, sp.smallest_profile(sk_tn2), "batten_tenon_l", "BT0_TnB")
+    sp.combine(bt, tn_b.bodies.item(0), JOIN, False, "BT0_TnB_J")
+
+    # Pattern (after tenons joined)
     all_battens = [bt]
     if n > 1:
         pat = sp.body_pattern(
