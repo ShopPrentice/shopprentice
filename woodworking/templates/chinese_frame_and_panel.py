@@ -248,30 +248,54 @@ def run(context):
     cx = ev("frame_w") + ev(
         "(rail_len - 2 * frame_w) / (batten_count + 1)")
 
+    def _dt_sketch(plane, y_val, name):
+        """Draw octagonal dovetail profile on an XZ plane."""
+        sk = comp.sketches.add(plane)
+        sk.name = name
+        m2s = sk.modelToSketchSpace
+        pts = [
+            (cx - wh, 0), (cx - wh, pe), (cx - nh, pe),
+            (cx - wh, pe + sd), (cx + wh, pe + sd),
+            (cx + nh, pe), (cx + wh, pe), (cx + wh, 0),
+        ]
+        sps = [m2s(P.create(px, y_val, pz)) for px, pz in pts]
+        lines = sk.sketchCurves.sketchLines
+        fl = lines.addByTwoPoints(
+            P.create(sps[0].x, sps[0].y, 0),
+            P.create(sps[1].x, sps[1].y, 0))
+        pv = fl.endSketchPoint
+        for j in range(2, len(sps)):
+            l = lines.addByTwoPoints(
+                pv, P.create(sps[j].x, sps[j].y, 0))
+            pv = l.endSketchPoint
+        lines.addByTwoPoints(pv, fl.startSketchPoint)
+        return sk
+
+    # Through-groove tools (extend through tongues)
+    gpl = sp.off_plane(
+        comp, comp.xZConstructionPlane, "frame_w - tongue_l", "BT_GPl")
+    gsk = _dt_sketch(gpl, ev("frame_w - tongue_l"), "BT_GSk")
+    gt = sp.ext_new(
+        comp, gsk.profiles.item(0),
+        "stile_len - 2 * frame_w + 2 * tongue_l", "BT_GT").bodies.item(0)
+    all_grooves = [gt]
+    if n > 1:
+        gpat = sp.body_pattern(
+            comp, gt, comp.xConstructionAxis,
+            "batten_count",
+            "(rail_len - 2 * frame_w) / (batten_count + 1)",
+            "BT_GPat")
+        for j in range(gpat.bodies.count):
+            all_grooves.append(gpat.bodies.item(j))
+    sp.combine(panel, all_grooves, CUT, False, "BT_ThroughGroove")
+
+    # Batten body at inner length
     bpl = sp.off_plane(
         comp, comp.xZConstructionPlane, "frame_w", "BT_Pl")
-    sk = comp.sketches.add(bpl)
-    sk.name = "BT_Sk"
-    m2s = sk.modelToSketchSpace
-    pts = [
-        (cx - wh, 0), (cx - wh, pe), (cx - nh, pe),
-        (cx - wh, pe + sd), (cx + wh, pe + sd),
-        (cx + nh, pe), (cx + wh, pe), (cx + wh, 0),
-    ]
-    sps = [m2s(P.create(px, ev("frame_w"), pz)) for px, pz in pts]
-    lines = sk.sketchCurves.sketchLines
-    fl = lines.addByTwoPoints(
-        P.create(sps[0].x, sps[0].y, 0),
-        P.create(sps[1].x, sps[1].y, 0))
-    pv = fl.endSketchPoint
-    for j in range(2, len(sps)):
-        l = lines.addByTwoPoints(
-            pv, P.create(sps[j].x, sps[j].y, 0))
-        pv = l.endSketchPoint
-    lines.addByTwoPoints(pv, fl.startSketchPoint)
+    bsk = _dt_sketch(bpl, ev("frame_w"), "BT_Sk")
 
     bt = sp.ext_new(
-        comp, sk.profiles.item(0),
+        comp, bsk.profiles.item(0),
         "stile_len - 2 * frame_w", "BT0").bodies.item(0)
     bt.name = "Batten_0"
 
@@ -310,6 +334,6 @@ def run(context):
         for j in range(pat.bodies.count):
             all_battens.append(pat.bodies.item(j))
 
-    sp.combine(panel, all_battens, CUT, True, "BT_Groove")
+    # Through-groove already cut above; CUT rails with battens for mortises
     sp.combine(r_front, all_battens, CUT, True, "BT_FM")
     sp.combine(r_back, all_battens, CUT, True, "BT_BM")
