@@ -192,6 +192,7 @@ For joints beyond M&T, T&G, and gap filling, **check for a template first** (`fr
 
 | Joint | File | Template | Prefix | Use For |
 |-------|------|----------|--------|---------|
+| Frame & Panel | `woodworking/joinery/frame-and-panel.md` | `frame_and_panel` | `fp_` | Cabinet doors, chest lids, table tops, side panels |
 | Dado & Rabbet | `woodworking/joinery/dado-rabbet.md` | — (inline) | `dr_` | Shelves, case backs, drawer bottoms |
 | Lap Joint | `woodworking/joinery/lap-joint.md` | — | `lj_` | Frames, cross braces, lattice |
 | Box Joint | `woodworking/joinery/box-joint.md` | `finger_joint` | `bj_` | Boxes, drawers, decorative corners |
