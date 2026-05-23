@@ -13,36 +13,39 @@
     },
     {
       "body": "Leg_FR",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Front-right leg, mirrored across XMid from FL"
+      "note": "Front-right leg, mirrored across XMid from FL",
+      "contact": false
     },
     {
       "body": "Leg_BL",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "Back-left leg, mirrored across YMid from FL"
+      "note": "Back-left leg, mirrored across YMid from FL",
+      "contact": false
     },
     {
       "body": "Leg_BR",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Back-right leg, mirrored across YMid from FR"
+      "note": "Back-right leg, mirrored across YMid from FR",
+      "contact": false
     },
     {
       "body": "Top",

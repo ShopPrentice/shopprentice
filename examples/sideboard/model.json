@@ -14,12 +14,12 @@
     },
     {
       "body": "Side_Right",
-      "ref": "origin",
+      "ref": "Side_Left",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
       "note": "Right case side, mirror of left",
       "contact": false
@@ -118,14 +118,15 @@
     },
     {
       "body": "Kick_Front",
-      "ref": "origin",
+      "ref": "Side_Left",
       "side": "outside",
       "direction": [
         0,
         0,
-        1
+        -1
       ],
-      "note": "Front kick board at floor level, inset from case edges"
+      "note": "Front kick board at floor level, inset from case edges",
+      "contact": false
     },
     {
       "body": "Kick_Back",
@@ -141,14 +142,15 @@
     },
     {
       "body": "Kick_Left",
-      "ref": "origin",
+      "ref": "Kick_Front",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "Left kick board connecting front and back kicks"
+      "note": "Left kick board connecting front and back kicks",
+      "contact": false
     },
     {
       "body": "Kick_Right",

@@ -85,14 +85,15 @@
     },
     {
       "body": "Foot_Front",
-      "ref": "origin",
+      "ref": "Front",
       "side": "outside",
       "direction": [
         0,
         0,
-        1
+        -1
       ],
-      "note": "Front foot sits on floor"
+      "note": "Front foot sits on floor",
+      "contact": false
     },
     {
       "body": "Foot_Back",

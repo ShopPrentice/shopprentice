@@ -48,36 +48,36 @@
     },
     {
       "body": "leg_FR (1)",
-      "ref": "origin",
+      "ref": "leg_FR",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
       "note": "Front-left leg (YZ mirror of leg_FR)",
       "contact": false
     },
     {
       "body": "leg_FR (2)",
-      "ref": "origin",
+      "ref": "leg_FR",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
       "note": "Back-right leg (XZ mirror)",
       "contact": false
     },
     {
       "body": "leg_FR (1) (1)",
-      "ref": "origin",
+      "ref": "leg_FR",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
       "note": "Back-left leg (XZ mirror of front-left)",
       "contact": false

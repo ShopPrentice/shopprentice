@@ -12,13 +12,14 @@
     },
     {
       "body": "Side_Right",
-      "ref": "origin",
+      "ref": "Side_Left",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
-      ]
+        0
+      ],
+      "contact": false
     },
     {
       "body": "Side_Right",

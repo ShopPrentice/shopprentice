@@ -13,36 +13,39 @@
     },
     {
       "body": "Leg_FR",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Front-right leg sits on the floor (mirror of FL)"
+      "note": "Front-right leg sits on the floor (mirror of FL)",
+      "contact": false
     },
     {
       "body": "Post_BL",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "Back-left post sits on the floor"
+      "note": "Back-left post sits on the floor",
+      "contact": false
     },
     {
       "body": "Post_BR",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Back-right post sits on the floor (mirror of BL)"
+      "note": "Back-right post sits on the floor (mirror of BL)",
+      "contact": false
     },
     {
       "body": "Apron_Front",

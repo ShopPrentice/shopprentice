@@ -25,36 +25,36 @@
     },
     {
       "body": "Leg_NR",
-      "ref": "origin",
+      "ref": "Leg_NL",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
       "note": "Near-right leg stands on floor",
       "contact": false
     },
     {
       "body": "Leg_FL",
-      "ref": "origin",
+      "ref": "Leg_NL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
       "note": "Far-left leg stands on floor",
       "contact": false
     },
     {
       "body": "Leg_FR",
-      "ref": "origin",
+      "ref": "Leg_NL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
       "note": "Far-right leg stands on floor",
       "contact": false

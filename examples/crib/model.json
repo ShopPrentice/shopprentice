@@ -13,39 +13,6 @@
     },
     {
       "body": "Post_FR",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front-right post stands on floor"
-    },
-    {
-      "body": "Post_BL",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Back-left post stands on floor"
-    },
-    {
-      "body": "Post_BR",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Back-right post stands on floor"
-    },
-    {
-      "body": "Post_FR",
       "ref": "Post_FL",
       "side": "outside",
       "direction": [
@@ -93,14 +60,15 @@
     },
     {
       "body": "Rail_FrontBot",
-      "ref": "origin",
+      "ref": "Post_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Bottom rail is above floor"
+      "note": "Bottom rail is above floor",
+      "contact": false
     },
     {
       "body": "Rail_FrontTop",

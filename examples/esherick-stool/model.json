@@ -25,24 +25,24 @@
     },
     {
       "body": "Leg2 (3)",
-      "ref": "origin",
+      "ref": "Leg1 (3)",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
       "note": "Leg 2 (back-left) stands on floor, splayed",
       "contact": false
     },
     {
       "body": "Leg3 (3)",
-      "ref": "origin",
+      "ref": "Leg1 (3)",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
       "note": "Leg 3 (back-right) stands on floor, splayed",
       "contact": false

@@ -13,36 +13,39 @@
     },
     {
       "body": "Post_FR",
-      "ref": "origin",
+      "ref": "Post_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Front-right corner post, mirror of FL across X midplane"
+      "note": "Front-right corner post, mirror of FL across X midplane",
+      "contact": false
     },
     {
       "body": "Post_BL",
-      "ref": "origin",
+      "ref": "Post_FL",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "Back-left corner post, tall (headboard_h)"
+      "note": "Back-left corner post, tall (headboard_h)",
+      "contact": false
     },
     {
       "body": "Post_BR",
-      "ref": "origin",
+      "ref": "Post_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Back-right corner post, mirror of BL across X midplane"
+      "note": "Back-right corner post, mirror of BL across X midplane",
+      "contact": false
     },
     {
       "body": "Rail_Left",

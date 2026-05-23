@@ -13,36 +13,39 @@
     },
     {
       "body": "Kick_Left",
-      "ref": "origin",
+      "ref": "Kick_Front",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "Left kick board sits on floor"
+      "note": "Left kick board sits on floor",
+      "contact": false
     },
     {
       "body": "Kick_Right",
-      "ref": "origin",
+      "ref": "Kick_Front",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Right kick board sits on floor"
+      "note": "Right kick board sits on floor",
+      "contact": false
     },
     {
       "body": "Kick_Back",
-      "ref": "origin",
+      "ref": "Kick_Front",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "Back kick board sits on floor"
+      "note": "Back kick board sits on floor",
+      "contact": false
     },
     {
       "body": "Kick_Right",

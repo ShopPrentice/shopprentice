@@ -13,36 +13,39 @@
     },
     {
       "body": "Leg_FR",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Front-right leg, mirror of FL across YZ midplane"
+      "note": "Front-right leg, mirror of FL across YZ midplane",
+      "contact": false
     },
     {
       "body": "Leg_BL",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "Back-left leg, mirror of FL across XZ midplane"
+      "note": "Back-left leg, mirror of FL across XZ midplane",
+      "contact": false
     },
     {
       "body": "Leg_BR",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Back-right leg, mirror of FR across XZ midplane"
+      "note": "Back-right leg, mirror of FR across XZ midplane",
+      "contact": false
     },
     {
       "body": "LR_Front_Lower",

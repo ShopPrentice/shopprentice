@@ -13,36 +13,39 @@
     },
     {
       "body": "FR",
-      "ref": "origin",
+      "ref": "FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Front-right leg stands on the floor"
+      "note": "Front-right leg stands on the floor",
+      "contact": false
     },
     {
       "body": "BL",
-      "ref": "origin",
+      "ref": "FL",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "Back-left leg stands on the floor"
+      "note": "Back-left leg stands on the floor",
+      "contact": false
     },
     {
       "body": "BR",
-      "ref": "origin",
+      "ref": "FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "Back-right leg stands on the floor"
+      "note": "Back-right leg stands on the floor",
+      "contact": false
     },
     {
       "body": "FL_Pin1",

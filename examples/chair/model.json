@@ -13,36 +13,39 @@
     },
     {
       "body": "Leg_FR",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "front-right leg, sits on ground"
+      "note": "front-right leg, sits on ground",
+      "contact": false
     },
     {
       "body": "Leg_BL",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "back-left leg with bend and 8-deg rake, full height to backrest"
+      "note": "back-left leg with bend and 8-deg rake, full height to backrest",
+      "contact": false
     },
     {
       "body": "Leg_BR",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "back-right leg with bend and 8-deg rake, full height to backrest"
+      "note": "back-right leg with bend and 8-deg rake, full height to backrest",
+      "contact": false
     },
     {
       "body": "Seat",
