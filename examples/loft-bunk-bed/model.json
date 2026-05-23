@@ -1,0 +1,207 @@
+{
+  "name": "Loft Bunk Bed",
+  "deps": [
+    {
+      "body": "Post_FL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Front-left post sits on floor, built from origin"
+    },
+    {
+      "body": "Post_FR",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Front-right post sits on floor"
+    },
+    {
+      "body": "Post_BL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Back-left post sits on floor"
+    },
+    {
+      "body": "Post_BR",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Back-right post sits on floor"
+    },
+    {
+      "body": "SideRail_L",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Left side rail spans from front to back posts, on +Y face of Post_FL"
+    },
+    {
+      "body": "SideRail_R",
+      "ref": "Post_FR",
+      "side": "outside",
+      "direction": [0, -1, 0],
+      "contact": true,
+      "note": "Right side rail spans from front to back posts, on -Y face of Post_FR"
+    },
+    {
+      "body": "EndRail_Head",
+      "ref": "Post_BL",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Head end rail between back posts, extends in +Y from Post_BL"
+    },
+    {
+      "body": "EndRail_Foot",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Foot end rail between front posts, extends in +Y from Post_FL"
+    },
+    {
+      "body": "GuardRail_R",
+      "ref": "Post_FR",
+      "side": "outside",
+      "direction": [0, -1, 0],
+      "contact": true,
+      "note": "Right guard rail on outer face of right posts"
+    },
+    {
+      "body": "GuardRail_Head",
+      "ref": "Post_BL",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Head guard rail between back posts, extends in +Y"
+    },
+    {
+      "body": "GuardRail_Foot",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Foot guard rail between front posts, extends in +Y"
+    },
+    {
+      "body": "GuardRail_Front",
+      "ref": "Post_BL",
+      "side": "outside",
+      "direction": [-1, 0, 0],
+      "contact": true,
+      "note": "Front guard rail from ladder opening to head post, on -X face of Post_BL"
+    },
+    {
+      "body": "FenceSupport",
+      "ref": "GuardRail_Front",
+      "side": "outside",
+      "direction": [0, 0, -1],
+      "contact": true,
+      "note": "Vertical support below front guard rail"
+    },
+    {
+      "body": "Ledger_L",
+      "ref": "SideRail_L",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Left ledger strip on inner face (+Y) of left side rail"
+    },
+    {
+      "body": "Ledger_R",
+      "ref": "SideRail_R",
+      "side": "outside",
+      "direction": [0, -1, 0],
+      "contact": true,
+      "note": "Right ledger strip on inner face (-Y) of right side rail"
+    },
+    {
+      "body": "Slat",
+      "ref": "Ledger_L",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Bed slats rest on top of ledger strips"
+    },
+    {
+      "body": "DeskLeg_L",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Left desk leg sits on floor"
+    },
+    {
+      "body": "DeskLeg_R",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Right desk leg sits on floor"
+    },
+    {
+      "body": "DeskRail_Front",
+      "ref": "DeskLeg_L",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "contact": true,
+      "note": "Front desk rail spans between desk legs, extends in +X from left leg"
+    },
+    {
+      "body": "DeskRail_Back",
+      "ref": "Post_FR",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "contact": true,
+      "note": "Back desk rail between back posts, extends in +X from Post_FR inner face"
+    },
+    {
+      "body": "DeskTop",
+      "ref": "DeskRail_Front",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Desk surface rests on desk rails"
+    },
+    {
+      "body": "LadderSide_L",
+      "ref": "SideRail_L",
+      "side": "outside",
+      "direction": [0, -1, 0],
+      "contact": true,
+      "note": "Left ladder side hooks onto left rail outer face, outside the bed"
+    },
+    {
+      "body": "LadderSide_R",
+      "ref": "SideRail_L",
+      "side": "outside",
+      "direction": [0, -1, 0],
+      "contact": true,
+      "note": "Right ladder side hooks onto left rail outer face, outside the bed"
+    },
+    {
+      "body": "Rung_5",
+      "ref": "LadderSide_L",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "contact": true,
+      "replicas": "Rung_*",
+      "note": "Rungs span between ladder sides (template body renamed by Fusion after CUT)"
+    },
+    {
+      "body": "DM_SR_L_F1",
+      "ref": "SideRail_L",
+      "side": "opposite",
+      "direction": [1, 0, 0],
+      "contact": true,
+      "replicas": "DM_*",
+      "note": "Domino void bodies — all joinery voids across components"
+    }
+  ]
+}

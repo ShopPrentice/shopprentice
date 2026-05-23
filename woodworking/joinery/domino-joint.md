@@ -152,11 +152,15 @@ The domino mortise is modeled as a **stadium-shaped void body** sketched at the 
    - Orientation: `vertical=True/False` per the orientation rule
 3. **Extrude** — `ext_new_sym` with `NewBodyFeatureOperation`, distance = `dm_<joint>_d`:
    - Symmetric extrude extends `dm_<joint>_d / 2` into each piece
-4. **Pattern** — `RectangularPatternFeature` along the joint:
+4. **Exposure check** — `sp.check_domino_exposure(void, piece_a, piece_b, normal_axis)`:
+   - Validates the void is fully inside both bodies on perpendicular axes
+   - Raises `ValueError` if the mortise opens to a surface (exposed domino)
+   - Call AFTER extrude, BEFORE CUT — catches placement errors early
+5. **Pattern** — `RectangularPatternFeature` along the joint:
    - Count: `dm_<joint>_count`
    - Spacing: `dm_<joint>_spacing`
-5. **CUT primary piece** — `combine(comp, piece_a, void_bodies, CUT, True)` — pockets in piece A, voids survive.
-6. **CUT secondary piece** — Get assembly proxy of piece B, CUT via root: `combine(piece_b_proxy, void_proxies, CUT, True)` — pockets in piece B.
+6. **CUT primary piece** — `combine(comp, piece_a, void_bodies, CUT, True)` — pockets in piece A, voids survive.
+7. **CUT secondary piece** — Get assembly proxy of piece B, CUT via root: `combine(piece_b_proxy, void_proxies, CUT, True)` — pockets in piece B.
 
 ### Why Void Bodies Instead of Direct CUT
 
