@@ -263,6 +263,8 @@ def run(context):
     # ==============================================================
     #  2. BACK BOARD — offset XZ plane at Y=box_width-bt, full height
     # ==============================================================
+    ref_front = find_body("Front")
+    ref_front_bb = ref_front.boundingBox
     back_pl = off_plane(case_c, case_c.xZConstructionPlane,
                         "box_width - board_thick", "Back_Pl")
     _, pr = sketch_rect_model(case_c, back_pl,
