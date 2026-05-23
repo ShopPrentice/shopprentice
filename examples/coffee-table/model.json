@@ -13,36 +13,39 @@
     },
     {
       "body": "Leg_FR",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
+        1,
         0,
-        0,
-        1
+        0
       ],
-      "note": "front-right tapered leg, sits on ground"
+      "note": "front-right tapered leg, sits on ground",
+      "contact": false
     },
     {
       "body": "Leg_BL",
-      "ref": "origin",
+      "ref": "Leg_FL",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "back-left tapered leg, sits on ground"
+      "note": "back-left tapered leg, sits on ground",
+      "contact": false
     },
     {
       "body": "Leg_BR",
-      "ref": "origin",
+      "ref": "Leg_FR",
       "side": "outside",
       "direction": [
         0,
-        0,
-        1
+        1,
+        0
       ],
-      "note": "back-right tapered leg, sits on ground"
+      "note": "back-right tapered leg, sits on ground",
+      "contact": false
     },
     {
       "body": "Top",

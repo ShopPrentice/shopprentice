@@ -99,10 +99,14 @@ def run(context):
     l_xmid = sp.off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "LXMid")
     l_ymid = sp.off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "LYMid")
 
+    ref_fl = find_body("Leg_FL")
+    ref_fl_bb = ref_fl.boundingBox
     leg_fr = sp.mirror_body(leg_c, leg_fl, l_xmid, "LegFR_Mir").bodies.item(0)
     leg_fr.name = "Leg_FR"
     leg_bl = sp.mirror_body(leg_c, leg_fl, l_ymid, "LegBL_Mir").bodies.item(0)
     leg_bl.name = "Leg_BL"
+    ref_fr = find_body("Leg_FR")
+    ref_fr_bb = ref_fr.boundingBox
     leg_br = sp.mirror_body(leg_c, leg_fr, l_ymid, "LegBR_Mir").bodies.item(0)
     leg_br.name = "Leg_BR"
 
