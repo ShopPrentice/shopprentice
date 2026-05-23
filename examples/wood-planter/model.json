@@ -64,7 +64,8 @@
         0,
         1
       ],
-      "note": "Front upper long rail, above front lower rail"
+      "note": "Front upper long rail, above front lower rail",
+      "contact": false
     },
     {
       "body": "LR_Back_Lower",
@@ -86,7 +87,8 @@
         0,
         1
       ],
-      "note": "Back upper long rail, mirror of front upper across XZ midplane"
+      "note": "Back upper long rail, mirror of front upper across XZ midplane",
+      "contact": false
     },
     {
       "body": "SR_Left_Lower",
@@ -108,7 +110,8 @@
         0,
         1
       ],
-      "note": "Left upper short rail, above left lower rail"
+      "note": "Left upper short rail, above left lower rail",
+      "contact": false
     },
     {
       "body": "SR_Right_Lower",
@@ -130,7 +133,8 @@
         0,
         1
       ],
-      "note": "Right upper short rail, mirror of left upper across YZ midplane"
+      "note": "Right upper short rail, mirror of left upper across YZ midplane",
+      "contact": false
     },
     {
       "body": "Slat_Front_1",
@@ -215,6 +219,30 @@
       ],
       "note": "Domino void at back mating face, mirror of BtDm_Front across XZ midplane",
       "replicas": "BtDm_Back*"
+    },
+    {
+      "body": "Body79",
+      "ref": "LR_Back_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "contact": false,
+      "note": "Auto-named slat fragment"
+    },
+    {
+      "body": "Body100",
+      "ref": "SR_Right_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "contact": false,
+      "note": "Auto-named slat fragment"
     }
   ]
 }
