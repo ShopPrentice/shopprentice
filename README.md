@@ -61,7 +61,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 <tr>
 <td align="center"><a href="examples/windsor-chair/"><img src="examples/windsor-chair/iso.png" width="200" /><br /><b>Windsor Chair</b></a><br />Splayed legs, turned stretchers, scooped seat</td>
 <td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/twin-live-edge-slab.png" width="200" /><br /><b>Twin Bed (Live Edge)</b></a><br />Slab headboard, bowtie inlays, Nakashima style</td>
-<td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/queen-platform.png" width="200" /><br /><b>Queen Bed</b></a><br />Bed rail fasteners, framed headboard, center beam</td>
+<td align="center"><a href="examples/loft-bunk-bed/"><img src="examples/loft-bunk-bed/screenshots/iso-top-right.png" width="200" /><br /><b>Loft Bunk Bed</b></a><br />56 domino joints, hook-tab ladder, integrated desk</td>
 </tr>
 <tr>
 <td align="center"><a href="examples/crib/"><img src="examples/crib/screenshots/iso-top-right.png" width="200" /><br /><b>Crib</b></a><br />CPSC spindles, dominos, mattress support</td>
