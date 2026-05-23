@@ -53,7 +53,8 @@
         0,
         0
       ],
-      "note": "FR is to the right of FL"
+      "note": "FR is to the right of FL",
+      "contact": false
     },
     {
       "body": "Leg_BL",
@@ -64,7 +65,8 @@
         1,
         0
       ],
-      "note": "BL is behind FL"
+      "note": "BL is behind FL",
+      "contact": false
     },
     {
       "body": "Leg_BR",
@@ -75,7 +77,8 @@
         0,
         0
       ],
-      "note": "BR is to the right of BL"
+      "note": "BR is to the right of BL",
+      "contact": false
     },
     {
       "body": "Top",
@@ -231,7 +234,8 @@
         0,
         1
       ],
-      "note": "Left drawer front, above front stretcher"
+      "note": "Left drawer front, above front stretcher",
+      "contact": false
     },
     {
       "body": "ddl_Back",
@@ -287,7 +291,8 @@
         0,
         1
       ],
-      "note": "Right drawer front, above front stretcher"
+      "note": "Right drawer front, above front stretcher",
+      "contact": false
     },
     {
       "body": "ddr_Back",
@@ -409,7 +414,8 @@
         1,
         0
       ],
-      "note": "Front-left tabletop bracket on front stretcher inner face"
+      "note": "Front-left tabletop bracket on front stretcher inner face",
+      "contact": false
     },
     {
       "body": "TB_FR",
@@ -420,7 +426,115 @@
         1,
         0
       ],
-      "note": "Front-right tabletop bracket on front stretcher inner face"
+      "note": "Front-right tabletop bracket on front stretcher inner face",
+      "contact": false
+    },
+    {
+      "body": "DM_BA_L_0",
+      "ref": "Apron_Back",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BA_L_*"
+    },
+    {
+      "body": "DM_BA_R_0",
+      "ref": "Apron_Back",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BA_R_*"
+    },
+    {
+      "body": "DM_LA_F_0",
+      "ref": "Apron_Left",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LA_F_*"
+    },
+    {
+      "body": "DM_LA_B_0",
+      "ref": "Apron_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LA_B_*"
+    },
+    {
+      "body": "DM_RA_F_0",
+      "ref": "Apron_Right",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RA_F_*"
+    },
+    {
+      "body": "DM_RA_B_0",
+      "ref": "Apron_Right",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RA_B_*"
+    },
+    {
+      "body": "DM_FR_L_0",
+      "ref": "Apron_FrontStretcher",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "body": "DM_FR_R_0",
+      "ref": "Apron_FrontStretcher",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "body": "DM_Div_F_0",
+      "ref": "Divider",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "body": "DM_Div_B_0",
+      "ref": "Divider",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_Div_B_*"
     }
   ]
 }

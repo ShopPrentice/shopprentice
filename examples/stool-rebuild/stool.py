@@ -1,7 +1,6 @@
 """Generated from capture_design — Stool v1
 NOTE: Auto-generated. Features marked TODO need manual review."""
 import adsk.core, adsk.fusion, math
-from helpers import sp as _sp
 
 
 def run(context):
@@ -36,6 +35,13 @@ def run(context):
     ]:
         params.add(name, adsk.core.ValueInput.createByString(expr), unit, comment)
 
+    # ── TWO COMPONENTS: Seat + Legs ──────────────────────────────
+    from helpers import sp
+    seat_occ = sp.make_comp(root, "Seat")
+    seat_c = seat_occ.component
+    legs_occ = sp.make_comp(root, "Legs")
+    legs_c = legs_occ.component
+
     # ── HELPERS ───────────────────────────────────────────────────
     P = adsk.core.Point3D.create
     H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
@@ -56,15 +62,11 @@ def run(context):
         return p
 
     def find_body(name):
-        def _walk(comp):
+        for comp in [seat_c, legs_c]:
             for i in range(comp.bRepBodies.count):
                 if comp.bRepBodies.item(i).name == name:
                     return comp.bRepBodies.item(i)
-            for occ in comp.occurrences:
-                r = _walk(occ.component)
-                if r: return r
-            return None
-        return _walk(root)
+        return None
 
     def find_face(body, axis, direction):
         best, best_val = None, (-1e10 if direction > 0 else 1e10)
@@ -107,24 +109,18 @@ def run(context):
         m.name = name
         return m
 
-    # ── COMPONENTS ────────────────────────────────────────────────
-    seat_occ = _sp.make_comp(root, "Seat")
-    seat_c = seat_occ.component
-    legs_occ = _sp.make_comp(root, "Legs")
-    legs_c = legs_occ.component
-
     # ── TIMELINE ──────────────────────────────────────────────────
 
-    # [0] ConstructionPlane: XMid (root — used for cross-component mirrors)
+    # [0] ConstructionPlane: XMid (in root — used for cross-component mirrors)
     XMid = off_plane(root, root.yZConstructionPlane, "seat_l / 2", "XMid")
 
-    # [1] ConstructionPlane: YMid (root — used for cross-component mirrors)
+    # [1] ConstructionPlane: YMid (in root — used for cross-component mirrors)
     YMid = off_plane(root, root.xZConstructionPlane, "seat_w / 2", "YMid")
 
-    # [2] ConstructionPlane: Seat_Pl
+    # [2] ConstructionPlane: Seat_Pl (in seat_c)
     Seat_Pl = off_plane(seat_c, seat_c.xYConstructionPlane, "seat_z", "Seat_Pl")
 
-    # [3] Sketch: Seat_Sk
+    # [3] Sketch: Seat_Sk (in seat_c)
     Seat_Sk = seat_c.sketches.add(Seat_Pl)
     Seat_Sk.name = "Seat_Sk"
     x0, y0, w, h = ev("0 cm"), ev("0 cm"), ev("seat_l"), ev("seat_w")
@@ -140,7 +136,7 @@ def run(context):
         V, P(x0 + w + 1, y0 + h/2, 0)).parameter.expression = "seat_w"
     Seat_Sk_prof = Seat_Sk.profiles.item(0)
 
-    # [4] Extrude: SeatBoard
+    # [4] Extrude: SeatBoard (in seat_c)
     inp = seat_c.features.extrudeFeatures.createInput(Seat_Sk_prof, NEWBODY)
     inp.setDistanceExtent(False, adsk.core.ValueInput.createByString("seat_t"))
     inp.taperAngle = adsk.core.ValueInput.createByString("seat_bevel")
@@ -149,14 +145,17 @@ def run(context):
     Seat = SeatBoard.bodies.item(0)
     Seat.name = "Seat"
 
-    # [5] ConstructionPlane: LegFront_Pl
+    # ── Assembly proxy: Seat body visible from legs_c context ─────
+    Seat_proxy = Seat.createForAssemblyContext(seat_occ)
+
+    # [5] ConstructionPlane: LegFront_Pl (in legs_c)
     LegFront_Pl = off_plane(legs_c, legs_c.xZConstructionPlane, "leg_inset_y - leg_d / 2", "LegFront_Pl")
 
     # Body-relative ref: Leg_NL depends on Seat
     ref_body = find_body("Seat")
     ref_bb = ref_body.boundingBox
 
-    # [6] Sketch: Leg_NL_Sk
+    # [6] Sketch: Leg_NL_Sk (in legs_c)
     Leg_NL_Sk = legs_c.sketches.add(LegFront_Pl)
     Leg_NL_Sk.name = "Leg_NL_Sk"
     lns = Leg_NL_Sk.sketchCurves.sketchLines
@@ -183,7 +182,7 @@ def run(context):
     gc.addHorizontal(ln2)
     Leg_NL_Sk_prof = Leg_NL_Sk.profiles.item(0)  # 1 profile(s)
 
-    # [7] Extrude: Leg_NL
+    # [7] Extrude: Leg_NL (in legs_c)
     inp = legs_c.features.extrudeFeatures.createInput(Leg_NL_Sk_prof, NEWBODY)
     inp.setDistanceExtent(False, adsk.core.ValueInput.createByString("leg_d"))
     Leg_NL = legs_c.features.extrudeFeatures.add(inp)
@@ -191,7 +190,7 @@ def run(context):
     Leg_NL_b = Leg_NL.bodies.item(0)
     Leg_NL_b.name = "Leg_NL"
 
-    # [8] Move: YSplay_NL
+    # [8] Move: YSplay_NL (in legs_c)
     xform = adsk.core.Matrix3D.create()
     xform.setWithArray([1.0, 0.0, 0.0, 0.0, 0.0, 0.996194698092, 0.087155742748, -1.839522337329, 0.0, -0.087155742748, 0.996194698092, 0.413011664712, 0.0, 0.0, 0.0, 1.0])
     move_coll = adsk.core.ObjectCollection.create()
@@ -201,10 +200,10 @@ def run(context):
     move_feat = legs_c.features.moveFeatures.add(move_inp)
     move_feat.name = "YSplay_NL"
 
-    # [9] Sketch: Sketch3 (on Seat face — created in root for cross-component access)
-    # variant 0: method=intersect
-    seat_proxy = Seat.createForAssemblyContext(seat_occ)
-    Sketch3 = root.sketches.add(find_face_near(seat_proxy, 15.24, 8.89, 17.78, 0.0, 0.0, 1.0))
+    # [9] Sketch: Sketch3 (in legs_c, on Seat's top face via proxy)
+    # Get the Seat proxy face for the sketch plane
+    _seat_top_face = find_face_near(Seat_proxy, 15.24, 8.89, 17.78, 0.0, 0.0, 1.0)
+    Sketch3 = legs_c.sketches.add(_seat_top_face)
     Sketch3.name = "Sketch3"
     lns = Sketch3.sketchCurves.sketchLines
     # Coordinate transform: captured sketch axes -> actual sketch axes
@@ -218,24 +217,24 @@ def run(context):
     _m11 = _cap_yd[0]*_act_yd.x + _cap_yd[1]*_act_yd.y + _cap_yd[2]*_act_yd.z
     def _xf(sx, sy):
         return (sx * _m00 + sy * _m01, sx * _m10 + sy * _m11)
-    # Intersect body 'Leg_NL' with sketch plane
+    # Intersect body 'Leg_NL' with sketch plane (same component — no proxy needed)
     _proj_body_Leg_NL = Sketch3.intersectWithSketchPlane([Leg_NL_b])
     _proj_pts = []  # [(x, y, sketchPoint), ...]
     _proj_curves = []  # [(sx, sy, ex, ey, curve), ...]
     for _ci in range(Sketch3.sketchCurves.count):
         _c = Sketch3.sketchCurves.item(_ci)
         if _c.isReference:
-            for _skpt in [_c.startSketchPoint, _c.endSketchPoint]:
-                _g = _skpt.geometry
-                _proj_pts.append((_g.x, _g.y, _skpt))
+            for _sp in [_c.startSketchPoint, _c.endSketchPoint]:
+                _g = _sp.geometry
+                _proj_pts.append((_g.x, _g.y, _sp))
             _s, _e = _c.startSketchPoint.geometry, _c.endSketchPoint.geometry
             _proj_curves.append((_s.x, _s.y, _e.x, _e.y, _c))
 
     def _nearest_proj(x, y):
         best, best_d = None, 1e10
-        for _px, _py, _skpt in _proj_pts:
+        for _px, _py, _sp in _proj_pts:
             _d = abs(_px - x) + abs(_py - y)
-            if _d < best_d: best, best_d = _skpt, _d
+            if _d < best_d: best, best_d = _sp, _d
         return best
 
     def _nearest_proj_curve(sx, sy, ex, ey):
@@ -344,7 +343,7 @@ def run(context):
         if _a < _best_a: _best_a, _best_pi = _a, _pi
     Sketch3_prof = Sketch3.profiles.item(_best_pi)
 
-    # [10] Sweep: Sweep1
+    # [10] Sweep: Sweep1 (in legs_c — CUTs leg tenon shoulder)
     # variant 1: d1=1.00, d2=0 (swapped)
     sweep_profs = adsk.core.ObjectCollection.create()
     _target_dims = [
@@ -368,8 +367,8 @@ def run(context):
     sweep_edge = None
     for i in range(Leg_NL_b.edges.count):
         e = Leg_NL_b.edges.item(i)
-        sp, ep = e.startVertex.geometry, e.endVertex.geometry
-        if (abs(sp.x - -0.2922) + abs(sp.y - 0.5643) + abs(sp.z - 0.2027) < 0.1 and
+        sv, ep = e.startVertex.geometry, e.endVertex.geometry
+        if (abs(sv.x - -0.2922) + abs(sv.y - 0.5643) + abs(sv.z - 0.2027) < 0.1 and
             abs(ep.x - 3.3020) + abs(ep.y - 2.3408) + abs(ep.z - 20.5086) < 0.1):
             sweep_edge = e
             break
@@ -391,10 +390,10 @@ def run(context):
     sweep_feat = legs_c.features.sweepFeatures.add(sweep_inp)
     sweep_feat.name = "Sweep1"
 
-    # [11] ConstructionPlane: Plane5
+    # [11] ConstructionPlane: Plane5 (in legs_c)
     Plane5 = off_plane(legs_c, legs_c.xYConstructionPlane, "0.08 in", "Plane5")
 
-    # [12] SplitBody: Split1
+    # [12] SplitBody: Split1 (in legs_c — splits Leg_NL_b by Plane5)
     split_inp = legs_c.features.splitBodyFeatures.createInput(Leg_NL_b, Plane5, True)
     split_feat = legs_c.features.splitBodyFeatures.add(split_inp)
     split_feat.name = "Split1"
@@ -480,37 +479,30 @@ def run(context):
         if not Leg_NL_2: Leg_NL_2 = find_body("Leg_NL (2)")
         if not Leg_NL: Leg_NL = find_body("Leg_NL")
 
-    # [13] Remove: RemoveBody-Leg_NL
+    # [13] Remove: RemoveBody-Leg_NL (in legs_c)
     _rm = Leg_NL
     if _rm: legs_c.features.removeFeatures.add(_rm)
 
-    # [14] Remove: RemoveBody-Leg_NL (2)
+    # [14] Remove: RemoveBody-Leg_NL (2) (in legs_c)
     _rm = Leg_NL_2
     if _rm: legs_c.features.removeFeatures.add(_rm)
 
-    # Body-relative refs: Leg_NR depends on Seat and Leg_NL (1)
+    # Body-relative refs: Leg_NR depends on Seat
     ref_body = find_body("Seat")
     ref_bb = ref_body.boundingBox
-    ref_body = find_body("Leg_NL (1)")
-    ref_bb = ref_body.boundingBox
 
-    # [15] Mirror: Leg_NR_Mirror
+    # [15] Mirror: Leg_NR_Mirror (in legs_c, mirror across YMid in root)
     Leg_NR_Mirror = mirror_bodies(legs_c, [Leg_NL_1], YMid, "Leg_NR_Mirror")
     Leg_NR = Leg_NR_Mirror.bodies.item(0)
     Leg_NR.name = "Leg_NR"
     Leg_NL_1 = Leg_NR_Mirror.bodies.item(1)
     Leg_NL_1.name = "Leg_NL (1)"
 
-    # Body-relative refs: Leg_FL depends on Seat and Leg_NL (1),
-    # Leg_FR depends on Seat and Leg_FL (via Leg_NL (1) mirror)
+    # Body-relative refs: Leg_FL depends on Seat
     ref_body = find_body("Seat")
     ref_bb = ref_body.boundingBox
-    ref_body = find_body("Leg_NL (1)")
-    ref_bb = ref_body.boundingBox
-    ref_body = find_body("Leg_NR")
-    ref_bb = ref_body.boundingBox
 
-    # [16] Mirror: Legs_Far_Mirror
+    # [16] Mirror: Legs_Far_Mirror (in legs_c, mirror across XMid in root)
     Legs_Far_Mirror = mirror_bodies(legs_c, [Leg_NL_1, Leg_NR], XMid, "Legs_Far_Mirror")
     Leg_FR = Legs_Far_Mirror.bodies.item(0)
     Leg_FR.name = "Leg_FR"
@@ -525,17 +517,45 @@ def run(context):
     ref_body = find_body("Leg_FL")
     ref_bb = ref_body.boundingBox
 
-    # [17] Combine: ThroughMortise (cross-component: legs CUT into seat)
-    _sp.combine(Seat, [Leg_NL_1, Leg_NR, Leg_FL, Leg_FR], CUT, True, "ThroughMortise")
+    # [17] Combine: ThroughMortise (cross-component: Seat CUT by legs)
+    # sp.combine auto-proxies tool bodies from legs_c into seat_c context
+    sp.combine(Seat, [Leg_NL_1, Leg_NR, Leg_FL, Leg_FR], CUT, True, "ThroughMortise")
 
-    # [18] Fillet: Fillet1 — split into per-component fillets
-    _face_targets_seat = [
+    # [18] Fillet: SeatFillet (in seat_c — Seat body edges only)
+    fillet_inp_seat = seat_c.features.filletFeatures.createInput()
+    fillet_items_seat = adsk.core.ObjectCollection.create()
+    _seat_face_targets = [
         ("Seat", -0.1, 8.89, 18.923),
         ("Seat", 15.24, -0.1, 18.923),
         ("Seat", 30.58, 8.89, 18.923),
         ("Seat", 15.24, 17.88, 18.923),
     ]
-    _face_targets_legs = [
+    _added_seat = set()
+    for _fb, _fx, _fy, _fz in _seat_face_targets:
+        _best_face, _best_d = None, 1e10
+        for _bsi in range(seat_c.bRepBodies.count):
+            _body = seat_c.bRepBodies.item(_bsi)
+            for _fi in range(_body.faces.count):
+                _f = _body.faces.item(_fi)
+                _p = _f.pointOnFace
+                _d = abs(_p.x-_fx)+abs(_p.y-_fy)+abs(_p.z-_fz)
+                if _d < _best_d: _best_face, _best_d = _f, _d
+        if _best_face and _best_d < 0.5:
+            for _ei in range(_best_face.edges.count):
+                _edge = _best_face.edges.item(_ei)
+                _eid = _edge.tempId
+                if _eid not in _added_seat:
+                    fillet_items_seat.add(_edge)
+                    _added_seat.add(_eid)
+    if fillet_items_seat.count > 0:
+        fillet_inp_seat.addConstantRadiusEdgeSet(fillet_items_seat, adsk.core.ValueInput.createByString("0.05 in"), True)
+        fillet_feat_seat = seat_c.features.filletFeatures.add(fillet_inp_seat)
+        fillet_feat_seat.name = "SeatFillet"
+
+    # [18b] Fillet: LegFillet (in legs_c — Leg body edges only)
+    fillet_inp_legs = legs_c.features.filletFeatures.createInput()
+    fillet_items_legs = adsk.core.ObjectCollection.create()
+    _leg_face_targets = [
         ("Leg_NR", 3.0846, 13.6421, 8.9916),
         ("Leg_NR", 3.0415, 16.4468, 8.9916),
         ("Leg_NR", 1.5075, 15.8133, 0.2032),
@@ -549,38 +569,31 @@ def run(context):
         ("Leg_NL (1)", 3.0846, 4.1379, 8.9916),
         ("Leg_NL (1)", 1.5075, 1.9667, 0.2032),
     ]
-
-    def _add_fillet(comp, face_targets, feat_name):
-        fillet_inp = comp.features.filletFeatures.createInput()
-        fillet_items = adsk.core.ObjectCollection.create()
-        _added = set()
-        for _fb, _fx, _fy, _fz in face_targets:
-            _best_face, _best_d = None, 1e10
-            for _bsi in range(comp.bRepBodies.count):
-                _body = comp.bRepBodies.item(_bsi)
-                for _fi in range(_body.faces.count):
-                    _f = _body.faces.item(_fi)
-                    _p = _f.pointOnFace
-                    _d = abs(_p.x-_fx)+abs(_p.y-_fy)+abs(_p.z-_fz)
-                    if _d < _best_d: _best_face, _best_d = _f, _d
-            if _best_face and _best_d < 0.5:
-                for _ei in range(_best_face.edges.count):
-                    _edge = _best_face.edges.item(_ei)
-                    _eid = _edge.tempId
-                    if _eid not in _added:
-                        fillet_items.add(_edge)
-                        _added.add(_eid)
-        if fillet_items.count > 0:
-            fillet_inp.addConstantRadiusEdgeSet(fillet_items, adsk.core.ValueInput.createByString("0.05 in"), True)
-            fillet_feat = comp.features.filletFeatures.add(fillet_inp)
-            fillet_feat.name = feat_name
-
-    _add_fillet(seat_c, _face_targets_seat, "Seat_Fillet")
-    _add_fillet(legs_c, _face_targets_legs, "Legs_Fillet")
+    _added_legs = set()
+    for _fb, _fx, _fy, _fz in _leg_face_targets:
+        _best_face, _best_d = None, 1e10
+        for _bsi in range(legs_c.bRepBodies.count):
+            _body = legs_c.bRepBodies.item(_bsi)
+            for _fi in range(_body.faces.count):
+                _f = _body.faces.item(_fi)
+                _p = _f.pointOnFace
+                _d = abs(_p.x-_fx)+abs(_p.y-_fy)+abs(_p.z-_fz)
+                if _d < _best_d: _best_face, _best_d = _f, _d
+        if _best_face and _best_d < 0.5:
+            for _ei in range(_best_face.edges.count):
+                _edge = _best_face.edges.item(_ei)
+                _eid = _edge.tempId
+                if _eid not in _added_legs:
+                    fillet_items_legs.add(_edge)
+                    _added_legs.add(_eid)
+    if fillet_items_legs.count > 0:
+        fillet_inp_legs.addConstantRadiusEdgeSet(fillet_items_legs, adsk.core.ValueInput.createByString("0.05 in"), True)
+        fillet_feat_legs = legs_c.features.filletFeatures.add(fillet_inp_legs)
+        fillet_feat_legs.name = "LegFillet"
 
     # ── FIT VIEW ──────────────────────────────────────────────────
-    _sp.apply_appearance("white oak")
-    _sp.apply_appearance("teak", bodies=["Leg_NL (1)", "Leg_NR", "Leg_FR", "Leg_FL"])
+    sp.apply_appearance("white oak")
+    sp.apply_appearance("teak", bodies=["Leg_NL (1)", "Leg_NR", "Leg_FR", "Leg_FL"])
 
     cam = app.activeViewport.camera
     cam.isFitView = True

@@ -20,7 +20,8 @@
         0,
         0
       ],
-      "note": "Front-right leg, mirror of FL across X midplane"
+      "note": "Front-right leg, mirror of FL across X midplane",
+      "contact": false
     },
     {
       "body": "Leg_BL",
@@ -31,7 +32,8 @@
         1,
         0
       ],
-      "note": "Back-left leg, mirror of FL across Y midplane"
+      "note": "Back-left leg, mirror of FL across Y midplane",
+      "contact": false
     },
     {
       "body": "Leg_BR",
@@ -42,7 +44,8 @@
         1,
         0
       ],
-      "note": "Back-right leg, mirror of FR across Y midplane"
+      "note": "Back-right leg, mirror of FR across Y midplane",
+      "contact": false
     },
     {
       "body": "FrontRail",
@@ -75,7 +78,8 @@
         1,
         0
       ],
-      "note": "Back rail, mirror of front rail across Y midplane"
+      "note": "Back rail, mirror of front rail across Y midplane",
+      "contact": false
     },
     {
       "body": "SideRailL",
@@ -262,7 +266,8 @@
         1
       ],
       "note": "Drawer front in center section",
-      "replicas": "dd_Front*"
+      "replicas": "dd_Front*",
+      "contact": false
     },
     {
       "body": "dd_Back",

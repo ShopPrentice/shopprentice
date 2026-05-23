@@ -156,7 +156,8 @@
         1
       ],
       "note": "Drawer front (first drawer), patterned vertically",
-      "replicas": "dd_Front*"
+      "replicas": "dd_Front*",
+      "contact": false
     },
     {
       "body": "dd_Back",

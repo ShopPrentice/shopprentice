@@ -138,7 +138,8 @@
         0,
         1
       ],
-      "note": "Drawer front, in drawer compartment below bottom board"
+      "note": "Drawer front, in drawer compartment below bottom board",
+      "contact": false
     },
     {
       "body": "dd_Back",
