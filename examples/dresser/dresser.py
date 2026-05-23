@@ -644,6 +644,8 @@ def _run(app):
     combine(kick_c, kick_right, kc_fr.bodies.item(0), CUT, True, "KC_FR_CutR")
 
     # Back-left: YZ plane at X = kick_inset + board_thick
+    ref_kb = find_body("Kick_Back")
+    ref_kb_bb = ref_kb.boundingBox
     kc_bl_pl = off_plane(kick_c, kick_c.yZConstructionPlane,
                          "kick_inset + board_thick", "KC_BL_Pl")
     _, pr = sketch_slot_model(kick_c, kc_bl_pl,
@@ -724,6 +726,8 @@ def _run(app):
     combine(root, bot_body_proxy, kb_l_proxies, CUT, True, "KB_L_CutB")
 
     # Right kick-to-bottom: board runs along Y → long dim vertical
+    ref_kick_right = find_body("Kick_Right")
+    ref_kick_right_bb = ref_kick_right.boundingBox
     _kb_r_n = int(ev("dm_kb_s_count"))
     _kb_r_sp = ev("dm_kb_s_sp")
     kb_r_bodies = []
@@ -740,6 +744,8 @@ def _run(app):
     combine(root, bot_body_proxy, kb_r_proxies, CUT, True, "KB_R_CutB")
 
     # Back kick-to-bottom: board runs along X → long dim horizontal
+    ref_kick_back = find_body("Kick_Back")
+    ref_kick_back_bb = ref_kick_back.boundingBox
     _kb_b_n = int(ev("dm_kb_b_count"))
     _kb_b_sp = ev("dm_kb_b_sp")
     kb_b_bodies = []
