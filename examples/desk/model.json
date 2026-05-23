@@ -1,0 +1,426 @@
+{
+  "deps": [
+    {
+      "body": "Leg_FL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front-left leg stands on floor"
+    },
+    {
+      "body": "Leg_FR",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front-right leg stands on floor"
+    },
+    {
+      "body": "Leg_BL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back-left leg stands on floor"
+    },
+    {
+      "body": "Leg_BR",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back-right leg stands on floor"
+    },
+    {
+      "body": "Leg_FR",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "FR is to the right of FL"
+    },
+    {
+      "body": "Leg_BL",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "BL is behind FL"
+    },
+    {
+      "body": "Leg_BR",
+      "ref": "Leg_BL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "BR is to the right of BL"
+    },
+    {
+      "body": "Top",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Desk top sits on top of legs"
+    },
+    {
+      "body": "Apron_Back",
+      "ref": "Leg_BL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Back apron spans between BL and BR legs"
+    },
+    {
+      "body": "Apron_Back",
+      "ref": "Top",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back apron hangs below the top"
+    },
+    {
+      "body": "Apron_Left",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Left apron spans between FL and BL legs"
+    },
+    {
+      "body": "Apron_Right",
+      "ref": "Apron_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right apron mirrors left apron",
+      "contact": false
+    },
+    {
+      "body": "Apron_FrontStretcher",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Front stretcher spans between FL and FR legs below drawer"
+    },
+    {
+      "body": "Apron_FrontStretcher",
+      "ref": "Apron_Back",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front stretcher is at bottom of apron zone",
+      "contact": false
+    },
+    {
+      "body": "Divider",
+      "ref": "Apron_FrontStretcher",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Center divider runs between front stretcher and back apron"
+    },
+    {
+      "body": "Divider_Front",
+      "ref": "Apron_FrontStretcher",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Divider front extension fills gap above stretcher between drawer fronts"
+    },
+    {
+      "body": "Runner_L",
+      "ref": "Apron_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left drawer runner attached to left apron inner face"
+    },
+    {
+      "body": "Runner_R",
+      "ref": "Apron_Right",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right drawer runner attached to right apron inner face"
+    },
+    {
+      "body": "Stop_L",
+      "ref": "Runner_L",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left drawer stop sits on top of left runner at back end"
+    },
+    {
+      "body": "Stop_R",
+      "ref": "Runner_R",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right drawer stop sits on top of right runner at back end"
+    },
+    {
+      "body": "ddl_Front",
+      "ref": "Apron_FrontStretcher",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left drawer front, above front stretcher"
+    },
+    {
+      "body": "ddl_Back",
+      "ref": "ddl_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Left drawer back is behind front",
+      "contact": false
+    },
+    {
+      "body": "ddl_Left",
+      "ref": "ddl_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left drawer left side"
+    },
+    {
+      "body": "ddl_Right",
+      "ref": "ddl_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left drawer right side"
+    },
+    {
+      "body": "ddl_Bottom",
+      "ref": "ddl_Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left drawer bottom panel"
+    },
+    {
+      "body": "ddr_Front",
+      "ref": "Apron_FrontStretcher",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right drawer front, above front stretcher"
+    },
+    {
+      "body": "ddr_Back",
+      "ref": "ddr_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Right drawer back is behind front",
+      "contact": false
+    },
+    {
+      "body": "ddr_Left",
+      "ref": "ddr_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right drawer left side"
+    },
+    {
+      "body": "ddr_Right",
+      "ref": "ddr_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right drawer right side"
+    },
+    {
+      "body": "ddr_Bottom",
+      "ref": "ddr_Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right drawer bottom panel"
+    },
+    {
+      "body": "TB_BL",
+      "ref": "Apron_Back",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back-left tabletop bracket on back apron inner face"
+    },
+    {
+      "body": "TB_BR",
+      "ref": "Apron_Back",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back-right tabletop bracket on back apron inner face"
+    },
+    {
+      "body": "TB_L_0",
+      "ref": "Apron_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left apron bracket 0"
+    },
+    {
+      "body": "TB_L_1",
+      "ref": "Apron_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left apron bracket 1"
+    },
+    {
+      "body": "TB_R_0",
+      "ref": "Apron_Right",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right apron bracket 0"
+    },
+    {
+      "body": "TB_R_1",
+      "ref": "Apron_Right",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right apron bracket 1"
+    },
+    {
+      "body": "TB_FL",
+      "ref": "Apron_FrontStretcher",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Front-left tabletop bracket on front stretcher inner face"
+    },
+    {
+      "body": "TB_FR",
+      "ref": "Apron_FrontStretcher",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Front-right tabletop bracket on front stretcher inner face"
+    }
+  ]
+}

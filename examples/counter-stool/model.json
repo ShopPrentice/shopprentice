@@ -1,0 +1,222 @@
+{
+  "deps": [
+    {
+      "body": "Seat",
+      "ref": "Leg_NL",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Seat sits on top of legs"
+    },
+    {
+      "body": "Leg_NL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Near-left leg stands on floor",
+      "contact": false
+    },
+    {
+      "body": "Leg_NR",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Near-right leg stands on floor",
+      "contact": false
+    },
+    {
+      "body": "Leg_FL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Far-left leg stands on floor",
+      "contact": false
+    },
+    {
+      "body": "Leg_FR",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Far-right leg stands on floor",
+      "contact": false
+    },
+    {
+      "body": "Leg_NR",
+      "ref": "Leg_NL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "NR is on the far-Y side of NL",
+      "contact": false
+    },
+    {
+      "body": "Leg_FL",
+      "ref": "Leg_NL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "FL is on the far-X side of NL",
+      "contact": false
+    },
+    {
+      "body": "Leg_FR",
+      "ref": "Leg_NL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "FR is on the far-X side of NL",
+      "contact": false
+    },
+    {
+      "body": "DM_NL",
+      "ref": "Seat",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Domino void at seat-to-leg NL joint"
+    },
+    {
+      "body": "DM_NR",
+      "ref": "Seat",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Domino void at seat-to-leg NR joint"
+    },
+    {
+      "body": "DM_FL",
+      "ref": "Seat",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Domino void at seat-to-leg FL joint"
+    },
+    {
+      "body": "DM_FR",
+      "ref": "Seat",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Domino void at seat-to-leg FR joint"
+    },
+    {
+      "body": "Str_Back",
+      "ref": "Leg_NR",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back stretcher runs between NR and FR legs at front_str_h"
+    },
+    {
+      "body": "Str_Front",
+      "ref": "Leg_NL",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front stretcher runs between NL and FL legs at front_str_h"
+    },
+    {
+      "body": "Str_Back",
+      "ref": "Str_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back stretcher is on far-Y side vs front stretcher",
+      "contact": false
+    },
+    {
+      "body": "Str_Left",
+      "ref": "Leg_NL",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left side stretcher runs between NL and NR at side_str_h"
+    },
+    {
+      "body": "Str_Right",
+      "ref": "Leg_FL",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right side stretcher runs between FL and FR at side_str_h"
+    },
+    {
+      "body": "Str_Right",
+      "ref": "Str_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right stretcher is on far-X side vs left stretcher",
+      "contact": false
+    },
+    {
+      "body": "Footrest",
+      "ref": "Str_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Footrest sits on top of front stretcher"
+    }
+  ]
+}

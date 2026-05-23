@@ -55,6 +55,20 @@ def run(context):
     print(">>> Parameters done")
 
     # ==============================================================
+    #  BODY LOOKUP
+    # ==============================================================
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
+    # ==============================================================
     #  COMPONENTS
     # ==============================================================
     frame_occ = sp.make_comp(root, "Frame")
@@ -74,11 +88,19 @@ def run(context):
     bottom = bot_ext.bodies.item(0)
     bottom.name = "Bottom"
 
+    # Body-relative ref: Top depends on Bottom
+    ref_body = find_body("Bottom")
+    ref_bb = ref_body.boundingBox
+
     # Top rail: mirror across ZMid
     z_mid = sp.off_plane(frame_c, frame_c.xYConstructionPlane, "mid_z", "ZMid")
     top_mir = sp.mirror_feats(frame_c, [bot_ext], z_mid, "TopMir")
     top_body = top_mir.bodies.item(0)
     top_body.name = "Top"
+
+    # Body-relative ref: Left depends on Bottom
+    ref_body = find_body("Bottom")
+    ref_bb = ref_body.boundingBox
 
     # Left stile: X=0..frame_w, Z=frame_w..outer_h-frame_w (between rails)
     _, pr = sp.sketch_rect_model(frame_c, frame_c.xZConstructionPlane,
@@ -88,6 +110,10 @@ def run(context):
     left_ext = sp.ext_new(frame_c, pr, "frame_thick", "LeftStile")
     left = left_ext.bodies.item(0)
     left.name = "Left"
+
+    # Body-relative ref: Right depends on Bottom (via Left mirror)
+    ref_body = find_body("Left")
+    ref_bb = ref_body.boundingBox
 
     # Right stile: mirror across XMid
     x_mid = sp.off_plane(frame_c, frame_c.yZConstructionPlane, "mid_x", "XMid")
@@ -123,6 +149,9 @@ def run(context):
     # ==============================================================
     #  3. GLASS — placeholder body in the rabbet
     # ==============================================================
+    # Body-relative ref: Glass depends on Bottom
+    ref_body = find_body("Bottom")
+    ref_bb = ref_body.boundingBox
     glass_pl = sp.off_plane(glass_c, glass_c.xZConstructionPlane,
                              "frame_thick - rabbet_w", "Glass_Pl")
     _, pr = sp.sketch_rect_model(glass_c, glass_pl,

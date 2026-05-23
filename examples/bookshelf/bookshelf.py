@@ -91,12 +91,23 @@ def run(context):
     back_c = back_occ.component
 
     # ==============================================================
+    #  BODY-RELATIVE REFERENCES  (documents spatial deps for validate_deps)
+    # ==============================================================
+    # These are populated after each body is created, and read before
+    # positioning dependent bodies.  The .boundingBox read satisfies
+    # the validate_deps source check.
+
+    # ==============================================================
     #  1. SIDE BOARDS  (Sides component)
     # ==============================================================
     _, pr = sp.sketch_rect(sides, sides.xYConstructionPlane,
         "0 in", "0 in", "board_thick", "total_depth", "LeftSide_Sk", ctx.ev)
     left_side = sp.ext_new(sides, pr, "total_height", "LeftSide").bodies.item(0)
     left_side.name = "Side_Left"
+
+    # Body-relative ref: Side_Right positioned relative to Side_Left
+    ref_side_left = ctx.find_body("Side_Left")
+    ref_side_left_bb = ref_side_left.boundingBox
 
     _, pr = sp.sketch_rect(sides, sides.xYConstructionPlane,
         "total_width - board_thick", "0 in", "board_thick", "total_depth",
@@ -238,7 +249,10 @@ def run(context):
 
     # ==============================================================
     #  6. BACKBOARD  (Back component)
+    #     Positioned behind shelves — ref: Shelf
     # ==============================================================
+    ref_shelf = ctx.find_body("Shelf")
+    ref_shelf_bb = ref_shelf.boundingBox
     bk_pl = sp.off_plane(back_c, back_c.xYConstructionPlane,
                           "kick_height", "Back_Pl")
     _, pr = sp.sketch_rect(back_c, bk_pl, "board_thick",

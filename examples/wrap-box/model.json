@@ -1,0 +1,47 @@
+{
+  "deps": [
+    {
+      "body": "Front",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Front case board, full box_length x box_height"
+    },
+    {
+      "body": "Back",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": false,
+      "note": "Back case board, mirror of Front across Y midplane, with cutter lip and groove"
+    },
+    {
+      "body": "End_Left",
+      "ref": "Front",
+      "side": "opposite",
+      "direction": [1, 0, 0],
+      "note": "Left end board with corner block, dovetailed to Front and Back"
+    },
+    {
+      "body": "End_Right",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "note": "Right end board, mirror of End_Left across X midplane"
+    },
+    {
+      "body": "Bottom",
+      "ref": "Front",
+      "side": "opposite",
+      "direction": [0, 0, 1],
+      "note": "Bottom panel with edge rabbets, tongue sits in grooves of all 4 case boards"
+    },
+    {
+      "body": "Lid",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Lid panel with edge rabbets, slides in from front, tongues into back and end grooves"
+    }
+  ]
+}

@@ -1,0 +1,370 @@
+{
+  "deps": [
+    {
+      "body": "End_L",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left end board (pin board), full case_height"
+    },
+    {
+      "body": "End_R",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right end board (pin board), mirror of End_L"
+    },
+    {
+      "body": "Front",
+      "ref": "End_L",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Front board (tail board) between end boards, trimmed above open_height with lip"
+    },
+    {
+      "body": "Back",
+      "ref": "End_L",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Back board (tail board) between end boards, trimmed above open_height"
+    },
+    {
+      "body": "Support_F",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Front support strip inside case, rests on bottom panel"
+    },
+    {
+      "body": "Support_B",
+      "ref": "Back",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back support strip inside case, mirror of Support_F"
+    },
+    {
+      "body": "Bottom",
+      "ref": "Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Raised bottom panel sitting in grooves near base of all case boards"
+    },
+    {
+      "body": "Lid_Rail_F",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front lid rail, recessed lid_rab from case front"
+    },
+    {
+      "body": "Lid_Rail_B",
+      "ref": "Back",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back lid rail at back edge of case"
+    },
+    {
+      "body": "Lid_Stile_L",
+      "ref": "Lid_Rail_F",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left lid stile between front and back rails"
+    },
+    {
+      "body": "Lid_Stile_R",
+      "ref": "Lid_Rail_F",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right lid stile, mirror of Lid_Stile_L"
+    },
+    {
+      "body": "Lid_Div",
+      "ref": "Lid_Rail_F",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Center lid divider running Y between rails"
+    },
+    {
+      "body": "Lid_Panel_L",
+      "ref": "Lid_Stile_L",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left lid panel (tongue into frame grooves)"
+    },
+    {
+      "body": "Lid_Panel_R",
+      "ref": "Lid_Stile_R",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right lid panel, mirror of Lid_Panel_L"
+    },
+    {
+      "body": "Pull",
+      "ref": "Lid_Rail_F",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Pull handle protruding past case front, tenoned into front rail"
+    },
+    {
+      "body": "UT_Front",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Upper tray front side, mitered corners"
+    },
+    {
+      "body": "UT_Back",
+      "ref": "UT_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Upper tray back side, mirror of UT_Front",
+      "contact": false
+    },
+    {
+      "body": "UT_End_L",
+      "ref": "UT_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Upper tray left end"
+    },
+    {
+      "body": "UT_End_R",
+      "ref": "UT_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Upper tray right end, mirror of UT_End_L"
+    },
+    {
+      "body": "UT_Bottom",
+      "ref": "UT_Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Upper tray bottom panel in grooves"
+    },
+    {
+      "body": "UT_Div",
+      "ref": "UT_Bottom",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Upper tray center divider with handle notch"
+    },
+    {
+      "body": "LTL_Front",
+      "ref": "Bottom",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Lower-left tray front side"
+    },
+    {
+      "body": "LTL_Back",
+      "ref": "LTL_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Lower-left tray back side, mirror of LTL_Front",
+      "contact": false
+    },
+    {
+      "body": "LTL_End_L",
+      "ref": "LTL_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Lower-left tray left end"
+    },
+    {
+      "body": "LTL_End_R",
+      "ref": "LTL_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Lower-left tray right end"
+    },
+    {
+      "body": "LTL_Bottom",
+      "ref": "LTL_Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Lower-left tray bottom panel"
+    },
+    {
+      "body": "LTL_Div",
+      "ref": "LTL_Bottom",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Lower-left tray center divider with handle notch"
+    },
+    {
+      "body": "LTR_Front",
+      "ref": "Bottom",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Lower-right tray front side (mirror of LTL)"
+    },
+    {
+      "body": "LTR_Back",
+      "ref": "LTR_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Lower-right tray back side",
+      "contact": false
+    },
+    {
+      "body": "LTR_End_L",
+      "ref": "LTR_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Lower-right tray left end"
+    },
+    {
+      "body": "LTR_End_R",
+      "ref": "LTR_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Lower-right tray right end"
+    },
+    {
+      "body": "LTR_Bottom",
+      "ref": "LTR_Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Lower-right tray bottom panel"
+    },
+    {
+      "body": "LTR_Div",
+      "ref": "LTR_Bottom",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Lower-right tray center divider"
+    }
+  ]
+}

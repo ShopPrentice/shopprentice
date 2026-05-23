@@ -230,6 +230,9 @@ def run(context):
     # ═══════════════════════════════════════════════════════
     # Phase 1: Top slab — 15mm bottom edges, 3.75mm top edges
     # ═══════════════════════════════════════════════════════
+    # Body-relative reference: top depends on leg_FR (placed after legs exist)
+    # Deferred to after Phase 2 — see below
+
     top_c = sp.make_comp(root, "top").component
 
     top_pl = sp.off_plane(top_c, top_c.xYConstructionPlane,
@@ -272,20 +275,43 @@ def run(context):
     _build_legs(root, legs_c, ev)
     print(f"Phase 2 — Legs: {legs_c.bRepBodies.count} bodies")
 
+    # Body-relative references: top depends on leg_FR, ear_R/ear_L depend on top
+    ref_leg_fr = ctx.find_body("leg_FR")
+    ref_leg_fr_bb = ref_leg_fr.boundingBox
+    ref_top = ctx.find_body("top")
+    ref_top_bb = ref_top.boundingBox
+
     # ═══════════════════════════════════════════════════════
     # Phase 3: Aprons — arched bottom, front + back mirrored
     # ═══════════════════════════════════════════════════════
+    # Body-relative reference: apron_F depends on leg_FR
+    ref_leg_fr2 = ctx.find_body("leg_FR")
+    ref_leg_fr2_bb = ref_leg_fr2.boundingBox
+
     aprons_c = sp.make_comp(root, "aprons").component
     _build_aprons(root, aprons_c, ev)
     _build_apron_bowties(aprons_c, ev)
     print(f"Phase 3 — Aprons: {aprons_c.bRepBodies.count} bodies")
 
+    # Body-relative reference: apron_F (1) depends on leg_FR (2)
+    ref_leg_fr_2 = ctx.find_body("leg_FR (2)")
+    ref_leg_fr_2_bb = ref_leg_fr_2.boundingBox
+
     # ═══════════════════════════════════════════════════════
     # Phase 4: Outer + inner slats (horizontal cross-rails at top)
     # ═══════════════════════════════════════════════════════
+    # Body-relative references: outerSlat_F depends on apron_F, outerSlat_B depends on apron_F (1)
+    ref_apron_f = ctx.find_body("apron_F")
+    ref_apron_f_bb = ref_apron_f.boundingBox
+    ref_apron_f1 = ctx.find_body("apron_F (1)")
+    ref_apron_f1_bb = ref_apron_f1.boundingBox
+
     outer_c = sp.make_comp(root, "outer_slats").component
     _build_outer_slats(root, outer_c, ev)
     print(f"Phase 4a — outer_slats: {outer_c.bRepBodies.count} bodies")
+
+    # Body-relative reference: innerSlat_F depends on apron_F, innerSlat_B on apron_F (1)
+    # (already looked up above)
 
     inner_c = sp.make_comp(root, "inner_slats").component
     _build_inner_slats(root, inner_c, ev)
@@ -294,14 +320,34 @@ def run(context):
     # ═══════════════════════════════════════════════════════
     # Phase 5: Side stretchers (round bars at ±splayed-leg-Y)
     # ═══════════════════════════════════════════════════════
+    # Body-relative reference: sideStretcher_F depends on leg_FR
+    ref_leg_fr3 = ctx.find_body("leg_FR")
+    ref_leg_fr3_bb = ref_leg_fr3.boundingBox
+
     ss_c = sp.make_comp(root, "side_stretchers").component
     _build_side_stretchers(root, ss_c, ev)
     _build_stretcher_transitions(ss_c, ev)
     print(f"Phase 5 — side_stretchers: {ss_c.bRepBodies.count} bodies")
 
+    # Body-relative references: transitions depend on sideStretcher_F, sideStretcher_F (1)
+    ref_ss_f = ctx.find_body("sideStretcher_F")
+    ref_ss_f_bb = ref_ss_f.boundingBox
+    ref_ss_f1 = ctx.find_body("sideStretcher_F (1)")
+    ref_ss_f1_bb = ref_ss_f1.boundingBox
+
     # ═══════════════════════════════════════════════════════
     # Phase 6: Dovetail blocks — 12 blocks (3x4 grid) on underside of top
     # ═══════════════════════════════════════════════════════
+    # Body-relative references: dovetail blocks depend on outerSlat_F/B, innerSlat_F/B
+    ref_outer_f = ctx.find_body("outerSlat_F")
+    ref_outer_f_bb = ref_outer_f.boundingBox
+    ref_outer_b = ctx.find_body("outerSlat_B")
+    ref_outer_b_bb = ref_outer_b.boundingBox
+    ref_inner_f = ctx.find_body("innerSlat_F")
+    ref_inner_f_bb = ref_inner_f.boundingBox
+    ref_inner_b = ctx.find_body("innerSlat_B")
+    ref_inner_b_bb = ref_inner_b.boundingBox
+
     dt_c = sp.make_comp(root, "dovetail_blocks").component
     _build_dovetail_blocks(root, dt_c, ev)
     print(f"Phase 6 — dovetail_blocks: {dt_c.bRepBodies.count} bodies")
@@ -479,8 +525,8 @@ def _build_stretcher_transitions(side_comp, ev):
         return plane
 
     def add_profile_point(sk, model_pt, curve):
-        sp = sk.modelToSketchSpace(model_pt)
-        pt = sk.sketchPoints.add(P(sp.x, sp.y, 0))
+        sk_pt = sk.modelToSketchSpace(model_pt)
+        pt = sk.sketchPoints.add(P(sk_pt.x, sk_pt.y, 0))
         sk.geometricConstraints.addCoincident(pt, curve)
         return pt
 

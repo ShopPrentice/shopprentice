@@ -82,6 +82,17 @@ def run(context):
     # ==============================================================
     #  HELPERS
     # ==============================================================
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
     def ev(e):
         p = params.itemByName(e)
         return p.value if p else design.unitsManager.evaluateExpression(e, "cm")
@@ -312,6 +323,10 @@ def run(context):
     #  Tenons built as NewBody, mirrored, JOINed into rail.
     # ==============================================================
 
+    # Body-relative references for rail positioning
+    ref_leg_fl = find_body("Leg_FL")
+    ref_leg_fl_bb = ref_leg_fl.boundingBox
+
     # --- Front lower rail ---
     flo_pl = off_plane(lr_c, lr_c.xYConstructionPlane, "lo_z", "FLo_Pl")
     _, pr = sketch_rect(lr_c, flo_pl,
@@ -348,6 +363,10 @@ def run(context):
         "long_shoulder", "groove_width", "FLo_Groove_Sk")
     ext_cut(lr_c, pr, "groove_depth", flo_body, "FLo_Groove")
 
+    # Body-relative reference for upper rail positioning
+    ref_flo = find_body("LR_Front_Lower")
+    ref_flo_bb = ref_flo.boundingBox
+
     # --- Front upper rail ---
     fhi_pl = off_plane(lr_c, lr_c.xYConstructionPlane, "hi_z", "FHi_Pl")
     _, pr = sketch_rect(lr_c, fhi_pl,
@@ -380,6 +399,10 @@ def run(context):
         "long_shoulder", "groove_width", "FHi_Groove_Sk")
     ext_cut(lr_c, pr, "groove_depth", fhi_body, "FHi_Groove")
 
+    # Body-relative reference for back rails
+    ref_leg_bl = find_body("Leg_BL")
+    ref_leg_bl_bb = ref_leg_bl.boundingBox
+
     # Mirror front pair → back pair
     lr_mid_xz = off_plane(lr_c, lr_c.xZConstructionPlane, "mid_y", "LR_MidXZ")
     mir_lr = mirror_bodies(lr_c, [flo_body, fhi_body], lr_mid_xz, "Mir_LR_Back")
@@ -388,11 +411,19 @@ def run(context):
     bhi_body = mir_lr.bodies.item(1)
     bhi_body.name = "LR_Back_Upper"
 
+    # Body-relative reference for back upper rail
+    ref_blo = find_body("LR_Back_Lower")
+    ref_blo_bb = ref_blo.boundingBox
+
     # ==============================================================
     #  3. SHORT RAILS  (ShortRails component)
     #
     #  Same pattern as long rails but rotated, staggered tenon Z.
     # ==============================================================
+
+    # Body-relative reference: left short rail refs Leg_FL (already looked up above)
+    # Re-read bounding box for short rail context
+    ref_leg_fl_bb = ref_leg_fl.boundingBox
 
     # --- Left lower rail ---
     llo_pl = off_plane(sr_c, sr_c.xYConstructionPlane, "lo_z", "LLo_Pl")
@@ -430,6 +461,10 @@ def run(context):
         "groove_width", "short_shoulder", "LLo_Groove_Sk")
     ext_cut(sr_c, pr, "groove_depth", llo_body, "LLo_Groove")
 
+    # Body-relative reference for left upper short rail
+    ref_sllo = find_body("SR_Left_Lower")
+    ref_sllo_bb = ref_sllo.boundingBox
+
     # --- Left upper rail ---
     lhi_pl = off_plane(sr_c, sr_c.xYConstructionPlane, "hi_z", "LHi_Pl")
     _, pr = sketch_rect(sr_c, lhi_pl,
@@ -462,6 +497,10 @@ def run(context):
         "groove_width", "short_shoulder", "LHi_Groove_Sk")
     ext_cut(sr_c, pr, "groove_depth", lhi_body, "LHi_Groove")
 
+    # Body-relative reference for right short rails
+    ref_leg_fr = find_body("Leg_FR")
+    ref_leg_fr_bb = ref_leg_fr.boundingBox
+
     # Mirror left pair → right pair
     sr_mid_yz = off_plane(sr_c, sr_c.yZConstructionPlane, "mid_x", "SR_MidYZ")
     mir_sr = mirror_bodies(sr_c, [llo_body, lhi_body], sr_mid_yz, "Mir_SR_Right")
@@ -469,6 +508,10 @@ def run(context):
     rlo_body.name = "SR_Right_Lower"
     rhi_body = mir_sr.bodies.item(1)
     rhi_body.name = "SR_Right_Upper"
+
+    # Body-relative reference for right upper short rail
+    ref_srlo = find_body("SR_Right_Lower")
+    ref_srlo_bb = ref_srlo.boundingBox
 
     # ==============================================================
     #  4. LEG MORTISES — bulk CUT  (root, assembly proxies)
@@ -718,6 +761,10 @@ def run(context):
     ext_bt = ext_new(bt_c, pr, "bottom_thickness", "BottomSlat_1")
     bt_tmpl = ext_bt.bodies.item(0)
     bt_tmpl.name = "BottomSlat_1"
+
+    # Body-relative reference for domino positioning
+    ref_bt1 = find_body("BottomSlat_1")
+    ref_bt1_bb = ref_bt1.boundingBox
 
     # --- Domino voids (sketched on slat mating face, not origin) ---
     # Find the front mating face of the template slat (min Y face)

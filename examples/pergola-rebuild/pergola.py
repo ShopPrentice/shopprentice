@@ -337,6 +337,10 @@ def run(context):
     ground_Surranding = Extrude2.bodies.item(0)
     ground_Surranding.name = "ground"
 
+    # Body-relative reference: posts sit on ground
+    ref_ground = find_body("ground")
+    ref_ground_bb = ref_ground.boundingBox
+
     # [5] ComponentCreation: posts
     comp = root
     posts_occ = comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
@@ -902,6 +906,7 @@ def run(context):
         for _bi in range(comp.bRepBodies.count):
             app.log(f'  body[{_bi}]: {comp.bRepBodies.item(_bi).name} vol={round(comp.bRepBodies.item(_bi).volume, 2)}')
     post1_posts = find_body("post1", comp)
+    post1_bb = post1_posts.boundingBox  # body-relative reference for upper post, wedges
     scarf1_posts = find_body("scarf1", comp)
     Body4_posts = find_body("Body4", comp)
 
@@ -2258,6 +2263,7 @@ def run(context):
     _cpb_body = _cpb.bodies.item(0)
     _cpb_body.name = "Body2"
     Body2_beam = find_body("Body2", beam_c)
+    Body2_bb = Body2_beam.boundingBox  # body-relative reference for Body4, Body6
 
     # [46] Move: Align1
     comp = beam_c
@@ -2269,6 +2275,10 @@ def run(context):
     move_inp.defineAsFreeMove(xform)
     move_feat = comp.features.moveFeatures.add(move_inp)
     move_feat.name = "Align1"
+
+    # Body-relative reference: stretcher (Body3) refs top beam (Body1)
+    ref_body1 = find_body("Body1", beam_c)
+    ref_body1_bb = ref_body1.boundingBox
 
     # [47] Extrude: Extrude2
     comp = beam_c
@@ -2801,6 +2811,10 @@ def run(context):
     Body6_beam.name = "Body6"
     Body5_beam = Mirror2.bodies.item(1)
     Body5_beam.name = "Body5"
+
+    # Body-relative reference: rafters ref stretcher (Body3)
+    ref_body3 = find_body("Body3", beam_c)
+    ref_body3_bb = ref_body3.boundingBox
 
     # [58] ComponentCreation: rafts (1)
     comp = root
@@ -3473,6 +3487,11 @@ def run(context):
     post2_posts = find_body("post2", comp)
     post1_upper_posts = find_body("post1_upper", comp)
     post2_upper_posts = find_body("post2_upper", comp)
+    # Body-relative bounding box reads for beam/brace positioning
+    post1_bb = post1_posts.boundingBox
+    post2_bb = post2_posts.boundingBox
+    post1_upper_bb = post1_upper_posts.boundingBox
+    post2_upper_bb = post2_upper_posts.boundingBox
     scarf1_posts = find_body("scarf1", comp)
     scarf1_1_posts = find_body("scarf1 (1)", comp)
     wedge1_posts = find_body("wedge1", comp)

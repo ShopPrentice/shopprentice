@@ -1,6 +1,7 @@
 """Generated from capture_design — Stool v1
 NOTE: Auto-generated. Features marked TODO need manual review."""
 import adsk.core, adsk.fusion, math
+from helpers import sp as _sp
 
 
 def run(context):
@@ -106,19 +107,25 @@ def run(context):
         m.name = name
         return m
 
+    # ── COMPONENTS ────────────────────────────────────────────────
+    seat_occ = _sp.make_comp(root, "Seat")
+    seat_c = seat_occ.component
+    legs_occ = _sp.make_comp(root, "Legs")
+    legs_c = legs_occ.component
+
     # ── TIMELINE ──────────────────────────────────────────────────
 
-    # [0] ConstructionPlane: XMid
+    # [0] ConstructionPlane: XMid (root — used for cross-component mirrors)
     XMid = off_plane(root, root.yZConstructionPlane, "seat_l / 2", "XMid")
 
-    # [1] ConstructionPlane: YMid
+    # [1] ConstructionPlane: YMid (root — used for cross-component mirrors)
     YMid = off_plane(root, root.xZConstructionPlane, "seat_w / 2", "YMid")
 
     # [2] ConstructionPlane: Seat_Pl
-    Seat_Pl = off_plane(root, root.xYConstructionPlane, "seat_z", "Seat_Pl")
+    Seat_Pl = off_plane(seat_c, seat_c.xYConstructionPlane, "seat_z", "Seat_Pl")
 
     # [3] Sketch: Seat_Sk
-    Seat_Sk = root.sketches.add(Seat_Pl)
+    Seat_Sk = seat_c.sketches.add(Seat_Pl)
     Seat_Sk.name = "Seat_Sk"
     x0, y0, w, h = ev("0 cm"), ev("0 cm"), ev("seat_l"), ev("seat_w")
     rect = Seat_Sk.sketchCurves.sketchLines.addTwoPointRectangle(
@@ -134,19 +141,23 @@ def run(context):
     Seat_Sk_prof = Seat_Sk.profiles.item(0)
 
     # [4] Extrude: SeatBoard
-    inp = root.features.extrudeFeatures.createInput(Seat_Sk_prof, NEWBODY)
+    inp = seat_c.features.extrudeFeatures.createInput(Seat_Sk_prof, NEWBODY)
     inp.setDistanceExtent(False, adsk.core.ValueInput.createByString("seat_t"))
     inp.taperAngle = adsk.core.ValueInput.createByString("seat_bevel")
-    SeatBoard = root.features.extrudeFeatures.add(inp)
+    SeatBoard = seat_c.features.extrudeFeatures.add(inp)
     SeatBoard.name = "SeatBoard"
     Seat = SeatBoard.bodies.item(0)
     Seat.name = "Seat"
 
     # [5] ConstructionPlane: LegFront_Pl
-    LegFront_Pl = off_plane(root, root.xZConstructionPlane, "leg_inset_y - leg_d / 2", "LegFront_Pl")
+    LegFront_Pl = off_plane(legs_c, legs_c.xZConstructionPlane, "leg_inset_y - leg_d / 2", "LegFront_Pl")
+
+    # Body-relative ref: Leg_NL depends on Seat
+    ref_body = find_body("Seat")
+    ref_bb = ref_body.boundingBox
 
     # [6] Sketch: Leg_NL_Sk
-    Leg_NL_Sk = root.sketches.add(LegFront_Pl)
+    Leg_NL_Sk = legs_c.sketches.add(LegFront_Pl)
     Leg_NL_Sk.name = "Leg_NL_Sk"
     lns = Leg_NL_Sk.sketchCurves.sketchLines
     def _xf(sx, sy): return (sx, sy)
@@ -173,9 +184,9 @@ def run(context):
     Leg_NL_Sk_prof = Leg_NL_Sk.profiles.item(0)  # 1 profile(s)
 
     # [7] Extrude: Leg_NL
-    inp = root.features.extrudeFeatures.createInput(Leg_NL_Sk_prof, NEWBODY)
+    inp = legs_c.features.extrudeFeatures.createInput(Leg_NL_Sk_prof, NEWBODY)
     inp.setDistanceExtent(False, adsk.core.ValueInput.createByString("leg_d"))
-    Leg_NL = root.features.extrudeFeatures.add(inp)
+    Leg_NL = legs_c.features.extrudeFeatures.add(inp)
     Leg_NL.name = "Leg_NL"
     Leg_NL_b = Leg_NL.bodies.item(0)
     Leg_NL_b.name = "Leg_NL"
@@ -185,14 +196,14 @@ def run(context):
     xform.setWithArray([1.0, 0.0, 0.0, 0.0, 0.0, 0.996194698092, 0.087155742748, -1.839522337329, 0.0, -0.087155742748, 0.996194698092, 0.413011664712, 0.0, 0.0, 0.0, 1.0])
     move_coll = adsk.core.ObjectCollection.create()
     move_coll.add(Leg_NL_b)
-    move_inp = root.features.moveFeatures.createInput2(move_coll)
+    move_inp = legs_c.features.moveFeatures.createInput2(move_coll)
     move_inp.defineAsFreeMove(xform)
-    move_feat = root.features.moveFeatures.add(move_inp)
+    move_feat = legs_c.features.moveFeatures.add(move_inp)
     move_feat.name = "YSplay_NL"
 
-    # [9] Sketch: Sketch3
+    # [9] Sketch: Sketch3 (on Seat face, but CUTs into leg — lives in Legs component)
     # variant 0: method=intersect
-    Sketch3 = root.sketches.add(find_face_near(Seat, 15.24, 8.89, 17.78, 0.0, 0.0, 1.0))
+    Sketch3 = legs_c.sketches.add(find_face_near(Seat, 15.24, 8.89, 17.78, 0.0, 0.0, 1.0))
     Sketch3.name = "Sketch3"
     lns = Sketch3.sketchCurves.sketchLines
     # Coordinate transform: captured sketch axes -> actual sketch axes
@@ -213,17 +224,17 @@ def run(context):
     for _ci in range(Sketch3.sketchCurves.count):
         _c = Sketch3.sketchCurves.item(_ci)
         if _c.isReference:
-            for _sp in [_c.startSketchPoint, _c.endSketchPoint]:
-                _g = _sp.geometry
-                _proj_pts.append((_g.x, _g.y, _sp))
+            for _skpt in [_c.startSketchPoint, _c.endSketchPoint]:
+                _g = _skpt.geometry
+                _proj_pts.append((_g.x, _g.y, _skpt))
             _s, _e = _c.startSketchPoint.geometry, _c.endSketchPoint.geometry
             _proj_curves.append((_s.x, _s.y, _e.x, _e.y, _c))
 
     def _nearest_proj(x, y):
         best, best_d = None, 1e10
-        for _px, _py, _sp in _proj_pts:
+        for _px, _py, _skpt in _proj_pts:
             _d = abs(_px - x) + abs(_py - y)
-            if _d < best_d: best, best_d = _sp, _d
+            if _d < best_d: best, best_d = _skpt, _d
         return best
 
     def _nearest_proj_curve(sx, sy, ex, ey):
@@ -361,13 +372,13 @@ def run(context):
             abs(ep.x - 3.3020) + abs(ep.y - 2.3408) + abs(ep.z - 20.5086) < 0.1):
             sweep_edge = e
             break
-    sweep_path = root.features.createPath(sweep_edge)
+    sweep_path = legs_c.features.createPath(sweep_edge)
     _psv = sweep_edge.startVertex.geometry
     _vtx_match = (abs(_psv.x - -0.2922) + abs(_psv.y - 0.5643) + abs(_psv.z - 0.2027) < 0.1)
     _opposed = sweep_path.item(0).isOpposedToEntity
     _path_fwd = not (_vtx_match != _opposed)
     # _path_fwd: True if path direction matches captured direction
-    sweep_inp = root.features.sweepFeatures.createInput(sweep_profs, sweep_path, CUT)
+    sweep_inp = legs_c.features.sweepFeatures.createInput(sweep_profs, sweep_path, CUT)
     sweep_inp.orientation = adsk.fusion.SweepOrientationTypes.PerpendicularOrientationType
     if _path_fwd:
         sweep_inp.distanceTwo = adsk.core.ValueInput.createByString("0")
@@ -376,59 +387,58 @@ def run(context):
         sweep_inp.distanceTwo = adsk.core.ValueInput.createByString("1.00")
         sweep_inp.distanceOne = adsk.core.ValueInput.createByString("0")
     sweep_inp.participantBodies = [Leg_NL_b]
-    sweep_feat = root.features.sweepFeatures.add(sweep_inp)
+    sweep_feat = legs_c.features.sweepFeatures.add(sweep_inp)
     sweep_feat.name = "Sweep1"
 
     # [11] ConstructionPlane: Plane5
-    Plane5 = off_plane(root, root.xYConstructionPlane, "0.08 in", "Plane5")
+    Plane5 = off_plane(legs_c, legs_c.xYConstructionPlane, "0.08 in", "Plane5")
 
     # [12] SplitBody: Split1
-    split_inp = root.features.splitBodyFeatures.createInput(Leg_NL_b, Plane5, True)
-    split_feat = root.features.splitBodyFeatures.add(split_inp)
+    split_inp = legs_c.features.splitBodyFeatures.createInput(Leg_NL_b, Plane5, True)
+    split_feat = legs_c.features.splitBodyFeatures.add(split_inp)
     split_feat.name = "Split1"
 
     # Multi-tool split workaround: expected 3 pieces from 1 body
     # API only supports 1 tool per split — try additional planes
-    _pre_count = root.bRepBodies.count
-    _need = 3 - (root.bRepBodies.count - _pre_count + 2)
+    _pre_count = legs_c.bRepBodies.count
+    _need = 3 - (legs_c.bRepBodies.count - _pre_count + 2)
     # 2 = minimum pieces from first split
     _got = 0
-    for _bi in range(root.bRepBodies.count):
-        _bn = root.bRepBodies.item(_bi).name
+    for _bi in range(legs_c.bRepBodies.count):
+        _bn = legs_c.bRepBodies.item(_bi).name
         import re as _re
-        from helpers import sp
         if _re.sub(r"(\s*\(\d+\))+\s*$", "", _bn) == "Leg_NL": _got += 1
     if _got < 3:
         # Try each construction plane as supplementary split tool
         _biggest = None
-        for _bi in range(root.bRepBodies.count):
-            _b = root.bRepBodies.item(_bi)
+        for _bi in range(legs_c.bRepBodies.count):
+            _b = legs_c.bRepBodies.item(_bi)
             if _re.sub(r"(\s*\(\d+\))+\s*$", "", _b.name) == "Leg_NL":
                 if _biggest is None or _b.volume > _biggest.volume: _biggest = _b
         if _biggest:
             # Try every candidate tool, score by volume match, pick best
             _tools = []
-            for _pi in range(root.constructionPlanes.count):
-                _tools.append(root.constructionPlanes.item(_pi))
-            for _bi3 in range(root.bRepBodies.count):
-                _bod = root.bRepBodies.item(_bi3)
+            for _pi in range(legs_c.constructionPlanes.count):
+                _tools.append(legs_c.constructionPlanes.item(_pi))
+            for _bi3 in range(legs_c.bRepBodies.count):
+                _bod = legs_c.bRepBodies.item(_bi3)
                 if _bod != _biggest:
                     for _fi in range(_bod.faces.count):
                         _tools.append(_bod.faces.item(_fi))
             # Record pre-supplementary volumes to detect new pieces
             _pre_vols = set()
-            for _bi4 in range(root.bRepBodies.count):
-                _pre_vols.add(round(root.bRepBodies.item(_bi4).volume, 4))
+            for _bi4 in range(legs_c.bRepBodies.count):
+                _pre_vols.add(round(legs_c.bRepBodies.item(_bi4).volume, 4))
             _best_tool = None
             _best_new_vol = 1e10
             for _pl in _tools:
                 try:
-                    _si = root.features.splitBodyFeatures.createInput(_biggest, _pl, True)
-                    _sf = root.features.splitBodyFeatures.add(_si)
+                    _si = legs_c.features.splitBodyFeatures.createInput(_biggest, _pl, True)
+                    _sf = legs_c.features.splitBodyFeatures.add(_si)
                     # Find the smallest NEW piece (not in pre-split volumes)
                     _new_min = 1e10
-                    for _bi2 in range(root.bRepBodies.count):
-                        _bx = root.bRepBodies.item(_bi2)
+                    for _bi2 in range(legs_c.bRepBodies.count):
+                        _bx = legs_c.bRepBodies.item(_bi2)
                         _bv = round(_bx.volume, 4)
                         if _bv not in _pre_vols and _bv < _new_min: _new_min = _bv
                     if _new_min < _best_new_vol:
@@ -439,8 +449,8 @@ def run(context):
                     pass
             # Apply the best tool (smallest new piece = closest to trim waste)
             if _best_tool is not None:
-                _si = root.features.splitBodyFeatures.createInput(_biggest, _best_tool, True)
-                _sf = root.features.splitBodyFeatures.add(_si)
+                _si = legs_c.features.splitBodyFeatures.createInput(_biggest, _best_tool, True)
+                _sf = legs_c.features.splitBodyFeatures.add(_si)
                 _sf.name = "Split1_sup"
     _found = set()
     Seat = find_body("Seat")
@@ -455,8 +465,8 @@ def run(context):
     _missing = [n for n in _expected if n not in _found]
     if _missing:
         _unmatched = []
-        for _bi in range(root.bRepBodies.count):
-            _b = root.bRepBodies.item(_bi)
+        for _bi in range(legs_c.bRepBodies.count):
+            _b = legs_c.bRepBodies.item(_bi)
             if _b.name not in _found: _unmatched.append(_b)
         _unmatched.sort(key=lambda b: -b.volume)
         _missing.sort(key=lambda n: -max((b.volume for b in _unmatched), default=0) if not any(b.name == n for b in _unmatched) else 0)
@@ -471,21 +481,36 @@ def run(context):
 
     # [13] Remove: RemoveBody-Leg_NL
     _rm = Leg_NL
-    if _rm: root.features.removeFeatures.add(_rm)
+    if _rm: legs_c.features.removeFeatures.add(_rm)
 
     # [14] Remove: RemoveBody-Leg_NL (2)
     _rm = Leg_NL_2
-    if _rm: root.features.removeFeatures.add(_rm)
+    if _rm: legs_c.features.removeFeatures.add(_rm)
+
+    # Body-relative refs: Leg_NR depends on Seat and Leg_NL (1)
+    ref_body = find_body("Seat")
+    ref_bb = ref_body.boundingBox
+    ref_body = find_body("Leg_NL (1)")
+    ref_bb = ref_body.boundingBox
 
     # [15] Mirror: Leg_NR_Mirror
-    Leg_NR_Mirror = mirror_bodies(root, [Leg_NL_1], YMid, "Leg_NR_Mirror")
+    Leg_NR_Mirror = mirror_bodies(legs_c, [Leg_NL_1], YMid, "Leg_NR_Mirror")
     Leg_NR = Leg_NR_Mirror.bodies.item(0)
     Leg_NR.name = "Leg_NR"
     Leg_NL_1 = Leg_NR_Mirror.bodies.item(1)
     Leg_NL_1.name = "Leg_NL (1)"
 
+    # Body-relative refs: Leg_FL depends on Seat and Leg_NL (1),
+    # Leg_FR depends on Seat and Leg_FL (via Leg_NL (1) mirror)
+    ref_body = find_body("Seat")
+    ref_bb = ref_body.boundingBox
+    ref_body = find_body("Leg_NL (1)")
+    ref_bb = ref_body.boundingBox
+    ref_body = find_body("Leg_NR")
+    ref_bb = ref_body.boundingBox
+
     # [16] Mirror: Legs_Far_Mirror
-    Legs_Far_Mirror = mirror_bodies(root, [Leg_NL_1, Leg_NR], XMid, "Legs_Far_Mirror")
+    Legs_Far_Mirror = mirror_bodies(legs_c, [Leg_NL_1, Leg_NR], XMid, "Legs_Far_Mirror")
     Leg_FR = Legs_Far_Mirror.bodies.item(0)
     Leg_FR.name = "Leg_FR"
     Leg_FL = Legs_Far_Mirror.bodies.item(1)
@@ -495,17 +520,21 @@ def run(context):
     Leg_NR = Legs_Far_Mirror.bodies.item(3)
     Leg_NR.name = "Leg_NR"
 
-    # [17] Combine: ThroughMortise
-    combine(root, Seat, [Leg_NL_1, Leg_NR, Leg_FL, Leg_FR], CUT, True, "ThroughMortise")
+    # Body-relative ref: Leg_FR depends on Leg_FL
+    ref_body = find_body("Leg_FL")
+    ref_bb = ref_body.boundingBox
 
-    # [18] Fillet: Fillet1
-    fillet_inp = root.features.filletFeatures.createInput()
-    fillet_items_0 = adsk.core.ObjectCollection.create()
-    _face_targets = [
+    # [17] Combine: ThroughMortise (cross-component: legs CUT into seat)
+    _sp.combine(Seat, [Leg_NL_1, Leg_NR, Leg_FL, Leg_FR], CUT, True, "ThroughMortise")
+
+    # [18] Fillet: Fillet1 — split into per-component fillets
+    _face_targets_seat = [
         ("Seat", -0.1, 8.89, 18.923),
         ("Seat", 15.24, -0.1, 18.923),
         ("Seat", 30.58, 8.89, 18.923),
         ("Seat", 15.24, 17.88, 18.923),
+    ]
+    _face_targets_legs = [
         ("Leg_NR", 3.0846, 13.6421, 8.9916),
         ("Leg_NR", 3.0415, 16.4468, 8.9916),
         ("Leg_NR", 1.5075, 15.8133, 0.2032),
@@ -519,33 +548,38 @@ def run(context):
         ("Leg_NL (1)", 3.0846, 4.1379, 8.9916),
         ("Leg_NL (1)", 1.5075, 1.9667, 0.2032),
     ]
-    _added = set()
-    for _fb, _fx, _fy, _fz in _face_targets:
-        # Search ALL bodies (names may be swapped from mirror)
-        _best_face, _best_d = None, 1e10
-        for _bsi in range(root.bRepBodies.count):
-            _body = root.bRepBodies.item(_bsi)
-            for _fi in range(_body.faces.count):
-                _f = _body.faces.item(_fi)
-                _p = _f.pointOnFace
-                _d = abs(_p.x-_fx)+abs(_p.y-_fy)+abs(_p.z-_fz)
-                if _d < _best_d: _best_face, _best_d = _f, _d
-        if _best_face and _best_d < 0.5:
-            # Add all edges of the matched face (fillet API needs edges)
-            for _ei in range(_best_face.edges.count):
-                _edge = _best_face.edges.item(_ei)
-                _eid = _edge.tempId
-                if _eid not in _added:
-                    fillet_items_0.add(_edge)
-                    _added.add(_eid)
-    if fillet_items_0.count > 0:
-        fillet_inp.addConstantRadiusEdgeSet(fillet_items_0, adsk.core.ValueInput.createByString("0.05 in"), True)
-    fillet_feat = root.features.filletFeatures.add(fillet_inp)
-    fillet_feat.name = "Fillet1"
+
+    def _add_fillet(comp, face_targets, feat_name):
+        fillet_inp = comp.features.filletFeatures.createInput()
+        fillet_items = adsk.core.ObjectCollection.create()
+        _added = set()
+        for _fb, _fx, _fy, _fz in face_targets:
+            _best_face, _best_d = None, 1e10
+            for _bsi in range(comp.bRepBodies.count):
+                _body = comp.bRepBodies.item(_bsi)
+                for _fi in range(_body.faces.count):
+                    _f = _body.faces.item(_fi)
+                    _p = _f.pointOnFace
+                    _d = abs(_p.x-_fx)+abs(_p.y-_fy)+abs(_p.z-_fz)
+                    if _d < _best_d: _best_face, _best_d = _f, _d
+            if _best_face and _best_d < 0.5:
+                for _ei in range(_best_face.edges.count):
+                    _edge = _best_face.edges.item(_ei)
+                    _eid = _edge.tempId
+                    if _eid not in _added:
+                        fillet_items.add(_edge)
+                        _added.add(_eid)
+        if fillet_items.count > 0:
+            fillet_inp.addConstantRadiusEdgeSet(fillet_items, adsk.core.ValueInput.createByString("0.05 in"), True)
+            fillet_feat = comp.features.filletFeatures.add(fillet_inp)
+            fillet_feat.name = feat_name
+
+    _add_fillet(seat_c, _face_targets_seat, "Seat_Fillet")
+    _add_fillet(legs_c, _face_targets_legs, "Legs_Fillet")
 
     # ── FIT VIEW ──────────────────────────────────────────────────
-    sp.apply_appearance("white oak")
-    sp.apply_appearance("teak", bodies=["Leg_NL (1)", "Leg_NR", "Leg_FR", "Leg_FL"])
+    _sp.apply_appearance("white oak")
+    _sp.apply_appearance("teak", bodies=["Leg_NL (1)", "Leg_NR", "Leg_FR", "Leg_FL"])
 
     cam = app.activeViewport.camera
     cam.isFitView = True

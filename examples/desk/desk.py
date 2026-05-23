@@ -99,6 +99,18 @@ def run(context):
 
     print(">>> Parameters done")
 
+    # === BODY-RELATIVE HELPER ===
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
@@ -160,6 +172,12 @@ def run(context):
     leg_bl.name = "Leg_BL"
     sp.mirror_body(leg_c, leg_bl, l_xmid, "LegBR").bodies.item(0).name = "Leg_BR"
     print(">>> Legs: 4 (tapered)")
+
+    # Body-relative refs: aprons reference legs for positioning
+    ref_fl = find_body("Leg_FL")
+    ref_fl_bb = ref_fl.boundingBox
+    ref_bl = find_body("Leg_BL")
+    ref_bl_bb = ref_bl.boundingBox
 
     # ==============================================================
     #  2. APRONS — back + 2 sides + front rail above drawer
@@ -230,6 +248,18 @@ def run(context):
 
     print(">>> Aprons: 4 + divider + 2 runners + 2 stops")
 
+    # Body-relative refs: top sits on legs, aprons hang below top
+    ref_fl_top = find_body("Leg_FL")
+    ref_fl_top_bb = ref_fl_top.boundingBox
+    ref_ab = find_body("Apron_Back")
+    ref_ab_bb = ref_ab.boundingBox
+    ref_al = find_body("Apron_Left")
+    ref_al_bb = ref_al.boundingBox
+    ref_ar = find_body("Apron_Right")
+    ref_ar_bb = ref_ar.boundingBox
+    ref_afs = find_body("Apron_FrontStretcher")
+    ref_afs_bb = ref_afs.boundingBox
+
     # ==============================================================
     #  3. TOP — with cable grommet
     # ==============================================================
@@ -267,12 +297,29 @@ def run(context):
 
     print(">>> Top: 1 (with grommet)")
 
+    # Body-relative refs: drawers ref front stretcher, runners ref side aprons
+    ref_afs_dr = find_body("Apron_FrontStretcher")
+    ref_afs_dr_bb = ref_afs_dr.boundingBox
+    ref_rl = find_body("Runner_L")
+    ref_rl_bb = ref_rl.boundingBox if ref_rl else None
+    ref_rr = find_body("Runner_R")
+    ref_rr_bb = ref_rr.boundingBox if ref_rr else None
+
     # ==============================================================
     #  4. DRAWERS — left and right, separated by center divider
     # ==============================================================
     ddl_result = dovetailed_drawer.build(drawer_l_c, prefix="ddl", ev=ev)
     ddr_result = dovetailed_drawer.build(drawer_r_c, prefix="ddr", ev=ev)
     print(f">>> Drawers: {len(ddl_result['all_bodies'])} + {len(ddr_result['all_bodies'])} bodies")
+
+    # Body-relative refs: drawer parts reference drawer fronts
+    ref_ddl_front = find_body("ddl_Front")
+    ref_ddl_front_bb = ref_ddl_front.boundingBox if ref_ddl_front else None
+    ref_ddr_front = find_body("ddr_Front")
+    ref_ddr_front_bb = ref_ddr_front.boundingBox if ref_ddr_front else None
+    # Bracket refs: Top references legs
+    ref_top = find_body("Top")
+    ref_top_bb = ref_top.boundingBox if ref_top else None
 
     # ==============================================================
     #  5. JOINERY — dominos for all connections
@@ -305,55 +352,50 @@ def run(context):
         elif b.name == "Apron_Right": ra_body = b
         elif b.name == "Apron_FrontStretcher": fr_body = b
         elif b.name == "Divider": div_body = b
-    ba_p = ba_body.createForAssemblyContext(apron_occ)
-    la_p = la_body.createForAssemblyContext(apron_occ)
-    ra_p = ra_body.createForAssemblyContext(apron_occ)
-    fr_p_body = fr_body.createForAssemblyContext(apron_occ)
-    div_p = div_body.createForAssemblyContext(apron_occ)
+    # Construction planes inside apron_c (voids live in owning component)
+    dm_fl = sp.off_plane(apron_c, apron_c.yZConstructionPlane, "leg_size", "DM_FL")
+    dm_fr = sp.off_plane(apron_c, apron_c.yZConstructionPlane, "desk_l - leg_size", "DM_FR")
+    dm_lf = sp.off_plane(apron_c, apron_c.xZConstructionPlane, "leg_size", "DM_LF")
+    dm_lb = sp.off_plane(apron_c, apron_c.xZConstructionPlane, "desk_w - leg_size", "DM_LB")
 
-    dm_fl = sp.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
-    dm_fr = sp.off_plane(root, root.yZConstructionPlane, "desk_l - leg_size", "DM_FR")
-    dm_lf = sp.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
-    dm_lb = sp.off_plane(root, root.xZConstructionPlane, "desk_w - leg_size", "DM_LB")
-
-    # Back apron → BL, BR legs
-    domino.grid(root, dm_fl, ("leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_p, bl_p, "DM_BA_L", ev)
-    domino.grid(root, dm_fr, ("desk_l - leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_p, br_p, "DM_BA_R", ev)
+    # Back apron → BL, BR legs (native body_a, leg proxy body_b)
+    domino.grid(apron_c, dm_fl, ("leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_body, bl_p, "DM_BA_L", ev)
+    domino.grid(apron_c, dm_fr, ("desk_l - leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_body, br_p, "DM_BA_R", ev)
 
     # Left apron → FL, BL
-    domino.grid(root, dm_lf, ("apron_thick/2", "leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_p, fl_p, "DM_LA_F", ev)
-    domino.grid(root, dm_lb, ("apron_thick/2", "desk_w - leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_p, bl_p, "DM_LA_B", ev)
+    domino.grid(apron_c, dm_lf, ("apron_thick/2", "leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_body, fl_p, "DM_LA_F", ev)
+    domino.grid(apron_c, dm_lb, ("apron_thick/2", "desk_w - leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_body, bl_p, "DM_LA_B", ev)
 
     # Right apron → FR, BR
-    domino.grid(root, dm_lf, ("desk_l - apron_thick/2", "leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_p, fr_p, "DM_RA_F", ev)
-    domino.grid(root, dm_lb, ("desk_l - apron_thick/2", "desk_w - leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_p, br_p, "DM_RA_B", ev)
+    domino.grid(apron_c, dm_lf, ("desk_l - apron_thick/2", "leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_body, fr_p, "DM_RA_F", ev)
+    domino.grid(apron_c, dm_lb, ("desk_l - apron_thick/2", "desk_w - leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_body, br_p, "DM_RA_B", ev)
 
     # Front stretcher → FL, FR legs (1 domino each, centered in stretcher)
     params.add("fr_dm_z", VI("apron_z + stretcher_h / 2"), "in", "")
-    domino.grid(root, dm_fl, ("leg_size", "apron_thick / 2", "fr_dm_z"),
-        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_p_body, fl_p, "DM_FR_L", ev)
-    domino.grid(root, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
-        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_p_body, fr_p, "DM_FR_R", ev)
+    domino.grid(apron_c, dm_fl, ("leg_size", "apron_thick / 2", "fr_dm_z"),
+        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_body, fl_p, "DM_FR_L", ev)
+    domino.grid(apron_c, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
+        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_body, fr_p, "DM_FR_R", ev)
 
     # Divider → front rail and back apron (auto-placed in mating area)
     # domino.between() finds where the bodies overlap and places dominos there.
     # Short depth so dominos fit within the thin apron/divider.
     params.add("div_dm_d", VI("apron_thick / 2"), "in", "")
-    dm_div_f = sp.off_plane(root, root.xZConstructionPlane, "apron_thick", "DM_DivF")
-    dm_div_b = sp.off_plane(root, root.xZConstructionPlane,
+    dm_div_f = sp.off_plane(apron_c, apron_c.xZConstructionPlane, "apron_thick", "DM_DivF")
+    dm_div_b = sp.off_plane(apron_c, apron_c.xZConstructionPlane,
                              "desk_w - leg_size - apron_thick", "DM_DivB")
     # Divider dominos — between() auto-orients: long_axis=Z (longer
     # mating dimension), step along X. Standard dm_w/dm_t fit.
-    domino.between(root, dm_div_f, div_p, fr_p_body,
+    domino.between(apron_c, dm_div_f, div_body, fr_body,
         interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
         long_expr="dm_w", count=1, name="DM_Div_F", ev=ev)
-    domino.between(root, dm_div_b, div_p, ba_p,
+    domino.between(apron_c, dm_div_b, div_body, ba_body,
         interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
         long_expr="dm_w", count=2, name="DM_Div_B", ev=ev)
 
@@ -499,7 +541,9 @@ def run(context):
                    ("DrawerR", drawer_r_c), ("Brackets", bracket_c)]:
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cn}: {len(names)} bodies -> {names}")
-    print(f"Root: {root.bRepBodies.count} domino voids")
+    dm_count = sum(1 for i in range(apron_c.bRepBodies.count)
+                   if apron_c.bRepBodies.item(i).name.startswith("DM_"))
+    print(f"Aprons: includes {dm_count} domino voids")
 
     sp.apply_appearance("maple")
     # Note: Fusion's "3D Maple" uses a procedural 3D texture — grain direction

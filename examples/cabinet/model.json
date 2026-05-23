@@ -1,0 +1,117 @@
+{
+  "deps": [
+    {
+      "body": "Side_Left",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "left side panel, full height"
+    },
+    {
+      "body": "Side_Right",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "right side panel, full height"
+    },
+    {
+      "body": "Side_Right",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "right side is to the right of left side",
+      "contact": false
+    },
+    {
+      "body": "Top",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "top board dado-joined into sides, at top of case"
+    },
+    {
+      "body": "Bottom",
+      "ref": "Side_Left",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "bottom board dado-joined into sides, at bottom of case"
+    },
+    {
+      "body": "Door_Left",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "left inset door, front face of case"
+    },
+    {
+      "body": "Door_Left",
+      "ref": "Top",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "left door below top, within case opening"
+    },
+    {
+      "body": "Door_Right",
+      "ref": "Door_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "right door is to the right of left door",
+      "contact": false
+    },
+    {
+      "body": "Shelf",
+      "ref": "Bottom",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "adjustable shelf, positioned at mid height between top and bottom",
+      "contact": false
+    },
+    {
+      "body": "BackPanel",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "plywood back panel rabbeted into sides, at rear of case"
+    }
+  ]
+}

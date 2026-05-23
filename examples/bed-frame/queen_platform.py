@@ -30,6 +30,18 @@ def run(context):
     ev = lambda e: (params.itemByName(e).value if params.itemByName(e)
                     else design.unitsManager.evaluateExpression(e, "cm"))
 
+    # === BODY-RELATIVE LOOKUP ===
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
     # === USER PARAMETERS ===
     for pname, expr, unit in [
         # Mattress
@@ -148,6 +160,14 @@ def run(context):
     # ================================================================
     #  2. RAILS — side rails, foot rail, ledger strips
     # ================================================================
+    # Body-relative references for rail positioning
+    ref_post_fl = find_body("Post_FL")
+    ref_post_fl_bb = ref_post_fl.boundingBox
+    ref_post_fr = find_body("Post_FR")
+    ref_post_fr_bb = ref_post_fr.boundingBox
+    ref_post_bl = find_body("Post_BL")
+    ref_post_bl_bb = ref_post_bl.boundingBox
+
     # Side rails: between posts, centered on post cross-section
     lr_pl = sp.off_plane(rail_c, rail_c.yZConstructionPlane,
                           "post_size / 2 - rail_thick / 2", "LR_Pl")
@@ -178,6 +198,12 @@ def run(context):
         {"x": "end_rail_l", "z": "back_rail_h"}, "BackRail_Sk", ev)
     back_rail_ext = sp.ext_new(rail_c, pr, "rail_thick", "BackRail")
     rail_back = back_rail_ext.bodies.item(0); rail_back.name = "Rail_Back"
+
+    # Body-relative references for ledger positioning
+    ref_rail_left = find_body("Rail_Left")
+    ref_rail_left_bb = ref_rail_left.boundingBox
+    ref_rail_right = find_body("Rail_Right")
+    ref_rail_right_bb = ref_rail_right.boundingBox
 
     # Ledger strips: on inside face of side rails, supporting slats
     ldg_pl = sp.off_plane(rail_c, rail_c.yZConstructionPlane,
@@ -212,6 +238,12 @@ def run(context):
     hb_br_ext = sp.ext_new(hb_c, pr, "hb_rail_thick", "HBBotRail")
     hb_bot_rail = hb_br_ext.bodies.item(0); hb_bot_rail.name = "HB_BotRail"
 
+    # Body-relative references for headboard slat positioning
+    ref_hb_bot_rail = find_body("HB_BotRail")
+    ref_hb_bot_rail_bb = ref_hb_bot_rail.boundingBox
+    ref_hb_top_rail = find_body("HB_TopRail")
+    ref_hb_top_rail_bb = ref_hb_top_rail.boundingBox
+
     # Vertical slats with stub tenons into rails
     _, pr = sp.sketch_rect_model(hb_c, hb_y_pl,
         ("hb_slat_start - hb_slat_w / 2", "hb_face_y",
@@ -233,6 +265,11 @@ def run(context):
     # ================================================================
     #  4. SLATS — mattress support, resting on ledger strips
     # ================================================================
+    # Body-relative references for slat positioning
+    ref_ledger_left = find_body("Ledger_Left")
+    ref_ledger_left_bb = ref_ledger_left.boundingBox
+    ref_ledger_right = find_body("Ledger_Right")
+    ref_ledger_right_bb = ref_ledger_right.boundingBox
     slat_z_pl = sp.off_plane(slat_c, slat_c.xYConstructionPlane, "slat_z", "SlatZ_Pl")
     _, pr = sp.sketch_rect_model(slat_c, slat_z_pl,
         ("post_size / 2 + rail_thick / 2", "post_size", "slat_z"),
@@ -251,6 +288,10 @@ def run(context):
     # ================================================================
     #  5. CENTER SUPPORT — beam with 2 legs
     # ================================================================
+    # Body-relative reference for center beam positioning
+    ref_slat_1 = find_body("Slat_1")
+    ref_slat_1_bb = ref_slat_1.boundingBox
+
     # Beam: runs lengthwise (Y) at mid_x, from post to post, up to ledger top
     beam_pl = sp.off_plane(support_c, support_c.yZConstructionPlane,
                             "mid_x - beam_thick / 2", "Beam_Pl")
@@ -259,6 +300,10 @@ def run(context):
         {"y": "bed_l", "z": "beam_w"}, "Beam_Sk", ev)
     beam_ext = sp.ext_new(support_c, pr, "beam_thick", "CenterBeam")
     beam = beam_ext.bodies.item(0); beam.name = "CenterBeam"
+
+    # Body-relative reference for beam leg positioning
+    ref_beam = find_body("CenterBeam")
+    ref_beam_bb = ref_beam.boundingBox
 
     # Two legs under the beam (at 1/3 and 2/3 along length)
     _, pr = sp.sketch_rect_model(support_c, support_c.xYConstructionPlane,
@@ -288,9 +333,9 @@ def run(context):
             all_hb_slats.append(hb_pat.bodies.item(i))
 
     hb_slat_proxies = [b.createForAssemblyContext(hb_occ) for b in all_hb_slats]
-    for i, sp in enumerate(hb_slat_proxies):
-        sp.combine(hb_tr_p, [sp], CUT, True, f"HBSlatMort_TR_{i}")
-        sp.combine(hb_br_p, [sp], CUT, True, f"HBSlatMort_BR_{i}")
+    for i, slat_proxy in enumerate(hb_slat_proxies):
+        slat_proxy.combine(hb_tr_p, [slat_proxy], CUT, True, f"HBSlatMort_TR_{i}")
+        slat_proxy.combine(hb_br_p, [slat_proxy], CUT, True, f"HBSlatMort_BR_{i}")
 
     print(">>> Headboard slat mortises done")
 
@@ -311,11 +356,15 @@ def run(context):
     hb_tr_rp = hb_top_rail.createForAssemblyContext(hb_occ)
     hb_br_rp = hb_bot_rail.createForAssemblyContext(hb_occ)
 
-    # Domino planes at post inner faces
+    # Domino planes at post inner faces (kept in root for bed rail fasteners)
     dm_xl = sp.off_plane(root, root.yZConstructionPlane, "post_size", "DM_XL")
     dm_xr = sp.off_plane(root, root.yZConstructionPlane, "outer_w - post_size", "DM_XR")
     dm_yf = sp.off_plane(root, root.xZConstructionPlane, "post_size", "DM_YF")
     dm_yb = sp.off_plane(root, root.xZConstructionPlane, "outer_l - post_size", "DM_YB")
+
+    # Domino planes inside headboard component (for HB rail joints)
+    hb_dm_xl = sp.off_plane(hb_c, hb_c.yZConstructionPlane, "post_size", "DM_XL")
+    hb_dm_xr = sp.off_plane(hb_c, hb_c.yZConstructionPlane, "outer_w - post_size", "DM_XR")
 
     # --- Side rails → posts (bed rail fasteners — detachable) ---
     rail_center_z = ev("rail_z") + (ev("rail_top_z") - ev("rail_z")) / 2
@@ -368,22 +417,22 @@ def run(context):
     # HB bottom rail center Z
     hb_br_z = ev("front_post_h") + ev("hb_bot_rail_h") / 2
 
-    domino.grid(root, dm_xl,
+    domino.grid(hb_c, hb_dm_xl,
         ("post_size", f"{ev('outer_l') - ev('post_size') / 2} cm", f"{hb_tr_z} cm"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        hb_tr_rp, bl_p, "DM_HBT_L", ev)
-    domino.grid(root, dm_xr,
+        hb_top_rail, bl_p, "DM_HBT_L", ev)
+    domino.grid(hb_c, hb_dm_xr,
         ("outer_w - post_size", f"{ev('outer_l') - ev('post_size') / 2} cm", f"{hb_tr_z} cm"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        hb_tr_rp, br_p, "DM_HBT_R", ev)
-    domino.grid(root, dm_xl,
+        hb_top_rail, br_p, "DM_HBT_R", ev)
+    domino.grid(hb_c, hb_dm_xl,
         ("post_size", f"{ev('outer_l') - ev('post_size') / 2} cm", f"{hb_br_z} cm"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        hb_br_rp, bl_p, "DM_HBB_L", ev)
-    domino.grid(root, dm_xr,
+        hb_bot_rail, bl_p, "DM_HBB_L", ev)
+    domino.grid(hb_c, hb_dm_xr,
         ("outer_w - post_size", f"{ev('outer_l') - ev('post_size') / 2} cm", f"{hb_br_z} cm"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        hb_br_rp, br_p, "DM_HBB_R", ev)
+        hb_bot_rail, br_p, "DM_HBB_R", ev)
 
     # --- Ledger strips → side rails (smaller dominos for thin ledger) ---
     params.add("ldm_t", VI("5 mm"), "in", "")     # 5mm cutter for 0.75" ledger
@@ -394,30 +443,30 @@ def run(context):
     params.add("ledger_dm_y0", VI("post_size + ledger_dm_sp"), "in", "")
     params.add("ledger_dm_z", VI("ledger_z + ledger_h / 2"), "in", "")
 
-    # Left ledger → left rail (smaller dominos, flat — both grain in Y, cross at Z)
-    ledger_dm_pl_l = sp.off_plane(root, root.yZConstructionPlane,
+    # Left ledger → left rail (both in rail_c — use native bodies)
+    ledger_dm_pl_l = sp.off_plane(rail_c, rail_c.yZConstructionPlane,
         "post_size / 2 + rail_thick / 2", "LedgerDM_PlL")
     # Ledger (grain Y) → rail (grain Y): domino lays flat, wide face in YZ plane
     # long_axis="y" (parallel to grain, wide face in the board surface plane)
-    domino.grid(root, ledger_dm_pl_l,
+    domino.grid(rail_c, ledger_dm_pl_l,
         ("post_size / 2 + rail_thick / 2", "ledger_dm_y0", "ledger_dm_z"),
         "y", "ledger_dm_sp", "ledger_dm_count", "y", "ldm_w", "ldm_t", "ldm_d",
-        ll_p, rl_p, "DM_LL", ev)
+        ledger_left, rail_left, "DM_LL", ev)
 
-    # Right ledger → right rail
-    ledger_dm_pl_r = sp.off_plane(root, root.yZConstructionPlane,
+    # Right ledger → right rail (both in rail_c — use native bodies)
+    ledger_dm_pl_r = sp.off_plane(rail_c, rail_c.yZConstructionPlane,
         "outer_w - post_size / 2 - rail_thick / 2", "LedgerDM_PlR")
-    lr_p = None
+    ledger_right_b = None
     for i in range(rail_c.bRepBodies.count):
         if rail_c.bRepBodies.item(i).name == "Ledger_Right":
-            lr_p = rail_c.bRepBodies.item(i).createForAssemblyContext(rail_occ)
+            ledger_right_b = rail_c.bRepBodies.item(i)
             break
 
-    if lr_p:
-        domino.grid(root, ledger_dm_pl_r,
+    if ledger_right_b:
+        domino.grid(rail_c, ledger_dm_pl_r,
             ("outer_w - post_size / 2 - rail_thick / 2", "ledger_dm_y0", "ledger_dm_z"),
             "y", "ledger_dm_sp", "ledger_dm_count", "y", "ldm_w", "ldm_t", "ldm_d",
-            lr_p, rr_p, "DM_LR", ev)
+            ledger_right_b, rail_right, "DM_LR", ev)
 
     print(">>> Dominos: all rail + headboard + ledger joints")
 

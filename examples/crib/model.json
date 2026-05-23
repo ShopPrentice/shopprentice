@@ -1,0 +1,240 @@
+{
+  "deps": [
+    {
+      "body": "Post_FL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front-left post stands on floor"
+    },
+    {
+      "body": "Post_FR",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front-right post stands on floor"
+    },
+    {
+      "body": "Post_BL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back-left post stands on floor"
+    },
+    {
+      "body": "Post_BR",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back-right post stands on floor"
+    },
+    {
+      "body": "Post_FR",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "FR post is to the right of FL post"
+    },
+    {
+      "body": "Post_BL",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "BL post is behind FL post"
+    },
+    {
+      "body": "Post_BR",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "BR post is to the right of FL post"
+    },
+    {
+      "body": "Rail_FrontBot",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Front bottom rail spans between FL and FR posts at bottom"
+    },
+    {
+      "body": "Rail_FrontBot",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Bottom rail is above floor"
+    },
+    {
+      "body": "Rail_FrontTop",
+      "ref": "Rail_FrontBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front top rail is above front bottom rail"
+    },
+    {
+      "body": "Rail_BackBot",
+      "ref": "Rail_FrontBot",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back bottom rail is behind front bottom rail"
+    },
+    {
+      "body": "Rail_BackTop",
+      "ref": "Rail_BackBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back top rail is above back bottom rail"
+    },
+    {
+      "body": "Rail_LeftBot",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Left bottom rail spans between FL and BL posts"
+    },
+    {
+      "body": "Rail_LeftTop",
+      "ref": "Rail_LeftBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left top rail is above left bottom rail"
+    },
+    {
+      "body": "Rail_RightBot",
+      "ref": "Rail_LeftBot",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right bottom rail mirrors left bottom rail",
+      "contact": false
+    },
+    {
+      "body": "Rail_RightTop",
+      "ref": "Rail_RightBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right top rail is above right bottom rail"
+    },
+    {
+      "body": "Spindle_F1",
+      "ref": "Rail_FrontBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front spindles span between front bottom and top rails",
+      "replicas": "Spindle_F*"
+    },
+    {
+      "body": "Spindle_L1",
+      "ref": "Rail_LeftBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left spindles span between left bottom and top rails",
+      "replicas": "Spindle_L*"
+    },
+    {
+      "body": "SupRail_Left",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left support rail at mattress height, mortised into posts"
+    },
+    {
+      "body": "SupRail_Right",
+      "ref": "SupRail_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right support rail mirrors left",
+      "contact": false
+    },
+    {
+      "body": "Slat_1",
+      "ref": "SupRail_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Mattress slats span between support rails",
+      "replicas": "Slat_*"
+    }
+  ]
+}

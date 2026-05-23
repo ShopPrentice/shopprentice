@@ -133,6 +133,20 @@ def run(context):
     ]:
         params.add(pname, VI(expr), unit, desc)
 
+    # ------------------------------------------------------------------
+    #  find_body — resolve body reference by name (recursive)
+    # ------------------------------------------------------------------
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
     # ==============================================================
     #  MIDPLANES
     # ==============================================================
@@ -184,12 +198,12 @@ def run(context):
             ln = sketch.sketchCurves.sketchLines.item(i)
             if not ln.isReference:
                 continue
-            for sp in [ln.startSketchPoint, ln.endSketchPoint]:
-                if id(sp) not in seen:
-                    seen.add(id(sp))
-                    g = sp.geometry
+            for skpt in [ln.startSketchPoint, ln.endSketchPoint]:
+                if id(skpt) not in seen:
+                    seen.add(id(skpt))
+                    g = skpt.geometry
                     if best is None or (g.x + g.y) < (best.geometry.x + best.geometry.y):
-                        best = sp
+                        best = skpt
         return best
 
     # 1. Dovetail tenon (front half) — trapezoidal plan-view cross-section
@@ -338,6 +352,14 @@ def run(context):
     mir_y = sp.mirror_bodies(leg_c, [leg_fl, leg_fr], YMid, "LegMirY")
     mir_y.bodies.item(0).name = "Leg_BL"
     mir_y.bodies.item(1).name = "Leg_BR"
+
+    # -- Body-relative references: stretchers + top relative to legs --
+    ref_leg_fl = find_body("Leg_FL")
+    ref_leg_fl_bb = ref_leg_fl.boundingBox
+    ref_leg_fr = find_body("Leg_FR")
+    ref_leg_fr_bb = ref_leg_fr.boundingBox
+    ref_leg_bl = find_body("Leg_BL")
+    ref_leg_bl_bb = ref_leg_bl.boundingBox
 
     # ==============================================================
     #  LONG STRETCHERS — proper combine-based joinery workflow:
@@ -553,6 +575,13 @@ def run(context):
         if b.volume > 100:
             b.name = "SS_Right"
             break
+
+    # -- Body-relative references: deadman relative to front long stretcher --
+    ref_ls_front = find_body("LS_Front")
+    ref_ls_front_bb = ref_ls_front.boundingBox
+    # SS_Left used by SSPinF_0
+    ref_ss_left = find_body("SS_Left")
+    ref_ss_left_bb = ref_ss_left.boundingBox
 
     # ==============================================================
     #  DEADMAN (panel on front stretcher, between front legs)
@@ -843,6 +872,12 @@ def run(context):
         "vise_handle_l / 2", "ViseHandle")
     handle_body = handle_ext.bodies.item(0)
     handle_body.name = "Vise_Handle"
+
+    # -- Body-relative references: vise guide + handle relative to chop + screw --
+    ref_vise_chop = find_body("Vise_Chop")
+    ref_vise_chop_bb = ref_vise_chop.boundingBox
+    ref_vise_screw = find_body("Vise_Screw")
+    ref_vise_screw_bb = ref_vise_screw.boundingBox
 
     # Parallel guide — rectangular board along Y through leg
     vise_guide_pl = sp.off_plane(vise_c, root.xZConstructionPlane,

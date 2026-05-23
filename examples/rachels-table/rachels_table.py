@@ -259,6 +259,20 @@ def run(context):
         occ.component.name = name
         return occ
 
+    # ------------------------------------------------------------------
+    #  find_body — resolve body reference by name (recursive)
+    # ------------------------------------------------------------------
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
     # ==============================================================
     #  COMPONENTS
     # ==============================================================
@@ -392,6 +406,16 @@ def run(context):
     br_body.name = "BR"
     br_mirror.bodies.item(1).name = "BR_Pin1"
     br_mirror.bodies.item(2).name = "BR_Pin2"
+
+    # -- Body-relative references: rails + pins positioned relative to legs --
+    ref_fl = find_body("FL")
+    ref_fl_bb = ref_fl.boundingBox
+    ref_fr = find_body("FR")
+    ref_fr_bb = ref_fr.boundingBox
+    ref_bl = find_body("BL")
+    ref_bl_bb = ref_bl.boundingBox
+    ref_br = find_body("BR")
+    ref_br_bb = ref_br.boundingBox
 
     # ==============================================================
     #  RAILS COMPONENT — FRONT/BACK (bridle tenon JOIN)
@@ -567,6 +591,10 @@ def run(context):
     #  TOP COMPONENT
     # ==============================================================
 
+    # -- Body-relative reference: top positioned relative to FL leg --
+    # (FL ref already resolved above — re-read for top positioning)
+    ref_fl_top_bb = ref_fl.boundingBox
+
     # Top panel
     top_pl = off_plane(top_c, top_c.xYConstructionPlane,
         "table_h - top_thick", "Top_Pl")
@@ -717,6 +745,10 @@ def run(context):
     ca_prof = smallest_profile(ca_sk)
     ext_op(top_c, ca_prof, "cleat_w", CUT, left_cleat_body, "LeftCleatArch")
 
+    # -- Body-relative reference: cleat positioned relative to top --
+    ref_top = find_body("Top")
+    ref_top_bb = ref_top.boundingBox
+
     # Mirror left cleat -> right
     xmid_top = off_plane(top_c, top_c.yZConstructionPlane,
         "table_w / 2", "XMid_Pl")
@@ -829,9 +861,9 @@ def run(context):
     bot_edges = adsk.core.ObjectCollection.create()
     for i in range(top_body.edges.count):
         edge = top_body.edges.item(i)
-        sp = edge.startVertex.geometry
+        sv = edge.startVertex.geometry
         ep = edge.endVertex.geometry
-        if abs(sp.z - bot_z) < 0.01 and abs(ep.z - bot_z) < 0.01:
+        if abs(sv.z - bot_z) < 0.01 and abs(ep.z - bot_z) < 0.01:
             bot_edges.add(edge)
     if bot_edges.count > 0:
         bevel_inp = top_c.features.chamferFeatures.createInput2()
@@ -849,9 +881,9 @@ def run(context):
     top_edges = adsk.core.ObjectCollection.create()
     for i in range(top_body.edges.count):
         edge = top_body.edges.item(i)
-        sp = edge.startVertex.geometry
+        sv = edge.startVertex.geometry
         ep = edge.endVertex.geometry
-        if abs(sp.z - top_z) < 0.01 and abs(ep.z - top_z) < 0.01:
+        if abs(sv.z - top_z) < 0.01 and abs(ep.z - top_z) < 0.01:
             top_edges.add(edge)
     if top_edges.count > 0:
         fillet_inp = top_c.features.filletFeatures.createInput()

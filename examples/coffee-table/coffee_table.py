@@ -57,6 +57,20 @@ def run(context):
     print(">>> Parameters done")
 
     # ==============================================================
+    #  BODY LOOKUP
+    # ==============================================================
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
+    # ==============================================================
     #  COMPONENTS
     # ==============================================================
     leg_occ   = sp.make_comp(root, "Legs")
@@ -97,6 +111,9 @@ def run(context):
     # ==============================================================
     #  2. TOP — solid panel
     # ==============================================================
+    # Body-relative ref: Top depends on Leg_FL
+    ref_body = find_body("Leg_FL")
+    ref_bb = ref_body.boundingBox
     top_pl = sp.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
     _, pr = sp.sketch_rect_model(top_c, top_pl,
         ("0 in", "0 in", "leg_h"),
@@ -111,6 +128,9 @@ def run(context):
     # ==============================================================
     #  3. SHELF — lower shelf between legs
     # ==============================================================
+    # Body-relative ref: Shelf depends on Leg_FL
+    ref_body = find_body("Leg_FL")
+    ref_bb = ref_body.boundingBox
     shelf_z_pl = sp.off_plane(shelf_c, shelf_c.xYConstructionPlane,
                                "shelf_z", "Shelf_Pl")
     _, pr = sp.sketch_rect_model(shelf_c, shelf_z_pl,
@@ -126,39 +146,55 @@ def run(context):
     # ==============================================================
     #  4. DOMINO JOINERY — legs directly to top underside
     #     One domino per leg, centered on the leg, at the top interface
+    #     Voids live in the Top component; legs are cross-component proxies.
     # ==============================================================
     fl_proxy = leg_fl.createForAssemblyContext(leg_occ)
     fr_proxy = leg_fr.createForAssemblyContext(leg_occ)
     bl_proxy = leg_bl.createForAssemblyContext(leg_occ)
     br_proxy = leg_br.createForAssemblyContext(leg_occ)
-    top_proxy = top_body.createForAssemblyContext(top_occ)
 
-    # Interface plane at leg top (Z = leg_h)
-    dm_pl = sp.off_plane(root, root.xYConstructionPlane, "leg_h", "DM_Pl")
+    # Interface plane at leg top (Z = leg_h) — in Top component
+    dm_pl = sp.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "DM_Pl")
+
+    # Body-relative ref: DM_FL depends on Leg_FL
+    ref_body = find_body("Leg_FL")
+    ref_bb = ref_body.boundingBox
 
     # FL leg domino
-    domino.single(root, dm_pl,
+    domino.single(top_c, dm_pl,
         ("leg_inset", "leg_inset", "leg_h"),
         "x", "dm_w", "dm_t", "dm_d",
-        fl_proxy, top_proxy, "DM_FL", ev)
+        top_body, fl_proxy, "DM_FL", ev)
+
+    # Body-relative ref: DM_FR depends on Leg_FR
+    ref_body = find_body("Leg_FR")
+    ref_bb = ref_body.boundingBox
 
     # FR leg domino
-    domino.single(root, dm_pl,
+    domino.single(top_c, dm_pl,
         ("table_l - leg_inset", "leg_inset", "leg_h"),
         "x", "dm_w", "dm_t", "dm_d",
-        fr_proxy, top_proxy, "DM_FR", ev)
+        top_body, fr_proxy, "DM_FR", ev)
+
+    # Body-relative ref: DM_BL depends on Leg_BL
+    ref_body = find_body("Leg_BL")
+    ref_bb = ref_body.boundingBox
 
     # BL leg domino
-    domino.single(root, dm_pl,
+    domino.single(top_c, dm_pl,
         ("leg_inset", "table_w - leg_inset", "leg_h"),
         "x", "dm_w", "dm_t", "dm_d",
-        bl_proxy, top_proxy, "DM_BL", ev)
+        top_body, bl_proxy, "DM_BL", ev)
+
+    # Body-relative ref: DM_BR depends on Leg_BR
+    ref_body = find_body("Leg_BR")
+    ref_bb = ref_body.boundingBox
 
     # BR leg domino
-    domino.single(root, dm_pl,
+    domino.single(top_c, dm_pl,
         ("table_l - leg_inset", "table_w - leg_inset", "leg_h"),
         "x", "dm_w", "dm_t", "dm_d",
-        br_proxy, top_proxy, "DM_BR", ev)
+        top_body, br_proxy, "DM_BR", ev)
 
     print(">>> Dominos: 4 leg-to-top joints")
 
@@ -178,7 +214,7 @@ def run(context):
     for cn, c in [("Legs", leg_c), ("Top", top_c), ("Shelf", shelf_c)]:
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cn}: {len(names)} -> {names}")
-    print(f"Root: {root.bRepBodies.count} domino voids")
+    print(f"Root: {root.bRepBodies.count} bodies")
 
     sp.apply_appearance("walnut")
 

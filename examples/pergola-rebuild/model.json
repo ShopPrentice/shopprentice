@@ -1,0 +1,133 @@
+{
+  "deps": [
+    {
+      "body": "wall",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Surranding: surrounding wall backdrop on XZ plane"
+    },
+    {
+      "body": "ground",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Surranding: ground plane slab",
+      "contact": false
+    },
+    {
+      "body": "post1",
+      "ref": "ground",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "posts: left pergola post (lower, with scarf+notches JOINed)"
+    },
+    {
+      "body": "post2",
+      "ref": "ground",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "posts: right pergola post (lower, with scarf+notches JOINed)"
+    },
+    {
+      "body": "post1_upper",
+      "ref": "post1",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "posts: left post upper section above scarf joint split"
+    },
+    {
+      "body": "post2_upper",
+      "ref": "post2",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "posts: right post upper section above scarf joint split"
+    },
+    {
+      "body": "wedge1",
+      "ref": "post1",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "posts: wedge key for left post scarf joint"
+    },
+    {
+      "body": "wedge2",
+      "ref": "post2",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "posts: wedge key for right post scarf joint, mirrored"
+    },
+    {
+      "body": "Body1",
+      "ref": "post1_upper",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "beam: front top beam (X direction across posts)"
+    },
+    {
+      "body": "Body2",
+      "ref": "post2_upper",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "beam: back top beam (copy of Body1, offset in Y)"
+    },
+    {
+      "body": "Body3",
+      "ref": "Body1",
+      "side": "opposite",
+      "direction": [0, 0, 1],
+      "note": "beam: front stretcher connecting posts below top beam"
+    },
+    {
+      "body": "Body4",
+      "ref": "Body2",
+      "side": "opposite",
+      "direction": [0, 0, 1],
+      "note": "beam: back stretcher, mirrored from Body3"
+    },
+    {
+      "body": "Body5",
+      "ref": "Body1",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "note": "beam: rafter-support extension on front beam"
+    },
+    {
+      "body": "Body6",
+      "ref": "Body2",
+      "side": "opposite",
+      "direction": [0, 1, 0],
+      "note": "beam: rafter-support extension on back beam, mirrored from Body5"
+    },
+    {
+      "body": "Body1",
+      "ref": "Body3",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "rafts (1): primary rafter (Y direction across stretchers)",
+      "replicas": "Body*"
+    },
+    {
+      "body": "left_brace",
+      "ref": "post1_upper",
+      "side": "opposite",
+      "direction": [0, 0, 1],
+      "note": "braces: left knee braces between post1 and beam (2 braces JOINed)"
+    },
+    {
+      "body": "right_brace",
+      "ref": "post2_upper",
+      "side": "opposite",
+      "direction": [0, 0, 1],
+      "note": "braces: right knee braces between post2 and beam (2 braces JOINed)"
+    },
+    {
+      "body": "Body1",
+      "ref": "ground",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "deck5: primary deck floor board (X direction)",
+      "replicas": "Body*"
+    }
+  ]
+}

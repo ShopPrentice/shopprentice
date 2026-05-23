@@ -12,7 +12,7 @@ Coordinate system:
 import adsk.core, adsk.fusion, math
 
 from helpers import sp
-from helpers.templates import domino
+from woodworking.templates import domino
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
@@ -72,6 +72,20 @@ def run(context):
 
     print(">>> Parameters done")
 
+    # ------------------------------------------------------------------
+    #  find_body — resolve body reference by name (recursive)
+    # ------------------------------------------------------------------
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
     # Rake geometry (used for post profile + domino positions)
     rake_rad = math.radians(ev("back_rake"))
     cos_r, sin_r = math.cos(rake_rad), math.sin(rake_rad)
@@ -114,13 +128,13 @@ def run(context):
         P3.create(0, yo, bz),                                             # 4: outer bend
         P3.create(0, yo, 0),                                              # 5: outer bottom
     ]
-    sp = [m2s(p) for p in mp]
+    spts = [m2s(p) for p in mp]
 
-    l0 = lines.addByTwoPoints(sp[0], sp[1])
-    l1 = lines.addByTwoPoints(l0.endSketchPoint, sp[2])
-    l2 = lines.addByTwoPoints(l1.endSketchPoint, sp[3])
-    l3 = lines.addByTwoPoints(l2.endSketchPoint, sp[4])
-    l4 = lines.addByTwoPoints(l3.endSketchPoint, sp[5])
+    l0 = lines.addByTwoPoints(spts[0], spts[1])
+    l1 = lines.addByTwoPoints(l0.endSketchPoint, spts[2])
+    l2 = lines.addByTwoPoints(l1.endSketchPoint, spts[3])
+    l3 = lines.addByTwoPoints(l2.endSketchPoint, spts[4])
+    l4 = lines.addByTwoPoints(l3.endSketchPoint, spts[5])
     l5 = lines.addByTwoPoints(l4.endSketchPoint, l0.startSketchPoint)
 
     h_ax, v_ax = sp.probe_sketch_axes(sk)
@@ -170,6 +184,14 @@ def run(context):
 
     print(f">>> Legs: {leg_c.bRepBodies.count} bodies")
 
+    # -- Body-relative references: aprons positioned relative to legs/posts --
+    ref_leg_fl = find_body("Leg_FL")
+    ref_leg_fl_bb = ref_leg_fl.boundingBox
+    ref_leg_fr = find_body("Leg_FR")
+    ref_leg_fr_bb = ref_leg_fr.boundingBox
+    ref_post_bl = find_body("Post_BL")
+    ref_post_bl_bb = ref_post_bl.boundingBox
+
     # ==============================================================
     #  2. APRONS
     # ==============================================================
@@ -205,6 +227,10 @@ def run(context):
     apr_right.name = "Apron_Right"
 
     print(f">>> Aprons: {apr_c.bRepBodies.count} bodies")
+
+    # -- Body-relative reference: back board positioned relative to posts --
+    # (Post_BL ref already resolved above — re-read for back board positioning)
+    ref_post_bl_back_bb = ref_post_bl.boundingBox
 
     # ==============================================================
     #  3. BACK — back board (raked to match post angle)
@@ -249,68 +275,76 @@ def run(context):
 
     print(f">>> Seat: {seat_c.bRepBodies.count} body")
 
+    # -- Body-relative references: dominos positioned relative to aprons + back board --
+    ref_apron_front = find_body("Apron_Front")
+    ref_apron_front_bb = ref_apron_front.boundingBox
+    ref_apron_back = find_body("Apron_Back")
+    ref_apron_back_bb = ref_apron_back.boundingBox
+    ref_apron_left = find_body("Apron_Left")
+    ref_apron_left_bb = ref_apron_left.boundingBox
+    ref_apron_right = find_body("Apron_Right")
+    ref_apron_right_bb = ref_apron_right.boundingBox
+    ref_back_board = find_body("Back_Board")
+    ref_back_board_bb = ref_back_board.boundingBox
+
     # ==============================================================
     #  5. JOINERY
     # ==============================================================
+    # Leg/post proxies (cross-component targets for apron + back board dominos)
     fl_p = leg_fl.createForAssemblyContext(leg_occ)
     fr_p = leg_fr.createForAssemblyContext(leg_occ)
     bl_p = post_bl.createForAssemblyContext(leg_occ)
     br_p = post_br.createForAssemblyContext(leg_occ)
-    fa_p = apr_front.createForAssemblyContext(apr_occ)
-    ba_p = apr_back.createForAssemblyContext(apr_occ)
-    la_p = apr_left.createForAssemblyContext(apr_occ)
-    ra_p = apr_right.createForAssemblyContext(apr_occ)
-    bb_p = back_board.createForAssemblyContext(back_occ)
     seat_p = seat_body.createForAssemblyContext(seat_occ)
 
-    dm_yz_l = sp.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_YZ_L")
-    dm_yz_r = sp.off_plane(root, root.yZConstructionPlane, "bench_l - leg_size", "DM_YZ_R")
-    dm_xz_f = sp.off_plane(root, root.xZConstructionPlane, "front_inset + leg_size", "DM_XZ_F")
-    dm_xz_b = sp.off_plane(root, root.xZConstructionPlane, "bench_d - leg_size", "DM_XZ_B")
+    # -- Apron dominos (voids live in apron component) --
+    dm_yz_l = sp.off_plane(apr_c, apr_c.yZConstructionPlane, "leg_size", "DM_YZ_L")
+    dm_yz_r = sp.off_plane(apr_c, apr_c.yZConstructionPlane, "bench_l - leg_size", "DM_YZ_R")
+    dm_xz_f = sp.off_plane(apr_c, apr_c.xZConstructionPlane, "front_inset + leg_size", "DM_XZ_F")
+    dm_xz_b = sp.off_plane(apr_c, apr_c.xZConstructionPlane, "bench_d - leg_size", "DM_XZ_B")
 
-    # Apron dominos
-    domino.grid(root, dm_yz_l,
+    domino.grid(apr_c, dm_yz_l,
         start=("leg_size", "front_inset + apron_thick / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=fl_p, body_b=fa_p, name="DM_FA_L", ev=ev)
-    domino.grid(root, dm_yz_r,
+        depth_expr="dm_d", body_a=apr_front, body_b=fl_p, name="DM_FA_L", ev=ev)
+    domino.grid(apr_c, dm_yz_r,
         start=("bench_l - leg_size", "front_inset + apron_thick / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=fr_p, body_b=fa_p, name="DM_FA_R", ev=ev)
-    domino.grid(root, dm_yz_l,
+        depth_expr="dm_d", body_a=apr_front, body_b=fr_p, name="DM_FA_R", ev=ev)
+    domino.grid(apr_c, dm_yz_l,
         start=("leg_size", "bench_d - leg_size / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=bl_p, body_b=ba_p, name="DM_BA_L", ev=ev)
-    domino.grid(root, dm_yz_r,
+        depth_expr="dm_d", body_a=apr_back, body_b=bl_p, name="DM_BA_L", ev=ev)
+    domino.grid(apr_c, dm_yz_r,
         start=("bench_l - leg_size", "bench_d - leg_size / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=br_p, body_b=ba_p, name="DM_BA_R", ev=ev)
-    domino.grid(root, dm_xz_f,
+        depth_expr="dm_d", body_a=apr_back, body_b=br_p, name="DM_BA_R", ev=ev)
+    domino.grid(apr_c, dm_xz_f,
         start=("apron_thick / 2", "front_inset + leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=fl_p, body_b=la_p, name="DM_LA_F", ev=ev)
-    domino.grid(root, dm_xz_b,
+        depth_expr="dm_d", body_a=apr_left, body_b=fl_p, name="DM_LA_F", ev=ev)
+    domino.grid(apr_c, dm_xz_b,
         start=("apron_thick / 2", "bench_d - leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=bl_p, body_b=la_p, name="DM_LA_B", ev=ev)
-    domino.grid(root, dm_xz_f,
+        depth_expr="dm_d", body_a=apr_left, body_b=bl_p, name="DM_LA_B", ev=ev)
+    domino.grid(apr_c, dm_xz_f,
         start=("bench_l - apron_thick / 2", "front_inset + leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=fr_p, body_b=ra_p, name="DM_RA_F", ev=ev)
-    domino.grid(root, dm_xz_b,
+        depth_expr="dm_d", body_a=apr_right, body_b=fr_p, name="DM_RA_F", ev=ev)
+    domino.grid(apr_c, dm_xz_b,
         start=("bench_l - apron_thick / 2", "bench_d - leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=br_p, body_b=ra_p, name="DM_RA_B", ev=ev)
+        depth_expr="dm_d", body_a=apr_right, body_b=br_p, name="DM_RA_B", ev=ev)
 
-    # Back board → post dominos (at raked position)
+    # -- Back board dominos (voids live in back component) --
     bb_off = ev("back_board_offset")
     bench_d_cm = ev("bench_d")
     bend_z_cm = ev("bend_z")
@@ -319,18 +353,21 @@ def run(context):
     bb_y = bench_d_cm + (-ls_cm / 2 * cos_r + bb_off * sin_r)
     bb_z = bend_z_cm + (ls_cm / 2 * sin_r + bb_off * cos_r)
 
-    domino.single(root, dm_yz_l,
+    dm_bb_yz_l = sp.off_plane(back_c, back_c.yZConstructionPlane, "leg_size", "DM_YZ_L")
+    dm_bb_yz_r = sp.off_plane(back_c, back_c.yZConstructionPlane, "bench_l - leg_size", "DM_YZ_R")
+
+    domino.single(back_c, dm_bb_yz_l,
         center=(f"{ls_cm} cm", f"{bb_y} cm", f"{bb_z} cm"),
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=bl_p, body_b=bb_p,
+        depth_expr="dm_d", body_a=back_board, body_b=bl_p,
         name="DM_BB_L", ev=ev)
-    domino.single(root, dm_yz_r,
+    domino.single(back_c, dm_bb_yz_r,
         center=(f"{ev('bench_l') - ls_cm} cm", f"{bb_y} cm", f"{bb_z} cm"),
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=br_p, body_b=bb_p,
+        depth_expr="dm_d", body_a=back_board, body_b=br_p,
         name="DM_BB_R", ev=ev)
 
-    print(f">>> Dominos done: {root.bRepBodies.count} voids in root")
+    print(f">>> Dominos done")
 
     # Seat notches
     sp.combine(seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
@@ -467,7 +504,7 @@ def run(context):
         names = [occ.component.bRepBodies.item(j).name
                  for j in range(occ.component.bRepBodies.count)]
         print(f"{cn}: {len(names)} -> {names}")
-    print(f"Root: {root.bRepBodies.count} domino voids")
+    print(f"Root: {root.bRepBodies.count} bodies")
 
     sp.apply_appearance("white oak")
 

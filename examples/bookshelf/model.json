@@ -1,0 +1,83 @@
+{
+  "deps": [
+    {
+      "body": "Side_Left",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "left side board, full height, sits on ground"
+    },
+    {
+      "body": "Side_Right",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "right side board, full height, sits on ground"
+    },
+    {
+      "body": "Side_Right",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "right side is to the right of left side",
+      "contact": false
+    },
+    {
+      "body": "KickBoard",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "kick board spans between sides at bottom, domino-joined"
+    },
+    {
+      "body": "Shelf",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "shelf template with through M&T into sides, patterned along Z",
+      "replicas": "Shelf (*)"
+    },
+    {
+      "body": "TopBoard",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "top board above sides, through dovetails into sides"
+    },
+    {
+      "body": "BackPanel",
+      "ref": "Shelf",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "plywood back panel behind shelves, domino-joined to shelves"
+    }
+  ]
+}

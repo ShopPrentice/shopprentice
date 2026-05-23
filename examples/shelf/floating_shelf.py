@@ -57,6 +57,13 @@ def run(context):
     shelf_c = shelf_occ.component
     cleat_c = cleat_occ.component
 
+    def find_body(name, comp=None):
+        c = comp or shelf_c
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        return None
+
     # ==============================================================
     #  1. SHELF — hollow shell
     # ==============================================================
@@ -69,21 +76,25 @@ def run(context):
     bottom = bot_ext.bodies.item(0)
     bottom.name = "Bottom"
 
-    # Top board: Z = shelf_thick - board_thick
+    # Top board: positioned relative to Bottom
+    bottom_ref = find_body("Bottom")
+    bottom_bb = bottom_ref.boundingBox
     top_pl = sp.off_plane(shelf_c, shelf_c.xYConstructionPlane,
                            "shelf_thick - board_thick", "Top_Pl")
     _, pr = sp.sketch_rect_model(shelf_c, top_pl,
-        ("0 in", "0 in", "shelf_thick - board_thick"),
+        (f"{bottom_bb.minPoint.x} cm", f"{bottom_bb.minPoint.y} cm",
+         "shelf_thick - board_thick"),
         {"x": "shelf_l", "y": "shelf_d"},
         "Top_Sk", ev)
     top_ext = sp.ext_new(shelf_c, pr, "board_thick", "TopBoard")
     top_body = top_ext.bodies.item(0)
     top_body.name = "Top"
 
-    # Left end cap: X=0, full depth × full height
+    # Left end cap: fits between Bottom and Top boards
     _, pr = sp.sketch_rect_model(shelf_c, shelf_c.yZConstructionPlane,
-        ("0 in", "0 in", "0 in"),
-        {"y": "shelf_d", "z": "shelf_thick"},
+        (f"{bottom_bb.minPoint.x} cm", f"{bottom_bb.minPoint.y} cm",
+         "board_thick"),
+        {"y": "shelf_d", "z": "cleat_h"},
         "LeftCap_Sk", ev)
     left_ext = sp.ext_new(shelf_c, pr, "board_thick", "LeftCap")
     left_cap = left_ext.bodies.item(0)
@@ -100,8 +111,9 @@ def run(context):
     # ==============================================================
     #  2. CLEAT — wall-mount strip
     # ==============================================================
-    # Cleat sits inside the shelf cavity, against the back wall (max Y)
-    # Position: X = board_thick, Y = board_thick, Z = board_thick
+    # Cleat sits inside the shelf cavity, inset by board_thick from Bottom
+    bottom_ref = find_body("Bottom")
+    bottom_bb = bottom_ref.boundingBox
     cleat_pl = sp.off_plane(cleat_c, cleat_c.xYConstructionPlane,
                              "board_thick", "Cleat_Pl")
     _, pr = sp.sketch_rect_model(cleat_c, cleat_pl,

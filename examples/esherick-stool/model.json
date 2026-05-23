@@ -1,0 +1,130 @@
+{
+  "deps": [
+    {
+      "body": "Seat",
+      "ref": "Leg1",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Seat sits on top of legs via through-tenons"
+    },
+    {
+      "body": "Leg1",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Leg 1 (front apex) stands on floor, splayed"
+    },
+    {
+      "body": "Leg2",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Leg 2 (back-left) stands on floor, splayed"
+    },
+    {
+      "body": "Leg3",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Leg 3 (back-right) stands on floor, splayed"
+    },
+    {
+      "body": "Leg2",
+      "ref": "Leg1",
+      "side": "opposite",
+      "direction": [1, 0, 0],
+      "note": "Leg 2 is behind-left of leg 1 (negative X direction)"
+    },
+    {
+      "body": "Leg3",
+      "ref": "Leg2",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "note": "Leg 3 is to the right of leg 2"
+    },
+    {
+      "body": "TW_L1",
+      "ref": "Leg1",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Wedge body in leg 1 through-tenon"
+    },
+    {
+      "body": "TW_L2",
+      "ref": "Leg2",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Wedge body in leg 2 through-tenon"
+    },
+    {
+      "body": "TW_L3",
+      "ref": "Leg3",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Wedge body in leg 3 through-tenon"
+    },
+    {
+      "body": "Str_12",
+      "ref": "Leg1",
+      "side": "opposite",
+      "direction": [0, 0, 1],
+      "note": "Stretcher between legs 1 and 2 at str_h1 height"
+    },
+    {
+      "body": "Str_23",
+      "ref": "Leg2",
+      "side": "opposite",
+      "direction": [0, 0, 1],
+      "note": "Stretcher between legs 2 and 3 at str_h2 height"
+    },
+    {
+      "body": "Str_31",
+      "ref": "Leg3",
+      "side": "opposite",
+      "direction": [0, 0, 1],
+      "note": "Stretcher between legs 3 and 1 at str_h3 height"
+    },
+    {
+      "body": "TW_Str_12_0",
+      "ref": "Str_12",
+      "side": "opposite",
+      "direction": [1, 0, 0],
+      "note": "Wedge at stretcher 12 end A (leg 1 side)"
+    },
+    {
+      "body": "TW_Str_12_1",
+      "ref": "Str_12",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "note": "Wedge at stretcher 12 end B (leg 2 side)"
+    },
+    {
+      "body": "TW_Str_23_0",
+      "ref": "Str_23",
+      "side": "opposite",
+      "direction": [0, 1, 0],
+      "note": "Wedge at stretcher 23 end A (leg 2 side)"
+    },
+    {
+      "body": "TW_Str_23_1",
+      "ref": "Str_23",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "note": "Wedge at stretcher 23 end B (leg 3 side)"
+    },
+    {
+      "body": "TW_Str_31_0",
+      "ref": "Str_31",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "note": "Wedge at stretcher 31 end A (leg 3 side)"
+    },
+    {
+      "body": "TW_Str_31_1",
+      "ref": "Str_31",
+      "side": "opposite",
+      "direction": [1, 0, 0],
+      "note": "Wedge at stretcher 31 end B (leg 1 side)"
+    }
+  ]
+}

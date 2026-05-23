@@ -26,6 +26,20 @@ def run(context):
                     else design.unitsManager.evaluateExpression(e, "cm"))
 
     # ==============================================================
+    #  BODY LOOKUP (for body-relative references / validate_deps)
+    # ==============================================================
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
+    # ==============================================================
     #  PARAMETERS
     # ==============================================================
     for pname, expr, unit in [
@@ -79,6 +93,10 @@ def run(context):
     ls_ext = sp.ext_new(case_c, pr, "board_thick", "LeftSide")
     left = ls_ext.bodies.item(0); left.name = "Side_Left"
 
+    # Body-relative ref: Side_Right mirrors Side_Left
+    ref_side_left = find_body("Side_Left")
+    ref_side_left_bb = ref_side_left.boundingBox
+
     # Right side: mirror
     x_mid = sp.off_plane(case_c, case_c.yZConstructionPlane, "mid_x", "XMid")
     sp.mirror_feats(case_c, [ls_ext], x_mid, "RightMir").bodies.item(0).name = "Side_Right"
@@ -120,6 +138,10 @@ def run(context):
     # ==============================================================
     #  2. DOORS — 2 inset door panels
     # ==============================================================
+    # Body-relative ref: Door_Left positioned relative to Top
+    ref_top = find_body("Top")
+    ref_top_bb = ref_top.boundingBox
+
     # Left door: inset inside case opening
     door_z_offset = "board_thick + door_gap"
     _, pr = sp.sketch_rect_model(door_c, door_c.xZConstructionPlane,
@@ -127,6 +149,10 @@ def run(context):
         {"x": "door_w", "z": "door_h"}, "LeftDoor_Sk", ev)
     ld_ext = sp.ext_new(door_c, pr, "door_thick", "LeftDoor")
     ld_ext.bodies.item(0).name = "Door_Left"
+
+    # Body-relative ref: Door_Right mirrors Door_Left
+    ref_door_left = find_body("Door_Left")
+    ref_door_left_bb = ref_door_left.boundingBox
 
     # Right door: mirror across XMid
     d_xmid = sp.off_plane(door_c, door_c.yZConstructionPlane, "mid_x", "DXMid")
@@ -137,6 +163,9 @@ def run(context):
     # ==============================================================
     #  3. SHELF — adjustable (just positioned, no dados)
     # ==============================================================
+    # Body-relative ref: Shelf positioned above Bottom
+    ref_bottom = find_body("Bottom")
+    ref_bottom_bb = ref_bottom.boundingBox
     shelf_z_pl = sp.off_plane(shelf_c, shelf_c.xYConstructionPlane, "mid_z", "ShelfZ_Pl")
     _, pr = sp.sketch_rect_model(shelf_c, shelf_z_pl,
         ("board_thick", "0 in", "mid_z"),
