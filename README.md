@@ -69,7 +69,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 <td align="center"><a href="examples/bookshelf/"><img src="examples/bookshelf/screenshots/iso-top-right.png" width="200" /><br /><b>Bookshelf</b></a><br />Through M&T shelves, dovetail top</td>
 </tr>
 <tr>
-<td align="center"><a href="examples/counter-stool/"><img src="examples/counter-stool/screenshots/iso-top-right.png" width="200" /><br /><b>Counter Stool</b></a><br />Splayed legs, dominos, stretchers</td>
+<td align="center"><a href="examples/shaker-nightstand/"><img src="examples/shaker-nightstand/screenshots/iso-top-right.png" width="200" /><br /><b>Shaker Nightstand</b></a><br />Sliding dovetails, half-blind dovetail drawers, revolved knobs</td>
 <td align="center"><a href="examples/wrap-box/"><img src="examples/wrap-box/screenshots/iso-top-right.png" width="200" /><br /><b>Wrap Box</b></a><br />Dovetailed dispenser with cutter slot</td>
 <td align="center"><a href="examples/pencil-box/"><img src="examples/pencil-box/screenshots/iso-top-right.png" width="200" /><br /><b>Pencil Box</b></a><br />Dovetailed box with sliding lid</td>
 </tr>

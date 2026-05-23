@@ -2502,7 +2502,12 @@ def validate_deps(ctx, metadata_path=None):
             pass
         if script_path:
             script_dir = os.path.dirname(script_path)
-            metadata_path = os.path.join(script_dir, "model.json")
+            stem = os.path.splitext(os.path.basename(script_path))[0]
+            per_script = os.path.join(script_dir, f"{stem}_model.json")
+            if os.path.exists(per_script):
+                metadata_path = per_script
+            else:
+                metadata_path = os.path.join(script_dir, "model.json")
         else:
             print("validate_deps: no metadata path and no script path found")
             return None
@@ -2683,11 +2688,11 @@ def validate_deps(ctx, metadata_path=None):
     for j in range(ctx.root.occurrences.count):
         _collect_comp_bodies(ctx.root.occurrences.item(j).component)
 
-    # Flag root-level bodies — they should be inside components
+    # Flag root-level bodies — ALL bodies should be inside components.
     if root_bodies:
         print(f"  FAIL  {len(root_bodies)} bodies in root component "
               f"(should be inside a component):")
-        for rb in root_bodies[:10]:  # show first 10
+        for rb in root_bodies[:10]:
             print(f"         - {rb}")
         if len(root_bodies) > 10:
             print(f"         ... and {len(root_bodies) - 10} more")
