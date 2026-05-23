@@ -297,20 +297,20 @@ def run(context):
     _dll = ctx.find_body("DeskLeg_L")
     _dll_bb = _dll.boundingBox
 
-    # Front desk apron — between legs, connects to leg sides
+    # Front desk apron — between legs, centered on leg in Y
     desk_rail_pl = sp.off_plane(desk_c, desk_c.xYConstructionPlane, "desk_rail_z", "DeskRail_Pl")
     sk_drf, prof_drf = sp.sketch_rect_model(
         desk_c, desk_rail_pl,
-        ("post_size + desk_leg_size", "desk_front_y", "desk_rail_z"),
+        ("post_size + desk_leg_size", "desk_front_y + desk_leg_size / 2 - desk_rail_thick / 2", "desk_rail_z"),
         {"x": "bed_l - 2 * desk_leg_size", "y": "desk_rail_thick"},
         "DeskRail_Front_Sk", ev=ev)
     dr_front = sp.ext_new(desk_c, prof_drf, "desk_rail_h", "DeskRail_Front").bodies.item(0)
     dr_front.name = "DeskRail_Front"
 
-    # Back desk apron — between back posts, connects at posts' inner X faces
+    # Back desk apron — between back posts, centered on post in Y
     sk_drb, prof_drb = sp.sketch_rect_model(
         desk_c, desk_rail_pl,
-        ("post_size", "outer_w - post_size - desk_rail_thick", "desk_rail_z"),
+        ("post_size", "outer_w - post_size / 2 - desk_rail_thick / 2", "desk_rail_z"),
         {"x": "bed_l", "y": "desk_rail_thick"},
         "DeskRail_Back_Sk", ev=ev)
     dr_back = sp.ext_new(desk_c, prof_drb, "desk_rail_h", "DeskRail_Back").bodies.item(0)
@@ -561,6 +561,10 @@ def run(context):
         ext = sp.ext_new_sym(comp_a, prof, d_e, name)
         void = ext.bodies.item(0)
         void.name = name
+        # Detect interface normal from plane geometry
+        pn = plane.geometry.normal
+        normal_axis = 'x' if abs(pn.x) > 0.9 else ('y' if abs(pn.y) > 0.9 else 'z')
+        sp.check_domino_exposure(void, body_a, body_b, normal_axis)
         # CUT primary piece (same component — no proxy needed)
         sp.combine(body_a, [void], CUT, True, name+"_CutA")
         # CUT secondary piece (cross-component via assembly proxies)
@@ -685,12 +689,12 @@ def run(context):
     # ── Desk Rail → Post Dominos ──────────────────────────────────
     desk_z_ctr = "desk_rail_z + desk_rail_h / 2"
 
-    # Back desk apron → back posts (rail end faces meet posts' inner X faces)
+    # Back desk apron → back posts (rail centered on post in Y, domino at post center)
     # Interface at YZ planes X=post_size and X=outer_l-post_size
-    domino_joint(iface_foot, ("post_size", "outer_w - post_size", desk_z_ctr), "z",
+    domino_joint(iface_foot, ("post_size", "outer_w - post_size / 2", desk_z_ctr), "z",
                  "dm_desk_h", "dm_desk_t", "dm_desk_d",
                  "DM_DR_B_F", dr_back, desk_occ, post_fr, post_occ)
-    domino_joint(iface_head, ("outer_l - post_size", "outer_w - post_size", desk_z_ctr), "z",
+    domino_joint(iface_head, ("outer_l - post_size", "outer_w - post_size / 2", desk_z_ctr), "z",
                  "dm_desk_h", "dm_desk_t", "dm_desk_d",
                  "DM_DR_B_H", dr_back, desk_occ, post_br, post_occ)
 

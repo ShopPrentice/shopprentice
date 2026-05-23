@@ -1377,6 +1377,74 @@ def mating_bounds(body_a, body_b, normal_axis, tol=0.1):
     return result
 
 
+def check_domino_exposure(void, body_a, body_b, normal_axis, tol=0.05):
+    """Check that a domino void creates blind pockets in both mating pieces.
+
+    On axes perpendicular to the interface normal, the void must be fully
+    contained within each body's bounding box. If it extends beyond a body's
+    boundary, the mortise pocket opens to a surface — the domino is "exposed."
+
+    Call this AFTER creating the void body but BEFORE CUTting it from
+    the mating pieces. Raises ValueError with diagnostic info if exposure
+    is detected, so the agent can fix placement during the build.
+
+    Args:
+        void: The domino void body (un-CUT).
+        body_a: Primary mating piece.
+        body_b: Secondary mating piece.
+        normal_axis: 'x', 'y', or 'z' — axis perpendicular to the
+            interface (the extrude direction of the domino).
+        tol: Tolerance in cm (default 0.05 ≈ 0.5mm).
+
+    Raises:
+        ValueError: If the void extends beyond either body on any
+            perpendicular axis, with axis ranges for both the void
+            and the offending body so the agent can diagnose and fix.
+
+    Example:
+        void = ext.bodies.item(0)
+        sp.check_domino_exposure(void, rail, post, 'x')
+        # If rail Y=[42, 43] and void Y=[42.77, 43.23] and post Y=[43, 46]:
+        #   → ValueError: void extends beyond rail in Y (void max=43.23, rail max=43.00)
+        #   → ValueError: void extends beyond post in Y (void min=42.77, post min=43.00)
+        # Fix: center the rail on the post so the domino sits inside both pieces.
+    """
+    perp_axes = [ax for ax in ('x', 'y', 'z') if ax != normal_axis]
+    vbb = void.boundingBox
+    errors = []
+
+    for body, label in [(body_a, body_a.name), (body_b, body_b.name)]:
+        bbb = body.boundingBox
+        for ax in perp_axes:
+            v_lo = getattr(vbb.minPoint, ax)
+            v_hi = getattr(vbb.maxPoint, ax)
+            b_lo = getattr(bbb.minPoint, ax)
+            b_hi = getattr(bbb.maxPoint, ax)
+
+            if v_lo < b_lo - tol:
+                overshoot = b_lo - v_lo
+                errors.append(
+                    f"  {void.name} exposed in {label} on -{ax.upper()} side: "
+                    f"void {ax}={v_lo:.2f} extends {overshoot:.2f} cm "
+                    f"beyond {label} {ax}_min={b_lo:.2f}")
+            if v_hi > b_hi + tol:
+                overshoot = v_hi - b_hi
+                errors.append(
+                    f"  {void.name} exposed in {label} on +{ax.upper()} side: "
+                    f"void {ax}={v_hi:.2f} extends {overshoot:.2f} cm "
+                    f"beyond {label} {ax}_max={b_hi:.2f}")
+
+    if errors:
+        detail = "\n".join(errors)
+        raise ValueError(
+            f"check_domino_exposure: domino '{void.name}' mortise is exposed "
+            f"(opens to surface) — the mortise pocket won't be blind.\n"
+            f"{detail}\n"
+            f"Fix: reposition the mating body so the domino center is well "
+            f"inside both pieces, or move the domino center to the mating "
+            f"surface overlap region.")
+
+
 # ── Joint Validation ───────────────────────────────────────────────
 
 def validate_joint_contact(body_a, body_b, joint_axis=None, tol_cm=0.1):
