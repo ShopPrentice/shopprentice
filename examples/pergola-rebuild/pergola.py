@@ -272,6 +272,10 @@ def run(context):
     wall_Surranding = Extrude1.bodies.item(0)
     wall_Surranding.name = "wall"
 
+    # Body-relative ref: ground depends on wall
+    ref_wall = find_body("wall")
+    ref_wall_bb = ref_wall.boundingBox
+
     # [3] Sketch: Sketch2
     comp = Surranding_c
     Sketch2_Surranding = comp.sketches.add(root.xYConstructionPlane)
