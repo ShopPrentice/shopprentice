@@ -917,6 +917,12 @@ def run(context):
     from helpers import hardware
     hardware.clear_step_cache()
 
+    # Body-relative ref: hinge leaves depend on doors
+    ref_ldoor = ctx.find_body("LeftDoor")
+    ref_ldoor_bb = ref_ldoor.boundingBox
+    ref_rdoor = ctx.find_body("RightDoor")
+    ref_rdoor_bb = ref_rdoor.boundingBox
+
     # Proxied bodies for cross-component hinge install
     ldoor_px = ldoor_body.createForAssemblyContext(doors_occ)
     rdoor_px = rdoor_body.createForAssemblyContext(doors_occ)
