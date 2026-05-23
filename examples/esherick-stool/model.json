@@ -26,7 +26,7 @@
     {
       "body": "Leg2 (3)",
       "ref": "Leg1 (3)",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,

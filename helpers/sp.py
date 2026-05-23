@@ -2559,10 +2559,17 @@ def validate_deps(ctx, metadata_path=None):
 
             # Check 1: was find_body("ref_name") called?
             # Match patterns: find_body("ref_name"), find_body('ref_name')
+            # Also try base name without (N) suffixes for renamed bodies
+            base_ref = re.sub(r'(\s*\(\d+\))+$', '', ref_name)
             lookup_pat = re.compile(
                 r'find_body\(\s*["\']' + re.escape(ref_name) + r'["\']'
             )
             found_lookup = bool(lookup_pat.search(script_source))
+            if not found_lookup and base_ref != ref_name:
+                lookup_pat = re.compile(
+                    r'find_body\(\s*["\']' + re.escape(base_ref) + r'["\']'
+                )
+                found_lookup = bool(lookup_pat.search(script_source))
 
             # Check 2: was .boundingBox accessed on that body?
             # Look for boundingBox near the find_body call (within same section)

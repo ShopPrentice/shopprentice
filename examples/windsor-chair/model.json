@@ -286,22 +286,24 @@
     {
       "body": "TW_SR_2",
       "ref": "Str_Right",
-      "side": "inside",
+      "side": "opposite",
       "direction": [
         0,
         1,
         0
-      ]
+      ],
+      "contact": false
     },
     {
       "body": "TW_SR_3",
       "ref": "Str_Right",
-      "side": "inside",
+      "side": "outside",
       "direction": [
         0,
         1,
         0
-      ]
+      ],
+      "contact": false
     }
   ]
 }
