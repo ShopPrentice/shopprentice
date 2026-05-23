@@ -207,6 +207,94 @@
       ],
       "note": "Drawer bottom panel",
       "replicas": "dd_Bottom*"
+    },
+    {
+      "body": "Body5",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Kick corner domino FL"
+    },
+    {
+      "body": "Body6",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Kick corner domino FR"
+    },
+    {
+      "body": "Body7",
+      "ref": "Kick_Back",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Kick corner domino BL"
+    },
+    {
+      "body": "Body8",
+      "ref": "Kick_Back",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Kick corner domino BR"
+    },
+    {
+      "body": "KB_F0",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "KB_F*"
+    },
+    {
+      "body": "KB_L0",
+      "ref": "Kick_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "KB_L*"
+    },
+    {
+      "body": "KB_R0",
+      "ref": "Kick_Right",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "KB_R*"
+    },
+    {
+      "body": "KB_B0",
+      "ref": "Kick_Back",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "KB_B*"
     }
   ]
 }

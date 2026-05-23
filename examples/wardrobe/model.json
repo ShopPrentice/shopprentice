@@ -9,7 +9,8 @@
         0,
         1
       ],
-      "note": "Left case side, full height from kick_h to case_h"
+      "note": "Left case side, full height from kick_h to case_h",
+      "contact": false
     },
     {
       "body": "Side_Right",
@@ -100,7 +101,8 @@
         0,
         0
       ],
-      "note": "Left door in case opening, left half"
+      "note": "Left door in case opening, left half",
+      "contact": false
     },
     {
       "body": "Door_Right",
@@ -123,7 +125,8 @@
         0,
         1
       ],
-      "note": "Interior shelf 6 inches below top"
+      "note": "Interior shelf 6 inches below top",
+      "contact": false
     },
     {
       "body": "Shelf",
@@ -146,7 +149,8 @@
         0,
         1
       ],
-      "note": "Hanging rod below shelf at rod_z height"
+      "note": "Hanging rod below shelf at rod_z height",
+      "contact": false
     },
     {
       "body": "Rod",
@@ -163,7 +167,7 @@
     {
       "body": "BackPanel",
       "ref": "Side_Left",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,

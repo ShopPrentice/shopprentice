@@ -65,7 +65,8 @@
         0,
         0
       ],
-      "note": "left inset door, front face of case"
+      "note": "left inset door, front face of case",
+      "contact": false
     },
     {
       "body": "Door_Left",
@@ -76,7 +77,8 @@
         0,
         1
       ],
-      "note": "left door below top, within case opening"
+      "note": "left door below top, within case opening",
+      "contact": false
     },
     {
       "body": "Door_Right",
@@ -105,7 +107,7 @@
     {
       "body": "BackPanel",
       "ref": "Side_Left",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,

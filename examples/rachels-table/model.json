@@ -4,133 +4,210 @@
       "body": "FL",
       "ref": "origin",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Front-left leg stands on the floor"
     },
     {
       "body": "FR",
       "ref": "origin",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Front-right leg stands on the floor"
     },
     {
       "body": "BL",
       "ref": "origin",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Back-left leg stands on the floor"
     },
     {
       "body": "BR",
       "ref": "origin",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Back-right leg stands on the floor"
     },
     {
       "body": "FL_Pin1",
       "ref": "FL",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Upper drawbore pin in FL leg"
     },
     {
       "body": "FL_Pin2",
       "ref": "FL",
-      "side": "opposite",
-      "direction": [0, 0, 1],
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Lower drawbore pin in FL leg"
     },
     {
       "body": "FR_Pin1",
       "ref": "FR",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Upper drawbore pin in FR leg"
     },
     {
       "body": "FR_Pin2",
       "ref": "FR",
-      "side": "opposite",
-      "direction": [0, 0, 1],
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Lower drawbore pin in FR leg"
     },
     {
       "body": "BL_Pin1",
       "ref": "BL",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Upper drawbore pin in BL leg"
     },
     {
       "body": "BL_Pin2",
       "ref": "BL",
-      "side": "opposite",
-      "direction": [0, 0, 1],
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Lower drawbore pin in BL leg"
     },
     {
       "body": "BR_Pin1",
       "ref": "BR",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Upper drawbore pin in BR leg"
     },
     {
       "body": "BR_Pin2",
       "ref": "BR",
-      "side": "opposite",
-      "direction": [0, 0, 1],
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Lower drawbore pin in BR leg"
     },
     {
       "body": "Front",
       "ref": "FL",
       "side": "outside",
-      "direction": [1, 0, 0],
+      "direction": [
+        1,
+        0,
+        0
+      ],
       "note": "Front rail spans FL to FR legs at top, bridle-joined"
     },
     {
       "body": "Back",
       "ref": "BL",
       "side": "outside",
-      "direction": [1, 0, 0],
+      "direction": [
+        1,
+        0,
+        0
+      ],
       "note": "Back rail spans BL to BR legs at top, mirrored from Front"
     },
     {
       "body": "Left",
       "ref": "FL",
       "side": "outside",
-      "direction": [0, 1, 0],
+      "direction": [
+        0,
+        1,
+        0
+      ],
       "note": "Left side rail spans FL to BL legs, through-tenons"
     },
     {
       "body": "Right",
       "ref": "FR",
       "side": "outside",
-      "direction": [0, 1, 0],
+      "direction": [
+        0,
+        1,
+        0
+      ],
       "note": "Right side rail spans FR to BR legs, mirrored from Left"
     },
     {
       "body": "Top",
       "ref": "FL",
       "side": "outside",
-      "direction": [0, 0, 1],
-      "note": "Floating top panel sits above all four legs"
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Floating top panel sits above all four legs",
+      "contact": false
     },
     {
       "body": "LeftCleat",
       "ref": "Top",
       "side": "opposite",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Left cleat hangs beneath top, through-tenons into front/back rails"
     },
     {
       "body": "RightCleat",
       "ref": "Top",
       "side": "opposite",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Right cleat hangs beneath top, mirrored from LeftCleat"
     }
   ]

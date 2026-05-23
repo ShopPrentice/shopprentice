@@ -9,7 +9,8 @@
         0,
         1
       ],
-      "note": "Case front board, spans full width, Z from foot_h to case_h-lid_thick"
+      "note": "Case front board, spans full width, Z from foot_h to case_h-lid_thick",
+      "contact": false
     },
     {
       "body": "Back",
@@ -62,7 +63,7 @@
     {
       "body": "Bottom",
       "ref": "Front",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         0,
@@ -241,12 +242,13 @@
         1,
         0
       ],
-      "note": "Plywood back panel rabbeted into case sides, at rear"
+      "note": "Plywood back panel rabbeted into case sides, at rear",
+      "contact": false
     },
     {
       "body": "BackPanel",
       "ref": "Side_Left",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,

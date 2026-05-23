@@ -111,7 +111,8 @@
         0,
         1
       ],
-      "note": "Front top rail is above front bottom rail"
+      "note": "Front top rail is above front bottom rail",
+      "contact": false
     },
     {
       "body": "Rail_BackBot",
@@ -134,7 +135,8 @@
         0,
         1
       ],
-      "note": "Back top rail is above back bottom rail"
+      "note": "Back top rail is above back bottom rail",
+      "contact": false
     },
     {
       "body": "Rail_LeftBot",
@@ -156,7 +158,8 @@
         0,
         1
       ],
-      "note": "Left top rail is above left bottom rail"
+      "note": "Left top rail is above left bottom rail",
+      "contact": false
     },
     {
       "body": "Rail_RightBot",
@@ -179,7 +182,8 @@
         0,
         1
       ],
-      "note": "Right top rail is above right bottom rail"
+      "note": "Right top rail is above right bottom rail",
+      "contact": false
     },
     {
       "body": "Spindle_F1",
@@ -208,7 +212,7 @@
     {
       "body": "SupRail_Left",
       "ref": "Post_FL",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         0,
@@ -239,6 +243,204 @@
       ],
       "note": "Mattress slats span between support rails",
       "replicas": "Slat_*"
+    },
+    {
+      "body": "DM_FBR_L_0",
+      "ref": "Rail_FrontBot",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_FBR_L_*"
+    },
+    {
+      "body": "DM_FBR_R_0",
+      "ref": "Rail_FrontBot",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_FBR_R_*"
+    },
+    {
+      "body": "DM_FTR_L_0",
+      "ref": "Rail_FrontTop",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_FTR_L_*"
+    },
+    {
+      "body": "DM_FTR_R_0",
+      "ref": "Rail_FrontTop",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_FTR_R_*"
+    },
+    {
+      "body": "DM_BBR_L_0",
+      "ref": "Rail_BackBot",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BBR_L_*"
+    },
+    {
+      "body": "DM_BBR_R_0",
+      "ref": "Rail_BackBot",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BBR_R_*"
+    },
+    {
+      "body": "DM_BTR_L_0",
+      "ref": "Rail_BackTop",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BTR_L_*"
+    },
+    {
+      "body": "DM_BTR_R_0",
+      "ref": "Rail_BackTop",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BTR_R_*"
+    },
+    {
+      "body": "DM_LBR_F_0",
+      "ref": "Rail_LeftBot",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LBR_F_*"
+    },
+    {
+      "body": "DM_LBR_B_0",
+      "ref": "Rail_LeftBot",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LBR_B_*"
+    },
+    {
+      "body": "DM_LTR_F_0",
+      "ref": "Rail_LeftTop",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LTR_F_*"
+    },
+    {
+      "body": "DM_LTR_B_0",
+      "ref": "Rail_LeftTop",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LTR_B_*"
+    },
+    {
+      "body": "DM_RBR_F_0",
+      "ref": "Rail_RightBot",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RBR_F_*"
+    },
+    {
+      "body": "DM_RBR_B_0",
+      "ref": "Rail_RightBot",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RBR_B_*"
+    },
+    {
+      "body": "DM_RTR_F_0",
+      "ref": "Rail_RightTop",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RTR_F_*"
+    },
+    {
+      "body": "DM_RTR_B_0",
+      "ref": "Rail_RightTop",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RTR_B_*"
+    },
+    {
+      "body": "DM_SlatL_0",
+      "ref": "SupRail_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_SlatL_*"
+    },
+    {
+      "body": "DM_SlatR_0",
+      "ref": "SupRail_Right",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_SlatR_*"
     }
   ]
 }

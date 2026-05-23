@@ -9,7 +9,8 @@
         0,
         1
       ],
-      "note": "Seat board at top, elevated by leg_h"
+      "note": "Seat board at top, elevated by leg_h",
+      "contact": false
     },
     {
       "body": "Leg_NL (1)",
@@ -82,7 +83,7 @@
     {
       "body": "Leg_FR",
       "ref": "Leg_FL",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,

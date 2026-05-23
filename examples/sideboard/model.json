@@ -9,7 +9,8 @@
         0,
         1
       ],
-      "note": "Left case side, sits above kick height"
+      "note": "Left case side, sits above kick height",
+      "contact": false
     },
     {
       "body": "Side_Right",
@@ -20,7 +21,8 @@
         0,
         1
       ],
-      "note": "Right case side, mirror of left"
+      "note": "Right case side, mirror of left",
+      "contact": false
     },
     {
       "body": "Side_Right",
@@ -65,7 +67,8 @@
         0,
         0
       ],
-      "note": "Left divider is inboard of left side"
+      "note": "Left divider is inboard of left side",
+      "contact": false
     },
     {
       "body": "Div_Right",
@@ -99,7 +102,8 @@
         0,
         1
       ],
-      "note": "Top board sits on top of case sides with overhang"
+      "note": "Top board sits on top of case sides with overhang",
+      "contact": false
     },
     {
       "body": "Top",
@@ -167,7 +171,8 @@
         0,
         0
       ],
-      "note": "Left door in left section opening"
+      "note": "Left door in left section opening",
+      "contact": false
     },
     {
       "body": "Door_Left",
@@ -178,7 +183,8 @@
         0,
         0
       ],
-      "note": "Left door is inboard of left side"
+      "note": "Left door is inboard of left side",
+      "contact": false
     },
     {
       "body": "Door_Right",
@@ -189,7 +195,8 @@
         0,
         0
       ],
-      "note": "Right door in right section opening"
+      "note": "Right door in right section opening",
+      "contact": false
     },
     {
       "body": "dd_Front",
@@ -200,7 +207,8 @@
         0,
         0
       ],
-      "note": "Drawer front in center section"
+      "note": "Drawer front in center section",
+      "contact": false
     },
     {
       "body": "dd_Front",
@@ -211,7 +219,8 @@
         0,
         0
       ],
-      "note": "Drawer front between dividers"
+      "note": "Drawer front between dividers",
+      "contact": false
     },
     {
       "body": "dd_Back",
@@ -262,7 +271,7 @@
     {
       "body": "BackPanel",
       "ref": "Bottom",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,
@@ -273,7 +282,7 @@
     {
       "body": "BackPanel",
       "ref": "Side_Left",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,
