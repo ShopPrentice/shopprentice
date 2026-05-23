@@ -632,5 +632,6 @@ def run(context):
         print(f"{comp_name}: {len(names)} bodies — {names}")
 
     # APPEARANCE SPEC
-    # species: white_oak
+    # species: white_oak  |  knobs: mahogany
     sp.apply_appearance("white oak")
+    sp.apply_appearance("mahogany", bodies=["Knob", "Knob (1)"])
