@@ -101,7 +101,8 @@
         0,
         0
       ],
-      "note": "Right side rail, mirror of left across X midplane"
+      "note": "Right side rail, mirror of left across X midplane",
+      "contact": false
     },
     {
       "body": "Bottom",
@@ -112,7 +113,8 @@
         0,
         1
       ],
-      "note": "Case bottom board above frame, at case_z"
+      "note": "Case bottom board above frame, at case_z",
+      "contact": false
     },
     {
       "body": "Top",
@@ -180,7 +182,8 @@
         0,
         0
       ],
-      "note": "Divider1 is inboard of left end"
+      "note": "Divider1 is inboard of left end",
+      "contact": false
     },
     {
       "body": "Divider2",
@@ -191,7 +194,8 @@
         0,
         0
       ],
-      "note": "Second vertical divider at 2/3 width"
+      "note": "Second vertical divider at 2/3 width",
+      "contact": false
     },
     {
       "body": "Divider2",
@@ -328,7 +332,8 @@
         0,
         0
       ],
-      "note": "Left door in left section opening"
+      "note": "Left door in left section opening",
+      "contact": false
     },
     {
       "body": "LeftDoor",
@@ -339,7 +344,8 @@
         0,
         0
       ],
-      "note": "Left door between left end and divider1"
+      "note": "Left door between left end and divider1",
+      "contact": false
     },
     {
       "body": "RightDoor",
@@ -350,7 +356,8 @@
         0,
         0
       ],
-      "note": "Right door in right section opening"
+      "note": "Right door in right section opening",
+      "contact": false
     },
     {
       "body": "RightDoor",
@@ -361,7 +368,8 @@
         0,
         0
       ],
-      "note": "Right door between divider2 and right end"
+      "note": "Right door between divider2 and right end",
+      "contact": false
     },
     {
       "body": "Cleat1",
@@ -383,7 +391,8 @@
         0,
         0
       ],
-      "note": "Right mirror of Cleat1 at 4/5 width"
+      "note": "Right mirror of Cleat1 at 4/5 width",
+      "contact": false
     },
     {
       "body": "Cleat2",
@@ -405,7 +414,8 @@
         0,
         0
       ],
-      "note": "Right mirror of Cleat2 at 3/5 width"
+      "note": "Right mirror of Cleat2 at 3/5 width",
+      "contact": false
     },
     {
       "body": "DmCl1_0",
@@ -458,6 +468,54 @@
       "contact": true,
       "note": "Domino void at Cleat2_R-to-case bottom joint",
       "replicas": "DmCl2R_*"
+    },
+    {
+      "body": "LDoor_H_Lo_Leaf",
+      "ref": "LeftDoor",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "contact": false,
+      "note": "Hinge leaf"
+    },
+    {
+      "body": "LDoor_H_Hi_Leaf",
+      "ref": "LeftDoor",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "contact": false,
+      "note": "Hinge leaf"
+    },
+    {
+      "body": "RDoor_H_Lo_Leaf",
+      "ref": "RightDoor",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "contact": false,
+      "note": "Hinge leaf"
+    },
+    {
+      "body": "RDoor_H_Hi_Leaf",
+      "ref": "RightDoor",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "contact": false,
+      "note": "Hinge leaf"
     }
   ]
 }
