@@ -290,7 +290,8 @@ def run(context):
     # ================================================================
     # Body-relative reference for center beam positioning
     ref_slat_1 = find_body("Slat_1")
-    ref_slat_1_bb = ref_slat_1.boundingBox
+    if ref_slat_1:
+        ref_slat_1_bb = ref_slat_1.boundingBox
 
     # Beam: runs lengthwise (Y) at mid_x, from post to post, up to ledger top
     beam_pl = sp.off_plane(support_c, support_c.yZConstructionPlane,
@@ -334,8 +335,8 @@ def run(context):
 
     hb_slat_proxies = [b.createForAssemblyContext(hb_occ) for b in all_hb_slats]
     for i, slat_proxy in enumerate(hb_slat_proxies):
-        slat_proxy.combine(hb_tr_p, [slat_proxy], CUT, True, f"HBSlatMort_TR_{i}")
-        slat_proxy.combine(hb_br_p, [slat_proxy], CUT, True, f"HBSlatMort_BR_{i}")
+        sp.combine(hb_tr_p, [slat_proxy], CUT, True, f"HBSlatMort_TR_{i}")
+        sp.combine(hb_br_p, [slat_proxy], CUT, True, f"HBSlatMort_BR_{i}")
 
     print(">>> Headboard slat mortises done")
 

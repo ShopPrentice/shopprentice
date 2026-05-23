@@ -231,7 +231,7 @@ def run(context):
     # Use the back panel as tool body to cut matching grooves
     for bname, bbody in [("Bot", bot_body), ("Top", top_body),
                           ("Left", left_body), ("Right", right_body)]:
-        sp.combine(case_c, bbody, back_body, CUT, True,
+        sp.combine(bbody, back_body, CUT, True,
                    f"Rab_{bname}")
 
     # Body-relative reference: Divider1 depends on Bottom and Left
@@ -268,9 +268,9 @@ def run(context):
     div2_body.name = "Divider2"
 
     # Dado CUTs — dividers CUT into Top and Bottom boards
-    sp.combine(case_c, bot_body, [div1_body, div2_body], CUT, True,
+    sp.combine(bot_body, [div1_body, div2_body], CUT, True,
                "Dado_Bot")
-    sp.combine(case_c, top_body, [div1_body, div2_body], CUT, True,
+    sp.combine(top_body, [div1_body, div2_body], CUT, True,
                "Dado_Top")
 
     # ── Dominos: Divider-to-Case Top & Bottom ─────────────────────
@@ -636,16 +636,16 @@ def run(context):
     leg_bl_proxy = leg_bl.createForAssemblyContext(frame_occ)
     leg_br_proxy = leg_br.createForAssemblyContext(frame_occ)
 
-    sp.combine(root, leg_fl_proxy,
+    sp.combine(leg_fl_proxy,
                [frail_proxy, srail_l_proxy],
                CUT, True, "Mortise_FL")
-    sp.combine(root, leg_fr_proxy,
+    sp.combine(leg_fr_proxy,
                [frail_proxy, srail_r_proxy],
                CUT, True, "Mortise_FR")
-    sp.combine(root, leg_bl_proxy,
+    sp.combine(leg_bl_proxy,
                [brail_proxy, srail_l_proxy],
                CUT, True, "Mortise_BL")
-    sp.combine(root, leg_br_proxy,
+    sp.combine(leg_br_proxy,
                [brail_proxy, srail_r_proxy],
                CUT, True, "Mortise_BR")
 
@@ -797,7 +797,7 @@ def run(context):
         tn_b_body = tn_b_ext.bodies.item(0)
 
         # JOIN both tenons into cleat
-        sp.combine(cleats_c, c_body, [tn_f_body, tn_b_body],
+        sp.combine(c_body, [tn_f_body, tn_b_body],
                    JOIN, False, f"{cname}_TnJoin")
 
         # Mirror across XMid
@@ -836,9 +836,9 @@ def run(context):
                      for b in cleat_bodies]
 
     # Cleats CUT mortises in front/back rails
-    sp.combine(root, frail_px, cleat_proxies,
+    sp.combine(frail_px, cleat_proxies,
                CUT, True, "CleatMort_Front")
-    sp.combine(root, brail_px, cleat_proxies,
+    sp.combine(brail_px, cleat_proxies,
                CUT, True, "CleatMort_Back")
 
     # Cleats CUT into case bottom (attachment dados)
@@ -849,7 +849,7 @@ def run(context):
             bot_ref = b
             break
     bot_px = bot_ref.createForAssemblyContext(case_occ)
-    sp.combine(root, bot_px, cleat_proxies,
+    sp.combine(bot_px, cleat_proxies,
                CUT, True, "CleatDado_Bot")
 
     # ── Dominos: Cleat-to-Case Bottom ───────────────────────────────

@@ -201,9 +201,10 @@ def run(context):
     move_feat = legs_c.features.moveFeatures.add(move_inp)
     move_feat.name = "YSplay_NL"
 
-    # [9] Sketch: Sketch3 (on Seat face, but CUTs into leg — lives in Legs component)
+    # [9] Sketch: Sketch3 (on Seat face — created in root for cross-component access)
     # variant 0: method=intersect
-    Sketch3 = legs_c.sketches.add(find_face_near(Seat, 15.24, 8.89, 17.78, 0.0, 0.0, 1.0))
+    seat_proxy = Seat.createForAssemblyContext(seat_occ)
+    Sketch3 = root.sketches.add(find_face_near(seat_proxy, 15.24, 8.89, 17.78, 0.0, 0.0, 1.0))
     Sketch3.name = "Sketch3"
     lns = Sketch3.sketchCurves.sketchLines
     # Coordinate transform: captured sketch axes -> actual sketch axes
