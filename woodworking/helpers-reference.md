@@ -32,6 +32,13 @@ def run(context):
     side = sp.face_side(frag, top_face)           # 'normal'|'anti'|'on'
     groups = sp.classify_bodies(frags, leg)        # {'inside':[], 'outside':[], ...}
 
+    # Mating surface — contact area between two bodies at their interface
+    mb = sp.mating_bounds(rung, ladder_side, 'x')  # normal axis = 'x'
+    # returns {'y_min': .., 'y_max': .., 'y_center': .., 'y_size': ..,
+    #          'z_min': .., 'z_max': .., 'z_center': .., 'z_size': ..}
+    # Raises ValueError if bodies are gapped, overlapping, or don't share
+    # a mating surface — gives the agent diagnostic feedback during build.
+
     # Sketches — rectangles
     sk, prof = sp.sketch_rect(comp, plane, "0 cm", "0 cm", "w", "d",
                                name="Sk", ev=ctx.ev)
@@ -190,3 +197,5 @@ All feature builders take `comp` as first arg. Available via `from helpers impor
 | `sketch_slot` | `(comp, plane, cx_expr, cy_expr, long_expr, short_expr, vertical, name, ev)` | (sketch, profile) | Stadium shape in sketch-space coords. Use for domino mortises. |
 | `sketch_slot_model` | `(comp, plane, model_center, long_model_axis, long_expr, short_expr, name, ev)` | (sketch, profile) | Stadium shape in model-space coords with auto sign detection. |
 | `probe_sketch_signs` | `(sk)` | (h_axis, v_axis, h_sign, v_sign) | Extends `probe_sketch_axes` with sign detection for non-XY planes. |
+| `mating_bounds` | `(body_a, body_b, normal_axis, tol=0.1)` | dict | Contact area between two bodies at interface. Returns `{ax_min, ax_max, ax_center, ax_size}` for each axis parallel to the interface. **Raises ValueError** if bodies are gapped (not touching), overlapping (penetrating — CUT first), or have no shared mating surface. Provides diagnostic messages with axis ranges so the agent can fix placement during the build. |
+| `validate_deps` | `(ctx, metadata_path=None)` | bool or None | Validates dependency tree from `model.json`. Checks: (1) side — body_side vs expected, (2) contact — bounding box overlap, (3) completeness — all bodies in design are tracked (including root), (4) root bodies — flags bodies in root that should be in components, (5) source — find_body + boundingBox usage. Returns `True` (all pass), `False` (failures), or `None` (no metadata file). Dep entries support optional `"replicas": "glob_pattern"` to cover pattern copies (e.g., `"Rung_*"`). |

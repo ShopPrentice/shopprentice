@@ -90,6 +90,35 @@ Back panel sits in rabbet in case sides
 | After lid | +1 lid + 2 cleats | Lid covers top opening |
 | Final | ~20–25 | Zero structural interferences |
 
+## Lid Flip (Opening the Lid for Display)
+
+To show the chest open, rotate the **Lid occurrence** around the hinge pin axis:
+
+```
+Hinge pin axis: X (runs left-right along the back edge)
+Pivot point: (0, box_width, open_height) — at the hinge barrel center
+Rotation: NEGATIVE angle around X axis (lid flips backward, away from front)
+Default open angle: -100° (leaning back slightly past vertical)
+```
+
+```python
+pivot = Point3D.create(0, ev("box_width"), ev("open_height"))
+axis = Vector3D.create(1, 0, 0)
+rot = Matrix3D.create()
+rot.setToRotation(math.radians(-100), axis, pivot)
+lid_occurrence.transform2 = rot
+```
+
+**Direction rule:** The lid opens **backward** (away from the front of the chest, toward the back and over). This is always a **negative** X rotation. Positive X rotation would flip the lid forward into the chest — wrong.
+
+**Angle guide:**
+- -90° = upright (vertical)
+- -100° = slightly past vertical (natural resting position with lid stay)
+- -110° = leaning well back
+- -180° = fully flat behind the chest
+
+To close: reset to identity matrix (`lid_occurrence.transform2 = Matrix3D.create()`).
+
 ## Common Mistakes
 
 - **Forgetting drawer opening in front case board** — most common error

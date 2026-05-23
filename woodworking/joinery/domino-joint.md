@@ -101,17 +101,53 @@ The domino narrow dimension (`dm_t`) must fit within the thinnest board at the j
 
 **Rule:** cutter diameter ≤ 1/3 of the thinnest board. A 0.75" ledger with an 8mm domino (42% of thickness) is too aggressive — the mortise walls are paper-thin.
 
+## Body Ownership
+
+**Domino void bodies must live inside a component — never in root.** This is the same rule as mortise-and-tenon, drawbore, or any other joinery: the joint body belongs to the component of the primary connecting piece. Cross-component CUTs go through root via assembly proxies, but the void body itself stays inside its owning component.
+
+Choose the **primary piece** (the one the domino is most naturally part of):
+- Rail → post: void in the **rail's** component (the domino travels with the rail)
+- Kick → side: void in the **kick's** component
+- Ledger → side rail: void in the **ledger's** component
+- Rung → ladder side: void in the **ladder** component
+
+The void body appears in model.json like any other body, with its own dependency entry. For pattern copies, use the `replicas` glob field.
+
+## Mating Surface
+
+**Place dominos within the contact area — not based on the full body dimensions.** When body A meets body B at an interface, the contact area is the overlap of their cross-sections at that interface. Dominos placed outside this area miss the mating surface entirely.
+
+This matters most when the two bodies have different sizes or when the joint interface is a partial overlap (angled connections, T-joints where one piece doesn't span the full face of the other).
+
+**Before placing dominos, call `sp.mating_bounds()`:**
+
+```python
+# Example: rung (4" deep × 1.5" face) meeting ladder side (3" wide)
+# Interface normal is 'x' (YZ plane)
+mb = sp.mating_bounds(rung_body, ladder_side, 'x')
+# mb = {'y_min': .., 'y_max': .., 'y_center': .., 'y_size': ..,
+#        'z_min': .., 'z_max': .., 'z_center': .., 'z_size': ..}
+# Rung is 4" deep but only 2" overlaps the ladder side.
+# Dominos must fit within mb['y_size'], not the full 4" rung depth.
+dm_y = mb['y_center']   # domino centered in the actual contact area
+dm_z = mb['z_center']   # domino centered in Z overlap
+```
+
+`mating_bounds` raises `ValueError` if the bodies are gapped (not touching), overlapping (penetrating — CUT first), or have no shared mating surface. The error message includes axis ranges so you can diagnose and fix placement during the build — no need to wait for final validation.
+
+**This applies to ALL joinery**, not just dominos. Whenever placing any joint at a partial-overlap interface, verify that the joint geometry falls within the contact area.
+
 ## Geometry Workflow
 
-The domino mortise is modeled as a **stadium-shaped void body** sketched on the mating surface and symmetric-extruded so it penetrates equally into both pieces. The stadium shape is two semicircles (radius = `dm_w / 2`) connected by two straight lines — use `sketch_slot` to draw this. After creation, the void is CUT from both pieces (with `keepTool=True` on the first CUT so it survives for the second).
+The domino mortise is modeled as a **stadium-shaped void body** sketched at the mating interface and symmetric-extruded so it penetrates equally into both pieces. The stadium shape is two semicircles (radius = `dm_w / 2`) connected by two straight lines — use `sketch_slot` or `sketch_slot_model` to draw this. After creation, the void is CUT from both pieces (with `keepTool=True` on the first CUT so it survives for the second).
 
-**IMPORTANT — sketch on the mating face, not a construction plane.** Find the BRep face of the piece where the domino will be inserted and create the sketch directly on that face. This follows the "reference related pieces" principle. When the sketch is on a face, Fusion may project face edges and create multiple profiles — always select the **inner profile** (the slot itself, `profileLoops.count == 1`) not the surrounding face region.
+**Sketch plane:** Use a construction plane at the interface or the BRep mating face of the primary piece. When using a face, Fusion may project face edges and create multiple profiles — always select the **inner profile** (the slot itself, `profileLoops.count == 1`) not the surrounding face region.
 
 ### Void Body Approach
 
-1. **Face** — Find the mating face on the piece (e.g., `body.faces` iteration by position or normal). Do NOT use a construction plane offset from origin.
-2. **Sketch** — `sketch_slot` on that face:
-   - Center: positioned at the domino location on the mating face
+1. **Mating bounds** — Determine the contact area between the two pieces at the interface (see Mating Surface above). All domino centers must fall within this area.
+2. **Sketch** — `sketch_slot` or `sketch_slot_model` inside the **primary piece's component**:
+   - Center: positioned within the mating bounds
    - Size: `dm_<joint>_h` (long) × `dm_<joint>_w` (short)
    - Orientation: `vertical=True/False` per the orientation rule
 3. **Extrude** — `ext_new_sym` with `NewBodyFeatureOperation`, distance = `dm_<joint>_d`:
@@ -119,8 +155,8 @@ The domino mortise is modeled as a **stadium-shaped void body** sketched on the 
 4. **Pattern** — `RectangularPatternFeature` along the joint:
    - Count: `dm_<joint>_count`
    - Spacing: `dm_<joint>_spacing`
-5. **CUT piece A** — `combine(comp, piece_a, void_bodies, CUT, True)` — pockets in piece A, voids survive.
-6. **CUT piece B** — `combine(root, piece_b_proxy, void_proxies, CUT, True)` — pockets in piece B via assembly proxy.
+5. **CUT primary piece** — `combine(comp, piece_a, void_bodies, CUT, True)` — pockets in piece A, voids survive.
+6. **CUT secondary piece** — Get assembly proxy of piece B, CUT via root: `combine(piece_b_proxy, void_proxies, CUT, True)` — pockets in piece B.
 
 ### Why Void Bodies Instead of Direct CUT
 
@@ -147,45 +183,50 @@ The domino mortise is modeled as a **stadium-shaped void body** sketched on the 
 
 ## Example Snippet
 
-Domino voids connecting a kick board to two side panels (symmetric left/right), using `sketch_slot` for stadium shape and `ext_new_sym` for symmetric extrude:
+Domino voids connecting a kick board to two side panels (symmetric left/right). Note: void bodies are created inside `kick_c` (the kick component), not root. Cross-component CUTs go through assembly proxies.
 
 ```python
 # -- Kick-to-side domino voids (per-joint sizing) --
-# Sketch plane at mating interface: inner face of left side
+# 1. Find the reference body and determine mating bounds
+side_l = ctx.find_body("Side_L")
+kick = ctx.find_body("Kick")
+side_bb = side_l.boundingBox
+kick_bb = kick.boundingBox
+# Mating area at X = board_thick interface:
+# Z overlap = max(kick_minZ, side_minZ) to min(kick_maxZ, side_maxZ)
+# Y overlap = max(kick_minY, side_minY) to min(kick_maxY, side_maxY)
+
+# 2. Sketch inside the kick component (void lives here)
 k_dm_pl = off_plane(kick_c, kick_c.yZConstructionPlane,
                     "board_thick", "KDm_Pl")
 
-# Stadium void — vertical (kick end face is taller than wide)
 _, pr = sketch_slot(kick_c, k_dm_pl,
     cxe="board_thick / 2",
-    cye="dm_kick_zsp",
+    cye="dm_kick_zsp",   # within mating Z range
     long_e="dm_kick_h", short_e="dm_kick_w",
     vertical=True, name="KDm_Sk")
 
-# Symmetric extrude: dm_kick_d/2 into each piece
+# 3. Extrude inside kick_c — void body stays in this component
 ext_k_dm = ext_new_sym(kick_c, pr, "dm_kick_d", "KDm_Void")
 k_dm_body = ext_k_dm.bodies.item(0)
 
-# Pattern along Z
+# 4. Pattern along Z (inside kick_c)
 k_dm_pat = body_pattern(kick_c, k_dm_body,
     kick_c.zConstructionAxis, "dm_kick_count", "dm_kick_zsp", "KDm_PatZ")
 
-# Collect void bodies
 dm_left = [k_dm_body]
 for i in range(k_dm_pat.bodies.count):
     dm_left.append(k_dm_pat.bodies.item(i))
 
-# CUT kick board (keepTool=True — voids survive for side CUT)
-combine(kick_c, kick_body, dm_left, CUT, True, "KDm_CutKick")
+# 5. CUT kick board (same component — no proxy needed)
+combine(kick_body, dm_left, CUT, True, "KDm_CutKick")
 
-# Mirror extrude across XMid → right side voids + independent pattern
-mir_k_dm = mirror_feat(kick_c, [ext_k_dm], k_XMid, "KDm_MirX")
-# ... pattern right side, CUT right voids from kick ...
-
-# CUT sides via assembly proxies in root
+# 6. CUT side panel via assembly proxy (cross-component)
 dm_left_proxies = [b.createForAssemblyContext(kick_occ) for b in dm_left]
-combine(root, left_side_proxy, dm_left_proxies, CUT, True, "KickDomL")
-# ... right side proxies ...
+side_l_proxy = side_l.createForAssemblyContext(side_occ)
+combine(side_l_proxy, dm_left_proxies, CUT, True, "KickDomL")
+
+# Mirror for right side...
 ```
 
 ## Appearance
