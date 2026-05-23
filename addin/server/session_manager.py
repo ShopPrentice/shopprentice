@@ -20,6 +20,7 @@ Document identity:
         ShopPrentice.sessionId  — current owning session (changes on transfer)
 """
 
+import threading
 import time
 import uuid
 from typing import Dict, List, Optional
@@ -59,6 +60,169 @@ class Session:
         self.document_name = doc.name if doc else None
 
 
+class _QueueEntry:
+    """One pending tool execution waiting for its turn."""
+    __slots__ = ('tool_name', 'session_id', 'enqueued_at', 'ready')
+
+    def __init__(self, tool_name: str, session_id: Optional[str]):
+        self.tool_name = tool_name
+        self.session_id = session_id
+        self.enqueued_at = time.time()
+        self.ready = threading.Event()
+
+
+class ExecutionQueue:
+    """FIFO queue that serializes main-thread tool executions.
+
+    Each HTTP thread calls ``enter()`` which blocks until it is that
+    request's turn.  After execution completes, ``leave()`` wakes the
+    next waiter.  The queue also tracks whether Fusion has started
+    processing the active callback so callers can distinguish "waiting
+    in queue" from "Fusion is unresponsive".
+    """
+
+    CALLBACK_START_TIMEOUT: float = 30.0
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._waiters: List[_QueueEntry] = []
+        self._active: Optional[_QueueEntry] = None
+        self._callback_started = False
+        self._callback_started_at: Optional[float] = None
+
+    def enter(self, tool_name: str, session_id: Optional[str]) -> dict:
+        """Block until it is this request's turn.
+
+        Returns metadata the caller can attach to the tool response:
+        ``queue_depth_on_entry`` and ``wait_time``.
+        """
+        entry = _QueueEntry(tool_name, session_id)
+
+        with self._lock:
+            if self._active is None:
+                self._active = entry
+                self._callback_started = False
+                self._callback_started_at = None
+                return {"queue_depth_on_entry": 0, "wait_time": 0.0}
+
+            depth = len(self._waiters) + 1
+            self._waiters.append(entry)
+
+        app.log(
+            f"[queue] {tool_name} (session "
+            f"{session_id[:8] if session_id else 'none'}): "
+            f"queued at position {depth}"
+        )
+
+        entry.ready.wait()
+
+        wait_time = time.time() - entry.enqueued_at
+        app.log(f"[queue] {tool_name}: ready after {wait_time:.1f}s wait")
+
+        return {
+            "queue_depth_on_entry": depth,
+            "wait_time": round(wait_time, 2),
+        }
+
+    def mark_callback_started(self):
+        """Called from the main-thread callback to confirm Fusion is alive."""
+        with self._lock:
+            self._callback_started = True
+            self._callback_started_at = time.time()
+
+    def leave(self):
+        """Signal the next waiter that it is their turn."""
+        with self._lock:
+            if self._waiters:
+                nxt = self._waiters.pop(0)
+                self._active = nxt
+                self._callback_started = False
+                self._callback_started_at = None
+                nxt.ready.set()
+            else:
+                self._active = None
+                self._callback_started = False
+                self._callback_started_at = None
+
+    def check_health(
+        self, posted_at: float, tool_name: Optional[str] = None,
+    ) -> Optional[str]:
+        """Return ``None`` if healthy, or an error string if Fusion
+        appears unresponsive (callback never started).
+
+        When *tool_name* is ``"execute_script"`` the message prompts
+        the agent to review its script for crash-causing bugs while
+        the user restarts Fusion.
+        """
+        with self._lock:
+            if self._callback_started:
+                return None
+            elapsed = time.time() - posted_at
+            if elapsed > self.CALLBACK_START_TIMEOUT:
+                lines = [
+                    f"Fusion 360 has not responded to the "
+                    f"'{tool_name or 'unknown'}' call after "
+                    f"{elapsed:.0f}s — it appears frozen or crashed.",
+                    "",
+                    "**Action required:**",
+                    "1. Tell the user that Fusion 360 is unresponsive "
+                    "and needs to be restarted (or the ShopPrentice "
+                    "add-in reloaded).",
+                ]
+                if tool_name == "execute_script":
+                    lines.extend([
+                        "2. While waiting for the restart, review the "
+                        "script you just sent for crash-causing bugs:",
+                        "   - Infinite loops or unbounded recursion",
+                        "   - doc.close() / app.documents.add() calls "
+                        "(forbidden — the harness manages documents)",
+                        "   - TemporaryBRepManager use (unsupported)",
+                        "   - Very large body counts or complex boolean "
+                        "operations that exhaust memory",
+                        "3. Prepare a corrected script so you can "
+                        "re-run it immediately after the restart.",
+                    ])
+                else:
+                    lines.append(
+                        "2. Once Fusion is restarted, retry this "
+                        "tool call."
+                    )
+                return "\n".join(lines)
+        return None
+
+    def get_status(self) -> dict:
+        """Snapshot of queue state for diagnostics."""
+        with self._lock:
+            return {
+                "active_tool": (
+                    self._active.tool_name if self._active else None
+                ),
+                "active_session": (
+                    self._active.session_id[:8]
+                    if self._active and self._active.session_id
+                    else None
+                ),
+                "callback_started": self._callback_started,
+                "active_running_for": (
+                    round(time.time() - self._callback_started_at, 1)
+                    if self._callback_started_at else None
+                ),
+                "queue_depth": len(self._waiters),
+                "waiting": [
+                    {
+                        "tool": e.tool_name,
+                        "session": (
+                            e.session_id[:8] if e.session_id else None
+                        ),
+                        "waiting_for": round(
+                            time.time() - e.enqueued_at, 1
+                        ),
+                    }
+                    for e in self._waiters
+                ],
+            }
+
+
 class SessionManager:
     """Singleton that owns the session→document registry."""
 
@@ -75,6 +239,7 @@ class SessionManager:
         self._last_execution: float = 0.0
         self._current_session_id: Optional[str] = None
         self._doc_closing_handler = None
+        self._execution_queue = ExecutionQueue()
 
     # ── singleton ──────────────────────────────────────────────────────
 
@@ -243,7 +408,7 @@ class SessionManager:
     # ── document-closed event ──────────────────────────────────────────
 
     def on_document_closed(self) -> None:
-        for sid, session in self._sessions.items():
+        for sid, session in list(self._sessions.items()):
             if session._doc_ref is not None:
                 try:
                     valid = session._doc_ref.isValid
@@ -572,7 +737,7 @@ class SessionManager:
 
     def _evict_oldest_orphan(self):
         oldest = None
-        for s in self._sessions.values():
+        for s in list(self._sessions.values()):
             if s.status == "orphaned":
                 if oldest is None or s.last_active < oldest.last_active:
                     oldest = s

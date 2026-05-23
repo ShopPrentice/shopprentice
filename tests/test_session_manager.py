@@ -366,6 +366,168 @@ class TestThrottleGate(unittest.TestCase):
         self.assertGreater(self.sm._last_execution, 0.0)
 
 
+ExecutionQueue = mod.ExecutionQueue
+
+
+class TestExecutionQueue(unittest.TestCase):
+
+    def setUp(self):
+        SessionManager.reset()
+        self.sm = SessionManager.instance()
+
+    def test_queue_exists(self):
+        self.assertIsInstance(self.sm._execution_queue, ExecutionQueue)
+
+    def test_immediate_enter_returns_zero_wait(self):
+        q = self.sm._execution_queue
+        meta = q.enter("test_tool", "abc12345")
+        try:
+            self.assertEqual(meta["queue_depth_on_entry"], 0)
+            self.assertEqual(meta["wait_time"], 0.0)
+        finally:
+            q.leave()
+
+    def test_queue_serializes_execution(self):
+        """Two threads entering the queue don't overlap."""
+        import threading
+        import time
+
+        q = self.sm._execution_queue
+        order = []
+
+        def worker(name, hold_time):
+            q.enter(name, None)
+            try:
+                order.append(f"{name}_start")
+                time.sleep(hold_time)
+                order.append(f"{name}_end")
+            finally:
+                q.leave()
+
+        t1 = threading.Thread(target=worker, args=("A", 0.1))
+        t2 = threading.Thread(target=worker, args=("B", 0.05))
+        t1.start()
+        time.sleep(0.01)  # let A enter first
+        t2.start()
+        t1.join()
+        t2.join()
+
+        self.assertEqual(order, ["A_start", "A_end", "B_start", "B_end"])
+
+    def test_queue_reports_depth_and_wait(self):
+        """Second entrant sees depth=1 and positive wait_time."""
+        import threading
+        import time
+
+        q = self.sm._execution_queue
+        meta_b = {}
+
+        def worker_a():
+            q.enter("tool_a", None)
+            time.sleep(0.15)
+            q.leave()
+
+        def worker_b():
+            time.sleep(0.02)  # ensure A enters first
+            m = q.enter("tool_b", None)
+            meta_b.update(m)
+            q.leave()
+
+        ta = threading.Thread(target=worker_a)
+        tb = threading.Thread(target=worker_b)
+        ta.start()
+        tb.start()
+        ta.join()
+        tb.join()
+
+        self.assertEqual(meta_b["queue_depth_on_entry"], 1)
+        self.assertGreater(meta_b["wait_time"], 0.05)
+
+    def test_mark_callback_started(self):
+        q = self.sm._execution_queue
+        q.enter("tool_x", "sess1234")
+        try:
+            self.assertFalse(q.get_status()["callback_started"])
+            q.mark_callback_started()
+            self.assertTrue(q.get_status()["callback_started"])
+        finally:
+            q.leave()
+
+    def test_check_health_ok_after_callback_started(self):
+        import time
+        q = self.sm._execution_queue
+        q.enter("tool_x", None)
+        try:
+            q.mark_callback_started()
+            self.assertIsNone(q.check_health(time.time() - 999))
+        finally:
+            q.leave()
+
+    def test_check_health_error_when_stuck(self):
+        import time
+        q = self.sm._execution_queue
+        q.enter("tool_x", None)
+        try:
+            posted_at = time.time() - (q.CALLBACK_START_TIMEOUT + 5)
+            err = q.check_health(posted_at, tool_name="tool_x")
+            self.assertIsNotNone(err)
+            self.assertIn("frozen or crashed", err)
+            self.assertIn("restarted", err)
+        finally:
+            q.leave()
+
+    def test_check_health_execute_script_prompts_review(self):
+        import time
+        q = self.sm._execution_queue
+        q.enter("execute_script", None)
+        try:
+            posted_at = time.time() - (q.CALLBACK_START_TIMEOUT + 5)
+            err = q.check_health(posted_at, tool_name="execute_script")
+            self.assertIn("review the script", err.lower())
+            self.assertIn("Infinite loops", err)
+            self.assertIn("Prepare a corrected script", err)
+        finally:
+            q.leave()
+
+    def test_get_status_shows_waiters(self):
+        import threading
+        import time
+
+        q = self.sm._execution_queue
+        q.enter("active_tool", "sess_a")
+        q.mark_callback_started()
+
+        ready = threading.Event()
+        done = threading.Event()
+
+        def waiter():
+            ready.set()
+            q.enter("waiting_tool", "sess_b")
+            q.leave()
+            done.set()
+
+        t = threading.Thread(target=waiter)
+        t.start()
+        ready.wait()
+        time.sleep(0.05)  # let waiter block on enter()
+
+        status = q.get_status()
+        self.assertEqual(status["active_tool"], "active_tool")
+        self.assertEqual(status["queue_depth"], 1)
+        self.assertEqual(status["waiting"][0]["tool"], "waiting_tool")
+
+        q.leave()  # release the waiter
+        done.wait(timeout=2)
+        t.join()
+
+    def test_queue_survives_reset(self):
+        old_q = self.sm._execution_queue
+        SessionManager.reset()
+        new_sm = SessionManager.instance()
+        self.assertIsInstance(new_sm._execution_queue, ExecutionQueue)
+        self.assertIsNot(new_sm._execution_queue, old_q)
+
+
 class TestDocGone(unittest.TestCase):
 
     def setUp(self):

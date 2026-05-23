@@ -26,3 +26,4 @@ from . import manage_documents
 from . import export_step
 from . import apply_appearance
 from . import claim_document
+from . import get_queue_status
