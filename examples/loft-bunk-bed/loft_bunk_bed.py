@@ -208,17 +208,11 @@ def run(context):
     pa("fence_support_z", adsk.core.ValueInput.createByString("loft_h + rail_h"), "in", "Support post bottom Z")
     pa("fence_support_h", adsk.core.ValueInput.createByString("guard_z - loft_h - rail_h"), "in", "Support post height")
 
-    sk_fsp, prof_fsp = sp.sketch_rect_model(
-        guard_c, guard_c.xYConstructionPlane,
-        ("fence_front_x", "post_size / 2 - guard_thick / 2", "0 in"),
-        {"x": "guard_thick", "y": "guard_thick"},
-        "FenceSupport_Sk_base", ev=ev)
-    # Need to sketch at the right Z — use a plane at fence_support_z
     fsp_pl = sp.off_plane(guard_c, guard_c.xYConstructionPlane, "fence_support_z", "FenceSupport_Pl")
     sk_fsp2, prof_fsp2 = sp.sketch_rect_model(
         guard_c, fsp_pl,
         ("fence_front_x", "post_size / 2 - guard_thick / 2", "fence_support_z"),
-        {"x": "guard_thick", "y": "guard_thick"},
+        {"x": "post_size", "y": "guard_thick"},
         "FenceSupport_Sk", ev=ev)
     ext_fsp = sp.ext_new(guard_c, prof_fsp2, "fence_support_h", "FenceSupport")
     fsp_body = ext_fsp.bodies.item(0)
@@ -313,11 +307,11 @@ def run(context):
     dr_front = sp.ext_new(desk_c, prof_drf, "desk_rail_h", "DeskRail_Front").bodies.item(0)
     dr_front.name = "DeskRail_Front"
 
-    # Back desk apron — at inner face of back posts, extends into posts for proper connection
+    # Back desk apron — between back posts, connects at posts' inner X faces
     sk_drb, prof_drb = sp.sketch_rect_model(
         desk_c, desk_rail_pl,
-        ("0 in", "outer_w - post_size - desk_rail_thick", "desk_rail_z"),
-        {"x": "outer_l", "y": "desk_rail_thick"},
+        ("post_size", "outer_w - post_size - desk_rail_thick", "desk_rail_z"),
+        {"x": "bed_l", "y": "desk_rail_thick"},
         "DeskRail_Back_Sk", ev=ev)
     dr_back = sp.ext_new(desk_c, prof_drb, "desk_rail_h", "DeskRail_Back").bodies.item(0)
     dr_back.name = "DeskRail_Back"
@@ -681,17 +675,22 @@ def run(context):
                  "dm_guard_h", "dm_guard_t", "dm_guard_d",
                  "DM_GR_Front_H", gr_front, guard_occ, post_bl, post_occ)
 
+    # Fence support → front guard rail (XY interface at Z=guard_z)
+    domino_joint(guard_pl, ("fence_front_x + post_size / 2", "post_size / 2", "guard_z"), "x",
+                 "dm_guard_h", "dm_guard_t", "dm_guard_d",
+                 "DM_FS_GR", fsp_body, guard_occ, gr_front, guard_occ)
+
     print("Joinery: guard rail domino joints")
 
     # ── Desk Rail → Post Dominos ──────────────────────────────────
     desk_z_ctr = "desk_rail_z + desk_rail_h / 2"
 
-    # Back desk apron → back posts (apron back face meets post inner Y face)
-    # Interface at XZ plane Y=outer_w-post_size; dominos at X=post_size/2 and outer_l-post_size/2
-    domino_joint(iface_post_yr, ("post_size / 2", "outer_w - post_size", desk_z_ctr), "z",
+    # Back desk apron → back posts (rail end faces meet posts' inner X faces)
+    # Interface at YZ planes X=post_size and X=outer_l-post_size
+    domino_joint(iface_foot, ("post_size", "outer_w - post_size", desk_z_ctr), "z",
                  "dm_desk_h", "dm_desk_t", "dm_desk_d",
                  "DM_DR_B_F", dr_back, desk_occ, post_fr, post_occ)
-    domino_joint(iface_post_yr, ("outer_l - post_size / 2", "outer_w - post_size", desk_z_ctr), "z",
+    domino_joint(iface_head, ("outer_l - post_size", "outer_w - post_size", desk_z_ctr), "z",
                  "dm_desk_h", "dm_desk_t", "dm_desk_d",
                  "DM_DR_B_H", dr_back, desk_occ, post_br, post_occ)
 

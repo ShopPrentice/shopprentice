@@ -157,9 +157,9 @@
       "body": "DeskRail_Back",
       "ref": "Post_FR",
       "side": "outside",
-      "direction": [0, -1, 0],
+      "direction": [1, 0, 0],
       "contact": true,
-      "note": "Back desk rail at inner face of back posts, extends in -Y from Post_FR"
+      "note": "Back desk rail between back posts, extends in +X from Post_FR inner face"
     },
     {
       "body": "DeskTop",

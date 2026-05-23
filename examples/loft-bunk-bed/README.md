@@ -4,7 +4,7 @@ A parametric loft bunk bed -- Twin 40"W x 75"L, elevated sleeping platform at 58
 
 ---
 
-**Script:** [`loft_bunk_bed.py`](loft_bunk_bed.py) -- 94 bodies (39 structural + 55 domino voids). Zero interferences. Full dependency validation.
+**Script:** [`loft_bunk_bed.py`](loft_bunk_bed.py) -- 95 bodies (39 structural + 56 domino voids). Zero interferences. Full dependency validation.
 
 **Style:** Modern
 
@@ -14,13 +14,13 @@ A parametric loft bunk bed -- Twin 40"W x 75"L, elevated sleeping platform at 58
 |-----------|--------|-------------|
 | Posts | 4 | 3" square posts, 78" tall with top chamfers |
 | BedRails | 4 | Side rails (1.5" thick x 8" tall) + end rails, centered on posts |
-| GuardRails | 5 | Top guard rails on 3 sides + partial front (ladder opening) + fence support post |
+| GuardRails | 5 | Top guard rails on 3 sides + partial front (ladder opening) + fence support post (3"×1") |
 | Ledgers | 2 | 0.75" strips on inner rail faces supporting slats |
 | Slats | 13 | Mattress support, patterned along bed length |
 | Desk | 5 | Desktop + 2 front legs + front/back aprons, 30" surface height |
 | Ladder | 6 | 2 angled sides with hook tabs + 4 rungs, 12-degree lean |
 
-### Joinery -- 55 Domino Joints
+### Joinery -- 56 Domino Joints
 
 All joinery uses Festool-style domino loose tenons. Void bodies live inside their owning component (not root), with cross-component CUTs via assembly proxies.
 
@@ -29,7 +29,8 @@ All joinery uses Festool-style domino loose tenons. Void bodies live inside thei
 | Side rails to posts | 8mm x 40mm | 8 | 2 per end, at 1/3 and 2/3 rail height |
 | End rails to posts | 8mm x 40mm | 8 | 2 per end, same Z positions |
 | Guard rails to posts | 6mm x 30mm | 7 | 1 per connection point |
-| Desk back apron to posts | 6mm x 30mm | 2 | At each back post |
+| Fence support to guard rail | 6mm x 30mm | 1 | XY interface at guard rail bottom |
+| Desk back apron to posts | 6mm x 30mm | 2 | Rail between posts, dominos at inner X faces |
 | Desk front apron to legs | 6mm x 30mm | 2 | At each desk leg |
 | Ledger to side rail | 5mm x 30mm | 8 | 4 per side, patterned along length |
 | Rung to ladder sides | 6mm x 20mm | 16 | 2 per end x 4 rungs x 2 sides |
