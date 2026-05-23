@@ -2636,8 +2636,8 @@ def validate_deps(ctx, metadata_path=None):
         # Exact match
         if name in tracked:
             continue
-        # Pattern copy: "Slat (3)" → base "Slat"
-        base = re.sub(r'\s*\(\d+\)$', '', name)
+        # Pattern copy: "Slat (3)" or "Str_12 (1) (3)" → base "Slat" / "Str_12"
+        base = re.sub(r'(\s*\(\d+\))+$', '', name)
         if base in tracked:
             continue
         # Replica glob: e.g. "Rung_*" covers Rung_2, Rung_3, etc.
