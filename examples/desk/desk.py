@@ -386,6 +386,8 @@ def run(context):
     # Divider → front rail and back apron (auto-placed in mating area)
     # domino.between() finds where the bodies overlap and places dominos there.
     # Short depth so dominos fit within the thin apron/divider.
+    ref_div = find_body("Divider")
+    ref_div_bb = ref_div.boundingBox
     params.add("div_dm_d", VI("apron_thick / 2"), "in", "")
     dm_div_f = sp.off_plane(apron_c, apron_c.xZConstructionPlane, "apron_thick", "DM_DivF")
     dm_div_b = sp.off_plane(apron_c, apron_c.xZConstructionPlane,

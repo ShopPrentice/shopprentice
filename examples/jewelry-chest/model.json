@@ -174,7 +174,8 @@
         0,
         1
       ],
-      "note": "Upper tray front side, mitered corners"
+      "note": "Upper tray front side, mitered corners",
+      "contact": false
     },
     {
       "body": "UT_Back",
@@ -325,7 +326,7 @@
     {
       "body": "LTR_End_L",
       "ref": "LTR_Front",
-      "side": "opposite",
+      "side": "outside",
       "direction": [
         1,
         0,
@@ -336,7 +337,7 @@
     {
       "body": "LTR_End_R",
       "ref": "LTR_Front",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,
