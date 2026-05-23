@@ -353,13 +353,13 @@ def run(context):
         return None
 
     fbr_b = get_rail_body("Rail_FrontBot")
-    ftr_b = get_rail_body("Rail_FrontTop")
+    ftr_b = find_body("Rail_FrontTop"); ftr_bb = ftr_b.boundingBox
     bbr_b = get_rail_body("Rail_BackBot")
-    btr_b = get_rail_body("Rail_BackTop")
+    btr_b = find_body("Rail_BackTop"); btr_bb = btr_b.boundingBox
     lbr_b = get_rail_body("Rail_LeftBot")
-    ltr_b = get_rail_body("Rail_LeftTop")
+    ltr_b = find_body("Rail_LeftTop"); ltr_bb = ltr_b.boundingBox
     rbr_b = get_rail_body("Rail_RightBot")
-    rtr_b = get_rail_body("Rail_RightTop")
+    rtr_b = find_body("Rail_RightTop"); rtr_bb = rtr_b.boundingBox
 
     fbr_p = get_rail_proxy("Rail_FrontBot")
     ftr_p = get_rail_proxy("Rail_FrontTop")
@@ -530,6 +530,10 @@ def run(context):
     params.add("slat_dm_z", VI("slat_z + support_thick / 2"), "in", "")
     # First slat Y center
     params.add("slat_dm_y0", VI("post_size + slat_w / 2"), "in", "")
+
+    # Body-relative ref: slat dominos depend on support rails
+    ref_sr_r = find_body("SupRail_Right")
+    ref_sr_r_bb = ref_sr_r.boundingBox
 
     # Create domino voids without CUT (we'll CUT manually)
     left_voids = domino.grid(support_c, dm_slat_xl,
