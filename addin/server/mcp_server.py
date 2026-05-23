@@ -191,7 +191,15 @@ class SimpleMCPServer:
         result_container = {'result': None, 'exception': None, 'completed': False}
         result_lock = threading.Lock()
 
+        # Grab the execution queue before defining the callback so the
+        # closure captures the same queue object used by enter()/leave().
+        sm_for_queue = SessionManager.instance()
+        queue = sm_for_queue._execution_queue
+
         def callback(data):
+            # Tell the queue that Fusion is alive and processing.
+            queue.mark_callback_started()
+
             # Resolve SessionManager via sys.modules so we always get the
             # current singleton, even after a hot-reload that replaced the
             # module-level import.
@@ -283,36 +291,107 @@ class SimpleMCPServer:
                             sm._save_global_state(sess)
                         sm.current_session_id = None
 
-        if not TaskManager.is_running():
+        # ── queue serialization ───────────────────────────────────────
+        # Block until it is this request's turn.  The queue tells us
+        # how long we waited and how many tools were ahead so we can
+        # relay that to the agent (avoids "is Fusion broken?" confusion).
+        queue_meta = queue.enter(tool_name or operation_type, session_id)
+
+        try:
+            if not TaskManager.is_running():
+                if app:
+                    app.log("TaskManager is not running, attempting to start it")
+                TaskManager.start()
+
+            task_id = TaskManager.post(
+                command=f"execute_{operation_type}",
+                callback=callback,
+                data={"arguments": arguments}
+            )
+
+            if not task_id:
+                raise Exception("Failed to post task to TaskManager")
+
             if app:
-                app.log("TaskManager is not running, attempting to start it")
-            TaskManager.start()
+                app.log(f"Posted {operation_type} execution task {task_id} to main thread")
 
-        task_id = TaskManager.post(
-            command=f"execute_{operation_type}",
-            callback=callback,
-            data={"arguments": arguments}
-        )
+            timeout = 1800  # 30 minute timeout
+            start_time = time.time()
+            posted_at = time.time()
 
-        if not task_id:
-            raise Exception("Failed to post task to TaskManager")
+            while time.time() - start_time < timeout:
+                with result_lock:
+                    if result_container['completed']:
+                        if result_container['exception'] is not None:
+                            raise result_container['exception']
+                        result = result_container['result']
 
-        if app:
-            app.log(f"Posted {operation_type} execution task {task_id} to main thread")
+                        # Inject queue wait info so the agent knows
+                        # the delay was normal queuing, not a failure.
+                        if (queue_meta['wait_time'] > 1.0
+                                and isinstance(result, dict)
+                                and isinstance(
+                                    result.get('content'), list)):
+                            result['content'].insert(0, {
+                                "type": "text",
+                                "text": (
+                                    f"[Queue: waited "
+                                    f"{queue_meta['wait_time']:.1f}s, "
+                                    f"{queue_meta['queue_depth_on_entry']}"
+                                    " tool(s) ahead of yours. Fusion 360 "
+                                    "processes one tool at a time; this "
+                                    "is normal.]"
+                                ),
+                            })
 
-        timeout = 1800  # 30 minute timeout
-        start_time = time.time()
+                        return result
 
-        while time.time() - start_time < timeout:
-            with result_lock:
-                if result_container['completed']:
-                    if result_container['exception'] is not None:
-                        raise result_container['exception']
-                    return result_container['result']
+                # Outside the result_lock — check whether Fusion even
+                # started processing our callback.
+                health_err = queue.check_health(
+                    posted_at, tool_name=tool_name,
+                )
+                if health_err:
+                    return {
+                        "content": [{"type": "text", "text": health_err}],
+                        "isError": True,
+                    }
 
-            await asyncio.sleep(0.01)
+                await asyncio.sleep(0.01)
 
-        raise Exception(f"{operation_type.title()} execution timed out")
+            # Callback started but never completed within the timeout.
+            lines = [
+                f"The '{tool_name or operation_type}' tool has been "
+                f"running for {timeout}s without completing. "
+                "Fusion 360 is likely frozen.",
+                "",
+                "**Action required:**",
+                "1. Tell the user that Fusion 360 appears frozen and "
+                "needs to be restarted.",
+            ]
+            if tool_name == "execute_script":
+                lines.extend([
+                    "2. Review the script you sent for crash-causing "
+                    "bugs:",
+                    "   - Infinite loops or unbounded recursion",
+                    "   - doc.close() / app.documents.add() calls "
+                    "(forbidden)",
+                    "   - TemporaryBRepManager use (unsupported)",
+                    "   - Very large body counts or complex boolean "
+                    "operations",
+                    "3. Prepare a corrected script to run after the "
+                    "restart.",
+                ])
+            else:
+                lines.append(
+                    "2. Once Fusion is restarted, retry this tool call."
+                )
+            return {
+                "content": [{"type": "text", "text": "\n".join(lines)}],
+                "isError": True,
+            }
+        finally:
+            queue.leave()
 
     def _handle_resources_list(self, request_id: Any) -> Dict[str, Any]:
         """Handle resources/list request."""
