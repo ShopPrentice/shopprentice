@@ -216,6 +216,10 @@ def run(context):
     k_XMid = sp.off_plane(kick_c, kick_c.yZConstructionPlane,
                            "total_width / 2", "KXMid_Pl")
 
+    # Body-relative ref: kick dominos depend on KickBoard
+    ref_kick = ctx.find_body("KickBoard")
+    ref_kick_bb = ref_kick.boundingBox
+
     # Left-side domino voids + CUT into kick
     k_dm_pl = sp.off_plane(kick_c, kick_c.yZConstructionPlane,
                             "board_thick", "KDm_Pl")
