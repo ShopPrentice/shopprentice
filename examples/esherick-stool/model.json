@@ -20,7 +20,8 @@
         0,
         1
       ],
-      "note": "Leg 1 (front apex) stands on floor, splayed"
+      "note": "Leg 1 (front apex) stands on floor, splayed",
+      "contact": false
     },
     {
       "body": "Leg2 (3)",
@@ -31,7 +32,8 @@
         0,
         1
       ],
-      "note": "Leg 2 (back-left) stands on floor, splayed"
+      "note": "Leg 2 (back-left) stands on floor, splayed",
+      "contact": false
     },
     {
       "body": "Leg3 (3)",
@@ -42,7 +44,8 @@
         0,
         1
       ],
-      "note": "Leg 3 (back-right) stands on floor, splayed"
+      "note": "Leg 3 (back-right) stands on floor, splayed",
+      "contact": false
     },
     {
       "body": "Leg2 (3)",
@@ -53,7 +56,8 @@
         0,
         0
       ],
-      "note": "Leg 2 is behind-left of leg 1 (negative X direction)"
+      "note": "Leg 2 is behind-left of leg 1 (negative X direction)",
+      "contact": false
     },
     {
       "body": "Leg3 (3)",
@@ -64,7 +68,8 @@
         1,
         0
       ],
-      "note": "Leg 3 is to the right of leg 2"
+      "note": "Leg 3 is to the right of leg 2",
+      "contact": false
     },
     {
       "body": "TW_L1",
@@ -135,7 +140,7 @@
     {
       "body": "TW_Str_12_0",
       "ref": "Str_12 (1) (3)",
-      "side": "opposite",
+      "side": "outside",
       "direction": [
         1,
         0,
@@ -146,7 +151,7 @@
     {
       "body": "TW_Str_12_1",
       "ref": "Str_12 (1) (3)",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,
@@ -179,7 +184,7 @@
     {
       "body": "TW_Str_31_0",
       "ref": "Str_31 (1) (3)",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,
@@ -190,7 +195,7 @@
     {
       "body": "TW_Str_31_1",
       "ref": "Str_31 (1) (3)",
-      "side": "opposite",
+      "side": "outside",
       "direction": [
         1,
         0,

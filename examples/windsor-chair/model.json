@@ -4,179 +4,304 @@
       "body": "Seat",
       "ref": "origin",
       "side": "outside",
-      "direction": [0, 0, 1],
-      "note": "Seat plank at seat_h above floor"
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Seat plank at seat_h above floor",
+      "contact": false
     },
     {
       "body": "Leg_FL",
       "ref": "Seat",
       "side": "opposite",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Front-left leg hangs below seat"
     },
     {
       "body": "Leg_FR",
       "ref": "Seat",
       "side": "opposite",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Front-right leg, mirror of FL across XMid"
     },
     {
       "body": "Leg_BL",
       "ref": "Seat",
       "side": "opposite",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Back-left leg, mirror of FL across side midplane"
     },
     {
       "body": "Leg_BR",
       "ref": "Seat",
       "side": "opposite",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Back-right leg, mirror of BL across XMid"
     },
     {
       "body": "TW_FL",
       "ref": "Leg_FL",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Tenon wedge in FL leg-to-seat joint"
     },
     {
       "body": "TW_BL",
       "ref": "Leg_BL",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Tenon wedge in BL leg-to-seat joint"
     },
     {
       "body": "TW_FR",
       "ref": "Leg_FR",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Tenon wedge in FR leg-to-seat joint, mirror of TW_FL"
     },
     {
       "body": "TW_BR",
       "ref": "Leg_BR",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Tenon wedge in BR leg-to-seat joint, mirror of TW_BL"
     },
     {
       "body": "Str_Left",
       "ref": "Leg_FL",
       "side": "outside",
-      "direction": [0, 1, 0],
+      "direction": [
+        0,
+        1,
+        0
+      ],
       "note": "Left side stretcher between FL and BL legs at str_height_frac"
     },
     {
       "body": "Str_Right",
       "ref": "Leg_FR",
       "side": "outside",
-      "direction": [0, 1, 0],
+      "direction": [
+        0,
+        1,
+        0
+      ],
       "note": "Right side stretcher, mirror of Str_Left across XMid"
     },
     {
       "body": "Str_Cross",
       "ref": "Str_Left",
       "side": "outside",
-      "direction": [1, 0, 0],
+      "direction": [
+        1,
+        0,
+        0
+      ],
       "note": "Cross stretcher connecting left and right side stretchers at midpoint"
     },
     {
       "body": "TW_SL_FL",
       "ref": "Str_Left",
       "side": "opposite",
-      "direction": [0, 1, 0],
+      "direction": [
+        0,
+        1,
+        0
+      ],
       "note": "Wedge at Str_Left FL end"
     },
     {
       "body": "TW_SL_BL",
       "ref": "Str_Left",
       "side": "outside",
-      "direction": [0, 1, 0],
+      "direction": [
+        0,
+        1,
+        0
+      ],
       "note": "Wedge at Str_Left BL end"
     },
     {
       "body": "TW_SR_0",
       "ref": "Str_Right",
-      "side": "opposite",
-      "direction": [0, 1, 0],
+      "side": "inside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
       "note": "Wedge at Str_Right front end, mirror of TW_SL_FL"
     },
     {
       "body": "TW_SR_1",
       "ref": "Str_Right",
-      "side": "outside",
-      "direction": [0, 1, 0],
+      "side": "inside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
       "note": "Wedge at Str_Right back end, mirror of TW_SL_BL"
     },
     {
       "body": "TW_SC_L",
       "ref": "Str_Cross",
       "side": "opposite",
-      "direction": [1, 0, 0],
+      "direction": [
+        1,
+        0,
+        0
+      ],
       "note": "Wedge at Str_Cross left end"
     },
     {
       "body": "TW_SC_R",
       "ref": "Str_Cross",
       "side": "outside",
-      "direction": [1, 0, 0],
+      "direction": [
+        1,
+        0,
+        0
+      ],
       "note": "Wedge at Str_Cross right end"
     },
     {
       "body": "Spin_0",
       "ref": "Seat",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Leftmost back spindle, base at seat surface"
     },
     {
       "body": "Spin_1",
       "ref": "Seat",
       "side": "outside",
-      "direction": [0, 0, 1]
+      "direction": [
+        0,
+        0,
+        1
+      ]
     },
     {
       "body": "Spin_2",
       "ref": "Seat",
       "side": "outside",
-      "direction": [0, 0, 1]
+      "direction": [
+        0,
+        0,
+        1
+      ]
     },
     {
       "body": "Spin_3",
       "ref": "Seat",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Center spindle"
     },
     {
       "body": "Spin_4",
       "ref": "Seat",
       "side": "outside",
-      "direction": [0, 0, 1]
+      "direction": [
+        0,
+        0,
+        1
+      ]
     },
     {
       "body": "Spin_5",
       "ref": "Seat",
       "side": "outside",
-      "direction": [0, 0, 1]
+      "direction": [
+        0,
+        0,
+        1
+      ]
     },
     {
       "body": "Spin_6",
       "ref": "Seat",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Rightmost back spindle"
     },
     {
       "body": "CrestRail",
       "ref": "Spin_3",
       "side": "outside",
-      "direction": [0, 0, 1],
+      "direction": [
+        0,
+        0,
+        1
+      ],
       "note": "Crest rail swept along top arc, above spindle tops"
+    },
+    {
+      "body": "TW_SR_2",
+      "ref": "Str_Right",
+      "side": "inside",
+      "direction": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "body": "TW_SR_3",
+      "ref": "Str_Right",
+      "side": "inside",
+      "direction": [
+        0,
+        1,
+        0
+      ]
     }
   ]
 }

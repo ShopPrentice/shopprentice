@@ -247,7 +247,7 @@
     {
       "body": "DM_FBR_L_0",
       "ref": "Rail_FrontBot",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,
@@ -269,7 +269,7 @@
     {
       "body": "DM_FTR_L_0",
       "ref": "Rail_FrontTop",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,
@@ -291,7 +291,7 @@
     {
       "body": "DM_BBR_L_0",
       "ref": "Rail_BackBot",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,
@@ -313,7 +313,7 @@
     {
       "body": "DM_BTR_L_0",
       "ref": "Rail_BackTop",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,
@@ -335,7 +335,7 @@
     {
       "body": "DM_LBR_F_0",
       "ref": "Rail_LeftBot",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,
@@ -357,7 +357,7 @@
     {
       "body": "DM_LTR_F_0",
       "ref": "Rail_LeftTop",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,
@@ -379,7 +379,7 @@
     {
       "body": "DM_RBR_F_0",
       "ref": "Rail_RightBot",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,
@@ -401,7 +401,7 @@
     {
       "body": "DM_RTR_F_0",
       "ref": "Rail_RightTop",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,
@@ -434,7 +434,7 @@
     {
       "body": "DM_SlatR_0",
       "ref": "SupRail_Right",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,

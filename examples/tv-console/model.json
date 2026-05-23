@@ -472,7 +472,7 @@
     {
       "body": "LDoor_H_Lo_Leaf",
       "ref": "LeftDoor",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,
@@ -484,7 +484,7 @@
     {
       "body": "LDoor_H_Hi_Leaf",
       "ref": "LeftDoor",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,
@@ -496,7 +496,7 @@
     {
       "body": "RDoor_H_Lo_Leaf",
       "ref": "RightDoor",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,
@@ -508,7 +508,7 @@
     {
       "body": "RDoor_H_Hi_Leaf",
       "ref": "RightDoor",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         0,
         1,

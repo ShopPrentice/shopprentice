@@ -175,7 +175,7 @@
     {
       "body": "left_brace",
       "ref": "post1_upper",
-      "side": "opposite",
+      "side": "outside",
       "direction": [
         0,
         0,
@@ -186,7 +186,7 @@
     {
       "body": "right_brace",
       "ref": "post2_upper",
-      "side": "opposite",
+      "side": "outside",
       "direction": [
         0,
         0,

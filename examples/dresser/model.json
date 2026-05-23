@@ -211,7 +211,7 @@
     {
       "body": "Body5",
       "ref": "Kick_Front",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,
@@ -233,7 +233,7 @@
     {
       "body": "Body7",
       "ref": "Kick_Back",
-      "side": "outside",
+      "side": "opposite",
       "direction": [
         1,
         0,
