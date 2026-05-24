@@ -71,12 +71,22 @@ Stretchers (if present) connect legs at a lower height
 | After top | 9 | Top centered on frame |
 | Final | 9–15 | Zero interferences |
 
+## Apron Placement
+
+**Aprons are flush with the leg outer face.** Each apron sits within the leg's cross-section: front apron at Y=[0, apron_thick] within front leg Y=[0, leg_size]. The apron's outer surface aligns with the leg's outer surface — no setback. This ensures the apron is visible from outside and the domino/tenon interface is hidden inside the leg.
+
+**Front/back aprons run full length** between legs (X direction). **Side aprons are shorter** — they fit between the front and back aprons (Y = apron_thick to table_w - apron_thick). Side aprons connect to the front/back aprons at their ends via dominos.
+
+**Use `sp.mating_bounds()` before placing any domino** to find the actual contact area at the interface. This prevents dominos from landing outside the mating surface.
+
 ## Common Mistakes
 
+- Aprons placed on leg INNER face instead of flush with OUTER face (visible gap between apron and leg)
 - Apron tenons colliding inside the leg (stagger depths or notch tenons)
 - Top glued to aprons across grain direction (causes cracking)
 - Leg taper starting at wrong height (should start below apron, not at floor)
 - Stretcher tenons conflicting with apron tenons inside the same leg
+- Dominos placed without calling `mating_bounds()` first (dominos miss the contact area)
 
 ## Parameter Suggestions
 

@@ -58,8 +58,13 @@ Drawers hang from runners or sit on guides between aprons
 8. Details (leg tapers, edge treatments)
 ```
 
+## Apron Placement (when aprons are present)
+
+**Aprons are flush with the leg outer face** — not set back on the inner face. Front apron at Y=[0, apron_thick] within front leg Y=[0, leg_size]. Side aprons fit between front/back aprons. Always call `sp.mating_bounds()` before placing dominos.
+
 ## Common Mistakes
 
+- Aprons placed on leg INNER face instead of flush with OUTER face (visible gap)
 - Using computer desk depth (28") for a writing desk (should be 16–20")
 - Drawer opening not CUT in front apron (or: forgetting to omit front apron)
 - Top attachment restricting wood movement across width
