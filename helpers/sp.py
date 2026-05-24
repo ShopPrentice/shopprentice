@@ -1503,10 +1503,16 @@ def validate_joint_contact(body_a, body_b, joint_axis=None, tol_cm=0.1):
     overlap_along = min(a_max, b_max) - max(a_min, b_min)
     if overlap_along < -tol_cm:
         gap = -overlap_along
-        print(f"  WARN  Joint contact: {body_a.name} and {body_b.name} "
-              f"have a {gap:.2f} cm gap along {joint_axis} axis. "
-              f"{body_a.name} {joint_axis}=[{a_min:.2f}, {a_max:.2f}], "
-              f"{body_b.name} {joint_axis}=[{b_min:.2f}, {b_max:.2f}]")
+        raise ValueError(
+            f"Joint contact failed: {body_a.name} and {body_b.name} "
+            f"have a {gap:.2f} cm gap along {joint_axis} axis. "
+            f"{body_a.name} {joint_axis}=[{a_min:.2f}, {a_max:.2f}], "
+            f"{body_b.name} {joint_axis}=[{b_min:.2f}, {b_max:.2f}]. "
+            f"FIX: {body_a.name} was likely positioned from origin "
+            f"instead of from {body_b.name}'s geometry. Rebuild the "
+            f"sketch on {body_b.name}'s face or dimension from its "
+            f"projected edges — do NOT change the design to avoid "
+            f"this body.")
 
     # Check perpendicular overlap (bodies must share area in the other 2 axes)
     perp_axes = [ax for ax in all_axes if ax != joint_axis]
@@ -1517,10 +1523,15 @@ def validate_joint_contact(body_a, body_b, joint_axis=None, tol_cm=0.1):
         p_overlap = min(pa_max, pb_max) - max(pa_min, pb_min)
         perp_overlaps[pax] = p_overlap
         if p_overlap < -tol_cm:
-            print(f"  WARN  Joint contact: {body_a.name} and {body_b.name} "
-                  f"don't overlap in {pax} axis — no shared mating area. "
-                  f"{body_a.name} {pax}=[{pa_min:.2f}, {pa_max:.2f}], "
-                  f"{body_b.name} {pax}=[{pb_min:.2f}, {pb_max:.2f}]")
+            raise ValueError(
+                f"Joint contact failed: {body_a.name} and {body_b.name} "
+                f"don't overlap in {pax} axis — no shared mating area. "
+                f"{body_a.name} {pax}=[{pa_min:.2f}, {pa_max:.2f}], "
+                f"{body_b.name} {pax}=[{pb_min:.2f}, {pb_max:.2f}]. "
+                f"FIX: {body_a.name} was likely positioned from origin "
+                f"instead of from {body_b.name}'s geometry. Sketch on "
+                f"the reference body's face and dimension from projected "
+                f"edges — do NOT change the design to avoid this body.")
 
     return {
         "axis": joint_axis,
@@ -2677,6 +2688,55 @@ def validate_deps(ctx, metadata_path=None):
             else:
                 print(f"   OK   {body_name}: ref '{ref_name}' looked up "
                       f"+ geometry read")
+
+    # ── Sketch origin check: non-root bodies should not dimension from origin ──
+    origin_bodies = set(d["body"] for d in deps if d["ref"] == "origin")
+    origin_dim_issues = []
+
+    def _check_sketch_origin(comp, comp_name):
+        for si in range(comp.sketches.count):
+            sk = comp.sketches.item(si)
+            origin_pt = sk.originPoint
+            for di in range(sk.sketchDimensions.count):
+                dim = sk.sketchDimensions.item(di)
+                try:
+                    e1 = dim.entityOne
+                    e2 = dim.entityTwo
+                    uses_origin = False
+                    if hasattr(e1, 'geometry') and hasattr(origin_pt, 'geometry'):
+                        if (abs(e1.geometry.x - origin_pt.geometry.x) < 0.001 and
+                            abs(e1.geometry.y - origin_pt.geometry.y) < 0.001):
+                            uses_origin = True
+                    if hasattr(e2, 'geometry') and hasattr(origin_pt, 'geometry'):
+                        if (abs(e2.geometry.x - origin_pt.geometry.x) < 0.001 and
+                            abs(e2.geometry.y - origin_pt.geometry.y) < 0.001):
+                            uses_origin = True
+                    if uses_origin:
+                        expr = dim.parameter.expression if dim.parameter else "?"
+                        origin_dim_issues.append(
+                            f"{comp_name}/{sk.name}: dim '{expr}' "
+                            f"references sketch origin")
+                except Exception:
+                    pass
+
+    for j in range(ctx.root.occurrences.count):
+        occ = ctx.root.occurrences.item(j)
+        comp = occ.component
+        comp_bodies_in = set()
+        for bi in range(comp.bRepBodies.count):
+            comp_bodies_in.add(comp.bRepBodies.item(bi).name)
+        has_root_body = bool(comp_bodies_in & origin_bodies)
+        if not has_root_body:
+            _check_sketch_origin(comp, comp.name)
+
+    if origin_dim_issues:
+        print("--- Sketch origin check ---")
+        for issue in origin_dim_issues[:10]:
+            print(f"  WARN  {issue}")
+        if len(origin_dim_issues) > 10:
+            print(f"         ... and {len(origin_dim_issues) - 10} more")
+        print(f"  Non-root sketches should dimension from projected "
+              f"reference geometry, not sketch origin.")
 
     # ── Completeness check: are all design bodies tracked? ──
     import fnmatch as _fnmatch

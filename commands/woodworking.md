@@ -361,6 +361,31 @@ This replaces `probe_sketch_axes` and `probe_sketch_signs` — it returns the or
 
 **During design-first planning, audit every sketch plane:** for each sketch in the plan, ask "does a body face already exist here?" If yes, use it. Only reach for a construction plane if one of the four exceptions above applies. Fewer construction planes = cleaner timeline, faster recompute, and geometry that moves parametrically with the body it belongs to.
 
+**Dimension from reference geometry, never from sketch origin (MANDATORY for non-root bodies):**
+Every non-root body's sketch position must be anchored to the reference body's geometry — not to the sketch origin (`sk.originPoint`). The sketch origin maps to the world origin; dimensioning from it encodes absolute position and breaks when the reference body moves.
+
+**Correct pattern:** Project a reference body edge or point into the sketch, then dimension all geometry from that projected point:
+```python
+# Apron sketch on leg's inner face — position anchored to leg
+leg_face = sp.find_face(leg_fl, "y", +1)  # leg inner face
+sk = apron_c.sketches.add(leg_face)
+# Project leg top edge for Z reference
+top_edge = [e for e in leg_face.edges if ...][0]
+proj = sk.project(top_edge)
+# Dimension apron rectangle from projected edge, NOT from sk.originPoint
+d.addDistanceDimension(proj_point, rect_corner, V, ...).parameter.expression = "apron_h"
+```
+
+**Wrong pattern (origin-based):**
+```python
+# Apron on construction plane — position from sketch origin = world origin
+sk = apron_c.sketches.add(construction_plane)
+d.addDistanceDimension(sk.originPoint, rect_corner, H, ...).parameter.expression = "leg_size"
+# ↑ "leg_size" is distance from world origin — origin-based positioning
+```
+
+The root body (ref=origin) is exempt — it legitimately dimensions from the sketch origin. All other bodies must anchor to their reference body's geometry. `validate_deps` checks for this: non-root sketches with dimensions from `sk.originPoint` are flagged.
+
 ### Sketch + Extrude Workflow
 
 ```python
