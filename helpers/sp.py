@@ -2460,6 +2460,13 @@ def validate_deps(ctx, metadata_path=None):
     print(f"\n=== Dependency tree ({len(deps)} relationships) ===")
     all_ok = True
 
+    origin_refs = [d["body"] for d in deps if d["ref"] == "origin"]
+    if len(origin_refs) > 1:
+        print(f"  FAIL  {len(origin_refs)} bodies reference origin "
+              f"(only 1 allowed): {origin_refs}")
+        print(f"         Chain other bodies off the first one instead.")
+        all_ok = False
+
     for entry in deps:
         body_name = entry["body"]
         ref_name = entry["ref"]
