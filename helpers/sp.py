@@ -1286,8 +1286,9 @@ def classify_bodies(bodies, reference, direction=None):
 def mating_bounds(body_a, body_b, normal_axis, tol=0.1):
     """Compute the contact area between two bodies at their shared interface.
 
-    Returns None with a printed warning if preconditions aren't met
-    (gap, overlap, or no shared area), so the script can continue.
+    Raises ValueError if bodies are gapped, overlapping, or have no shared
+    area — this is a computation, not a validation. The caller needs the
+    result to position geometry, so failing early is correct.
 
     Args:
         body_a, body_b: The two mating bodies.
@@ -1295,7 +1296,7 @@ def mating_bounds(body_a, body_b, normal_axis, tol=0.1):
         tol: Contact tolerance in cm (default 0.1 = 1mm).
 
     Returns:
-        dict with overlap bounds, or None if preconditions fail.
+        dict with overlap bounds in model coordinates (cm).
     """
     bb_a = body_a.boundingBox
     bb_b = body_b.boundingBox
@@ -1309,21 +1310,19 @@ def mating_bounds(body_a, body_b, normal_axis, tol=0.1):
 
     if normal_overlap < -tol:
         gap = -normal_overlap
-        print(
-            f"WARNING mating_bounds: {body_a.name} and {body_b.name} have a "
+        raise ValueError(
+            f"mating_bounds: {body_a.name} and {body_b.name} have a "
             f"{gap:.2f} cm gap along {normal_axis} axis — not in contact. "
             f"{body_a.name} {normal_axis}=[{n_a_lo:.2f}, {n_a_hi:.2f}], "
             f"{body_b.name} {normal_axis}=[{n_b_lo:.2f}, {n_b_hi:.2f}].")
-        return None
 
     if normal_overlap > tol:
-        print(
-            f"WARNING mating_bounds: {body_a.name} and {body_b.name} overlap "
+        raise ValueError(
+            f"mating_bounds: {body_a.name} and {body_b.name} overlap "
             f"by {normal_overlap:.2f} cm along {normal_axis} axis — "
             f"penetrating. "
             f"{body_a.name} {normal_axis}=[{n_a_lo:.2f}, {n_a_hi:.2f}], "
             f"{body_b.name} {normal_axis}=[{n_b_lo:.2f}, {n_b_hi:.2f}].")
-        return None
 
     para_axes = [ax for ax in ('x', 'y', 'z') if ax != normal_axis]
 
@@ -1338,12 +1337,11 @@ def mating_bounds(body_a, body_b, normal_axis, tol=0.1):
         hi = min(a_hi, b_hi)
 
         if lo >= hi:
-            print(
-                f"WARNING mating_bounds: {body_a.name} and {body_b.name} "
-                f"have no overlap in {ax} axis — no shared mating surface. "
+            raise ValueError(
+                f"mating_bounds: {body_a.name} and {body_b.name} have no "
+                f"overlap in {ax} axis — no shared mating surface. "
                 f"{body_a.name} {ax}=[{a_lo:.2f}, {a_hi:.2f}], "
                 f"{body_b.name} {ax}=[{b_lo:.2f}, {b_hi:.2f}].")
-            return None
 
         result[f'{ax}_min'] = lo
         result[f'{ax}_max'] = hi
