@@ -528,6 +528,53 @@ class TestExecutionQueue(unittest.TestCase):
         self.assertIsNot(new_sm._execution_queue, old_q)
 
 
+class TestReinitializeResumesSession(unittest.TestCase):
+    """Verify that re-sending initialize with an existing session ID
+    resumes the session instead of creating a new one."""
+
+    def setUp(self):
+        SessionManager.reset()
+        self.sm = SessionManager.instance()
+        self.sm._subscribe_document_events = lambda: None
+
+    def test_reinitialize_preserves_document_binding(self):
+        sid = self.sm.create_session()
+        doc = _make_doc("MyProject")
+        self.sm.bind_document(sid, doc)
+
+        session = self.sm.get_session(sid)
+        self.assertEqual(session.document_name, "MyProject")
+        doc_key = session.doc_key
+
+        # Simulate reconnect: get_session with existing ID should find it
+        resumed = self.sm.get_session(sid)
+        self.assertIsNotNone(resumed)
+        self.assertEqual(resumed.document_name, "MyProject")
+        self.assertEqual(resumed.doc_key, doc_key)
+
+    def test_reinitialize_reactivates_orphaned_session(self):
+        sid = self.sm.create_session()
+        doc = _make_doc("MyProject")
+        self.sm.bind_document(sid, doc)
+        self.sm.mark_orphaned(sid)
+
+        session = self.sm.get_session(sid)
+        self.assertEqual(session.status, "orphaned")
+
+        # After setting status back to active (as the mcp_server fix does)
+        session.status = "active"
+        self.assertEqual(session.status, "active")
+        self.assertEqual(session.document_name, "MyProject")
+
+    def test_no_duplicate_session_on_reinitialize(self):
+        sid = self.sm.create_session()
+        initial_count = len(self.sm.list_sessions())
+
+        # get_session with existing ID should NOT create a new session
+        self.sm.get_session(sid)
+        self.assertEqual(len(self.sm.list_sessions()), initial_count)
+
+
 class TestDocGone(unittest.TestCase):
 
     def setUp(self):
