@@ -85,6 +85,12 @@ class SimpleMCPServer:
 
             if method == "initialize":
                 sm = SessionManager.instance()
+                existing = sm.get_session(session_id) if session_id else None
+                if existing:
+                    existing.status = "active"
+                    resp = self._handle_initialize(request_id, params)
+                    app.log(f"[session] reinitialize — resumed {session_id[:8]}")
+                    return resp, session_id
                 new_sid = sm.create_session()
                 resp = self._handle_initialize(request_id, params)
                 return resp, new_sid
