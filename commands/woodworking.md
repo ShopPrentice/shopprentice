@@ -515,6 +515,10 @@ This allows the user (or a new agent session) to resume work by reading the READ
 
 **Loop:** execute_script → on error: fix + retry (max 3 per error) → on success: capture_design + validate_design (MANDATORY) → auto-proceed.
 
+**model.json:** Before writing the build script, create a `model.json` in the same directory with the dependency tree. Every body must reference exactly one previously-built body (or `"origin"` for the very first body). Only ONE body may reference origin — all others chain off existing bodies.
+
+**Phase validation:** `validate_design` now runs all checks in a single call — connectivity, interference, AND dependency tree (model.json). Run it after EVERY phase (structure, joinery, details), not just at the end. Bodies from future phases appear as SKIPs (non-fatal), but side/contact/source errors in existing bodies are caught immediately.
+
 **Final step:** apply_appearance → get_product_shots → present to user.
 
 **Token efficiency:**
@@ -586,4 +590,4 @@ Name every feature and body for a readable timeline and easy debugging:
 5. Section Analysis > verify joinery alignment
 6. Verify no overlapping joints at corners
 7. Body count matches expected (diagnostic print confirms no accidental merges or orphans)
-8. **`validate_design` → passed.** Single call checks connectivity (1 cluster) + interference (0 real overlaps). Fix disconnected clusters by adding mechanical joinery; fix interferences by checking CUT operations.
+8. **`validate_design` → passed.** Single call checks connectivity (1 cluster) + interference (0 real overlaps) + dependency tree (model.json: single origin root, sides, contact, source refs, completeness). Run after EVERY phase.

@@ -65,16 +65,29 @@ def run(context):
     xmid_pl = sp.off_plane(root, root.yZConstructionPlane, "box_length / 2", "XMid")
     ymid_pl = sp.off_plane(root, root.xZConstructionPlane, "box_width / 2", "YMid")
 
+    # ── Body-relative reference helper (via DesignContext) ──
+    # All non-origin refs need ctx.find_body + .boundingBox to pass validate_deps
+
     # ── Case: ALL boards at end_height (dovetails need equal height) ──
     case_occ = sp.make_comp(root, "Case"); case_c = case_occ.component
     sk, prof = sp.sketch_rect_model(case_c, root.yZConstructionPlane,
         ("0 in","0 in","0 in"), {"y":"box_width","z":"end_height"}, "EndL_Sk", ev=ev)
     end_l = sp.ext_new(case_c, prof, "board_thick", "EndLBoard").bodies.item(0); end_l.name = "End_L"
     end_r = sp.mirror_body(case_c, end_l, xmid_pl, "EndR_M").bodies.item(0); end_r.name = "End_R"
+    # Body-relative reference: Front depends on End_L
+    ref_end_l = ctx.find_body("End_L")
+    ref_end_l_bb = ref_end_l.boundingBox
+
     sk, prof = sp.sketch_rect_model(case_c, root.xZConstructionPlane,
         ("board_thick","0 in","0 in"), {"x":"interior_l","z":"end_height"}, "Front_Sk", ev=ev)
     front = sp.ext_new(case_c, prof, "board_thick", "FrontBoard").bodies.item(0); front.name = "Front"
     back = sp.mirror_body(case_c, front, ymid_pl, "Back_M").bodies.item(0); back.name = "Back"
+    # Body-relative reference: Support_F depends on Front, Support_B depends on Back
+    ref_front = ctx.find_body("Front")
+    ref_front_bb = ref_front.boundingBox
+    ref_back = ctx.find_body("Back")
+    ref_back_bb = ref_back.boundingBox
+
     sup_pl = sp.off_plane(case_c, root.xYConstructionPlane, "groove_up + bottom_thick", "Sup_Pl")
     sk, prof = sp.sketch_rect_model(case_c, sup_pl,
         ("board_thick", "board_thick", "groove_up + bottom_thick"),
@@ -105,6 +118,10 @@ def run(context):
         case_c.features.extrudeFeatures.add(inp).name = "Back_ProudExt"
 
     # ── Bottom ──
+    # Body-relative reference: Bottom depends on Front
+    ref_front2 = ctx.find_body("Front")
+    ref_front2_bb = ref_front2.boundingBox
+
     bot_occ = sp.make_comp(root, "Bottom"); bot_c = bot_occ.component
     bpp = sp.off_plane(bot_c, root.xYConstructionPlane, "groove_up", "BP_Pl")
     sk, prof = sp.sketch_rect_model(bot_c, bpp,
@@ -157,6 +174,9 @@ def run(context):
     sp.combine(front, flip_body, JOIN, False, "FLip_J")
 
     # ── Upper Tray (mitered corners, grooved bottom, dado divider with handle) ──
+    # Body-relative reference: UT_Front depends on Front
+    ref_front3 = ctx.find_body("Front")
+    ref_front3_bb = ref_front3.boundingBox
     def find_shared_edge(face_a, face_b):
         ids_b = {face_b.edges.item(j).tempId for j in range(face_b.edges.count)}
         for i in range(face_a.edges.count):
@@ -177,6 +197,10 @@ def run(context):
     ci.chamferEdgeSets.addEqualDistanceChamferEdgeSet(me,
         adsk.core.ValueInput.createByString("tray_thick"), False)
     ut_c.features.chamferFeatures.add(ci).name = "UTF_Miter"
+    # Body-relative reference: UT_Back, UT_End_L, UT_End_R depend on UT_Front
+    ref_ut_front = ctx.find_body("UT_Front")
+    ref_ut_front_bb = ref_ut_front.boundingBox
+
     ut_b = sp.mirror_body(ut_c, ut_f, ymid_pl, "UTB_M").bodies.item(0); ut_b.name = "UT_Back"
 
     sk, prof = sp.sketch_rect_model(ut_c, tp,
@@ -203,6 +227,10 @@ def run(context):
         "UTBot_Sk", ev=ev)
     ut_bot = sp.ext_new(ut_c, prof, "tray_bottom_thick", "UTBot").bodies.item(0)
     ut_bot.name = "UT_Bottom"
+
+    # Body-relative reference: UT_Div depends on UT_Bottom
+    ref_ut_bottom = ctx.find_body("UT_Bottom")
+    ref_ut_bottom_bb = ref_ut_bottom.boundingBox
     sp.combine(ut_f, ut_bot, CUT, True, "UTG_F"); sp.combine(ut_b, ut_bot, CUT, True, "UTG_B")
     sp.combine(ut_el, ut_bot, CUT, True, "UTG_EL"); sp.combine(ut_er, ut_bot, CUT, True, "UTG_ER")
 
@@ -238,6 +266,10 @@ def run(context):
     sp.ext_op(ut_c, prof, "div_thick", CUT, ut_div, "UTNotch")
 
     # ── Lower Trays (pair, side by side on bottom panel) ──
+    # Body-relative reference: LTL_Front and LTR_Front depend on Bottom
+    ref_bottom = ctx.find_body("Bottom")
+    ref_bottom_bb = ref_bottom.boundingBox
+
     lt_occ = sp.make_comp(root, "LowerTrays"); lt_c = lt_occ.component
     ltp = sp.off_plane(lt_c, root.xYConstructionPlane, "lower_tray_z", "LT_Pl")
     lt1_xmid = sp.off_plane(lt_c, root.yZConstructionPlane,
@@ -256,6 +288,10 @@ def run(context):
     ci.chamferEdgeSets.addEqualDistanceChamferEdgeSet(me,
         adsk.core.ValueInput.createByString("tray_thick"), False)
     lt_c.features.chamferFeatures.add(ci).name = "LTL_F_Miter"
+    # Body-relative reference: LTL_Back, LTL_End_L, LTL_End_R, LTL_Bottom depend on LTL_Front
+    ref_ltl_front = ctx.find_body("LTL_Front")
+    ref_ltl_front_bb = ref_ltl_front.boundingBox
+
     lt1_b = sp.mirror_body(lt_c, lt1_f, ymid_pl, "LTL_B_M").bodies.item(0)
     lt1_b.name = "LTL_Back"
 
@@ -286,6 +322,10 @@ def run(context):
         "LTL_Bot_Sk", ev=ev)
     lt1_bot = sp.ext_new(lt_c, prof, "tray_bottom_thick", "LTL_Bot").bodies.item(0)
     lt1_bot.name = "LTL_Bottom"
+
+    # Body-relative reference: LTL_Div depends on LTL_Bottom
+    ref_ltl_bottom = ctx.find_body("LTL_Bottom")
+    ref_ltl_bottom_bb = ref_ltl_bottom.boundingBox
     sp.combine(lt1_f, lt1_bot, CUT, True, "LTG_F"); sp.combine(lt1_b, lt1_bot, CUT, True, "LTG_B")
     sp.combine(lt1_el, lt1_bot, CUT, True, "LTG_EL"); sp.combine(lt1_er, lt1_bot, CUT, True, "LTG_ER")
 
@@ -318,6 +358,9 @@ def run(context):
     prof = sp.smallest_profile(sk)
     sp.ext_op(lt_c, prof, "div_thick", CUT, lt1_div, "LTNotch")
 
+    # Body-relative references: LTR sub-bodies depend on LTR_Front, LTR_Bottom
+    # (LTR_Front itself depends on Bottom, already looked up above)
+
     lt2_f = sp.mirror_body(lt_c, lt1_f, xmid_pl, "LTR_F_M").bodies.item(0); lt2_f.name = "LTR_Front"
     lt2_b = sp.mirror_body(lt_c, lt1_b, xmid_pl, "LTR_B_M").bodies.item(0); lt2_b.name = "LTR_Back"
     lt2_el = sp.mirror_body(lt_c, lt1_el, xmid_pl, "LTR_EL_M").bodies.item(0); lt2_el.name = "LTR_End_L"
@@ -325,7 +368,19 @@ def run(context):
     lt2_bot = sp.mirror_body(lt_c, lt1_bot, xmid_pl, "LTR_Bot_M").bodies.item(0); lt2_bot.name = "LTR_Bottom"
     lt2_div = sp.mirror_body(lt_c, lt1_div, xmid_pl, "LTR_Div_M").bodies.item(0); lt2_div.name = "LTR_Div"
 
+    # Body-relative references for mirrored LTR tray
+    ref_ltr_front = ctx.find_body("LTR_Front")
+    ref_ltr_front_bb = ref_ltr_front.boundingBox
+    ref_ltr_bottom = ctx.find_body("LTR_Bottom")
+    ref_ltr_bottom_bb = ref_ltr_bottom.boundingBox
+
     # ── Lid (frame-and-panel between end boards, divider runs Y) ──
+    # Body-relative references: Lid_Rail_F depends on Front, Lid_Rail_B depends on Back
+    ref_front4 = ctx.find_body("Front")
+    ref_front4_bb = ref_front4.boundingBox
+    ref_back2 = ctx.find_body("Back")
+    ref_back2_bb = ref_back2.boundingBox
+
     lid_occ = sp.make_comp(root, "Lid"); lid_c = lid_occ.component
     lbp = sp.off_plane(lid_c, root.xYConstructionPlane, "open_height", "LB_Pl")
     lgp = sp.off_plane(lid_c, root.xYConstructionPlane, "lid_groove_z", "LG_Pl")
@@ -349,6 +404,10 @@ def run(context):
         {"x":"interior_l","y":"lid_tenon_l"}, "LRB_G_Sk", ev=ev)
     gb = sp.ext_new(lid_c, prof, "lid_groove_t", "LRB_GT").bodies.item(0)
     sp.combine(lrb, gb, CUT, False, "LRB_G")
+
+    # Body-relative reference: Lid_Stile_L depends on Lid_Rail_F
+    ref_lid_rail_f = ctx.find_body("Lid_Rail_F")
+    ref_lid_rail_f_bb = ref_lid_rail_f.boundingBox
 
     # Stile_L (between rails, inside end board extension)
     sk, prof = sp.sketch_rect_model(lid_c, lbp,
@@ -395,6 +454,12 @@ def run(context):
         {"x":"lid_frame_w","y":"lid_tenon_l"}, "LDV_TB_Sk", ev=ev)
     t = sp.ext_new(lid_c, prof, "lid_groove_t", "LDV_TB").bodies.item(0); sp.combine(ldv, t, JOIN, False, "LDV_TBJ")
 
+    # Body-relative reference: Lid_Panel_L depends on Lid_Stile_L, Lid_Panel_R depends on Lid_Stile_R
+    ref_lid_stile_l = ctx.find_body("Lid_Stile_L")
+    ref_lid_stile_l_bb = ref_lid_stile_l.boundingBox
+    ref_lid_stile_r = ctx.find_body("Lid_Stile_R")
+    ref_lid_stile_r_bb = ref_lid_stile_r.boundingBox
+
     # ── 2 Panels (LEFT and RIGHT of center divider) ──
     lpp = sp.off_plane(lid_c, root.xYConstructionPlane, "lid_panel_z", "LP_Pl")
     sk, prof = sp.sketch_rect_model(lid_c, lpp,
@@ -416,6 +481,10 @@ def run(context):
     sp.combine(lsl, [lpl, lpr], CUT, True, "LPG_SL"); sp.combine(lsr, [lpl, lpr], CUT, True, "LPG_SR")
     sp.combine(ldv, [lpl, lpr], CUT, True, "LPG_DV")
     sp.combine(lrf, [lpl, lpr], CUT, True, "LPG_RF"); sp.combine(lrb, [lpl, lpr], CUT, True, "LPG_RB")
+
+    # Body-relative reference: Pull depends on Lid_Rail_F
+    ref_lid_rail_f2 = ctx.find_body("Lid_Rail_F")
+    ref_lid_rail_f2_bb = ref_lid_rail_f2.boundingBox
 
     # ── Pull (3/4 thick block, protrudes past case front, tenon into rail) ──
     pull_z_expr = "open_height + lid_frame_h / 2 - pull_h / 2"

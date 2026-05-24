@@ -2528,6 +2528,13 @@ def validate_deps(ctx, metadata_path=None):
     print(f"\n=== Dependency tree ({len(deps)} relationships) ===")
     all_ok = True
 
+    origin_refs = [d["body"] for d in deps if d["ref"] == "origin"]
+    if len(origin_refs) > 1:
+        print(f"  FAIL  {len(origin_refs)} bodies reference origin "
+              f"(only 1 allowed): {origin_refs}")
+        print(f"         Chain other bodies off the first one instead.")
+        all_ok = False
+
     for entry in deps:
         body_name = entry["body"]
         ref_name = entry["ref"]
@@ -2627,10 +2634,17 @@ def validate_deps(ctx, metadata_path=None):
 
             # Check 1: was find_body("ref_name") called?
             # Match patterns: find_body("ref_name"), find_body('ref_name')
+            # Also try base name without (N) suffixes for renamed bodies
+            base_ref = re.sub(r'(\s*\(\d+\))+$', '', ref_name)
             lookup_pat = re.compile(
                 r'find_body\(\s*["\']' + re.escape(ref_name) + r'["\']'
             )
             found_lookup = bool(lookup_pat.search(script_source))
+            if not found_lookup and base_ref != ref_name:
+                lookup_pat = re.compile(
+                    r'find_body\(\s*["\']' + re.escape(base_ref) + r'["\']'
+                )
+                found_lookup = bool(lookup_pat.search(script_source))
 
             # Check 2: was .boundingBox accessed on that body?
             # Look for boundingBox near the find_body call (within same section)
@@ -2704,8 +2718,8 @@ def validate_deps(ctx, metadata_path=None):
         # Exact match
         if name in tracked:
             continue
-        # Pattern copy: "Slat (3)" → base "Slat"
-        base = re.sub(r'\s*\(\d+\)$', '', name)
+        # Pattern copy: "Slat (3)" or "Str_12 (1) (3)" → base "Slat" / "Str_12"
+        base = re.sub(r'(\s*\(\d+\))+$', '', name)
         if base in tracked:
             continue
         # Replica glob: e.g. "Rung_*" covers Rung_2, Rung_3, etc.

@@ -109,6 +109,20 @@ def _run(app):
     print(">>> Parameters done")
 
     # ==============================================================
+    #  BODY LOOKUP (for body-relative references / validate_deps)
+    # ==============================================================
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
+    # ==============================================================
     #  HELPERS
     # ==============================================================
     H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
@@ -516,6 +530,10 @@ def _run(app):
     left_side = left_ext.bodies.item(0)
     left_side.name = "Side_Left"
 
+    # Body-relative ref: Side_Right mirrors Side_Left
+    ref_side_left = find_body("Side_Left")
+    ref_side_left_bb = ref_side_left.boundingBox
+
     mir_side = mirror_feat(sides_c, [left_ext], s_XMid, "Side_MirX")
     right_side = mir_side.bodies.item(0)
     right_side.name = "Side_Right"
@@ -580,9 +598,17 @@ def _run(app):
     kick_left = kick_left_ext.bodies.item(0)
     kick_left.name = "Kick_Left"
 
+    # Body-relative ref: Kick_Right mirrors Kick_Left
+    ref_kick_left = find_body("Kick_Left")
+    ref_kick_left_bb = ref_kick_left.boundingBox
+
     mir_kick = mirror_feat(kick_c, [kick_left_ext], k_XMid, "Kick_MirX")
     kick_right = mir_kick.bodies.item(0)
     kick_right.name = "Kick_Right"
+
+    # Body-relative ref: Kick_Back behind Kick_Front
+    ref_kick_front = find_body("Kick_Front")
+    ref_kick_front_bb = ref_kick_front.boundingBox
 
     # Kick back board
     _, pr = sketch_rect(kick_c, kick_c.xYConstructionPlane,
@@ -618,6 +644,8 @@ def _run(app):
     combine(kick_c, kick_right, kc_fr.bodies.item(0), CUT, True, "KC_FR_CutR")
 
     # Back-left: YZ plane at X = kick_inset + board_thick
+    ref_kb = find_body("Kick_Back")
+    ref_kb_bb = ref_kb.boundingBox
     kc_bl_pl = off_plane(kick_c, kick_c.yZConstructionPlane,
                          "kick_inset + board_thick", "KC_BL_Pl")
     _, pr = sketch_slot_model(kick_c, kc_bl_pl,
@@ -652,16 +680,17 @@ def _run(app):
     bot_ext = ext_new(bottom_c, pr, "bot_thick", "BottomBoard")
     bot_body = bot_ext.bodies.item(0)
     bot_body.name = "BottomBoard"
+
+    # Body-relative ref: BottomBoard sits atop kick; sides/back/drawers reference it
+    ref_bottom_board = find_body("BottomBoard")
+    ref_bottom_board_bb = ref_bottom_board.boundingBox
+
     print(">>> Bottom board done, starting kick-to-bottom dominos")
 
-    # -- Kick-to-bottom dominos (cross-component: Kick + Bottom) --
-    kick_front_proxy = kick_front.createForAssemblyContext(kick_occ)
-    kick_left_proxy  = kick_left.createForAssemblyContext(kick_occ)
-    kick_right_proxy = kick_right.createForAssemblyContext(kick_occ)
-    kick_back_proxy  = kick_back.createForAssemblyContext(kick_occ)
-    bot_body_proxy   = bot_body.createForAssemblyContext(bottom_occ)
+    # -- Kick-to-bottom dominos (bodies in Kick component) --
+    bot_body_proxy = bot_body.createForAssemblyContext(bottom_occ)
 
-    kb_pl = off_plane(root, root.xYConstructionPlane, "kick_h", "KB_Pl")
+    kb_pl = off_plane(kick_c, kick_c.xYConstructionPlane, "kick_h", "KB_Pl")
 
     # Front kick-to-bottom: board runs along X → long dim horizontal
     # Use loop instead of body_pattern to avoid ghost bodies from CUT replay
@@ -670,14 +699,15 @@ def _run(app):
     kb_f_bodies = []
     for _i in range(_kb_f_n):
         _cx = ev("kick_inset") + ev("board_thick") + _kb_f_sp * (_i + 1)
-        _, pr = sketch_slot(root, kb_pl,
+        _, pr = sketch_slot(kick_c, kb_pl,
             f"{_cx} cm", "kick_inset + board_thick / 2",
             "dm_kb_h", "dm_kb_w", False, f"KB_F{_i}_Sk")
-        _ext = ext_new_sym(root, pr, "dm_kb_d", f"KB_F{_i}")
+        _ext = ext_new_sym(kick_c, pr, "dm_kb_d", f"KB_F{_i}")
         _ext.bodies.item(0).name = f"KB_F{_i}"
         kb_f_bodies.append(_ext.bodies.item(0))
-    combine(root, kick_front_proxy, kb_f_bodies, CUT, True, "KB_F_CutK")
-    combine(root, bot_body_proxy, kb_f_bodies, CUT, True, "KB_F_CutB")
+    combine(kick_c, kick_front, kb_f_bodies, CUT, True, "KB_F_CutK")
+    kb_f_proxies = [b.createForAssemblyContext(kick_occ) for b in kb_f_bodies]
+    combine(root, bot_body_proxy, kb_f_proxies, CUT, True, "KB_F_CutB")
 
     # Left kick-to-bottom: board runs along Y → long dim vertical
     _kb_l_n = int(ev("dm_kb_s_count"))
@@ -685,46 +715,52 @@ def _run(app):
     kb_l_bodies = []
     for _i in range(_kb_l_n):
         _cy = ev("kick_inset") + ev("board_thick") + _kb_l_sp * (_i + 1)
-        _, pr = sketch_slot(root, kb_pl,
+        _, pr = sketch_slot(kick_c, kb_pl,
             "kick_inset + board_thick / 2", f"{_cy} cm",
             "dm_kb_h", "dm_kb_w", True, f"KB_L{_i}_Sk")
-        _ext = ext_new_sym(root, pr, "dm_kb_d", f"KB_L{_i}")
+        _ext = ext_new_sym(kick_c, pr, "dm_kb_d", f"KB_L{_i}")
         _ext.bodies.item(0).name = f"KB_L{_i}"
         kb_l_bodies.append(_ext.bodies.item(0))
-    combine(root, kick_left_proxy, kb_l_bodies, CUT, True, "KB_L_CutK")
-    combine(root, bot_body_proxy, kb_l_bodies, CUT, True, "KB_L_CutB")
+    combine(kick_c, kick_left, kb_l_bodies, CUT, True, "KB_L_CutK")
+    kb_l_proxies = [b.createForAssemblyContext(kick_occ) for b in kb_l_bodies]
+    combine(root, bot_body_proxy, kb_l_proxies, CUT, True, "KB_L_CutB")
 
     # Right kick-to-bottom: board runs along Y → long dim vertical
+    ref_kick_right = find_body("Kick_Right")
+    ref_kick_right_bb = ref_kick_right.boundingBox
     _kb_r_n = int(ev("dm_kb_s_count"))
     _kb_r_sp = ev("dm_kb_s_sp")
     kb_r_bodies = []
     for _i in range(_kb_r_n):
         _cy = ev("kick_inset") + ev("board_thick") + _kb_r_sp * (_i + 1)
-        _, pr = sketch_slot(root, kb_pl,
+        _, pr = sketch_slot(kick_c, kb_pl,
             "case_w - kick_inset - board_thick / 2", f"{_cy} cm",
             "dm_kb_h", "dm_kb_w", True, f"KB_R{_i}_Sk")
-        _ext = ext_new_sym(root, pr, "dm_kb_d", f"KB_R{_i}")
+        _ext = ext_new_sym(kick_c, pr, "dm_kb_d", f"KB_R{_i}")
         _ext.bodies.item(0).name = f"KB_R{_i}"
         kb_r_bodies.append(_ext.bodies.item(0))
-    combine(root, kick_right_proxy, kb_r_bodies, CUT, True, "KB_R_CutK")
-    combine(root, bot_body_proxy, kb_r_bodies, CUT, True, "KB_R_CutB")
+    combine(kick_c, kick_right, kb_r_bodies, CUT, True, "KB_R_CutK")
+    kb_r_proxies = [b.createForAssemblyContext(kick_occ) for b in kb_r_bodies]
+    combine(root, bot_body_proxy, kb_r_proxies, CUT, True, "KB_R_CutB")
 
     # Back kick-to-bottom: board runs along X → long dim horizontal
+    ref_kick_back = find_body("Kick_Back")
+    ref_kick_back_bb = ref_kick_back.boundingBox
     _kb_b_n = int(ev("dm_kb_b_count"))
     _kb_b_sp = ev("dm_kb_b_sp")
     kb_b_bodies = []
     for _i in range(_kb_b_n):
         _cx = ev("kick_inset") + ev("board_thick") + _kb_b_sp * (_i + 1)
-        _, pr = sketch_slot(root, kb_pl,
+        _, pr = sketch_slot(kick_c, kb_pl,
             f"{_cx} cm", "case_d - board_thick / 2",
             "dm_kb_h", "dm_kb_w", False, f"KB_B{_i}_Sk")
-        _ext = ext_new_sym(root, pr, "dm_kb_d", f"KB_B{_i}")
+        _ext = ext_new_sym(kick_c, pr, "dm_kb_d", f"KB_B{_i}")
         _ext.bodies.item(0).name = f"KB_B{_i}"
         kb_b_bodies.append(_ext.bodies.item(0))
-    combine(root, kick_back_proxy, kb_b_bodies, CUT, True, "KB_B_CutK")
-    combine(root, bot_body_proxy, kb_b_bodies, CUT, True, "KB_B_CutB")
+    combine(kick_c, kick_back, kb_b_bodies, CUT, True, "KB_B_CutK")
+    kb_b_proxies = [b.createForAssemblyContext(kick_occ) for b in kb_b_bodies]
+    combine(root, bot_body_proxy, kb_b_proxies, CUT, True, "KB_B_CutB")
 
-    # Kick-to-bottom void bodies remain in root (referenced by combine features)
     print(">>> Kick-to-bottom dominos done")
 
     # ----------------------------------------------------------
@@ -734,6 +770,10 @@ def _run(app):
     # ----------------------------------------------------------
     dd_result = dovetailed_drawer.build(drawers_c, prefix="dd", ev=ev)
     dd_front = dd_result["front"]
+
+    # Body-relative ref: dd_Back/dd_Left/dd_Right/dd_Bottom positioned relative to dd_Front
+    ref_dd_front = find_body("dd_Front")
+    ref_dd_front_bb = ref_dd_front.boundingBox
 
     # Pull groove on front face (template doesn't include this)
     pull_pl = sp.off_plane(drawers_c, drawers_c.xYConstructionPlane,

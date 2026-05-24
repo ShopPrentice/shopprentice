@@ -27,11 +27,25 @@ CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
 
+def find_body(name, comp=None):
+    c = comp or _root_comp
+    for i in range(c.bRepBodies.count):
+        if c.bRepBodies.item(i).name == name:
+            return c.bRepBodies.item(i)
+    for j in range(c.occurrences.count):
+        r = find_body(name, c.occurrences.item(j).component)
+        if r:
+            return r
+    return None
+
+
 def run(context):
     app = adsk.core.Application.get()
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root = design.rootComponent
+    global _root_comp
+    _root_comp = root
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
     ev = lambda e: (params.itemByName(e).value if params.itemByName(e)
@@ -133,6 +147,10 @@ def run(context):
     front = front_ext.bodies.item(0)
     front.name = "Front"
 
+    # Body-relative reference: Back depends on Front
+    ref_front = find_body("Front")
+    ref_front_bb = ref_front.boundingBox
+
     # Back board
     back_pl = sp.off_plane(case_c, case_c.xZConstructionPlane,
                             "case_d - board_thick", "Back_Pl")
@@ -148,6 +166,10 @@ def run(context):
     x_mid = sp.off_plane(case_c, case_c.yZConstructionPlane, "mid_x", "XMid")
     y_mid = sp.off_plane(case_c, case_c.xZConstructionPlane, "mid_y", "YMid")
 
+    # Body-relative reference: Side_Left depends on Front
+    ref_front2 = find_body("Front")
+    ref_front2_bb = ref_front2.boundingBox
+
     # Left side: Y=board_thick..case_d-board_thick, Z=foot_h..case_h-lid_thick
     left_yz = sp.off_plane(case_c, case_c.yZConstructionPlane,
                             "0 in", "Left_Pl")
@@ -159,6 +181,10 @@ def run(context):
     left = left_ext.bodies.item(0)
     left.name = "Side_Left"
 
+    # Body-relative reference: Side_Right depends on Side_Left
+    ref_side_left = find_body("Side_Left")
+    ref_side_left_bb = ref_side_left.boundingBox
+
     # Right side: mirror left across XMid
     right_mir = sp.mirror_feats(case_c, [left_ext], x_mid, "RightMir")
     right = right_mir.bodies.item(0)
@@ -169,6 +195,10 @@ def run(context):
     # ==============================================================
     #  2. BOTTOM — divider board between chest and drawer
     # ==============================================================
+    # Body-relative reference: Bottom depends on Front
+    ref_front3 = find_body("Front")
+    ref_front3_bb = ref_front3.boundingBox
+
     bot_pl = sp.off_plane(bottom_c, bottom_c.xYConstructionPlane,
                            "bottom_z", "Bot_Pl")
     _, pr = sp.sketch_rect_model(bottom_c, bot_pl,
@@ -187,10 +217,10 @@ def run(context):
     right_proxy = right.createForAssemblyContext(case_occ)
     bot_proxy = bot_body.createForAssemblyContext(bottom_occ)
 
-    sp.combine(root, front_proxy, [bot_proxy], CUT, True, "BotDado_F")
-    sp.combine(root, back_proxy, [bot_proxy], CUT, True, "BotDado_B")
-    sp.combine(root, left_proxy, [bot_proxy], CUT, True, "BotDado_L")
-    sp.combine(root, right_proxy, [bot_proxy], CUT, True, "BotDado_R")
+    sp.combine(front_proxy, [bot_proxy], CUT, True, "BotDado_F")
+    sp.combine(back_proxy, [bot_proxy], CUT, True, "BotDado_B")
+    sp.combine(left_proxy, [bot_proxy], CUT, True, "BotDado_L")
+    sp.combine(right_proxy, [bot_proxy], CUT, True, "BotDado_R")
 
     print(">>> Bottom + dados done")
 
@@ -200,6 +230,10 @@ def run(context):
     #     Left + right: inner_d long, foot_thick deep
     #     All foot_h tall with arch CUT
     # ==============================================================
+    # Body-relative reference: Foot_Front depends on Front
+    ref_front4 = find_body("Front")
+    ref_front4_bb = ref_front4.boundingBox
+
     # Front foot board
     _, pr = sp.sketch_rect_model(feet_c, feet_c.xZConstructionPlane,
         ("0 in", "0 in", "0 in"),
@@ -208,6 +242,10 @@ def run(context):
     ff_ext = sp.ext_new(feet_c, pr, "foot_thick", "FootFront")
     foot_front = ff_ext.bodies.item(0)
     foot_front.name = "Foot_Front"
+
+    # Body-relative reference: Foot_Back depends on Foot_Front
+    ref_foot_front = find_body("Foot_Front")
+    ref_foot_front_bb = ref_foot_front.boundingBox
 
     # Back foot board
     ff_back_pl = sp.off_plane(feet_c, feet_c.xZConstructionPlane,
@@ -220,6 +258,10 @@ def run(context):
     foot_back = fb_ext.bodies.item(0)
     foot_back.name = "Foot_Back"
 
+    # Body-relative reference: Foot_Left depends on Foot_Front
+    ref_foot_front2 = find_body("Foot_Front")
+    ref_foot_front2_bb = ref_foot_front2.boundingBox
+
     # Left foot board (between front and back foot boards)
     _, pr = sp.sketch_rect_model(feet_c, feet_c.yZConstructionPlane,
         ("0 in", "foot_thick", "0 in"),
@@ -228,6 +270,10 @@ def run(context):
     fl_ext = sp.ext_new(feet_c, pr, "foot_thick", "FootLeft")
     foot_left = fl_ext.bodies.item(0)
     foot_left.name = "Foot_Left"
+
+    # Body-relative reference: Foot_Right depends on Foot_Left
+    ref_foot_left = find_body("Foot_Left")
+    ref_foot_left_bb = ref_foot_left.boundingBox
 
     # Right foot: mirror across XMid
     f_xmid = sp.off_plane(feet_c, feet_c.yZConstructionPlane, "mid_x", "FXMid")
@@ -311,12 +357,26 @@ def run(context):
     # ==============================================================
     #  4. DRAWER — dovetailed drawer box (via template)
     # ==============================================================
+    # Body-relative reference: dd_Front depends on Bottom
+    ref_bottom = find_body("Bottom")
+    ref_bottom_bb = ref_bottom.boundingBox
+
     dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev)
     print(">>> Drawer: dovetailed drawer done (%d bodies)" % len(dd_result["all_bodies"]))
+
+    # Body-relative references for drawer sub-bodies
+    ref_dd_front = find_body("dd_Front")
+    ref_dd_front_bb = ref_dd_front.boundingBox
+    ref_dd_left = find_body("dd_Left")
+    ref_dd_left_bb = ref_dd_left.boundingBox
 
     # ==============================================================
     #  5. LID — solid panel + 2 breadboard battens
     # ==============================================================
+    # Body-relative reference: Lid depends on Front
+    ref_front5 = find_body("Front")
+    ref_front5_bb = ref_front5.boundingBox
+
     lid_z_pl = sp.off_plane(lid_c, lid_c.xYConstructionPlane,
                              "case_h - lid_thick", "Lid_Pl")
     _, pr = sp.sketch_rect_model(lid_c, lid_z_pl,
@@ -327,6 +387,10 @@ def run(context):
     lid_ext = sp.ext_new(lid_c, pr, "lid_thick", "LidPanel")
     lid_body = lid_ext.bodies.item(0)
     lid_body.name = "Lid"
+
+    # Body-relative reference: Batten_Left depends on Lid
+    ref_lid = find_body("Lid")
+    ref_lid_bb = ref_lid.boundingBox
 
     # Breadboard battens on underside — 2 battens running across Y (depth)
     # positioned at batten_inset from each end
@@ -340,6 +404,10 @@ def run(context):
     batten_l = bat_l_ext.bodies.item(0)
     batten_l.name = "Batten_Left"
 
+    # Body-relative reference: Batten_Right depends on Batten_Left
+    ref_batten_left = find_body("Batten_Left")
+    ref_batten_left_bb = ref_batten_left.boundingBox
+
     # Mirror left batten to right
     lid_xmid = sp.off_plane(lid_c, lid_c.yZConstructionPlane, "mid_x", "LidXMid")
     bat_mir = sp.mirror_feats(lid_c, [bat_l_ext], lid_xmid, "BattenRightMir")
@@ -351,6 +419,12 @@ def run(context):
     # ==============================================================
     #  6. BACK PANEL — plywood, rabbeted into sides
     # ==============================================================
+    # Body-relative references: BackPanel depends on Back and Side_Left
+    ref_back = find_body("Back")
+    ref_back_bb = ref_back.boundingBox
+    ref_side_left2 = find_body("Side_Left")
+    ref_side_left2_bb = ref_side_left2.boundingBox
+
     _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
         ("board_thick", "case_d - back_thick", "foot_h"),
         {"x": "inner_w", "z": "case_h - foot_h - lid_thick"},
@@ -369,7 +443,7 @@ def run(context):
         {"y": "back_thick", "z": "case_h - foot_h - lid_thick"},
         "RabL_Sk", ev)
     rab_l_tool = sp.ext_new(root, pr, "board_thick", "RabL_Tool")
-    sp.combine(root, left_proxy, [rab_l_tool.bodies.item(0)], CUT, False, "RabL_Cut")
+    sp.combine(left_proxy, [rab_l_tool.bodies.item(0)], CUT, False, "RabL_Cut")
 
     # Right side rabbet
     rab_r_pl = sp.off_plane(root, root.yZConstructionPlane,
@@ -379,7 +453,7 @@ def run(context):
         {"y": "back_thick", "z": "case_h - foot_h - lid_thick"},
         "RabR_Sk", ev)
     rab_r_tool = sp.ext_new(root, pr, "board_thick", "RabR_Tool")
-    sp.combine(root, right_proxy, [rab_r_tool.bodies.item(0)], CUT, False, "RabR_Cut")
+    sp.combine(right_proxy, [rab_r_tool.bodies.item(0)], CUT, False, "RabR_Cut")
 
     print(">>> Back panel + rabbets done")
 
@@ -491,8 +565,8 @@ def run(context):
 
         all_tails = [tail_body] + [pat_feat.bodies.item(i)
                                     for i in range(pat_feat.bodies.count)]
-        sp.combine(root, cut_body, all_tails, CUT, True, f"{name}_CutPin")
-        sp.combine(root, join_body, all_tails, JOIN, False, f"{name}_JoinSide")
+        sp.combine(cut_body, all_tails, CUT, True, f"{name}_CutPin")
+        sp.combine(join_body, all_tails, JOIN, False, f"{name}_JoinSide")
 
     # 4 corners: FL (front-left), BL (back-left), FR (front-right), BR (back-right)
     dt_corner(dt_left_pl, 0, 0, bt, "0 in",

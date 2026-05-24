@@ -67,6 +67,20 @@ def run(context):
         x_offset="board_thick + section_w + divider_thick + drawer_gap",
         z_offset="kick_h + board_thick + drawer_gap")
 
+    # ==============================================================
+    #  BODY LOOKUP (for body-relative references / validate_deps)
+    # ==============================================================
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
     print(">>> Parameters done")
 
     case_occ   = sp.make_comp(root, "Case")
@@ -91,6 +105,10 @@ def run(context):
     ls_ext = sp.ext_new(case_c, pr, "board_thick", "LeftSide")
     ls_ext.bodies.item(0).name = "Side_Left"
 
+    # Body-relative ref: Side_Right mirrors Side_Left
+    ref_side_left = find_body("Side_Left")
+    ref_side_left_bb = ref_side_left.boundingBox
+
     x_mid = sp.off_plane(case_c, case_c.yZConstructionPlane, "mid_x", "XMid")
     sp.mirror_feats(case_c, [ls_ext], x_mid, "RightMir").bodies.item(0).name = "Side_Right"
 
@@ -101,6 +119,10 @@ def run(context):
         {"x": "inner_w", "y": "case_d"}, "Bottom_Sk", ev)
     sp.ext_new(case_c, pr, "board_thick", "BottomBoard").bodies.item(0).name = "Bottom"
 
+    # Body-relative ref: Div_Left sits above Bottom
+    ref_bottom = find_body("Bottom")
+    ref_bottom_bb = ref_bottom.boundingBox
+
     # Left divider
     div_l_pl = sp.off_plane(case_c, case_c.yZConstructionPlane,
         "board_thick + section_w", "DivL_Pl")
@@ -109,6 +131,10 @@ def run(context):
         {"y": "case_d - back_thick", "z": "inner_h"}, "DivL_Sk", ev)
     sp.ext_new(case_c, pr, "divider_thick", "DivLeft").bodies.item(0).name = "Div_Left"
 
+    # Body-relative ref: Div_Right mirrors Div_Left
+    ref_div_left = find_body("Div_Left")
+    ref_div_left_bb = ref_div_left.boundingBox
+
     # Right divider: mirror
     sp.mirror_feats(case_c, [case_c.features.extrudeFeatures.itemByName("DivLeft")],
                      x_mid, "DivRightMir").bodies.item(0).name = "Div_Right"
@@ -116,6 +142,10 @@ def run(context):
     print(">>> Case: 5 bodies (2 sides, bottom, 2 dividers)")
 
     # ==== TOP ====
+    # Body-relative ref: Top sits on Side_Right (and Side_Left)
+    ref_side_right = find_body("Side_Right")
+    ref_side_right_bb = ref_side_right.boundingBox
+
     _, pr = sp.sketch_rect_model(top_c, top_c.xYConstructionPlane,
         ("-top_overhang", "-top_overhang", "top_z"),
         {"x": "case_w + 2 * top_overhang", "y": "case_d + top_overhang"},
@@ -135,6 +165,10 @@ def run(context):
     kf_ext = sp.ext_new(kick_c, pr, "board_thick", "KickFront")
     kf_ext.bodies.item(0).name = "Kick_Front"
 
+    # Body-relative ref: Kick_Back mirrors Kick_Front
+    ref_kick_front = find_body("Kick_Front")
+    ref_kick_front_bb = ref_kick_front.boundingBox
+
     k_ymid = sp.off_plane(kick_c, kick_c.xZConstructionPlane, "case_d / 2", "KYMid")
     sp.mirror_feats(kick_c, [kf_ext], k_ymid, "KickBackMir").bodies.item(0).name = "Kick_Back"
 
@@ -144,6 +178,10 @@ def run(context):
         "KickLeft_Sk", ev)
     kl_ext = sp.ext_new(kick_c, pr, "board_thick", "KickLeft")
     kl_ext.bodies.item(0).name = "Kick_Left"
+
+    # Body-relative ref: Kick_Right mirrors Kick_Left
+    ref_kick_left = find_body("Kick_Left")
+    ref_kick_left_bb = ref_kick_left.boundingBox
 
     k_xmid = sp.off_plane(kick_c, kick_c.yZConstructionPlane, "mid_x", "KXMid")
     sp.mirror_feats(kick_c, [kl_ext], k_xmid, "KickRightMir").bodies.item(0).name = "Kick_Right"
@@ -156,12 +194,25 @@ def run(context):
     dl_ext = sp.ext_new(door_c, pr, "door_thick", "DoorLeft")
     dl_ext.bodies.item(0).name = "Door_Left"
 
+    # Body-relative ref: Door_Right positioned relative to Div_Right
+    ref_div_right = find_body("Div_Right")
+    ref_div_right_bb = ref_div_right.boundingBox
+
     d_xmid = sp.off_plane(door_c, door_c.yZConstructionPlane, "mid_x", "DXMid")
     sp.mirror_feats(door_c, [dl_ext], d_xmid, "DoorRightMir").bodies.item(0).name = "Door_Right"
     print(">>> Doors: 2")
 
     # ==== DRAWER (center section) ====
     dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev)
+
+    # Body-relative ref: dd_Back/dd_Left/dd_Right/dd_Bottom relative to dd_Front
+    ref_dd_front = find_body("dd_Front")
+    ref_dd_front_bb = ref_dd_front.boundingBox
+
+    # Body-relative ref: dd_Right positioned relative to dd_Left
+    ref_dd_left = find_body("dd_Left")
+    ref_dd_left_bb = ref_dd_left.boundingBox
+
     print(">>> Drawer: %d" % len(dd_result["all_bodies"]))
 
     # ==== BACK PANEL ====

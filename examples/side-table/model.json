@@ -1,0 +1,325 @@
+{
+  "deps": [
+    {
+      "body": "Leg_FL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front-left leg"
+    },
+    {
+      "body": "Leg_FR",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Front-right leg, mirrored across XMid from FL",
+      "contact": false
+    },
+    {
+      "body": "Leg_BL",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back-left leg, mirrored across YMid from FL",
+      "contact": false
+    },
+    {
+      "body": "Leg_BR",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Back-right leg, mirrored from BL across XMid",
+      "contact": false
+    },
+    {
+      "body": "Apron_Back",
+      "ref": "Leg_BL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Back apron spanning BL to BR, flush with back of legs"
+    },
+    {
+      "body": "Apron_Left",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Left side apron spanning FL to BL"
+    },
+    {
+      "body": "Apron_Right",
+      "ref": "Leg_FR",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Right side apron, mirrored from Apron_Left across XMid"
+    },
+    {
+      "body": "Str_Upper",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Upper front stretcher framing drawer opening at top"
+    },
+    {
+      "body": "Str_Lower",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Lower front stretcher framing drawer opening at bottom"
+    },
+    {
+      "body": "Top",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Solid top panel with overhang and edge fillet"
+    },
+    {
+      "body": "dd_Front",
+      "ref": "Str_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Dovetailed drawer front (spalted maple)",
+      "contact": false
+    },
+    {
+      "body": "dd_Back",
+      "ref": "dd_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Drawer back, dovetailed to sides",
+      "contact": false
+    },
+    {
+      "body": "dd_Left",
+      "ref": "dd_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Drawer left side"
+    },
+    {
+      "body": "dd_Right",
+      "ref": "dd_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Drawer right side"
+    },
+    {
+      "body": "dd_Bottom",
+      "ref": "dd_Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Drawer bottom panel in bottom groove"
+    },
+    {
+      "body": "Pull_Post0",
+      "ref": "dd_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left pull post connecting bar to drawer front"
+    },
+    {
+      "body": "DM_BA_L_0",
+      "ref": "Apron_Back",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Domino void: back apron to BL leg (left end)",
+      "replicas": "DM_BA_L_*"
+    },
+    {
+      "body": "DM_BA_R_0",
+      "ref": "Apron_Back",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Domino void: back apron to BR leg (right end)",
+      "replicas": "DM_BA_R_*"
+    },
+    {
+      "body": "DM_LA_F_0",
+      "ref": "Apron_Left",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Domino void: left apron to FL leg (front end)",
+      "replicas": "DM_LA_F_*"
+    },
+    {
+      "body": "DM_LA_B_0",
+      "ref": "Apron_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Domino void: left apron to BL leg (back end)",
+      "replicas": "DM_LA_B_*"
+    },
+    {
+      "body": "DM_RA_F_0",
+      "ref": "Apron_Right",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Domino void: right apron to FR leg (front end)",
+      "replicas": "DM_RA_F_*"
+    },
+    {
+      "body": "DM_RA_B_0",
+      "ref": "Apron_Right",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Domino void: right apron to BR leg (back end)",
+      "replicas": "DM_RA_B_*"
+    },
+    {
+      "body": "DM_SU_L",
+      "ref": "Str_Upper",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Domino void: upper stretcher to FL leg (left end)"
+    },
+    {
+      "body": "DM_SU_R",
+      "ref": "Str_Upper",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Domino void: upper stretcher to FR leg (right end)"
+    },
+    {
+      "body": "DM_SL_L",
+      "ref": "Str_Lower",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Domino void: lower stretcher to FL leg (left end)"
+    },
+    {
+      "body": "DM_SL_R",
+      "ref": "Str_Lower",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Domino void: lower stretcher to FR leg (right end)"
+    },
+    {
+      "body": "TB_L_0",
+      "ref": "Apron_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Tabletop bracket on left apron inner face",
+      "replicas": "TB_L_*"
+    },
+    {
+      "body": "TB_R_0",
+      "ref": "Apron_Right",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Tabletop bracket on right apron inner face",
+      "replicas": "TB_R_*"
+    }
+  ]
+}

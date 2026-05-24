@@ -1,0 +1,262 @@
+{
+  "deps": [
+    {
+      "body": "Front",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Case front board, spans full width, Z from foot_h to case_h-lid_thick",
+      "contact": false
+    },
+    {
+      "body": "Back",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Case back board, opposite front at Y=case_d",
+      "contact": false
+    },
+    {
+      "body": "Side_Left",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "contact": true,
+      "note": "Left side board, dovetailed into front and back"
+    },
+    {
+      "body": "Side_Right",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right side board, mirror of left across X midplane",
+      "contact": false
+    },
+    {
+      "body": "Side_Right",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "contact": true,
+      "note": "Right side dovetailed into front"
+    },
+    {
+      "body": "Bottom",
+      "ref": "Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "contact": true,
+      "note": "Bottom divider board dadoed into case sides, separates chest from drawer"
+    },
+    {
+      "body": "Foot_Front",
+      "ref": "Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front bracket foot, below case front board"
+    },
+    {
+      "body": "Foot_Front",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        -1
+      ],
+      "note": "Front foot sits on floor",
+      "contact": false
+    },
+    {
+      "body": "Foot_Back",
+      "ref": "Foot_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back bracket foot, opposite front at case_d",
+      "contact": false
+    },
+    {
+      "body": "Foot_Left",
+      "ref": "Foot_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "contact": true,
+      "note": "Left bracket foot connecting front and back feet"
+    },
+    {
+      "body": "Foot_Right",
+      "ref": "Foot_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right bracket foot, mirror of left across X midplane",
+      "contact": false
+    },
+    {
+      "body": "dd_Front",
+      "ref": "Bottom",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Drawer front, in drawer compartment below bottom board",
+      "contact": false
+    },
+    {
+      "body": "dd_Back",
+      "ref": "dd_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Drawer back behind drawer front",
+      "contact": false
+    },
+    {
+      "body": "dd_Left",
+      "ref": "dd_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Drawer left side connects front and back"
+    },
+    {
+      "body": "dd_Right",
+      "ref": "dd_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Drawer right side opposite left",
+      "contact": false
+    },
+    {
+      "body": "dd_Bottom",
+      "ref": "dd_Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Drawer bottom panel"
+    },
+    {
+      "body": "Lid",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Lid panel sitting atop the case with overhang"
+    },
+    {
+      "body": "Batten_Left",
+      "ref": "Lid",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left breadboard batten on underside of lid"
+    },
+    {
+      "body": "Batten_Right",
+      "ref": "Lid",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right breadboard batten on underside of lid"
+    },
+    {
+      "body": "Batten_Right",
+      "ref": "Batten_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right batten is mirror of left across X midplane",
+      "contact": false
+    },
+    {
+      "body": "BackPanel",
+      "ref": "Back",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Plywood back panel rabbeted into case sides, at rear",
+      "contact": false
+    },
+    {
+      "body": "BackPanel",
+      "ref": "Side_Left",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "contact": true,
+      "note": "Back panel sits in rabbet in side boards"
+    }
+  ]
+}

@@ -1,0 +1,193 @@
+{
+  "deps": [
+    {
+      "body": "Side_Left",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left case side, full height from kick_h to case_h",
+      "contact": false
+    },
+    {
+      "body": "Side_Right",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right case side, mirror of left across X midplane",
+      "contact": false
+    },
+    {
+      "body": "Top",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Top board between sides at top of case"
+    },
+    {
+      "body": "Bottom",
+      "ref": "Side_Left",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Bottom board between sides at kick height"
+    },
+    {
+      "body": "Kick_Front",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        -1
+      ],
+      "note": "Front kick board at floor level, inset from edges",
+      "contact": false
+    },
+    {
+      "body": "Kick_Back",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back kick board, mirror of front",
+      "contact": false
+    },
+    {
+      "body": "Kick_Left",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Left kick board connecting front and back kicks",
+      "contact": false
+    },
+    {
+      "body": "Kick_Right",
+      "ref": "Kick_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right kick board, mirror of left",
+      "contact": false
+    },
+    {
+      "body": "Door_Left",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left door in case opening, left half",
+      "contact": false
+    },
+    {
+      "body": "Door_Right",
+      "ref": "Door_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right door, mirror of left across X midplane",
+      "contact": false
+    },
+    {
+      "body": "Shelf",
+      "ref": "Top",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Interior shelf 6 inches below top",
+      "contact": false
+    },
+    {
+      "body": "Shelf",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "contact": true,
+      "note": "Shelf fits between case sides"
+    },
+    {
+      "body": "Rod",
+      "ref": "Shelf",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Hanging rod below shelf at rod_z height",
+      "contact": false
+    },
+    {
+      "body": "Rod",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "contact": true,
+      "note": "Rod spans between case sides"
+    },
+    {
+      "body": "BackPanel",
+      "ref": "Side_Left",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "contact": true,
+      "note": "Plywood back panel at rear of case"
+    },
+    {
+      "body": "BackPanel",
+      "ref": "Bottom",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back panel spans from bottom to top inside the case"
+    }
+  ]
+}

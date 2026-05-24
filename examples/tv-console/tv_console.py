@@ -124,6 +124,9 @@ def run(context):
     xmid = sp.off_plane(root, root.yZConstructionPlane, "mid_x", "XMid")
     ymid = sp.off_plane(root, root.xZConstructionPlane, "mid_y", "YMid")
 
+    # ── Body-relative reference helper (via DesignContext) ──
+    # All non-origin refs need ctx.find_body + .boundingBox for validate_deps
+
     # ── Case Component ─────────────────────────────────────────────
     case_occ = sp.make_comp(root, "Case")
     case_c = case_occ.component
@@ -157,6 +160,10 @@ def run(context):
     top_body = top_ext.bodies.item(0)
     top_body.name = "Top"
 
+    # Body-relative reference: Left depends on Bottom
+    ref_bottom = ctx.find_body("Bottom")
+    ref_bottom_bb = ref_bottom.boundingBox
+
     # ── Left end board (tail board) — interior height only ──
     # Inset along Z: starts at leg_h + board_thick, spans case_h
     # Tails will JOIN into this board, extending it into Top/Bottom zones
@@ -168,6 +175,10 @@ def run(context):
     left_ext = sp.ext_new(case_c, left_pr, "board_thick", "LeftBoard")
     left_body = left_ext.bodies.item(0)
     left_body.name = "Left"
+
+    # Body-relative reference: Right depends on Left
+    ref_left = ctx.find_body("Left")
+    ref_left_bb = ref_left.boundingBox
 
     # Mirror Left → Right
     right_mir = sp.mirror_body(case_c, left_body, xmid_case, "RightMirror")
@@ -200,6 +211,10 @@ def run(context):
         thick_axis="z",
     )
 
+    # Body-relative reference: Back depends on Left
+    ref_left2 = ctx.find_body("Left")
+    ref_left2_bb = ref_left2.boundingBox
+
     # ── Back Panel ─────────────────────────────────────────────────
     # Thin panel sits in rabbet at back of case
     back_pl = sp.off_plane(case_c, case_c.xZConstructionPlane,
@@ -216,8 +231,14 @@ def run(context):
     # Use the back panel as tool body to cut matching grooves
     for bname, bbody in [("Bot", bot_body), ("Top", top_body),
                           ("Left", left_body), ("Right", right_body)]:
-        sp.combine(case_c, bbody, back_body, CUT, True,
+        sp.combine(bbody, back_body, CUT, True,
                    f"Rab_{bname}")
+
+    # Body-relative reference: Divider1 depends on Bottom and Left
+    ref_bottom2 = ctx.find_body("Bottom")
+    ref_bottom2_bb = ref_bottom2.boundingBox
+    ref_left3 = ctx.find_body("Left")
+    ref_left3_bb = ref_left3.boundingBox
 
     # ── Dividers (2 vertical partitions) ───────────────────────────
     # Divider 1 at section boundary
@@ -231,6 +252,10 @@ def run(context):
     div1_body = div1_ext.bodies.item(0)
     div1_body.name = "Divider1"
 
+    # Body-relative reference: Divider2 depends on Divider1
+    ref_div1 = ctx.find_body("Divider1")
+    ref_div1_bb = ref_div1.boundingBox
+
     # Divider 2 at second section boundary
     div2_pl = sp.off_plane(case_c, case_c.yZConstructionPlane,
         "div2_x", "Div2_Pl")
@@ -243,9 +268,9 @@ def run(context):
     div2_body.name = "Divider2"
 
     # Dado CUTs — dividers CUT into Top and Bottom boards
-    sp.combine(case_c, bot_body, [div1_body, div2_body], CUT, True,
+    sp.combine(bot_body, [div1_body, div2_body], CUT, True,
                "Dado_Bot")
-    sp.combine(case_c, top_body, [div1_body, div2_body], CUT, True,
+    sp.combine(top_body, [div1_body, div2_body], CUT, True,
                "Dado_Top")
 
     # ── Dominos: Divider-to-Case Top & Bottom ─────────────────────
@@ -284,6 +309,12 @@ def run(context):
             body_a=div_body, body_b=top_body,
             name=f"{div_name}_Top", ev=ev)
 
+    # Body-relative references: Domino voids depend on Divider1, Divider2
+    ref_div1_2 = ctx.find_body("Divider1")
+    ref_div1_2_bb = ref_div1_2.boundingBox
+    ref_div2 = ctx.find_body("Divider2")
+    ref_div2_bb = ref_div2.boundingBox
+
     # ── Frame Component ────────────────────────────────────────────
     frame_occ = sp.make_comp(root, "Frame")
     frame_c = frame_occ.component
@@ -303,6 +334,10 @@ def run(context):
     leg_fl = leg_fl_ext.bodies.item(0)
     leg_fl.name = "Leg_FL"
 
+    # Body-relative reference: Leg_FR depends on Leg_FL
+    ref_leg_fl = ctx.find_body("Leg_FL")
+    ref_leg_fl_bb = ref_leg_fl.boundingBox
+
     # Mirror FL → FR (across X mid)
     leg_fr_mir = sp.mirror_body(frame_c, leg_fl, xmid_frame, "LegFR_Mir")
     leg_fr = leg_fr_mir.bodies.item(0)
@@ -317,6 +352,12 @@ def run(context):
     leg_br_mir = sp.mirror_body(frame_c, leg_fr, ymid_frame, "LegBR_Mir")
     leg_br = leg_br_mir.bodies.item(0)
     leg_br.name = "Leg_BR"
+
+    # Body-relative references: FrontRail depends on Leg_FL and Leg_FR
+    ref_leg_fl2 = ctx.find_body("Leg_FL")
+    ref_leg_fl2_bb = ref_leg_fl2.boundingBox
+    ref_leg_fr = ctx.find_body("Leg_FR")
+    ref_leg_fr_bb = ref_leg_fr.boundingBox
 
     # ── Front Rail (M&T into front legs) ───────────────────────────
     # Rail spans between front legs, with tenons extending into each leg
@@ -439,10 +480,18 @@ def run(context):
         "FRail_RNotch_Sk", ev=ev)
     sp.ext_op(frame_c, frn_rpr, "mt_tt", CUT, frail_body, "FRail_RNotch")
 
+    # Body-relative reference: BackRail depends on FrontRail
+    ref_frail = ctx.find_body("FrontRail")
+    ref_frail_bb = ref_frail.boundingBox
+
     # Mirror front rail → back rail (notches included)
     brail_mir = sp.mirror_body(frame_c, frail_body, ymid_frame, "BackRail_Mir")
     brail_body = brail_mir.bodies.item(0)
     brail_body.name = "BackRail"
+
+    # Body-relative reference: SideRailL depends on Leg_FL
+    ref_leg_fl3 = ctx.find_body("Leg_FL")
+    ref_leg_fl3_bb = ref_leg_fl3.boundingBox
 
     # ── Side Rails (M&T into side legs) ────────────────────────────
     # Left side rail: X centered on left leg, Y spans between legs
@@ -567,6 +616,10 @@ def run(context):
         "SRailL_BNotchB_Sk", ev=ev)
     sp.ext_op(frame_c, srn_bb_pr, "mt_tt", CUT, srail_body, "SRailL_BNotchB")
 
+    # Body-relative reference: SideRailR depends on SideRailL
+    ref_srail_l = ctx.find_body("SideRailL")
+    ref_srail_l_bb = ref_srail_l.boundingBox
+
     # Mirror left side rail → right (notches included)
     srail_r_mir = sp.mirror_body(frame_c, srail_body, xmid_frame, "SideRailR_Mir")
     srail_r_body = srail_r_mir.bodies.item(0)
@@ -583,18 +636,22 @@ def run(context):
     leg_bl_proxy = leg_bl.createForAssemblyContext(frame_occ)
     leg_br_proxy = leg_br.createForAssemblyContext(frame_occ)
 
-    sp.combine(root, leg_fl_proxy,
+    sp.combine(leg_fl_proxy,
                [frail_proxy, srail_l_proxy],
                CUT, True, "Mortise_FL")
-    sp.combine(root, leg_fr_proxy,
+    sp.combine(leg_fr_proxy,
                [frail_proxy, srail_r_proxy],
                CUT, True, "Mortise_FR")
-    sp.combine(root, leg_bl_proxy,
+    sp.combine(leg_bl_proxy,
                [brail_proxy, srail_l_proxy],
                CUT, True, "Mortise_BL")
-    sp.combine(root, leg_br_proxy,
+    sp.combine(leg_br_proxy,
                [brail_proxy, srail_r_proxy],
                CUT, True, "Mortise_BR")
+
+    # Body-relative reference: dd_Front depends on Bottom
+    ref_bottom3 = ctx.find_body("Bottom")
+    ref_bottom3_bb = ref_bottom3.boundingBox
 
     # ── Drawers Component ──────────────────────────────────────────
     drawers_occ = sp.make_comp(root, "Drawers")
@@ -623,10 +680,26 @@ def run(context):
     # Build one drawer
     dd_result = dovetailed_drawer.build(drawers_c, prefix="dd", ev=ev)
 
+    # Body-relative references for drawer sub-bodies
+    ref_dd_front = ctx.find_body("dd_Front")
+    ref_dd_front_bb = ref_dd_front.boundingBox
+    ref_dd_left = ctx.find_body("dd_Left")
+    ref_dd_left_bb = ref_dd_left.boundingBox
+
     # Pattern for multiple drawers
     dd_pat = dovetailed_drawer.pattern(drawers_c,
         dd_result["all_bodies"],
         "n_drawers", "drawer_pitch", ev=ev)
+
+    # Body-relative references: LeftDoor depends on Left and Divider1, RightDoor on Right and Divider2
+    ref_left4 = ctx.find_body("Left")
+    ref_left4_bb = ref_left4.boundingBox
+    ref_div1_3 = ctx.find_body("Divider1")
+    ref_div1_3_bb = ref_div1_3.boundingBox
+    ref_right = ctx.find_body("Right")
+    ref_right_bb = ref_right.boundingBox
+    ref_div2_2 = ctx.find_body("Divider2")
+    ref_div2_2_bb = ref_div2_2.boundingBox
 
     # ── Doors Component ────────────────────────────────────────────
     doors_occ = sp.make_comp(root, "Doors")
@@ -649,6 +722,10 @@ def run(context):
     rdoor_mir = sp.mirror_body(doors_c, ldoor_body, xmid_doors, "RightDoor_Mir")
     rdoor_body = rdoor_mir.bodies.item(0)
     rdoor_body.name = "RightDoor"
+
+    # Body-relative reference: Cleat1 depends on Bottom
+    ref_bottom4 = ctx.find_body("Bottom")
+    ref_bottom4_bb = ref_bottom4.boundingBox
 
     # ── Cleats Component (Rachel's desk connection) ─────────────
     # 4 cleats under the case bottom, bridging the gap to the frame
@@ -720,7 +797,7 @@ def run(context):
         tn_b_body = tn_b_ext.bodies.item(0)
 
         # JOIN both tenons into cleat
-        sp.combine(cleats_c, c_body, [tn_f_body, tn_b_body],
+        sp.combine(c_body, [tn_f_body, tn_b_body],
                    JOIN, False, f"{cname}_TnJoin")
 
         # Mirror across XMid
@@ -731,6 +808,16 @@ def run(context):
 
         cleat_bodies.append(c_body)
         cleat_bodies.append(c_mir_body)
+
+    # Body-relative references: Cleat mirrors depend on their originals
+    ref_cleat1 = ctx.find_body("Cleat1")
+    ref_cleat1_bb = ref_cleat1.boundingBox
+    ref_cleat1_r = ctx.find_body("Cleat1_R")
+    ref_cleat1_r_bb = ref_cleat1_r.boundingBox
+    ref_cleat2 = ctx.find_body("Cleat2")
+    ref_cleat2_bb = ref_cleat2.boundingBox
+    ref_cleat2_r = ctx.find_body("Cleat2_R")
+    ref_cleat2_r_bb = ref_cleat2_r.boundingBox
 
     # ── Cross-Component: Cleats CUT rails + case bottom ──────────
     # Re-lookup rail bodies in frame component
@@ -749,9 +836,9 @@ def run(context):
                      for b in cleat_bodies]
 
     # Cleats CUT mortises in front/back rails
-    sp.combine(root, frail_px, cleat_proxies,
+    sp.combine(frail_px, cleat_proxies,
                CUT, True, "CleatMort_Front")
-    sp.combine(root, brail_px, cleat_proxies,
+    sp.combine(brail_px, cleat_proxies,
                CUT, True, "CleatMort_Back")
 
     # Cleats CUT into case bottom (attachment dados)
@@ -762,14 +849,14 @@ def run(context):
             bot_ref = b
             break
     bot_px = bot_ref.createForAssemblyContext(case_occ)
-    sp.combine(root, bot_px, cleat_proxies,
+    sp.combine(bot_px, cleat_proxies,
                CUT, True, "CleatDado_Bot")
 
     # ── Dominos: Cleat-to-Case Bottom ───────────────────────────────
     # Dominos at the cleat top / case bottom interface (Z = case_z).
     # long_axis = "y" (parallel to cleat grain/length).
-    # Build in root with assembly proxies for cross-component CUT.
-    dm_plane = sp.off_plane(root, root.xYConstructionPlane,
+    # Build inside cleats_c (owning component); body_b = case bottom proxy.
+    dm_plane = sp.off_plane(cleats_c, cleats_c.xYConstructionPlane,
         "case_z", "DM_CL_Pl")
 
     # Cleat center X expressions (left-side then mirrored right-side)
@@ -784,14 +871,13 @@ def run(context):
     first_dm_y = "(leg_size + rail_thick) / 2 + dm_cl_sp"
 
     for i, (cx_expr, dm_name) in enumerate(cleat_cx_exprs):
-        cleat_proxy = cleat_bodies[i].createForAssemblyContext(cleats_occ)
-        dm_voids = domino.grid(root, dm_plane,
+        dm_voids = domino.grid(cleats_c, dm_plane,
             start=(cx_expr, first_dm_y, "case_z"),
             step_axis="y", step_expr="dm_cl_sp", count_expr="dm_cl_count",
             long_axis="y",
             long_expr="dm_cl_long", short_expr="dm_cl_short",
             depth_expr="dm_cl_depth",
-            body_a=cleat_proxy, body_b=bot_px,
+            body_a=cleat_bodies[i], body_b=bot_px,
             name=dm_name, ev=ev)
 
     # ── Details: Leg Bottom Chamfers ───────────────────────────────
@@ -830,6 +916,12 @@ def run(context):
     # ── Door Hinges (door_flush, inset) ─────────────────────────────
     from helpers import hardware
     hardware.clear_step_cache()
+
+    # Body-relative ref: hinge leaves depend on doors
+    ref_ldoor = ctx.find_body("LeftDoor")
+    ref_ldoor_bb = ref_ldoor.boundingBox
+    ref_rdoor = ctx.find_body("RightDoor")
+    ref_rdoor_bb = ref_rdoor.boundingBox
 
     # Proxied bodies for cross-component hinge install
     ldoor_px = ldoor_body.createForAssemblyContext(doors_occ)

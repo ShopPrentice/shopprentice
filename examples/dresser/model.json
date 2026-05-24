@@ -1,0 +1,303 @@
+{
+  "deps": [
+    {
+      "body": "Kick_Front",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front kick board sits on floor"
+    },
+    {
+      "body": "Kick_Left",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Left kick board sits on floor",
+      "contact": false
+    },
+    {
+      "body": "Kick_Right",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right kick board sits on floor",
+      "contact": false
+    },
+    {
+      "body": "Kick_Back",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back kick board sits on floor",
+      "contact": false
+    },
+    {
+      "body": "Kick_Right",
+      "ref": "Kick_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right kick is on far-X side of left kick",
+      "contact": false
+    },
+    {
+      "body": "Kick_Back",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back kick is behind front kick",
+      "contact": false
+    },
+    {
+      "body": "BottomBoard",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Bottom board sits on top of kick assembly"
+    },
+    {
+      "body": "Side_Left",
+      "ref": "BottomBoard",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left side panel rises from bottom board to top (dovetailed)"
+    },
+    {
+      "body": "Side_Right",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right side panel mirrors left side",
+      "contact": false
+    },
+    {
+      "body": "Side_Right",
+      "ref": "BottomBoard",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right side panel also rises from bottom board"
+    },
+    {
+      "body": "TopBoard",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Top board sits on top of side panels (dovetailed)"
+    },
+    {
+      "body": "BackPanel",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back panel rabbeted into sides at rear"
+    },
+    {
+      "body": "BackPanel",
+      "ref": "BottomBoard",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back panel spans between bottom and top"
+    },
+    {
+      "body": "dd_Front",
+      "ref": "BottomBoard",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Drawer front (first drawer), patterned vertically",
+      "replicas": "dd_Front*",
+      "contact": false
+    },
+    {
+      "body": "dd_Back",
+      "ref": "dd_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Drawer back is behind drawer front",
+      "replicas": "dd_Back*",
+      "contact": false
+    },
+    {
+      "body": "dd_Left",
+      "ref": "dd_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Drawer left side",
+      "replicas": "dd_Left*"
+    },
+    {
+      "body": "dd_Right",
+      "ref": "dd_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Drawer right side",
+      "replicas": "dd_Right*"
+    },
+    {
+      "body": "dd_Bottom",
+      "ref": "dd_Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Drawer bottom panel",
+      "replicas": "dd_Bottom*"
+    },
+    {
+      "body": "Body5",
+      "ref": "Kick_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Kick corner domino FL"
+    },
+    {
+      "body": "Body6",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Kick corner domino FR"
+    },
+    {
+      "body": "Body7",
+      "ref": "Kick_Back",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Kick corner domino BL"
+    },
+    {
+      "body": "Body8",
+      "ref": "Kick_Back",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Kick corner domino BR"
+    },
+    {
+      "body": "KB_F0",
+      "ref": "Kick_Front",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "KB_F*"
+    },
+    {
+      "body": "KB_L0",
+      "ref": "Kick_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "KB_L*"
+    },
+    {
+      "body": "KB_R0",
+      "ref": "Kick_Right",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "KB_R*"
+    },
+    {
+      "body": "KB_B0",
+      "ref": "Kick_Back",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "KB_B*"
+    }
+  ]
+}

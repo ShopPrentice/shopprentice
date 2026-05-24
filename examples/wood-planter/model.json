@@ -1,0 +1,251 @@
+{
+  "deps": [
+    {
+      "body": "Leg_FL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front-left leg, full height from floor"
+    },
+    {
+      "body": "Leg_FR",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Front-right leg, mirror of FL across YZ midplane",
+      "contact": false
+    },
+    {
+      "body": "Leg_BL",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back-left leg, mirror of FL across XZ midplane",
+      "contact": false
+    },
+    {
+      "body": "Leg_BR",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Back-right leg, mirror of FR across XZ midplane",
+      "contact": false
+    },
+    {
+      "body": "LR_Front_Lower",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        -1,
+        0
+      ],
+      "note": "Front lower long rail, tenoned into FL and FR legs"
+    },
+    {
+      "body": "LR_Front_Upper",
+      "ref": "LR_Front_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front upper long rail, above front lower rail",
+      "contact": false
+    },
+    {
+      "body": "LR_Back_Lower",
+      "ref": "Leg_BL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back lower long rail, mirror of front lower across XZ midplane"
+    },
+    {
+      "body": "LR_Back_Upper",
+      "ref": "LR_Back_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back upper long rail, mirror of front upper across XZ midplane",
+      "contact": false
+    },
+    {
+      "body": "SR_Left_Lower",
+      "ref": "Leg_FL",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left lower short rail, tenoned into FL and BL legs"
+    },
+    {
+      "body": "SR_Left_Upper",
+      "ref": "SR_Left_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left upper short rail, above left lower rail",
+      "contact": false
+    },
+    {
+      "body": "SR_Right_Lower",
+      "ref": "Leg_FR",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right lower short rail, mirror of left lower across YZ midplane"
+    },
+    {
+      "body": "SR_Right_Upper",
+      "ref": "SR_Right_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right upper short rail, mirror of left upper across YZ midplane",
+      "contact": false
+    },
+    {
+      "body": "Slat_Front_1",
+      "ref": "LR_Front_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front slat template, tongue-and-groove between upper and lower front rails",
+      "replicas": "Slat_Front_*"
+    },
+    {
+      "body": "Slat_Back_1",
+      "ref": "LR_Back_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back slat template, mirror of front slats across XZ midplane",
+      "replicas": "Slat_Back_*"
+    },
+    {
+      "body": "Slat_Left_1",
+      "ref": "SR_Left_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left slat template, tongue-and-groove between upper and lower left rails",
+      "replicas": "Slat_Left_*"
+    },
+    {
+      "body": "Slat_Right_1",
+      "ref": "SR_Right_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right slat template, mirror of left slats across YZ midplane",
+      "replicas": "Slat_Right_*"
+    },
+    {
+      "body": "BottomSlat_1",
+      "ref": "LR_Front_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Bottom slat template, rests on lower rails with domino joinery",
+      "replicas": "BottomSlat_*"
+    },
+    {
+      "body": "BtDm_Front",
+      "ref": "BottomSlat_1",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Domino void at front mating face of bottom slat template",
+      "replicas": "BtDm_Front*"
+    },
+    {
+      "body": "BtDm_Back",
+      "ref": "BottomSlat_1",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Domino void at back mating face, mirror of BtDm_Front across XZ midplane",
+      "replicas": "BtDm_Back*"
+    },
+    {
+      "body": "Body79",
+      "ref": "LR_Back_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "contact": false,
+      "note": "Auto-named slat fragment"
+    },
+    {
+      "body": "Body100",
+      "ref": "SR_Right_Lower",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "contact": false,
+      "note": "Auto-named slat fragment"
+    }
+  ]
+}

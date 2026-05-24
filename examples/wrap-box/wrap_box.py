@@ -108,6 +108,20 @@ def run(context):
         params.add(pname, adsk.core.ValueInput.createByString(expr), unit, desc)
 
     # ==============================================================
+    #  BODY LOOKUP
+    # ==============================================================
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
+    # ==============================================================
     #  HELPERS
     # ==============================================================
     H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
@@ -272,6 +286,8 @@ def run(context):
     front_body.name = "Front"
 
     # 2. BACK BOARD — mirror of front across Y midplane
+    ref_body = find_body("Front")
+    ref_bb = ref_body.boundingBox  # Back depends on Front
     y_mid_pl = off_plane(case_c, case_c.xZConstructionPlane,
                          "box_width / 2", "YMid_Pl")
     back_mirror = mirror_body(case_c, front_body, y_mid_pl, "Back_Mirror")
@@ -279,6 +295,8 @@ def run(context):
     back_body.name = "Back"
 
     # 3. LEFT END BOARD
+    ref_body = find_body("Front")
+    ref_bb = ref_body.boundingBox  # End_Left depends on Front
     _, pr = sketch_rect_model(case_c, case_c.yZConstructionPlane,
         ("0 in", "board_thick", "0 in"),
         {"y": "side_inner_len", "z": "box_height"},
@@ -319,6 +337,10 @@ def run(context):
     # ==============================================================
     #  BOTTOM COMPONENT — edge rabbets
     # ==============================================================
+
+    # Body-relative ref: Bottom depends on Front
+    ref_body = find_body("Front")
+    ref_bb = ref_body.boundingBox
 
     # 6. FULL BOARD at tongue footprint
     _, pr = sketch_rect_model(bot_c, bot_c.xYConstructionPlane,
@@ -361,6 +383,10 @@ def run(context):
     # ==============================================================
     #  LID COMPONENT — edge rabbets (no front tongue, back tongue restored)
     # ==============================================================
+
+    # Body-relative ref: Lid depends on Front
+    ref_body = find_body("Front")
+    ref_bb = ref_body.boundingBox
 
     # Construction planes
     lid_base_pl = off_plane(lid_c, lid_c.xYConstructionPlane,
@@ -437,6 +463,9 @@ def run(context):
     # ----------------------------------------------------------
     #  MIRROR LEFT END -> RIGHT END (carries grooves)
     # ----------------------------------------------------------
+    # Body-relative ref: End_Right depends on Front (via End_Left mirror)
+    ref_body = find_body("End_Left")
+    ref_bb = ref_body.boundingBox
     end_mirror = mirror_body(root, left_proxy, x_mid_pl, "EndRight_Mirror")
     right_body = end_mirror.bodies.item(0)
     right_body.name = "End_Right"

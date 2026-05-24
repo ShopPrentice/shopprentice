@@ -1,0 +1,99 @@
+{
+  "deps": [
+    {
+      "body": "Side_Left",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "body": "Side_Right",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "contact": false
+    },
+    {
+      "body": "Side_Right",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "contact": false
+    },
+    {
+      "body": "Shelf",
+      "ref": "Side_Left",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "Shelf*"
+    },
+    {
+      "body": "ShDm_0",
+      "ref": "Shelf",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "ShDm_0*"
+    },
+    {
+      "body": "TopBoard",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "body": "KickBoard",
+      "ref": "Side_Left",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "body": "KDm_R_0",
+      "ref": "KickBoard",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "replicas": "KDm_R_*"
+    },
+    {
+      "body": "BackPanel",
+      "ref": "Side_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ]
+    }
+  ]
+}

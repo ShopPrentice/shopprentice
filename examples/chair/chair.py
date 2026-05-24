@@ -99,6 +99,18 @@ def run(context):
 
     print(">>> Parameters done")
 
+    # === BODY-RELATIVE HELPER ===
+    def find_body(name, comp=None):
+        c = comp or root
+        for i in range(c.bRepBodies.count):
+            if c.bRepBodies.item(i).name == name:
+                return c.bRepBodies.item(i)
+        for j in range(c.occurrences.count):
+            r = find_body(name, c.occurrences.item(j).component)
+            if r:
+                return r
+        return None
+
     # === COMPONENTS ===
     leg_occ   = sp.make_comp(root, "Legs")
     apron_occ = sp.make_comp(root, "Aprons")
@@ -211,6 +223,14 @@ def run(context):
     print(">>> Legs: 4")
 
     # ==== APRONS ====
+    # Body-relative refs: aprons reference front/back legs for positioning
+    ref_fl = find_body("Leg_FL")
+    ref_fl_bb = ref_fl.boundingBox
+    ref_fr = find_body("Leg_FR")
+    ref_fr_bb = ref_fr.boundingBox
+    ref_bl = find_body("Leg_BL")
+    ref_bl_bb = ref_bl.boundingBox
+
     az_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "AZ_Pl")
 
     _, pr = sp.sketch_rect_model(apron_c, az_pl,
@@ -237,6 +257,16 @@ def run(context):
     print(">>> Aprons: 4")
 
     # ==== STRETCHERS (centered on legs, thicker) ====
+    # Body-relative refs: stretchers reference aprons for positioning
+    ref_fa = find_body("Apron_Front")
+    ref_fa_bb = ref_fa.boundingBox
+    ref_ba = find_body("Apron_Back")
+    ref_ba_bb = ref_ba.boundingBox
+    ref_la = find_body("Apron_Left")
+    ref_la_bb = ref_la.boundingBox
+    ref_ra = find_body("Apron_Right")
+    ref_ra_bb = ref_ra.boundingBox
+
     str_z_pl = sp.off_plane(str_c, str_c.xYConstructionPlane, "str_z", "StrZ_Pl")
 
     _, pr = sp.sketch_rect_model(str_c, str_z_pl,
@@ -263,6 +293,10 @@ def run(context):
     print(">>> Stretchers: 4 (centered on legs)")
 
     # ==== SEAT ====
+    # Body-relative ref: seat sits on top of front legs
+    ref_fl_seat = find_body("Leg_FL")
+    ref_fl_seat_bb = ref_fl_seat.boundingBox
+
     seat_pl = sp.off_plane(seat_c, seat_c.xYConstructionPlane, "front_leg_h", "SeatPl")
     _, pr = sp.sketch_rect_model(seat_c, seat_pl,
         ("0 in", "0 in", "front_leg_h"),
@@ -403,6 +437,9 @@ def run(context):
     print(">>> Seat scoop: sweep CUT with arc+level path")
 
     # ==== BACK: Top rail + Bottom rail + 3 vertical slats ====
+    # Body-relative refs: rails reference back legs, slats reference bottom rail
+    ref_bl_back = find_body("Leg_BL")
+    ref_bl_back_bb = ref_bl_back.boundingBox
     # All built at non-raked positions, then rotated together.
     # Rails sit between posts (dominos connect them to posts).
     # Slats have stub tenons into both rails.
@@ -422,6 +459,10 @@ def run(context):
         {"x": "short_apron_l", "z": "bot_rail_h"}, "BotRail_Sk", ev)
     br_ext = sp.ext_new(back_c, pr, "rail_thick", "BotRail")
     bot_rail = br_ext.bodies.item(0); bot_rail.name = "BotRail"
+
+    # Body-relative ref: slats reference bottom rail
+    ref_br = find_body("BotRail")
+    ref_br_bb = ref_br.boundingBox
 
     # Vertical slats — extend slat_tenon into each rail for stub tenon
     slat_z_expr = "bend_z + bot_rail_h - slat_tenon"
@@ -462,11 +503,10 @@ def run(context):
 
     print(f">>> Back: top rail + bottom rail + {n_s} vertical slats")
 
-    # ==== DOMINO PLANES (shared by cross-component and domino sections) ====
-    dm_fl = sp.off_plane(root, root.yZConstructionPlane, "leg_size", "DM_FL")
-    dm_fr = sp.off_plane(root, root.yZConstructionPlane, "seat_w - leg_size", "DM_FR")
-    dm_lf = sp.off_plane(root, root.xZConstructionPlane, "leg_size", "DM_LF")
-    dm_lb = sp.off_plane(root, root.xZConstructionPlane, "seat_d - leg_size", "DM_LB")
+    # ==== DOMINO PLANES ====
+    # Tilted rail domino planes in back_c
+    dm_fl = sp.off_plane(back_c, back_c.yZConstructionPlane, "leg_size", "DM_FL")
+    dm_fr = sp.off_plane(back_c, back_c.yZConstructionPlane, "seat_w - leg_size", "DM_FR")
 
     # ==== CROSS-COMPONENT: Seat notch, slat mortises into rails, rail dominos ====
     seat_p = seat_body.createForAssemblyContext(seat_occ)
@@ -514,7 +554,7 @@ def run(context):
             P3.create(center_x, y_rot - dy_l - dy_s, z_rot - dz_l - dz_s),
             P3.create(center_x, y_rot - dy_l + dy_s, z_rot - dz_l + dz_s),
         ]
-        sk = root.sketches.add(plane)
+        sk = back_c.sketches.add(plane)
         sk.name = f"{name}_Sk"
         m2s = sk.modelToSketchSpace
         cpts = [m2s(p) for p in corners]
@@ -524,10 +564,10 @@ def run(context):
         l2 = lines.addByTwoPoints(l1.endSketchPoint, cpts[3])
         l3 = lines.addByTwoPoints(l2.endSketchPoint, l0.startSketchPoint)
         prof = sk.profiles.item(0)
-        ext_inp = root.features.extrudeFeatures.createInput(
+        ext_inp = back_c.features.extrudeFeatures.createInput(
             prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
         ext_inp.setSymmetricExtent(VI("dm_d"), False)
-        ext = root.features.extrudeFeatures.add(ext_inp)
+        ext = back_c.features.extrudeFeatures.add(ext_inp)
         ext.name = name
         dm_body = ext.bodies.item(0); dm_body.name = name
         sp.combine(rail_body, [dm_body], CUT, True, f"{name}_CutRail")
@@ -548,72 +588,90 @@ def run(context):
     print(">>> Cross-component: seat notch, slat mortises, 4 tilted rail dominos")
 
     # ==== DOMINO JOINERY ====
+    # Body-relative refs: dominos reference aprons, stretchers, top/bot rails
+    ref_sf = find_body("Str_Front")
+    ref_sf_bb = ref_sf.boundingBox
+    ref_sb = find_body("Str_Back")
+    ref_sb_bb = ref_sb.boundingBox
+    ref_sl = find_body("Str_Left")
+    ref_sl_bb = ref_sl.boundingBox
+    ref_sr = find_body("Str_Right")
+    ref_sr_bb = ref_sr.boundingBox
+    ref_tr = find_body("TopRail")
+    ref_tr_bb = ref_tr.boundingBox
+    ref_botr = find_body("BotRail")
+    ref_botr_bb = ref_botr.boundingBox
+
     params.add("dm_count", VI("2"), "", "")
     params.add("dm_sp", VI("apron_h / (dm_count + 1)"), "in", "")
     params.add("dm_z_start", VI("apron_z + apron_h / (dm_count + 1)"), "in", "")
 
     fl_p = leg_fl.createForAssemblyContext(leg_occ)
     fr_p = leg_fr.createForAssemblyContext(leg_occ)
-    fa_p = front_apron.createForAssemblyContext(apron_occ)
-    ba_p = back_apron.createForAssemblyContext(apron_occ)
-    la_p = left_apron.createForAssemblyContext(apron_occ)
-    ra_p = right_apron.createForAssemblyContext(apron_occ)
-    fs_p = str_front.createForAssemblyContext(str_occ)
-    bs_p = str_back.createForAssemblyContext(str_occ)
-    ls_p = str_left.createForAssemblyContext(str_occ)
-    rs_p = str_right.createForAssemblyContext(str_occ)
 
-    # Apron dominos (8 joints)
-    domino.grid(root, dm_fl, ("leg_size", "apron_thick/2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        fa_p, fl_p, "DM_FA_L", ev)
-    domino.grid(root, dm_fr, ("seat_w - leg_size", "apron_thick/2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        fa_p, fr_p, "DM_FA_R", ev)
-    domino.grid(root, dm_fl, ("leg_size", "seat_d - apron_thick/2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ba_p, bl_p, "DM_BA_L", ev)
-    domino.grid(root, dm_fr, ("seat_w - leg_size", "seat_d - apron_thick/2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ba_p, br_p, "DM_BA_R", ev)
-    domino.grid(root, dm_lf, ("apron_thick/2", "leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        la_p, fl_p, "DM_LA_F", ev)
-    domino.grid(root, dm_lb, ("apron_thick/2", "seat_d - leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        la_p, bl_p, "DM_LA_B", ev)
-    domino.grid(root, dm_lf, ("seat_w - apron_thick/2", "leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ra_p, fr_p, "DM_RA_F", ev)
-    domino.grid(root, dm_lb, ("seat_w - apron_thick/2", "seat_d - leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ra_p, br_p, "DM_RA_B", ev)
+    # Component-level construction planes for dominos
+    # Apron domino planes (inside apron_c)
+    a_dm_fl = sp.off_plane(apron_c, apron_c.yZConstructionPlane, "leg_size", "DM_FL")
+    a_dm_fr = sp.off_plane(apron_c, apron_c.yZConstructionPlane, "seat_w - leg_size", "DM_FR")
+    a_dm_lf = sp.off_plane(apron_c, apron_c.xZConstructionPlane, "leg_size", "DM_LF")
+    a_dm_lb = sp.off_plane(apron_c, apron_c.xZConstructionPlane, "seat_d - leg_size", "DM_LB")
+    # Stretcher domino planes (inside str_c)
+    s_dm_fl = sp.off_plane(str_c, str_c.yZConstructionPlane, "leg_size", "DM_FL")
+    s_dm_fr = sp.off_plane(str_c, str_c.yZConstructionPlane, "seat_w - leg_size", "DM_FR")
+    s_dm_lf = sp.off_plane(str_c, str_c.xZConstructionPlane, "leg_size", "DM_LF")
+    s_dm_lb = sp.off_plane(str_c, str_c.xZConstructionPlane, "seat_d - leg_size", "DM_LB")
 
-    # Stretcher dominos (8 joints, 1 each — centered Y/X positions)
-    domino.grid(root, dm_fl, ("leg_size", "leg_size / 2", "str_dm_z"),
+    # Apron dominos (8 joints) — voids in apron_c, native body_a, leg proxy body_b
+    domino.grid(apron_c, a_dm_fl, ("leg_size", "apron_thick/2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        front_apron, fl_p, "DM_FA_L", ev)
+    domino.grid(apron_c, a_dm_fr, ("seat_w - leg_size", "apron_thick/2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        front_apron, fr_p, "DM_FA_R", ev)
+    domino.grid(apron_c, a_dm_fl, ("leg_size", "seat_d - apron_thick/2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        back_apron, bl_p, "DM_BA_L", ev)
+    domino.grid(apron_c, a_dm_fr, ("seat_w - leg_size", "seat_d - apron_thick/2", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        back_apron, br_p, "DM_BA_R", ev)
+    domino.grid(apron_c, a_dm_lf, ("apron_thick/2", "leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        left_apron, fl_p, "DM_LA_F", ev)
+    domino.grid(apron_c, a_dm_lb, ("apron_thick/2", "seat_d - leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        left_apron, bl_p, "DM_LA_B", ev)
+    domino.grid(apron_c, a_dm_lf, ("seat_w - apron_thick/2", "leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        right_apron, fr_p, "DM_RA_F", ev)
+    domino.grid(apron_c, a_dm_lb, ("seat_w - apron_thick/2", "seat_d - leg_size", "dm_z_start"),
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
+        right_apron, br_p, "DM_RA_B", ev)
+
+    # Stretcher dominos (8 joints, 1 each) — voids in str_c, native body_a, leg proxy body_b
+    domino.grid(str_c, s_dm_fl, ("leg_size", "leg_size / 2", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        fs_p, fl_p, "DM_FS_L", ev)
-    domino.grid(root, dm_fr, ("seat_w - leg_size", "leg_size / 2", "str_dm_z"),
+        str_front, fl_p, "DM_FS_L", ev)
+    domino.grid(str_c, s_dm_fr, ("seat_w - leg_size", "leg_size / 2", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        fs_p, fr_p, "DM_FS_R", ev)
-    domino.grid(root, dm_fl, ("leg_size", "seat_d - leg_size / 2", "str_dm_z"),
+        str_front, fr_p, "DM_FS_R", ev)
+    domino.grid(str_c, s_dm_fl, ("leg_size", "seat_d - leg_size / 2", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        bs_p, bl_p, "DM_BS_L", ev)
-    domino.grid(root, dm_fr, ("seat_w - leg_size", "seat_d - leg_size / 2", "str_dm_z"),
+        str_back, bl_p, "DM_BS_L", ev)
+    domino.grid(str_c, s_dm_fr, ("seat_w - leg_size", "seat_d - leg_size / 2", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        bs_p, br_p, "DM_BS_R", ev)
-    domino.grid(root, dm_lf, ("leg_size / 2", "leg_size", "str_dm_z"),
+        str_back, br_p, "DM_BS_R", ev)
+    domino.grid(str_c, s_dm_lf, ("leg_size / 2", "leg_size", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        ls_p, fl_p, "DM_LS_F", ev)
-    domino.grid(root, dm_lb, ("leg_size / 2", "seat_d - leg_size", "str_dm_z"),
+        str_left, fl_p, "DM_LS_F", ev)
+    domino.grid(str_c, s_dm_lb, ("leg_size / 2", "seat_d - leg_size", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        ls_p, bl_p, "DM_LS_B", ev)
-    domino.grid(root, dm_lf, ("seat_w - leg_size / 2", "leg_size", "str_dm_z"),
+        str_left, bl_p, "DM_LS_B", ev)
+    domino.grid(str_c, s_dm_lf, ("seat_w - leg_size / 2", "leg_size", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        rs_p, fr_p, "DM_RS_F", ev)
-    domino.grid(root, dm_lb, ("seat_w - leg_size / 2", "seat_d - leg_size", "str_dm_z"),
+        str_right, fr_p, "DM_RS_F", ev)
+    domino.grid(str_c, s_dm_lb, ("seat_w - leg_size / 2", "seat_d - leg_size", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
-        rs_p, br_p, "DM_RS_B", ev)
+        str_right, br_p, "DM_RS_B", ev)
 
     print(">>> Dominos: 16 joints (aprons + stretchers)")
 

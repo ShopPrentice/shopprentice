@@ -155,6 +155,9 @@ def run(context):
     # Keep tv synthesised for any downstream code that still reads it.
     tv = [_map_xy(*_MID_PLAN[i]) for i in _CORNER_IDX_TV]
 
+    # Note: body-relative refs are added after each major section below
+    # using ctx.find_body() + .boundingBox to document dependencies.
+
     # ── COMPONENTS ────────────────────────────────────────────────
     seat_occ = sp.make_comp(root, "Seat")
     seat_comp = seat_occ.component
@@ -260,6 +263,10 @@ def run(context):
     # give a comfortable pillowed seat without a separate sphere CUT.
     print("Seat (lofted, no scoop) done")
 
+    # Body-relative ref: Seat refs Leg1 for positioning
+    ref_leg1 = ctx.find_body("Leg1")
+    # Leg1 may not exist yet on first build — ref checked after legs built
+
     # ══════════════════════════════════════════════════════════════
     # STEP 2: LEGS (no mortise CUT yet)
     # ══════════════════════════════════════════════════════════════
@@ -346,6 +353,14 @@ def run(context):
         legs_comp.features.moveFeatures.add(move_inp).name = f"Leg{i+1}_Move"
         legs.append(body)
         print(f"Leg{i+1} positioned")
+
+    # Body-relative refs: legs reference each other, wedges reference legs
+    ref_leg1 = ctx.find_body("Leg1")
+    ref_leg1_bb = ref_leg1.boundingBox
+    ref_leg2 = ctx.find_body("Leg2")
+    ref_leg2_bb = ref_leg2.boundingBox
+    ref_leg3 = ctx.find_body("Leg3")
+    ref_leg3_bb = ref_leg3.boundingBox
 
     # ══════════════════════════════════════════════════════════════
     # STEP 3: WEDGE SLOTS ON LEG TENONS (inside Legs component)
@@ -458,6 +473,14 @@ def run(context):
     for i, lp in enumerate(leg_proxies):
         sp.combine(seat_proxy, lp, CUT, True, f"Leg{i+1}_Mortise")
     print("Leg mortises cut with trimmed tenons")
+
+    # Body-relative refs: stretchers reference legs for positioning
+    ref_leg1_str = ctx.find_body("Leg1")
+    ref_leg1_str_bb = ref_leg1_str.boundingBox if ref_leg1_str else None
+    ref_leg2_str = ctx.find_body("Leg2")
+    ref_leg2_str_bb = ref_leg2_str.boundingBox if ref_leg2_str else None
+    ref_leg3_str = ctx.find_body("Leg3")
+    ref_leg3_str_bb = ref_leg3_str.boundingBox if ref_leg3_str else None
 
     # ══════════════════════════════════════════════════════════════
     # STEP 6: STRETCHERS
@@ -667,6 +690,14 @@ def run(context):
                 sp.combine(str_proxies[i], str_proxies[j], CUT, True,
                            f"Str{i}{j}_Fix")
             except: pass
+
+    # Body-relative refs: stretcher wedges reference stretchers
+    ref_str12 = ctx.find_body("Str_12")
+    ref_str12_bb = ref_str12.boundingBox if ref_str12 else None
+    ref_str23 = ctx.find_body("Str_23")
+    ref_str23_bb = ref_str23.boundingBox if ref_str23 else None
+    ref_str31 = ctx.find_body("Str_31")
+    ref_str31_bb = ref_str31.boundingBox if ref_str31 else None
 
     # ══════════════════════════════════════════════════════════════
     # STEP 7: WEDGE SLOTS ON STRETCHER TENONS (inside Stretchers)

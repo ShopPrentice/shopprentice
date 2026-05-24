@@ -1,0 +1,360 @@
+{
+  "deps": [
+    {
+      "body": "top",
+      "ref": "leg_FR",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Top slab rests above legs with a small gap (leg_to_top)",
+      "contact": false
+    },
+    {
+      "body": "ear_R",
+      "ref": "top",
+      "side": "inside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right edge ear (thin veneer shell on long cylindrical edge of top)"
+    },
+    {
+      "body": "ear_L",
+      "ref": "top",
+      "side": "inside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Left edge ear (thin veneer shell, mirrored)"
+    },
+    {
+      "body": "leg_FR",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front-right leg, entasis profile with 3-deg splay",
+      "contact": false
+    },
+    {
+      "body": "leg_FR (1)",
+      "ref": "leg_FR",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Front-left leg (YZ mirror of leg_FR)",
+      "contact": false
+    },
+    {
+      "body": "leg_FR (2)",
+      "ref": "leg_FR",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back-right leg (XZ mirror)",
+      "contact": false
+    },
+    {
+      "body": "leg_FR (1) (1)",
+      "ref": "leg_FR",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Back-left leg (XZ mirror of front-left)",
+      "contact": false
+    },
+    {
+      "body": "apron_F",
+      "ref": "leg_FR",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front apron with arched bottom, centered at X=+leg_dist_x/2"
+    },
+    {
+      "body": "apron_F (1)",
+      "ref": "leg_FR (2)",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back apron (YZ mirror of front apron), centered at X=-leg_dist_x/2",
+      "contact": false
+    },
+    {
+      "body": "BT_apron_F_v22_1",
+      "ref": "apron_F",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Bowtie inlay #1 in front apron face"
+    },
+    {
+      "body": "BT_apron_F_v22_2",
+      "ref": "apron_F",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Bowtie inlay #2 in front apron face"
+    },
+    {
+      "body": "BT_apron_F_v22_3",
+      "ref": "apron_F",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Bowtie inlay #3 in front apron face"
+    },
+    {
+      "body": "BT_apron_F_v22_4",
+      "ref": "apron_F",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Bowtie inlay #4 in front apron face"
+    },
+    {
+      "body": "BT_apron_F_v22_5",
+      "ref": "apron_F",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Bowtie inlay #5 in front apron face"
+    },
+    {
+      "body": "outerSlat_F",
+      "ref": "apron_F",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Front outer slat (horizontal cross-rail at Y=-leg_dist_y/2)"
+    },
+    {
+      "body": "outerSlat_B",
+      "ref": "apron_F (1)",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Back outer slat (XZ mirror of front outer slat)"
+    },
+    {
+      "body": "innerSlat_F",
+      "ref": "apron_F",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Front inner slat (horizontal cross-rail at Y=-leg_dist_y/6)"
+    },
+    {
+      "body": "innerSlat_B",
+      "ref": "apron_F (1)",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Back inner slat (XZ mirror of front inner slat)"
+    },
+    {
+      "body": "sideStretcher_F",
+      "ref": "leg_FR",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front side stretcher (round bar at Z=250mm, spanning leg X positions)"
+    },
+    {
+      "body": "sideStretcher_F (1)",
+      "ref": "leg_FR (2)",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back side stretcher (XZ mirror of front)"
+    },
+    {
+      "body": "editable_loft_transition_front_right_v22loc_in_side_stretchers",
+      "ref": "sideStretcher_F",
+      "side": "inside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Loft transition from front stretcher to front-right leg"
+    },
+    {
+      "body": "editable_loft_transition_front_left_v22loc_in_side_stretchers",
+      "ref": "sideStretcher_F",
+      "side": "inside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Loft transition from front stretcher to front-left leg"
+    },
+    {
+      "body": "editable_loft_transition_back_right_v22loc_in_side_stretchers",
+      "ref": "sideStretcher_F (1)",
+      "side": "inside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Loft transition from back stretcher to back-right leg"
+    },
+    {
+      "body": "editable_loft_transition_back_left_v22loc_in_side_stretchers",
+      "ref": "sideStretcher_F (1)",
+      "side": "inside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Loft transition from back stretcher to back-left leg"
+    },
+    {
+      "body": "dtOut_F_0",
+      "ref": "outerSlat_F",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Outer-front dovetail block row, primary block (pattern of 3 along X)",
+      "replicas": "dtOut_F_*"
+    },
+    {
+      "body": "dtIn_F_0",
+      "ref": "innerSlat_F",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Inner-front dovetail block row, primary block (pattern of 3 along X)",
+      "replicas": "dtIn_F_*"
+    },
+    {
+      "body": "dtOut_F_0 (1)",
+      "ref": "outerSlat_B",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Outer-back dovetail block row (XZ mirror of outer-front)",
+      "replicas": "dtOut_F_* (1)",
+      "contact": false
+    },
+    {
+      "body": "dtIn_F_0 (1)",
+      "ref": "innerSlat_B",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Inner-back dovetail block row (XZ mirror of inner-front)",
+      "replicas": "dtIn_F_* (1)",
+      "contact": false
+    },
+    {
+      "body": "ear_R_surface",
+      "ref": "top",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "contact": false,
+      "note": "Ear projection surface (hidden)"
+    },
+    {
+      "body": "ear_L_surface",
+      "ref": "top",
+      "side": "opposite",
+      "direction": [
+        -1,
+        0,
+        0
+      ],
+      "contact": false,
+      "note": "Ear projection surface (hidden)"
+    },
+    {
+      "body": "axis_marker_R",
+      "ref": "top",
+      "side": "inside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "contact": false,
+      "note": "Debug axis marker (hidden)"
+    }
+  ]
+}

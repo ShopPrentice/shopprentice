@@ -1,0 +1,414 @@
+{
+  "deps": [
+    {
+      "body": "Post_FL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front-left post stands on floor"
+    },
+    {
+      "body": "Post_FR",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "FR post is to the right of FL post",
+      "contact": false
+    },
+    {
+      "body": "Post_BL",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "BL post is behind FL post",
+      "contact": false
+    },
+    {
+      "body": "Post_BR",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "BR post is to the right of FL post",
+      "contact": false
+    },
+    {
+      "body": "Rail_FrontBot",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Front bottom rail spans between FL and FR posts at bottom"
+    },
+    {
+      "body": "Rail_FrontBot",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Bottom rail is above floor",
+      "contact": false
+    },
+    {
+      "body": "Rail_FrontTop",
+      "ref": "Rail_FrontBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front top rail is above front bottom rail",
+      "contact": false
+    },
+    {
+      "body": "Rail_BackBot",
+      "ref": "Rail_FrontBot",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Back bottom rail is behind front bottom rail",
+      "contact": false
+    },
+    {
+      "body": "Rail_BackTop",
+      "ref": "Rail_BackBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Back top rail is above back bottom rail",
+      "contact": false
+    },
+    {
+      "body": "Rail_LeftBot",
+      "ref": "Post_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "Left bottom rail spans between FL and BL posts"
+    },
+    {
+      "body": "Rail_LeftTop",
+      "ref": "Rail_LeftBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left top rail is above left bottom rail",
+      "contact": false
+    },
+    {
+      "body": "Rail_RightBot",
+      "ref": "Rail_LeftBot",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right bottom rail mirrors left bottom rail",
+      "contact": false
+    },
+    {
+      "body": "Rail_RightTop",
+      "ref": "Rail_RightBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Right top rail is above right bottom rail",
+      "contact": false
+    },
+    {
+      "body": "Spindle_F1",
+      "ref": "Rail_FrontBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Front spindles span between front bottom and top rails",
+      "replicas": "Spindle_F*"
+    },
+    {
+      "body": "Spindle_L1",
+      "ref": "Rail_LeftBot",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left spindles span between left bottom and top rails",
+      "replicas": "Spindle_L*"
+    },
+    {
+      "body": "SupRail_Left",
+      "ref": "Post_FL",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "Left support rail at mattress height, mortised into posts"
+    },
+    {
+      "body": "SupRail_Right",
+      "ref": "SupRail_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Right support rail mirrors left",
+      "contact": false
+    },
+    {
+      "body": "Slat_1",
+      "ref": "SupRail_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "Mattress slats span between support rails",
+      "replicas": "Slat_*"
+    },
+    {
+      "body": "DM_FBR_L_0",
+      "ref": "Rail_FrontBot",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_FBR_L_*"
+    },
+    {
+      "body": "DM_FBR_R_0",
+      "ref": "Rail_FrontBot",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_FBR_R_*"
+    },
+    {
+      "body": "DM_FTR_L_0",
+      "ref": "Rail_FrontTop",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_FTR_L_*"
+    },
+    {
+      "body": "DM_FTR_R_0",
+      "ref": "Rail_FrontTop",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_FTR_R_*"
+    },
+    {
+      "body": "DM_BBR_L_0",
+      "ref": "Rail_BackBot",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BBR_L_*"
+    },
+    {
+      "body": "DM_BBR_R_0",
+      "ref": "Rail_BackBot",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BBR_R_*"
+    },
+    {
+      "body": "DM_BTR_L_0",
+      "ref": "Rail_BackTop",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BTR_L_*"
+    },
+    {
+      "body": "DM_BTR_R_0",
+      "ref": "Rail_BackTop",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_BTR_R_*"
+    },
+    {
+      "body": "DM_LBR_F_0",
+      "ref": "Rail_LeftBot",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LBR_F_*"
+    },
+    {
+      "body": "DM_LBR_B_0",
+      "ref": "Rail_LeftBot",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LBR_B_*"
+    },
+    {
+      "body": "DM_LTR_F_0",
+      "ref": "Rail_LeftTop",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LTR_F_*"
+    },
+    {
+      "body": "DM_LTR_B_0",
+      "ref": "Rail_LeftTop",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_LTR_B_*"
+    },
+    {
+      "body": "DM_RBR_F_0",
+      "ref": "Rail_RightBot",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RBR_F_*"
+    },
+    {
+      "body": "DM_RBR_B_0",
+      "ref": "Rail_RightBot",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RBR_B_*"
+    },
+    {
+      "body": "DM_RTR_F_0",
+      "ref": "Rail_RightTop",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RTR_F_*"
+    },
+    {
+      "body": "DM_RTR_B_0",
+      "ref": "Rail_RightTop",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "replicas": "DM_RTR_B_*"
+    },
+    {
+      "body": "DM_SlatL_0",
+      "ref": "SupRail_Left",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_SlatL_*"
+    },
+    {
+      "body": "DM_SlatR_0",
+      "ref": "SupRail_Right",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "replicas": "DM_SlatR_*"
+    }
+  ]
+}

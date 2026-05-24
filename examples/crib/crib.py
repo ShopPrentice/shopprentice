@@ -19,11 +19,25 @@ from woodworking.templates import domino
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
 
+def find_body(name, comp=None):
+    c = comp or _root_comp
+    for i in range(c.bRepBodies.count):
+        if c.bRepBodies.item(i).name == name:
+            return c.bRepBodies.item(i)
+    for j in range(c.occurrences.count):
+        r = find_body(name, c.occurrences.item(j).component)
+        if r:
+            return r
+    return None
+
+
 def run(context):
     app = adsk.core.Application.get()
     design = adsk.fusion.Design.cast(app.activeProduct)
     design.designType = adsk.fusion.DesignTypes.ParametricDesignType
     root = design.rootComponent
+    global _root_comp
+    _root_comp = root
     params = design.userParameters
     VI = adsk.core.ValueInput.createByString
     ev = lambda e: (params.itemByName(e).value if params.itemByName(e)
@@ -108,6 +122,10 @@ def run(context):
     p_xmid = sp.off_plane(post_c, post_c.yZConstructionPlane, "mid_x", "PXMid")
     p_ymid = sp.off_plane(post_c, post_c.xZConstructionPlane, "mid_y", "PYMid")
 
+    # Body-relative reference: Post_FR, Post_BL, Post_BR depend on Post_FL
+    ref_post_fl = find_body("Post_FL")
+    ref_post_fl_bb = ref_post_fl.boundingBox
+
     post_fr = sp.mirror_body(post_c, post_fl, p_xmid, "PostFR").bodies.item(0)
     post_fr.name = "Post_FR"
     post_bl = sp.mirror_body(post_c, post_fl, p_ymid, "PostBL").bodies.item(0)
@@ -120,6 +138,10 @@ def run(context):
     # ================================================================
     #  2. RAILS — top + bottom on all 4 sides, centered on posts
     # ================================================================
+    # Body-relative references: Rails depend on Post_FL
+    ref_post_fl2 = find_body("Post_FL")
+    ref_post_fl2_bb = ref_post_fl2.boundingBox
+
     # Front bottom rail (short side, X direction)
     fbr_pl = sp.off_plane(rail_c, rail_c.xZConstructionPlane,
                            "post_size / 2 - rail_thick / 2", "FBR_Pl")
@@ -129,6 +151,10 @@ def run(context):
     fbr_ext = sp.ext_new(rail_c, pr, "rail_thick", "FrontBotRail")
     fbr = fbr_ext.bodies.item(0); fbr.name = "Rail_FrontBot"
 
+    # Body-relative reference: Rail_FrontTop depends on Rail_FrontBot
+    ref_fbr = find_body("Rail_FrontBot")
+    ref_fbr_bb = ref_fbr.boundingBox
+
     # Front top rail
     _, pr = sp.sketch_rect_model(rail_c, fbr_pl,
         ("post_size", "post_size / 2 - rail_thick / 2", "rail_h - rail_w"),
@@ -136,9 +162,18 @@ def run(context):
     ftr_ext = sp.ext_new(rail_c, pr, "rail_thick", "FrontTopRail")
     ftr = ftr_ext.bodies.item(0); ftr.name = "Rail_FrontTop"
 
+    # Body-relative reference: Rail_BackBot depends on Rail_FrontBot
+    ref_fbr2 = find_body("Rail_FrontBot")
+    ref_fbr2_bb = ref_fbr2.boundingBox
+
     # Mirror front rails to back
     r_ymid = sp.off_plane(rail_c, rail_c.xZConstructionPlane, "mid_y", "RYMid")
     sp.mirror_feats(rail_c, [fbr_ext], r_ymid, "BackBotRailMir").bodies.item(0).name = "Rail_BackBot"
+
+    # Body-relative reference: Rail_BackTop depends on Rail_BackBot
+    ref_bbr = find_body("Rail_BackBot")
+    ref_bbr_bb = ref_bbr.boundingBox
+
     sp.mirror_feats(rail_c, [ftr_ext], r_ymid, "BackTopRailMir").bodies.item(0).name = "Rail_BackTop"
 
     # Left bottom rail (long side, Y direction)
@@ -150,14 +185,27 @@ def run(context):
     lbr_ext = sp.ext_new(rail_c, pr, "rail_thick", "LeftBotRail")
     lbr_ext.bodies.item(0).name = "Rail_LeftBot"
 
+    # Body-relative reference: Rail_LeftTop depends on Rail_LeftBot
+    ref_lbr = find_body("Rail_LeftBot")
+    ref_lbr_bb = ref_lbr.boundingBox
+
     _, pr = sp.sketch_rect_model(rail_c, lbr_pl,
         ("post_size / 2 - rail_thick / 2", "post_size", "rail_h - rail_w"),
         {"y": "interior_l", "z": "rail_w"}, "LeftTopRail_Sk", ev)
     ltr_ext = sp.ext_new(rail_c, pr, "rail_thick", "LeftTopRail")
     ltr_ext.bodies.item(0).name = "Rail_LeftTop"
 
+    # Body-relative reference: Rail_RightBot depends on Rail_LeftBot
+    ref_lbr2 = find_body("Rail_LeftBot")
+    ref_lbr2_bb = ref_lbr2.boundingBox
+
     r_xmid = sp.off_plane(rail_c, rail_c.yZConstructionPlane, "mid_x", "RXMid")
     sp.mirror_feats(rail_c, [lbr_ext], r_xmid, "RightBotRailMir").bodies.item(0).name = "Rail_RightBot"
+
+    # Body-relative reference: Rail_RightTop depends on Rail_RightBot
+    ref_rbr = find_body("Rail_RightBot")
+    ref_rbr_bb = ref_rbr.boundingBox
+
     sp.mirror_feats(rail_c, [ltr_ext], r_xmid, "RightTopRailMir").bodies.item(0).name = "Rail_RightTop"
 
     print(">>> Rails: 8")
@@ -165,6 +213,11 @@ def run(context):
     # ================================================================
     #  3. SPINDLES — cylindrical, between top and bottom rails
     # ================================================================
+    # Body-relative references: Spindle_F depends on Rail_FrontBot, Spindle_L depends on Rail_LeftBot
+    ref_fbr3 = find_body("Rail_FrontBot")
+    ref_fbr3_bb = ref_fbr3.boundingBox
+    ref_lbr3 = find_body("Rail_LeftBot")
+    ref_lbr3_bb = ref_lbr3.boundingBox
     P3 = adsk.core.Point3D
 
     # Front spindle: circle on XY offset at spindle_z, extrude vertically by spindle_h
@@ -221,6 +274,9 @@ def run(context):
     # ================================================================
     #  4. MATTRESS SUPPORT — 2 support rails + slats
     # ================================================================
+    # Body-relative reference: SupRail_Left depends on Post_FL
+    ref_post_fl3 = find_body("Post_FL")
+    ref_post_fl3_bb = ref_post_fl3.boundingBox
     # Support rails run lengthwise (Y), centered on post inner X face.
     # Each end extends into the post (blind mortise — CUT rail into post).
     # Slats span widthwise (X) between the two support rails, tops flush.
@@ -234,9 +290,17 @@ def run(context):
     srl_ext = sp.ext_new(support_c, pr, "sup_rail_w", "SupRailLeft")
     sup_rail_l = srl_ext.bodies.item(0); sup_rail_l.name = "SupRail_Left"
 
+    # Body-relative reference: SupRail_Right depends on SupRail_Left
+    ref_sup_rail_l = find_body("SupRail_Left")
+    ref_sup_rail_l_bb = ref_sup_rail_l.boundingBox
+
     # Right support rail (mirror)
     sup_xmid = sp.off_plane(support_c, support_c.yZConstructionPlane, "mid_x", "SupXMid")
     sp.mirror_feats(support_c, [srl_ext], sup_xmid, "SupRailRMir").bodies.item(0).name = "SupRail_Right"
+
+    # Body-relative reference: Slat_1 depends on SupRail_Left
+    ref_sup_rail_l2 = find_body("SupRail_Left")
+    ref_sup_rail_l2_bb = ref_sup_rail_l2.boundingBox
 
     # Slats span between support rail inner faces, tops flush with rail tops
     slat_z_pl = sp.off_plane(support_c, support_c.xYConstructionPlane,
@@ -272,13 +336,30 @@ def run(context):
     bl_p = post_bl.createForAssemblyContext(post_occ)
     br_p = post_br.createForAssemblyContext(post_occ)
 
-    # Get rail bodies as proxies
+    # Get native rail bodies in rail_c (for domino body_a — owning component)
+    def get_rail_body(name):
+        for i in range(rail_c.bRepBodies.count):
+            b = rail_c.bRepBodies.item(i)
+            if b.name == name:
+                return b
+        return None
+
+    # Get rail bodies as proxies (for cross-component CUT targets)
     def get_rail_proxy(name):
         for i in range(rail_c.bRepBodies.count):
             b = rail_c.bRepBodies.item(i)
             if b.name == name:
                 return b.createForAssemblyContext(rail_occ)
         return None
+
+    fbr_b = get_rail_body("Rail_FrontBot")
+    ftr_b = find_body("Rail_FrontTop"); ftr_bb = ftr_b.boundingBox
+    bbr_b = get_rail_body("Rail_BackBot")
+    btr_b = find_body("Rail_BackTop"); btr_bb = btr_b.boundingBox
+    lbr_b = get_rail_body("Rail_LeftBot")
+    ltr_b = find_body("Rail_LeftTop"); ltr_bb = ltr_b.boundingBox
+    rbr_b = get_rail_body("Rail_RightBot")
+    rtr_b = find_body("Rail_RightTop"); rtr_bb = rtr_b.boundingBox
 
     fbr_p = get_rail_proxy("Rail_FrontBot")
     ftr_p = get_rail_proxy("Rail_FrontTop")
@@ -289,85 +370,85 @@ def run(context):
     rbr_p = get_rail_proxy("Rail_RightBot")
     rtr_p = get_rail_proxy("Rail_RightTop")
 
-    # Domino planes at post inner faces
-    dm_xl = sp.off_plane(root, root.yZConstructionPlane, "post_size", "DM_XL")
-    dm_xr = sp.off_plane(root, root.yZConstructionPlane, "outer_w - post_size", "DM_XR")
-    dm_yf = sp.off_plane(root, root.xZConstructionPlane, "post_size", "DM_YF")
-    dm_yb = sp.off_plane(root, root.xZConstructionPlane, "outer_l - post_size", "DM_YB")
+    # Domino planes at post inner faces (inside rail component)
+    dm_xl = sp.off_plane(rail_c, rail_c.yZConstructionPlane, "post_size", "DM_XL")
+    dm_xr = sp.off_plane(rail_c, rail_c.yZConstructionPlane, "outer_w - post_size", "DM_XR")
+    dm_yf = sp.off_plane(rail_c, rail_c.xZConstructionPlane, "post_size", "DM_YF")
+    dm_yb = sp.off_plane(rail_c, rail_c.xZConstructionPlane, "outer_l - post_size", "DM_YB")
 
     # --- Front bottom rail → FL, FR (2 dominos per end) ---
-    domino.grid(root, dm_xl,
+    domino.grid(rail_c, dm_xl,
         ("post_size", "post_size / 2", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        fbr_p, fl_p, "DM_FBR_L", ev)
-    domino.grid(root, dm_xr,
+        fbr_b, fl_p, "DM_FBR_L", ev)
+    domino.grid(rail_c, dm_xr,
         ("outer_w - post_size", "post_size / 2", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        fbr_p, fr_p, "DM_FBR_R", ev)
+        fbr_b, fr_p, "DM_FBR_R", ev)
 
     # --- Front top rail → FL, FR ---
-    domino.grid(root, dm_xl,
+    domino.grid(rail_c, dm_xl,
         ("post_size", "post_size / 2", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ftr_p, fl_p, "DM_FTR_L", ev)
-    domino.grid(root, dm_xr,
+        ftr_b, fl_p, "DM_FTR_L", ev)
+    domino.grid(rail_c, dm_xr,
         ("outer_w - post_size", "post_size / 2", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ftr_p, fr_p, "DM_FTR_R", ev)
+        ftr_b, fr_p, "DM_FTR_R", ev)
 
     # --- Back rails (mirror positions) ---
-    domino.grid(root, dm_xl,
+    domino.grid(rail_c, dm_xl,
         ("post_size", "outer_l - post_size / 2", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        bbr_p, bl_p, "DM_BBR_L", ev)
-    domino.grid(root, dm_xr,
+        bbr_b, bl_p, "DM_BBR_L", ev)
+    domino.grid(rail_c, dm_xr,
         ("outer_w - post_size", "outer_l - post_size / 2", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        bbr_p, br_p, "DM_BBR_R", ev)
-    domino.grid(root, dm_xl,
+        bbr_b, br_p, "DM_BBR_R", ev)
+    domino.grid(rail_c, dm_xl,
         ("post_size", "outer_l - post_size / 2", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        btr_p, bl_p, "DM_BTR_L", ev)
-    domino.grid(root, dm_xr,
+        btr_b, bl_p, "DM_BTR_L", ev)
+    domino.grid(rail_c, dm_xr,
         ("outer_w - post_size", "outer_l - post_size / 2", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        btr_p, br_p, "DM_BTR_R", ev)
+        btr_b, br_p, "DM_BTR_R", ev)
 
     # --- Left side rails → FL, BL ---
-    domino.grid(root, dm_yf,
+    domino.grid(rail_c, dm_yf,
         ("post_size / 2", "post_size", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        lbr_p, fl_p, "DM_LBR_F", ev)
-    domino.grid(root, dm_yb,
+        lbr_b, fl_p, "DM_LBR_F", ev)
+    domino.grid(rail_c, dm_yb,
         ("post_size / 2", "outer_l - post_size", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        lbr_p, bl_p, "DM_LBR_B", ev)
-    domino.grid(root, dm_yf,
+        lbr_b, bl_p, "DM_LBR_B", ev)
+    domino.grid(rail_c, dm_yf,
         ("post_size / 2", "post_size", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ltr_p, fl_p, "DM_LTR_F", ev)
-    domino.grid(root, dm_yb,
+        ltr_b, fl_p, "DM_LTR_F", ev)
+    domino.grid(rail_c, dm_yb,
         ("post_size / 2", "outer_l - post_size", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ltr_p, bl_p, "DM_LTR_B", ev)
+        ltr_b, bl_p, "DM_LTR_B", ev)
 
     # --- Right side rails → FR, BR ---
-    domino.grid(root, dm_yf,
+    domino.grid(rail_c, dm_yf,
         ("outer_w - post_size / 2", "post_size", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rbr_p, fr_p, "DM_RBR_F", ev)
-    domino.grid(root, dm_yb,
+        rbr_b, fr_p, "DM_RBR_F", ev)
+    domino.grid(rail_c, dm_yb,
         ("outer_w - post_size / 2", "outer_l - post_size", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rbr_p, br_p, "DM_RBR_B", ev)
-    domino.grid(root, dm_yf,
+        rbr_b, br_p, "DM_RBR_B", ev)
+    domino.grid(rail_c, dm_yf,
         ("outer_w - post_size / 2", "post_size", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rtr_p, fr_p, "DM_RTR_F", ev)
-    domino.grid(root, dm_yb,
+        rtr_b, fr_p, "DM_RTR_F", ev)
+    domino.grid(rail_c, dm_yb,
         ("outer_w - post_size / 2", "outer_l - post_size", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rtr_p, br_p, "DM_RTR_B", ev)
+        rtr_b, br_p, "DM_RTR_B", ev)
 
     print(">>> Dominos: 16 rail-to-post joints (32 voids)")
 
@@ -440,22 +521,26 @@ def run(context):
     print(">>> Support rail mortises: CUT into 4 posts")
 
     # --- Slats → support rails (dominos at each slat end) ---
-    # Interface planes at support rail inner faces
-    dm_slat_xl = sp.off_plane(root, root.yZConstructionPlane,
+    # Interface planes at support rail inner faces (inside support component)
+    dm_slat_xl = sp.off_plane(support_c, support_c.yZConstructionPlane,
                                "sup_rail_inset + sup_rail_w", "DM_SlatXL")
-    dm_slat_xr = sp.off_plane(root, root.yZConstructionPlane,
+    dm_slat_xr = sp.off_plane(support_c, support_c.yZConstructionPlane,
                                "outer_w - sup_rail_inset - sup_rail_w", "DM_SlatXR")
     # Domino center Z = middle of slat thickness
     params.add("slat_dm_z", VI("slat_z + support_thick / 2"), "in", "")
     # First slat Y center
     params.add("slat_dm_y0", VI("post_size + slat_w / 2"), "in", "")
 
+    # Body-relative ref: slat dominos depend on support rails
+    ref_sr_r = find_body("SupRail_Right")
+    ref_sr_r_bb = ref_sr_r.boundingBox
+
     # Create domino voids without CUT (we'll CUT manually)
-    left_voids = domino.grid(root, dm_slat_xl,
+    left_voids = domino.grid(support_c, dm_slat_xl,
         ("sup_rail_inset + sup_rail_w", "slat_dm_y0", "slat_dm_z"),
         "y", "slat_sp", "n_slats", "y", "dm_w", "dm_t", "dm_d",
         body_a=None, body_b=None, name="DM_SlatL", ev=ev, cut=False)
-    right_voids = domino.grid(root, dm_slat_xr,
+    right_voids = domino.grid(support_c, dm_slat_xr,
         ("outer_w - sup_rail_inset - sup_rail_w", "slat_dm_y0", "slat_dm_z"),
         "y", "slat_sp", "n_slats", "y", "dm_w", "dm_t", "dm_d",
         body_a=None, body_b=None, name="DM_SlatR", ev=ev, cut=False)
@@ -474,8 +559,8 @@ def run(context):
             slat_bodies_proxies.append(b.createForAssemblyContext(support_occ))
 
     all_voids = left_voids + right_voids
-    for sp in slat_bodies_proxies:
-        sp.combine(sp, all_voids, CUT, True, "DM_Slat_Cut")
+    for slat_p in slat_bodies_proxies:
+        sp.combine(slat_p, all_voids, CUT, True, "DM_Slat_Cut")
     print(f">>> Slat dominos: {int(ev('n_slats')) * 2} joints (into support rails)")
 
     # ================================================================

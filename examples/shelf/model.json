@@ -1,0 +1,41 @@
+{
+  "deps": [
+    {
+      "body": "Bottom",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Bottom board of the hollow shelf shell"
+    },
+    {
+      "body": "Top",
+      "ref": "Bottom",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": false,
+      "note": "Top board of the shelf, separated by cavity"
+    },
+    {
+      "body": "Cap_Left",
+      "ref": "Bottom",
+      "side": "opposite",
+      "direction": [1, 0, 0],
+      "note": "Left end cap closing the shelf cavity"
+    },
+    {
+      "body": "Cap_Right",
+      "ref": "Bottom",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "note": "Right end cap, mirrored from Cap_Left"
+    },
+    {
+      "body": "Cleat",
+      "ref": "Bottom",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "note": "Wall-mount cleat sits inside shelf cavity between top and bottom",
+      "contact": false
+    }
+  ]
+}

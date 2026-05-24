@@ -1,0 +1,270 @@
+{
+  "deps": [
+    {
+      "body": "Leg_FL",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "front-left leg, sits on ground"
+    },
+    {
+      "body": "Leg_FR",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "front-right leg, sits on ground",
+      "contact": false
+    },
+    {
+      "body": "Leg_BL",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "back-left leg, sits on ground",
+      "contact": false
+    },
+    {
+      "body": "Leg_BR",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "back-right leg, sits on ground",
+      "contact": false
+    },
+    {
+      "body": "Seat",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "seat board rests on top of legs"
+    },
+    {
+      "body": "Apron_Front",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "front apron spans between FL and FR legs, under seat"
+    },
+    {
+      "body": "Apron_Back",
+      "ref": "Leg_BL",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "back apron spans between BL and BR legs, under seat"
+    },
+    {
+      "body": "Apron_Left",
+      "ref": "Leg_FL",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "left apron spans between FL and BL legs"
+    },
+    {
+      "body": "Apron_Right",
+      "ref": "Leg_FR",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "right apron spans between FR and BR legs"
+    },
+    {
+      "body": "Str_Front",
+      "ref": "Apron_Front",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "front stretcher below front apron, near floor",
+      "contact": false
+    },
+    {
+      "body": "Str_Back",
+      "ref": "Apron_Back",
+      "side": "opposite",
+      "direction": [
+        0,
+        0,
+        1
+      ],
+      "note": "back stretcher below back apron, near floor",
+      "contact": false
+    },
+    {
+      "body": "DM_FA_L_0",
+      "ref": "Apron_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "domino grid: front apron to FL leg (2 voids)",
+      "replicas": "DM_FA_L_*"
+    },
+    {
+      "body": "DM_FA_R_0",
+      "ref": "Apron_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "domino grid: front apron to FR leg (2 voids)",
+      "replicas": "DM_FA_R_*"
+    },
+    {
+      "body": "DM_BA_L_0",
+      "ref": "Apron_Back",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "domino grid: back apron to BL leg (2 voids)",
+      "replicas": "DM_BA_L_*"
+    },
+    {
+      "body": "DM_BA_R_0",
+      "ref": "Apron_Back",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "domino grid: back apron to BR leg (2 voids)",
+      "replicas": "DM_BA_R_*"
+    },
+    {
+      "body": "DM_LA_F_0",
+      "ref": "Apron_Left",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "domino grid: left apron to FL leg (2 voids)",
+      "replicas": "DM_LA_F_*"
+    },
+    {
+      "body": "DM_LA_B_0",
+      "ref": "Apron_Left",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "domino grid: left apron to BL leg (2 voids)",
+      "replicas": "DM_LA_B_*"
+    },
+    {
+      "body": "DM_RA_F_0",
+      "ref": "Apron_Right",
+      "side": "opposite",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "domino grid: right apron to FR leg (2 voids)",
+      "replicas": "DM_RA_F_*"
+    },
+    {
+      "body": "DM_RA_B_0",
+      "ref": "Apron_Right",
+      "side": "outside",
+      "direction": [
+        0,
+        1,
+        0
+      ],
+      "note": "domino grid: right apron to BR leg (2 voids)",
+      "replicas": "DM_RA_B_*"
+    },
+    {
+      "body": "DM_SF_L",
+      "ref": "Str_Front",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "domino: front stretcher to FL leg"
+    },
+    {
+      "body": "DM_SF_R",
+      "ref": "Str_Front",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "domino: front stretcher to FR leg"
+    },
+    {
+      "body": "DM_SB_L",
+      "ref": "Str_Back",
+      "side": "opposite",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "domino: back stretcher to BL leg"
+    },
+    {
+      "body": "DM_SB_R",
+      "ref": "Str_Back",
+      "side": "outside",
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "note": "domino: back stretcher to BR leg"
+    }
+  ]
+}

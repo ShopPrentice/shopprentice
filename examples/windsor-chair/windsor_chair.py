@@ -717,6 +717,10 @@ def run(context):
 
 
 
+    # Body-relative refs: legs reference Seat for positioning
+    ref_seat = find_body("Seat")
+    ref_seat_bb = ref_seat.boundingBox
+
     # Find Seat body for face-relative sketching
     Seat_body_ref = None
     Seat_occ_ref = None
@@ -839,6 +843,20 @@ def run(context):
             b.name = "TW_BR"
     print("Legs: 4 + 4 wedges (chamfered, wedged, mirrored)")
 
+    # Body-relative refs: stretchers reference legs, wedges reference legs
+    ref_leg_fl = find_body("Leg_FL")
+    if ref_leg_fl:
+        ref_leg_fl_bb = ref_leg_fl.boundingBox
+    ref_leg_fr = find_body("Leg_FR")
+    if ref_leg_fr:
+        ref_leg_fr_bb = ref_leg_fr.boundingBox
+    ref_leg_bl = find_body("Leg_BL")
+    if ref_leg_bl:
+        ref_leg_bl_bb = ref_leg_bl.boundingBox
+    ref_leg_br = find_body("Leg_BR")
+    if ref_leg_br:
+        ref_leg_br_bb = ref_leg_br.boundingBox
+
     # ==== STRETCHERS (H-stretcher via turned_stretcher template) ====
     comp = root
     Stretchers_occ = comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
@@ -927,6 +945,12 @@ def run(context):
     else:
         Str_Right = None
 
+    # Body-relative refs: cross stretcher references side stretchers
+    ref_str_left = find_body("Str_Left")
+    ref_str_left_bb = ref_str_left.boundingBox if ref_str_left else None
+    ref_str_right = find_body("Str_Right")
+    ref_str_right_bb = ref_str_right.boundingBox if ref_str_right else None
+
     # ---- Cross stretcher (Str_Left → Str_Right) via template ----
     # Treat side stretchers as "legs" — get their axes and connect
     # at mid_y from each end (≈ midpoint of side stretcher).
@@ -992,6 +1016,10 @@ def run(context):
                 name=wname, ev=ev)
 
     print("Stretchers: " + str(sum(1 for s in [Str_Left, Str_Right, Str_Cross] if s)) + " built via template")
+
+    # Body-relative ref: cross stretcher for wedge positioning
+    ref_str_cross = find_body("Str_Cross")
+    ref_str_cross_bb = ref_str_cross.boundingBox if ref_str_cross else None
 
     # ==== BACK: Spindles on curved arc + Curved crest rail ====
     # Spindles arranged along an arc for comfort.
@@ -1131,6 +1159,10 @@ def run(context):
         body.name = sp_name
 
     print("Spindles: " + str(n_sp) + " built on curved arc")
+
+    # Body-relative ref: crest rail references center spindle
+    ref_spin3 = find_body("Spin_3")
+    ref_spin3_bb = ref_spin3.boundingBox if ref_spin3 else None
 
     # ==== CREST RAIL: sweep cross-section along top arc ====
     # Draw the top arc in a sketch at crest Z height
