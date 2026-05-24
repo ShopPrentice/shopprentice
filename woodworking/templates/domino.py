@@ -46,6 +46,21 @@ from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    """Extract normal vector from a ConstructionPlane or BRepFace."""
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
+
 METADATA = {
     "name": "domino",
     "category": "joinery",
@@ -129,6 +144,13 @@ def single(comp, plane, center, long_axis, long_expr, short_expr,
         sp.combine(body_a, void_body, CUT, True, f"{name}_CutA")
         sp.combine(body_b, void_body, CUT, True, f"{name}_CutB")
 
+        # Register assembly vector (perpendicular to mating plane)
+        av = _plane_normal(plane)
+        sp.register_joint(f"{name}_CutA", void_body, body_a, av,
+                          template="domino")
+        sp.register_joint(f"{name}_CutB", void_body, body_b, av,
+                          template="domino")
+
     return void_body
 
 
@@ -191,6 +213,14 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
         sp.combine(body_a, void_bodies, CUT, True, f"{name}_CutA")
         if body_b is not None and body_b != body_a:
             sp.combine(body_b, void_bodies, CUT, True, f"{name}_CutB")
+
+        # Register assembly vector (perpendicular to mating plane)
+        av = _plane_normal(plane)
+        sp.register_joint(f"{name}_CutA", void_bodies[0], body_a, av,
+                          template="domino")
+        if body_b is not None and body_b != body_a:
+            sp.register_joint(f"{name}_CutB", void_bodies[0], body_b, av,
+                              template="domino")
 
     return void_bodies
 
@@ -402,6 +432,13 @@ def between(comp, plane, body_a, body_b, interface_axis,
         if body_b is not None and body_b != body_a:
             sp.combine(body_b, void_bodies, CUT, True, f"{name}_CutB")
 
+        av = _plane_normal(plane)
+        sp.register_joint(f"{name}_CutA", void_bodies[0], body_a, av,
+                          template="domino")
+        if body_b is not None and body_b != body_a:
+            sp.register_joint(f"{name}_CutB", void_bodies[0], body_b, av,
+                              template="domino")
+
     # Validate containment — domino must be fully inside both bodies
     all_ok = True
     for void in void_bodies:
@@ -482,6 +519,26 @@ def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
     sp.combine(leg_nr, [nr_body], CUT, True, f"{name}_Leg_NR")
     sp.combine(leg_fl, [fl_body], CUT, True, f"{name}_Leg_FL")
     sp.combine(leg_fr, [fr_body], CUT, True, f"{name}_Leg_FR")
+
+    # Register assembly vectors — mirror the plane normal for each
+    # quadrant so the vector correctly reflects any non-axis-aligned plane.
+    av_nl = _plane_normal(plane)
+    x_n = _plane_normal(x_mid)
+    y_n = _plane_normal(y_mid)
+    av_nr = sp.mirror_vector(av_nl, x_n)
+    av_fl = sp.mirror_vector(av_nl, y_n)
+    av_fr = sp.mirror_vector(av_nr, y_n)
+
+    sp.register_joint(f"{name}_Top_Cut", nl_body, top_body, av_nl,
+                      template="domino")
+    sp.register_joint(f"{name}_Leg_NL", nl_body, leg_nl, av_nl,
+                      template="domino")
+    sp.register_joint(f"{name}_Leg_NR", nr_body, leg_nr, av_nr,
+                      template="domino")
+    sp.register_joint(f"{name}_Leg_FL", fl_body, leg_fl, av_fl,
+                      template="domino")
+    sp.register_joint(f"{name}_Leg_FR", fr_body, leg_fr, av_fr,
+                      template="domino")
 
     return all_voids
 

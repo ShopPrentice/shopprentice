@@ -454,6 +454,16 @@ def handler() -> dict:
             return bodies
 
         all_bodies = _flatten_bodies(out["components"])
+
+        # Include joint registry if present
+        joints_data = None
+        try:
+            attr = design.attributes.itemByName("shopprentice", "joints")
+            if attr:
+                joints_data = json.loads(attr.value)
+        except Exception:
+            pass
+
         summary = {
             "designName": out["designName"],
             "bodyCount": len(all_bodies),
@@ -463,6 +473,8 @@ def handler() -> dict:
             "userParameters": out["userParameters"],
             "fullCapture": capture_path,
         }
+        if joints_data:
+            summary["joints"] = joints_data
 
         return {
             "content": [{"type": "text", "text": json.dumps(summary, indent=2)}],

@@ -390,6 +390,12 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
         # Clean existing model before rebuilding (all in one transaction for Ctrl+Z revert)
         if clean and transaction_started:
             _clean_design()
+            # Reset joint registry for the new build
+            try:
+                from helpers import sp
+                sp.clear_joint_registry()
+            except Exception:
+                pass
             # Ensure design supports components (Part Design docs only allow one)
             import adsk.fusion
             design = adsk.fusion.Design.cast(app.activeProduct)
@@ -425,6 +431,13 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
                 transacted_doc.activate()
                 app.executeTextCommand('PTransaction.Commit')
                 current_doc.activate()
+
+        # Flush joint registry to design attributes
+        try:
+            from helpers import sp
+            sp.flush_joint_registry()
+        except Exception:
+            pass
 
         # Reset ActionLog so future get_changes calls start from a clean baseline
         try:

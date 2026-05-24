@@ -21,6 +21,59 @@ mortise_tenon.blind(comp, rail_body, leg_body, face_axis="y", ...)
 
 **Check for a template first.** If one exists, use it. Only write inline for simple joints (dado, rabbet, T&G) or joints without templates. See `woodworking/joinery/README.md` for the full template table.
 
+## Assembly Feasibility (CRITICAL)
+
+Every joint must declare an **assembly vector** — the direction the moving piece travels during insertion. `validate_design` checks that each joint can actually be assembled along its declared vector (no undercuts).
+
+### Template joinery (automatic)
+Templates call `sp.register_joint()` internally after their CUT combines. No extra code needed:
+```python
+domino.single(comp, plane, ...)   # auto-registers assembly vector
+dovetail.box(comp, front, left, ...)  # auto-registers along ext_axis
+```
+
+### Inline joinery (explicit registration required)
+When writing inline CUT operations (dado, rabbet, custom joints), register the joint:
+```python
+# Option A: separate combine + register
+sp.combine(side, shelf, CUT, True, "DadoL")
+sp.register_joint("DadoL", shelf, side, assembly_vector=(0, 0, 1))
+
+# Option B: convenience wrapper
+sp.combine_joint(side, shelf, CUT, True, "DadoL",
+                 assembly_vector=(0, 0, 1))
+```
+
+### Mirrored and patterned joints
+When a joint is mirrored, the assembly vector must be reflected:
+```python
+av = (1, 0, 0)
+mirror_plane_normal = _plane_normal(x_mid)  # e.g. (1, 0, 0)
+av_mirrored = sp.mirror_vector(av, mirror_plane_normal)  # → (-1, 0, 0)
+sp.register_joint("MT_Right", tenon_r, leg_r, av_mirrored)
+```
+
+For general transforms (circular patterns, rotated occurrences), use `sp.transform_vector(v, matrix3d)` — extracts the 3x3 rotation from a Matrix3D and applies it to the direction vector.
+
+Linear patterns preserve the assembly vector — no transformation needed.
+
+### Non-joint CUTs
+For material-removal CUTs that are not joints (trims, grooves, rabbets), mark them to suppress unregistered-joint warnings:
+```python
+sp.combine(panel, rabbet_tool, CUT, False, "EdgeRab")
+sp.mark_non_joint("EdgeRab")
+```
+
+### What validate_design checks
+1. All registered joints pass geometric feasibility (no undercut faces along assembly vector) — **errors** (fails validation)
+2. All CUT features in the timeline are accounted for (registered or marked as non-joint) — **warnings** (informational, does not fail validation)
+3. Unregistered CUTs with names containing Trim/Rab/EdgeCut/Groove are auto-excluded
+
+### Current limitations
+- **Pairwise only**: each joint is checked in isolation (tool body shape vs. assembly vector). Multi-body interactions (e.g., drawbore pins blocking tenon removal) are not modeled.
+- **Direction only**: assembly vectors are unit direction vectors with no distance. Compound-path joints (push + slide) require a future `assembly_path` extension.
+- **Assembly, not disassembly**: the check validates insertion feasibility. Joints that lock permanently after assembly (wedged tenons, drawbore) pass correctly because the insertion step itself is valid.
+
 ## Combine-Based Joinery (CRITICAL)
 
 **Never draw separate mortise/socket sketches.** Build the tenon/tail as a separate body, then use Fusion 360 **Combine** to cut the receiving board. The tenon body IS the cutting tool — one shape guarantees the mortise exactly matches.

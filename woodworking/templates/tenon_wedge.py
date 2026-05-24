@@ -145,6 +145,10 @@ def round_tenon(comp, tenon_body, mortise_body,
     _intersect_trim(wedge, tenon_body, f"{name}_Trim")
     sp.combine(tenon_body, wedge, CUT, True, f"{name}_Cut")
 
+    # Wedge is driven along slot_dir (sequence=2 — after tenon insertion)
+    sp.register_joint(f"{name}_Cut", wedge, tenon_body, slot_dir,
+                      template="tenon_wedge", sequence=2)
+
     return wedge
 
 
@@ -408,6 +412,9 @@ def _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
         # CUT wedge slot into tenon — combine routes intra- or
         # cross-component depending on tenon_body's owning component.
         sp.combine(tenon_body, wedge, CUT, True, f"{name}_Cut")
+
+        sp.register_joint(f"{name}_Cut", wedge, tenon_body, slot_dir,
+                          template="tenon_wedge", sequence=2)
 
     return wedge
 

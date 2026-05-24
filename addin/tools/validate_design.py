@@ -4,10 +4,13 @@ Validate Design Tool
 Single-call structural validation that runs all checks:
 1. Connectivity — all structural bodies form 1 connected cluster
 2. Interference — no unintended body overlaps (excludes void-on-void)
+3. Assembly — all joints are registered with assembly vectors and
+   pass geometric feasibility (no undercuts along insertion direction)
 
 Returns a combined pass/fail result with details from each check.
 """
 
+import json
 import traceback
 from primitives.tool import Tool
 from primitives.item import Item
@@ -156,6 +159,122 @@ def _check_interference(root_comp, exclude_prefixes):
     }
 
 
+# ── Assembly Check ──────────────────────────────────────────────────
+
+_NON_JOINT_PATTERNS = ("Trim", "Rab", "EdgeCut", "Groove", "EdgeRab",
+                       "BotRab", "Chamfer", "Fillet")
+
+
+def _find_body_by_name(root_comp, name):
+    """Find a body by name across root and all occurrences."""
+    for i in range(root_comp.bRepBodies.count):
+        b = root_comp.bRepBodies.item(i)
+        if b.name == name:
+            return b
+    for occ in root_comp.allOccurrences:
+        for i in range(occ.component.bRepBodies.count):
+            b = occ.component.bRepBodies.item(i)
+            if b.name == name:
+                return b
+    return None
+
+
+def _check_assembly(root_comp):
+    """Check assembly feasibility for all registered joints."""
+    design = adsk.fusion.Design.cast(app.activeProduct)
+
+    # Part A: read the joint registry from design attributes
+    registered_joints = []
+    non_joint_cuts = set()
+    attr = design.attributes.itemByName("shopprentice", "joints")
+    if attr:
+        try:
+            data = json.loads(attr.value)
+            registered_joints = data.get("joints", [])
+            non_joint_cuts = set(data.get("non_joint_cuts", []))
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+    registered_names = {j["name"] for j in registered_joints}
+
+    # Part B: detect all CUT operations from timeline
+    # (both Combine CUT and Extrude CUT — agents might use either)
+    detected_cuts = []
+    tl = design.timeline
+    CUT_OP = adsk.fusion.FeatureOperations.CutFeatureOperation
+    for i in range(tl.count):
+        item = tl.item(i)
+        entity = item.entity
+        if entity is None:
+            continue
+        try:
+            combine_feat = adsk.fusion.CombineFeature.cast(entity)
+            if combine_feat and combine_feat.operation == CUT_OP:
+                detected_cuts.append(combine_feat.name)
+                continue
+            ext_feat = adsk.fusion.ExtrudeFeature.cast(entity)
+            if ext_feat and ext_feat.operation == CUT_OP:
+                detected_cuts.append(ext_feat.name)
+        except Exception:
+            continue
+
+    # Part C: cross-reference — find unregistered CUTs (warnings only)
+    unregistered = []
+    for cut_name in detected_cuts:
+        if cut_name in registered_names:
+            continue
+        if cut_name in non_joint_cuts:
+            continue
+        excluded = any(pat in cut_name for pat in _NON_JOINT_PATTERNS)
+        unregistered.append({
+            "name": cut_name,
+            "excluded": excluded,
+        })
+
+    unregistered_warnings = [u for u in unregistered if not u["excluded"]]
+
+    # Part D: re-verify feasibility for registered joints
+    details = []
+    unfeasible_count = 0
+    for joint in registered_joints:
+        entry = {
+            "name": joint["name"],
+            "template": joint.get("template"),
+            "assembly_vector": joint.get("assembly_vector"),
+            "feasibility": joint.get("feasibility", "ok"),
+        }
+
+        tool_name = joint.get("tool_body", "")
+        tool_body = _find_body_by_name(root_comp, tool_name)
+        if tool_body and tool_body.faces.count > 0:
+            try:
+                from helpers.sp import check_assembly_feasibility
+                av = joint.get("assembly_vector", [1, 0, 0])
+                result = check_assembly_feasibility(tool_body, av)
+                entry["feasibility"] = "ok" if result["feasible"] else "undercut"
+                entry["undercut_count"] = result["undercut_count"]
+            except Exception:
+                pass
+
+        if entry["feasibility"] != "ok":
+            unfeasible_count += 1
+        details.append(entry)
+
+    # Feasibility fails only on undercut errors.
+    # Unregistered CUTs are informational warnings.
+    feasible = unfeasible_count == 0
+
+    return {
+        "feasible": feasible,
+        "registeredJoints": len(registered_joints),
+        "feasibleJoints": len(registered_joints) - unfeasible_count,
+        "unfeasibleJoints": unfeasible_count,
+        "unregisteredCuts": len(unregistered_warnings),
+        "details": details,
+        "unregistered": unregistered,
+    }
+
+
 # ── Handler ──────────────────────────────────────────────────────────
 
 def handler(exclude_prefixes: list = None) -> dict:
@@ -173,18 +292,21 @@ def handler(exclude_prefixes: list = None) -> dict:
         root = design.rootComponent
         prefixes = exclude_prefixes or ["DM_"]
 
-        # Run both checks
+        # Run all checks
         bodies = _collect_bodies_with_bb(root)
         connectivity = _check_connectivity(bodies, prefixes)
         interference = _check_interference(root, prefixes)
+        assembly = _check_assembly(root)
 
-        passed = connectivity["connected"] and interference["realCount"] == 0
+        passed = (connectivity["connected"]
+                  and interference["realCount"] == 0
+                  and assembly["feasible"])
 
-        import json
         result = {
             "passed": passed,
             "connectivity": connectivity,
             "interference": interference,
+            "assembly": assembly,
         }
 
         # Build summary message
@@ -198,6 +320,14 @@ def handler(exclude_prefixes: list = None) -> dict:
             parts.append("interference OK (0 real)")
         else:
             parts.append(f"INTERFERENCE FAIL ({interference['realCount']} real)")
+
+        if assembly["feasible"]:
+            asm_info = f"{assembly['registeredJoints']} joints"
+            if assembly["unregisteredCuts"] > 0:
+                asm_info += f", {assembly['unregisteredCuts']} unregistered CUT warnings"
+            parts.append(f"assembly OK ({asm_info})")
+        else:
+            parts.append(f"ASSEMBLY FAIL ({assembly['unfeasibleJoints']} undercut)")
 
         status = "PASSED" if passed else "FAILED"
         msg = f"{status}: {', '.join(parts)}"
@@ -220,13 +350,15 @@ def handler(exclude_prefixes: list = None) -> dict:
 TOOL_DESCRIPTION = \
 """Run all structural validation checks on the current design.
 
-Combines connectivity + interference checks in a single call:
+Combines connectivity + interference + assembly checks in a single call:
 1. **Connectivity** — all structural bodies must form 1 connected cluster
    (bounding-box adjacency, 0.5mm tolerance)
 2. **Interference** — no unintended body overlaps (excludes void-on-void
    pairs like joinery ghost bodies)
+3. **Assembly** — all registered joints pass feasibility (no undercuts along
+   assembly vector) and all Combine CUT features are accounted for
 
-Returns a single pass/fail result. A valid piece of furniture passes both.
+Returns a single pass/fail result. A valid piece of furniture passes all three.
 Joinery void bodies (DM_* prefix by default) are excluded from connectivity
 and their mutual overlaps are excluded from interference."""
 

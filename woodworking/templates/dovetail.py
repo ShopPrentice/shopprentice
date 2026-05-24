@@ -79,6 +79,21 @@ V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    """Extract normal vector from a ConstructionPlane or BRepFace."""
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
+
 METADATA = {
     "name": "dovetail",
     "category": "joinery",
@@ -338,6 +353,11 @@ def corner(pin_body, tail_body, plane,
     cut_combine = sp.combine(pin_body, tail_body, CUT, True,
                                    f"{name}_Cut")
 
+    # Register assembly vector — tails slide along the plane normal axis
+    av = _plane_normal(plane)
+    sp.register_joint(f"{name}_Cut", tail_body, pin_body, av,
+                      template="dovetail")
+
     return {
         "join_feat": join_feat,
         "pattern": pattern,
@@ -536,6 +556,14 @@ def box(comp, front, left,
     if back is not None:
         cut_back = sp.combine(back, tail_boards, CUT, True,
                               f"{name}_CutBack")
+
+    # Register assembly vectors — tails slide along ext_axis
+    av = sp.axis_vector(ext_axis)
+    sp.register_joint(f"{name}_CutFront", left, front, av,
+                      template="dovetail")
+    if cut_back is not None:
+        sp.register_joint(f"{name}_CutBack", left, back, av,
+                          template="dovetail")
 
     # ── Proud trim: cut tail boards back to original thickness ──
     # The tail boards were extended by proud_offset in ext_axis direction

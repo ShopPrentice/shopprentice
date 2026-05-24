@@ -48,6 +48,20 @@ from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
+
 METADATA = {
     "name": "bowtie",
     "category": "decorative_joinery",
@@ -197,6 +211,10 @@ def single(comp, plane, center, long_axis, short_axis,
     if cut and slab_body:
         # combine routes intra- or cross-component automatically.
         sp.combine(slab_body, [bt_body], CUT, True, f"{name}_Cut")
+
+        av = _plane_normal(plane)
+        sp.register_joint(f"{name}_Cut", bt_body, slab_body, av,
+                          template="bowtie")
 
     sk.isVisible = False
     return bt_body

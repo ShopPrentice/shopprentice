@@ -10,6 +10,7 @@ relying on module-level globals, so they work in both normal and sandbox mode.
 
 import adsk.core
 import adsk.fusion
+import json
 import math
 
 Point3D = adsk.core.Point3D
@@ -2723,3 +2724,199 @@ def validate_deps(ctx, metadata_path=None):
     status = "PASS" if all_ok else "FAIL"
     print(f"=== Dependency validation: {status} ===\n")
     return all_ok
+
+
+# ── Joint Registry & Assembly Feasibility ───────────────────────────
+
+_joint_registry: list = []
+_non_joint_cuts: set = set()
+
+
+def _normalize_vector(v):
+    x, y, z = v
+    mag = (x * x + y * y + z * z) ** 0.5
+    if mag < 1e-10:
+        raise ValueError("Cannot normalize zero vector")
+    return (x / mag, y / mag, z / mag)
+
+
+def mirror_vector(v, plane_normal):
+    """Reflect vector v across a plane defined by its normal.
+
+    v_reflected = v - 2 * dot(v, n) * n
+    Use when a mirrored joint needs its assembly vector reflected.
+    """
+    n = _normalize_vector(plane_normal)
+    vx, vy, vz = v
+    d = vx * n[0] + vy * n[1] + vz * n[2]
+    return (vx - 2 * d * n[0], vy - 2 * d * n[1], vz - 2 * d * n[2])
+
+
+def transform_vector(v, matrix):
+    """Apply a 3x3 rotation/reflection from a Matrix3D to a direction vector.
+
+    Extracts the upper-left 3x3 (rotation/reflection) from a Fusion 360
+    Matrix3D and applies it to the vector. Translation is ignored since
+    this is a direction, not a point.
+    """
+    vx, vy, vz = v
+    # Matrix3D is row-major: getCell(row, col)
+    rx = matrix.getCell(0, 0) * vx + matrix.getCell(0, 1) * vy + matrix.getCell(0, 2) * vz
+    ry = matrix.getCell(1, 0) * vx + matrix.getCell(1, 1) * vy + matrix.getCell(1, 2) * vz
+    rz = matrix.getCell(2, 0) * vx + matrix.getCell(2, 1) * vy + matrix.getCell(2, 2) * vz
+    return _normalize_vector((rx, ry, rz))
+
+
+def axis_vector(axis_name, direction=1):
+    """Convert axis name ('x', 'y', 'z') to a unit vector tuple."""
+    m = {"x": (1, 0, 0), "y": (0, 1, 0), "z": (0, 0, 1)}
+    v = m[axis_name.lower()]
+    return tuple(c * direction for c in v)
+
+
+def check_assembly_feasibility(tool_body, assembly_vector, threshold=0.05):
+    """Check if tool_body can be extracted along assembly_vector.
+
+    Uses face-normal undercut detection: a face creates an undercut
+    when its outward normal has a significant component opposing the
+    assembly direction AND a significant perpendicular component.
+
+    Returns dict with 'feasible', 'undercut_count', 'undercut_faces'.
+    """
+    av = _normalize_vector(assembly_vector)
+    undercut_faces = []
+
+    for i in range(tool_body.faces.count):
+        face = tool_body.faces.item(i)
+        pt = face.pointOnFace
+        ok, normal = face.evaluator.getNormalAtPoint(pt)
+        if not ok:
+            continue
+
+        nx, ny, nz = normal.x, normal.y, normal.z
+        along = nx * av[0] + ny * av[1] + nz * av[2]
+        perp_x = nx - along * av[0]
+        perp_y = ny - along * av[1]
+        perp_z = nz - along * av[2]
+        perp = (perp_x ** 2 + perp_y ** 2 + perp_z ** 2) ** 0.5
+
+        if along < -threshold and perp > threshold:
+            undercut_faces.append({
+                "index": i,
+                "normal": [round(nx, 4), round(ny, 4), round(nz, 4)],
+                "along": round(along, 4),
+                "perp": round(perp, 4),
+            })
+
+    return {
+        "feasible": len(undercut_faces) == 0,
+        "undercut_count": len(undercut_faces),
+        "undercut_faces": undercut_faces,
+    }
+
+
+def register_joint(name, tool_body, target_body, assembly_vector,
+                   template=None, sequence=1):
+    """Register a joint for assembly feasibility checking.
+
+    Call after sp.combine() CUT operations. Templates call this
+    automatically; inline joinery must call explicitly.
+
+    Args:
+        name: Feature name (should match the Combine CUT feature name).
+        tool_body: The tool BRepBody (tenon/tail that was CUT).
+        target_body: The target BRepBody (mortise piece that received CUT).
+        assembly_vector: (x, y, z) tuple — unit direction of insertion.
+        template: Template name if auto-registered (e.g. "domino").
+        sequence: Assembly step order (1 = first).
+
+    Returns:
+        The joint record dict.
+    """
+    av = _normalize_vector(assembly_vector)
+
+    tool_name = tool_body.name if hasattr(tool_body, 'name') else str(tool_body)
+    target_name = target_body.name if hasattr(target_body, 'name') else str(target_body)
+
+    feasibility = {"feasible": True, "undercut_count": 0, "undercut_faces": []}
+    try:
+        if hasattr(tool_body, 'faces') and tool_body.faces.count > 0:
+            feasibility = check_assembly_feasibility(tool_body, av)
+    except Exception:
+        pass
+
+    record = {
+        "name": name,
+        "template": template,
+        "assembly_vector": list(av),
+        "tool_body": tool_name,
+        "target_body": target_name,
+        "sequence": sequence,
+        "feasibility": "ok" if feasibility["feasible"] else "undercut",
+        "undercut_count": feasibility["undercut_count"],
+    }
+
+    _joint_registry.append(record)
+
+    if not feasibility["feasible"]:
+        app = adsk.core.Application.get()
+        app.log(f"[joint] UNDERCUT WARNING: joint '{name}' has "
+                f"{feasibility['undercut_count']} undercut face(s) "
+                f"along assembly vector {av}. "
+                f"The joint may be impossible to assemble.")
+
+    return record
+
+
+def combine_joint(target, tool_bodies, op, keep_tool, name,
+                  assembly_vector, template=None, sequence=1):
+    """Combine + register joint in one call.
+
+    Convenience wrapper for inline joinery that combines sp.combine()
+    with sp.register_joint().
+    """
+    feat = combine(target, tool_bodies, op, keep_tool, name)
+    tools = tool_bodies if isinstance(tool_bodies, list) else [tool_bodies]
+    for tb in tools:
+        register_joint(name, tb, target, assembly_vector,
+                       template=template, sequence=sequence)
+    return feat
+
+
+def mark_non_joint(feature_name):
+    """Mark a CUT feature as intentionally not a joint.
+
+    Use for trims, rabbets, grooves, and other material-removal CUTs
+    that should not trigger 'unregistered joint' warnings in
+    validate_design.
+    """
+    _non_joint_cuts.add(feature_name)
+
+
+def clear_joint_registry():
+    """Clear the joint registry. Called at script start (clean=True)."""
+    global _joint_registry, _non_joint_cuts
+    _joint_registry = []
+    _non_joint_cuts = set()
+
+
+def flush_joint_registry(design=None):
+    """Serialize the joint registry to a design attribute.
+
+    Called at the end of script execution by execute_script.py.
+    """
+    if design is None:
+        design = adsk.fusion.Design.cast(
+            adsk.core.Application.get().activeProduct)
+    if not design:
+        return
+
+    data = {
+        "joints": list(_joint_registry),
+        "non_joint_cuts": sorted(_non_joint_cuts),
+    }
+    attr = design.attributes.itemByName("shopprentice", "joints")
+    if attr:
+        attr.value = json.dumps(data)
+    else:
+        design.attributes.add("shopprentice", "joints", json.dumps(data))

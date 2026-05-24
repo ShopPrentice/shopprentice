@@ -31,6 +31,20 @@ from helpers import sp
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
+
 METADATA = {
     "name": "frame_and_panel",
     "category": "sub-assembly",
@@ -121,6 +135,7 @@ def _miter_corner(comp, base_plane, ext_axis,
     tri_body = tri_ext.bodies.item(0)
 
     sp.combine(rail_body, tri_body, CUT, True, f"{name}_RailCut")
+    sp.mark_non_joint(f"{name}_RailCut")
     sp.combine(stile_body, tri_body, JOIN, False, f"{name}_StileJoin")
 
 
@@ -270,9 +285,12 @@ def build(comp, base_plane, origin,
     stiles = [s_left, s_right]
 
     # CUT stiles into rails (bulk — both stiles per rail)
+    av_stile = sp.axis_vector(stile_axis)
     for rail in rails:
         sp.combine(rail, stiles, CUT, True,
                    f"{prefix}_{rail.name}_Mort")
+        sp.register_joint(f"{prefix}_{rail.name}_Mort", stiles[0], rail,
+                          av_stile, template="frame_and_panel")
 
     # ── Vertical dividers ─────────────────────────────────────────
     dividers_v = []
@@ -336,9 +354,13 @@ def build(comp, base_plane, origin,
             sp.combine(dv, dv_join, JOIN, False, f"{prefix}_DV{i}_AllJ")
 
             # CUT divider into rails
+            av_dv = sp.axis_vector(stile_axis)
             for rail in rails:
                 sp.combine(rail, dv, CUT, True,
                            f"{prefix}_{rail.name}_{dv.name}_Mort")
+                sp.register_joint(
+                    f"{prefix}_{rail.name}_{dv.name}_Mort", dv, rail,
+                    av_dv, template="frame_and_panel")
             dividers_v.append(dv)
 
     # ── Horizontal dividers (segmented between vertical members) ──
@@ -391,9 +413,13 @@ def build(comp, base_plane, origin,
                 sp.combine(dh, [tL.bodies.item(0), tR_mir.bodies.item(0)],
                            JOIN, False, f"{prefix}_{lbl}_TJ")
 
+                av_dh = sp.axis_vector(rail_axis)
                 for fb in rails + stiles + dividers_v:
                     sp.combine(fb, dh, CUT, True,
                                f"{prefix}_{fb.name}_{dh.name}_Mort")
+                    sp.register_joint(
+                        f"{prefix}_{fb.name}_{dh.name}_Mort", dh, fb,
+                        av_dh, template="frame_and_panel")
                 dividers_h.append(dh)
 
     # ── Panel(s) ──────────────────────────────────────────────────
@@ -544,6 +570,7 @@ def build(comp, base_plane, origin,
     for fb in all_frame:
         sp.combine(fb, all_panels, CUT, True,
                    f"{prefix}_{fb.name}_PanelGroove")
+        sp.mark_non_joint(f"{prefix}_{fb.name}_PanelGroove")
 
     # ── Mitered corners (格角榫) ─────────────────────────────────
     if corner_joint == "mitered_mt":
@@ -582,6 +609,7 @@ def build(comp, base_plane, origin,
         for stile in stiles:
             sp.combine(stile, all_panels, CUT, True,
                        f"{prefix}_{stile.name}_MiterGroove")
+            sp.mark_non_joint(f"{prefix}_{stile.name}_MiterGroove")
 
     all_bodies = rails + stiles + dividers_v + dividers_h + all_panels
 

@@ -28,6 +28,19 @@ from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
 METADATA = {
     "name": "dowel",
     "category": "joinery",
@@ -126,6 +139,12 @@ def single(comp, plane, center, diameter, depth,
         sp.combine(body_a, void_body, CUT, True, f"{name}_CutA")
         sp.combine(body_b, void_body, CUT, True, f"{name}_CutB")
 
+        av = _plane_normal(plane)
+        sp.register_joint(f"{name}_CutA", void_body, body_a, av,
+                          template="dowel")
+        sp.register_joint(f"{name}_CutB", void_body, body_b, av,
+                          template="dowel")
+
     return void_body
 
 
@@ -180,5 +199,11 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
     if cut and body_a is not None and body_b is not None:
         sp.combine(body_a, bodies, CUT, True, f"{name}_CutA")
         sp.combine(body_b, bodies, CUT, True, f"{name}_CutB")
+
+        av = _plane_normal(plane)
+        sp.register_joint(f"{name}_CutA", bodies[0], body_a, av,
+                          template="dowel")
+        sp.register_joint(f"{name}_CutB", bodies[0], body_b, av,
+                          template="dowel")
 
     return bodies

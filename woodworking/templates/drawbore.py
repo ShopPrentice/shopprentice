@@ -47,6 +47,20 @@ from helpers import sp
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
+
 METADATA = {
     "name": "drawbore",
     "category": "joinery",
@@ -255,6 +269,11 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
             sp.combine(stretcher, all_pins, CUT, True, f"{name}_PinCut")
             result["pin_cut"] = True
 
+            av = _plane_normal(pin_plane)
+            sp.register_joint(f"{name}_PinCut", all_pins[0], stretcher,
+                              av, template="drawbore", sequence=2)
+
+    result["assembly_vector"] = _plane_normal(tenon_plane)
     return result
 
 

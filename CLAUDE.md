@@ -18,7 +18,7 @@ When the user asks you to design or build furniture in Fusion 360, invoke the `/
 | `get_selection` | Read what the user has selected in the Fusion 360 UI |
 | `set_selection` | Highlight entities for the user (after identifying a problem body, etc.) |
 | `modify_parameters` | Change parameter values without re-running the script — for iterative tuning |
-| `validate_design` | Single-call structural validation: connectivity (1 cluster) + interference (0 overlaps) → pass/fail |
+| `validate_design` | Single-call structural validation: connectivity (1 cluster) + interference (0 overlaps) + assembly feasibility (all joints assemblable, no undercuts) → pass/fail |
 | `check_interference` | Diagnostic: detect body collisions (normally called via `validate_design`) |
 | `check_connectivity` | Diagnostic: detect disconnected parts (normally called via `validate_design`) |
 | `suppress_features` | Toggle timeline features on/off for "what if" diagnostics |

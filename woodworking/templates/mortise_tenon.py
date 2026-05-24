@@ -42,6 +42,20 @@ from helpers import sp
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    """Extract normal vector from a ConstructionPlane or BRepFace."""
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
 METADATA = {
     "name": "mortise_tenon",
     "category": "joinery",
@@ -182,6 +196,7 @@ def blind(comp, plane, origin, size, depth_expr,
                           f"{name}_Join")
 
     result["join"] = join
+    result["assembly_vector"] = _plane_normal(plane)
     return result
 
 
@@ -233,6 +248,11 @@ def through(comp, plane, origin, size, depth_expr,
                                f"{name}_Mort")
     result["mortise_cut"] = mort_cut
 
+    # Register assembly vector (tenon pushes along sketch plane normal)
+    av = _plane_normal(plane)
+    sp.register_joint(f"{name}_Mort", tenon_b, mortise_body, av,
+                      template="mortise_tenon")
+
     if mirror_plane:
         mir = sp.mirror_feats(comp, [tenon_ext], mirror_plane,
                               f"{name}_Mirror")
@@ -247,6 +267,7 @@ def through(comp, plane, origin, size, depth_expr,
                           f"{name}_Join")
 
     result["join"] = join
+    result["assembly_vector"] = _plane_normal(plane)
     return result
 
 

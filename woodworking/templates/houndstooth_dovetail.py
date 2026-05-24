@@ -90,6 +90,20 @@ Point3D = adsk.core.Point3D
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
+
 METADATA = {
     "name": "houndstooth_dovetail",
     "category": "joinery",
@@ -284,6 +298,10 @@ def corner(pin_body, tail_body, plane,
     # --- CUT pin_body using tail_body (with voids) as tool ---
     cut_combine = sp.combine(
         pin_body, tail_body, CUT, True, f"{name}_Cut")
+
+    av = _plane_normal(plane)
+    sp.register_joint(f"{name}_Cut", tail_body, pin_body, av,
+                      template="houndstooth_dovetail")
 
     return {
         "join_feat": join_feat,

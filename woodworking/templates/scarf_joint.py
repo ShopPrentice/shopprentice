@@ -44,6 +44,20 @@ CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 NEWBODY = adsk.fusion.FeatureOperations.NewBodyFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
+
 H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
 V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
 
@@ -199,6 +213,12 @@ def kanawa_tsugi(comp, body_a, body_b, splice_face,
                        f"{name}_CutZone_B")
     features.append(cut_b)
 
+    av = sp.axis_vector(grain_axis)
+    sp.register_joint(f"{name}_CutZone_A", scarf_body, body_a, av,
+                      template="scarf_joint")
+    sp.register_joint(f"{name}_CutZone_B", scarf_body, body_b, av,
+                      template="scarf_joint")
+
     # ── STEP 3: Oblique construction plane at scarf midpoint ─────
     mid_grain = splice_pos - grain_dir * sl / 2
     mid_depth = cs_min_depth + timber_d / 2
@@ -307,6 +327,11 @@ def kanawa_tsugi(comp, body_a, body_b, splice_face,
                f"{name}_Key_Cut_A")
     sp.combine(half_b_body, [key_tool], CUT, True,
                f"{name}_Key_Cut_B")
+
+    sp.register_joint(f"{name}_Key_Cut_A", key_tool, half_a_body, av,
+                      template="scarf_joint")
+    sp.register_joint(f"{name}_Key_Cut_B", key_tool, half_b_body, av,
+                      template="scarf_joint")
 
     # ── STEP 6: Wedge body ──────────────────────────────────────
     sk_w = comp.sketches.add(oblique_face)

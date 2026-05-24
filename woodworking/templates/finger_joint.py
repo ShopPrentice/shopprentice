@@ -38,6 +38,20 @@ V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
+
 METADATA = {
     "name": "finger_joint",
     "category": "joinery",
@@ -230,6 +244,10 @@ def corner(comp, plane, thick_expr, dist_expr,
     # into the finger board carves matching slots.
     pin_cut = sp.combine(finger_body, pin_body, CUT, True,
                          f"{name}_PinCut")
+
+    av = _plane_normal(plane)
+    sp.register_joint(f"{name}_PinCut", pin_body, finger_body, av,
+                      template="finger_joint")
 
     return {
         "cut_feat": cut_feat,
@@ -436,6 +454,13 @@ def box(comp, front, left,
     if back is not None:
         cut_back = sp.combine(back, finger_boards, CUT, True,
                               f"{name}_CutBack")
+
+    av = sp.axis_vector(ext_axis)
+    sp.register_joint(f"{name}_CutFront", left, front, av,
+                      template="finger_joint")
+    if cut_back is not None:
+        sp.register_joint(f"{name}_CutBack", left, back, av,
+                          template="finger_joint")
 
     return {
         "join_fl": join_fl, "pattern": pat,

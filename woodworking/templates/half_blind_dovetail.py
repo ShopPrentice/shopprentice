@@ -73,6 +73,20 @@ V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
+
+def _plane_normal(plane_or_face):
+    cp = adsk.fusion.ConstructionPlane.cast(plane_or_face)
+    if cp:
+        n = cp.geometry.normal
+        return (n.x, n.y, n.z)
+    bf = adsk.fusion.BRepFace.cast(plane_or_face)
+    if bf:
+        pt = bf.pointOnFace
+        ok, n = bf.evaluator.getNormalAtPoint(pt)
+        return (n.x, n.y, n.z)
+    raise ValueError(f"Cannot extract normal from {type(plane_or_face)}")
+
+
 METADATA = {
     "name": "half_blind_dovetail",
     "category": "joinery",
@@ -244,6 +258,10 @@ def corner(pin_body, tail_body, plane,
     cut_combine = sp.combine(pin_body, tail_body, CUT, True,
                              f"{name}_Cut")
 
+    av = _plane_normal(plane)
+    sp.register_joint(f"{name}_Cut", tail_body, pin_body, av,
+                      template="half_blind_dovetail")
+
     return {
         "join_feat": join_feat,
         "pattern": pattern,
@@ -403,6 +421,13 @@ def box(comp, front, left,
     if back is not None:
         cut_back = sp.combine(back, tail_boards, CUT, True,
                               f"{name}_CutBack")
+
+    av = sp.axis_vector(ext_axis)
+    sp.register_joint(f"{name}_CutFront", left, front, av,
+                      template="half_blind_dovetail")
+    if cut_back is not None:
+        sp.register_joint(f"{name}_CutBack", left, back, av,
+                          template="half_blind_dovetail")
 
     return {
         "join_fl": join_fl, "pattern": pat,
