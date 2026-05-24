@@ -384,7 +384,7 @@ d.addDistanceDimension(sk.originPoint, rect_corner, H, ...).parameter.expression
 # ↑ "leg_size" is distance from world origin — origin-based positioning
 ```
 
-The root body (ref=origin) is exempt — it legitimately dimensions from the sketch origin. All other bodies must anchor to their reference body's geometry. `validate_deps` checks for this: non-root sketches with dimensions from `sk.originPoint` are flagged.
+The root body (ref=origin) is exempt — it legitimately dimensions from the sketch origin. All other bodies must anchor to their reference body's geometry. `validate_deps` enforces this: non-root sketches with dimensions from `sk.originPoint` fail validation.
 
 ### Sketch + Extrude Workflow
 
@@ -540,9 +540,9 @@ This allows the user (or a new agent session) to resume work by reading the READ
 
 **Loop:** execute_script → on error: fix + retry (max 3 per error) → on success: capture_design + validate_design (MANDATORY) → auto-proceed.
 
-**model.json:** Before writing the build script, create a `model.json` in the same directory with the dependency tree. Every body must reference exactly one previously-built body (or `"origin"` for the very first body). Only ONE body may reference origin — all others chain off existing bodies.
+**model.json:** Before writing the build script, create a `model.json` in the same directory with the dependency tree. Each entry has `"body"` and `"ref"` — the body it was positioned from. Only ONE body may reference `"origin"` — all others chain off existing bodies. Example: `{"deps": [{"body": "Leg_FL", "ref": "origin"}, {"body": "Top", "ref": "Leg_FL"}]}`.
 
-**Phase validation:** `validate_design` now runs all checks in a single call — connectivity, interference, AND dependency tree (model.json). Run it after EVERY phase (structure, joinery, details), not just at the end. Bodies from future phases appear as SKIPs (non-fatal), but side/contact/source errors in existing bodies are caught immediately.
+**Phase validation:** `validate_design` runs connectivity, interference, and dependency checks (single origin, sketch origin enforcement, bodies in components). Run it after EVERY phase. Completeness (all bodies tracked) is advisory — it won't fail the build.
 
 **Final step:** apply_appearance → get_product_shots → present to user.
 
@@ -615,4 +615,4 @@ Name every feature and body for a readable timeline and easy debugging:
 5. Section Analysis > verify joinery alignment
 6. Verify no overlapping joints at corners
 7. Body count matches expected (diagnostic print confirms no accidental merges or orphans)
-8. **`validate_design` → passed.** Single call checks connectivity (1 cluster) + interference (0 real overlaps) + dependency tree (model.json: single origin root, sides, contact, source refs, completeness). Run after EVERY phase.
+8. **`validate_design` → passed.** Single call checks connectivity (1 cluster) + interference (0 real overlaps) + dependency tree (single origin root, sketch origin enforcement, bodies in components). Run after EVERY phase.

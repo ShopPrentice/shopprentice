@@ -2,95 +2,23 @@
   "deps": [
     {
       "body": "Seat",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Seat board at top, elevated by leg_h",
-      "contact": false
+      "ref": "origin"
     },
     {
       "body": "Leg_NL (1)",
-      "ref": "Seat",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Near-left leg, through-tenoned into seat, extends below"
+      "ref": "Seat"
     },
     {
       "body": "Leg_NR",
-      "ref": "Seat",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Near-right leg, mirror of NL across Y midplane"
-    },
-    {
-      "body": "Leg_NR",
-      "ref": "Leg_NL (1)",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Near-right leg is behind near-left leg (wider Y)",
-      "contact": false
+      "ref": "Seat"
     },
     {
       "body": "Leg_FL",
-      "ref": "Seat",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Far-left leg, mirror of NL across X midplane"
-    },
-    {
-      "body": "Leg_FL",
-      "ref": "Leg_NL (1)",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Far-left leg is at far X end from near-left",
-      "contact": false
+      "ref": "Seat"
     },
     {
       "body": "Leg_FR",
-      "ref": "Seat",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Far-right leg, diagonal mirror of NL"
-    },
-    {
-      "body": "Leg_FR",
-      "ref": "Leg_FL",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Far-right leg is behind far-left leg",
-      "contact": false
+      "ref": "Seat"
     }
   ]
 }

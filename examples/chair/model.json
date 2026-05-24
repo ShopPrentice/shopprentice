@@ -2,415 +2,147 @@
   "deps": [
     {
       "body": "Leg_FL",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "front-left leg, sits on ground"
+      "ref": "origin"
     },
     {
       "body": "Leg_FR",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "front-right leg, sits on ground",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Leg_BL",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "back-left leg with bend and 8-deg rake, full height to backrest",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Leg_BR",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "back-right leg with bend and 8-deg rake, full height to backrest",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Seat",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "seat board on top of front legs, notched around back legs"
+      "ref": "Leg_FL"
     },
     {
       "body": "Apron_Front",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "front apron spans between FL and FR legs, under seat"
+      "ref": "Leg_FL"
     },
     {
       "body": "Apron_Back",
-      "ref": "Leg_BL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "back apron spans between BL and BR legs, under seat"
+      "ref": "Leg_BL"
     },
     {
       "body": "Apron_Left",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "left apron spans between FL and BL legs"
+      "ref": "Leg_FL"
     },
     {
       "body": "Apron_Right",
-      "ref": "Leg_FR",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "right apron spans between FR and BR legs"
+      "ref": "Leg_FR"
     },
     {
       "body": "Str_Front",
-      "ref": "Apron_Front",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "front stretcher below front apron, near floor",
-      "contact": false
+      "ref": "Apron_Front"
     },
     {
       "body": "Str_Back",
-      "ref": "Apron_Back",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "back stretcher below back apron, near floor",
-      "contact": false
+      "ref": "Apron_Back"
     },
     {
       "body": "Str_Left",
-      "ref": "Apron_Left",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "left stretcher below left apron, near floor",
-      "contact": false
+      "ref": "Apron_Left"
     },
     {
       "body": "Str_Right",
-      "ref": "Apron_Right",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "right stretcher below right apron, near floor",
-      "contact": false
+      "ref": "Apron_Right"
     },
     {
       "body": "TopRail",
-      "ref": "Leg_BL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "top back rail between back legs, raked at 8 deg"
+      "ref": "Leg_BL"
     },
     {
       "body": "BotRail",
-      "ref": "Leg_BL",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "bottom back rail between back legs, at bend height, raked at 8 deg"
+      "ref": "Leg_BL"
     },
     {
       "body": "VSlat_4",
-      "ref": "BotRail",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "vertical back slat with stub tenons into top and bottom rails",
-      "replicas": "VSlat_*"
+      "ref": "BotRail"
     },
     {
       "body": "DM_FA_L_0",
-      "ref": "Apron_Front",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "domino grid: front apron to FL leg",
-      "replicas": "DM_FA_L_*"
+      "ref": "Apron_Front"
     },
     {
       "body": "DM_FA_R_0",
-      "ref": "Apron_Front",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "domino grid: front apron to FR leg",
-      "replicas": "DM_FA_R_*"
+      "ref": "Apron_Front"
     },
     {
       "body": "DM_BA_L_0",
-      "ref": "Apron_Back",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "domino grid: back apron to BL leg",
-      "replicas": "DM_BA_L_*"
+      "ref": "Apron_Back"
     },
     {
       "body": "DM_BA_R_0",
-      "ref": "Apron_Back",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "domino grid: back apron to BR leg",
-      "replicas": "DM_BA_R_*"
+      "ref": "Apron_Back"
     },
     {
       "body": "DM_LA_F_0",
-      "ref": "Apron_Left",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "domino grid: left apron to FL leg",
-      "replicas": "DM_LA_F_*"
+      "ref": "Apron_Left"
     },
     {
       "body": "DM_LA_B_0",
-      "ref": "Apron_Left",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "domino grid: left apron to BL leg",
-      "replicas": "DM_LA_B_*"
+      "ref": "Apron_Left"
     },
     {
       "body": "DM_RA_F_0",
-      "ref": "Apron_Right",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "domino grid: right apron to FR leg",
-      "replicas": "DM_RA_F_*"
+      "ref": "Apron_Right"
     },
     {
       "body": "DM_RA_B_0",
-      "ref": "Apron_Right",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "domino grid: right apron to BR leg",
-      "replicas": "DM_RA_B_*"
+      "ref": "Apron_Right"
     },
     {
       "body": "DM_FS_L_0",
-      "ref": "Str_Front",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "domino: front stretcher to FL leg"
+      "ref": "Str_Front"
     },
     {
       "body": "DM_FS_R_0",
-      "ref": "Str_Front",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "domino: front stretcher to FR leg"
+      "ref": "Str_Front"
     },
     {
       "body": "DM_BS_L_0",
-      "ref": "Str_Back",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "domino: back stretcher to BL leg"
+      "ref": "Str_Back"
     },
     {
       "body": "DM_BS_R_0",
-      "ref": "Str_Back",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "domino: back stretcher to BR leg"
+      "ref": "Str_Back"
     },
     {
       "body": "DM_LS_F_0",
-      "ref": "Str_Left",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "domino: left stretcher to FL leg"
+      "ref": "Str_Left"
     },
     {
       "body": "DM_LS_B_0",
-      "ref": "Str_Left",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "domino: left stretcher to BL leg"
+      "ref": "Str_Left"
     },
     {
       "body": "DM_RS_F_0",
-      "ref": "Str_Right",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "domino: right stretcher to FR leg"
+      "ref": "Str_Right"
     },
     {
       "body": "DM_RS_B_0",
-      "ref": "Str_Right",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "domino: right stretcher to BR leg"
+      "ref": "Str_Right"
     },
     {
       "body": "DM_TR_L",
-      "ref": "TopRail",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "tilted domino: top rail to BL leg"
+      "ref": "TopRail"
     },
     {
       "body": "DM_TR_R",
-      "ref": "TopRail",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "tilted domino: top rail to BR leg"
+      "ref": "TopRail"
     },
     {
       "body": "DM_BR_L",
-      "ref": "BotRail",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "tilted domino: bottom rail to BL leg"
+      "ref": "BotRail"
     },
     {
       "body": "DM_BR_R",
-      "ref": "BotRail",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "tilted domino: bottom rail to BR leg"
+      "ref": "BotRail"
     }
   ]
 }

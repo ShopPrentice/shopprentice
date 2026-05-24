@@ -2,70 +2,27 @@
   "deps": [
     {
       "body": "Front",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front board sits on the floor, full height"
+      "ref": "origin"
     },
     {
       "body": "Back",
-      "ref": "Front",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Back board sits on the floor, full height",
-      "contact": false
+      "ref": "Front"
     },
     {
       "body": "Side_Left",
-      "ref": "Front",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Left side board between front and back, full height"
+      "ref": "Front"
     },
     {
       "body": "Side_Right",
-      "ref": "Front",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Right side board between front and back, shorter (open_height for lid slot)"
+      "ref": "Front"
     },
     {
       "body": "Bottom",
-      "ref": "Front",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Bottom panel sits in grooves near the base of all four boards"
+      "ref": "Front"
     },
     {
       "body": "Lid",
-      "ref": "Front",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Sliding lid panel sits in grooves at top of front, back, and left side"
+      "ref": "Front"
     }
   ]
 }

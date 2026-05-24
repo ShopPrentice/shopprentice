@@ -2,98 +2,35 @@
   "deps": [
     {
       "body": "Side_Left",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ]
+      "ref": "origin"
     },
     {
       "body": "Side_Right",
-      "ref": "Side_Left",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "contact": false
-    },
-    {
-      "body": "Side_Right",
-      "ref": "Side_Left",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "contact": false
+      "ref": "Side_Left"
     },
     {
       "body": "Shelf",
-      "ref": "Side_Left",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "replicas": "Shelf*"
+      "ref": "Side_Left"
     },
     {
       "body": "ShDm_0",
-      "ref": "Shelf",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "replicas": "ShDm_0*"
+      "ref": "Shelf"
     },
     {
       "body": "TopBoard",
-      "ref": "Side_Left",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ]
+      "ref": "Side_Left"
     },
     {
       "body": "KickBoard",
-      "ref": "Side_Left",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ]
+      "ref": "Side_Left"
     },
     {
       "body": "KDm_R_0",
-      "ref": "KickBoard",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "replicas": "KDm_R_*"
+      "ref": "KickBoard"
     },
     {
       "body": "BackPanel",
-      "ref": "Side_Left",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ]
+      "ref": "Side_Left"
     }
   ]
 }
