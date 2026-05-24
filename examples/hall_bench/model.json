@@ -2,234 +2,83 @@
   "deps": [
     {
       "body": "Leg_FL",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front-left leg sits on the floor"
+      "ref": "origin"
     },
     {
       "body": "Leg_FR",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Front-right leg sits on the floor (mirror of FL)",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Post_BL",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Back-left post sits on the floor",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Post_BR",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Back-right post sits on the floor (mirror of BL)",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Apron_Front",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front apron spans between front legs, just below seat"
+      "ref": "Leg_FL"
     },
     {
       "body": "Apron_Back",
-      "ref": "Post_BL",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Back apron spans between back posts, just below seat"
+      "ref": "Post_BL"
     },
     {
       "body": "Apron_Left",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Left side apron connects front-left leg to back-left post"
+      "ref": "Leg_FL"
     },
     {
       "body": "Apron_Right",
-      "ref": "Leg_FR",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Right side apron connects front-right leg to back-right post (mirror of left)"
+      "ref": "Leg_FR"
     },
     {
       "body": "Seat",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Seat slab sits on top of all legs and posts"
+      "ref": "Leg_FL"
     },
     {
       "body": "Back_Board",
-      "ref": "Post_BL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Back board attached to upper back posts at raked angle"
+      "ref": "Post_BL"
     },
     {
       "body": "DM_FA_L_0",
-      "ref": "Apron_Front",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: front apron to left front leg",
-      "replicas": "DM_FA_L_*"
+      "ref": "Apron_Front"
     },
     {
       "body": "DM_FA_R_0",
-      "ref": "Apron_Front",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: front apron to right front leg",
-      "replicas": "DM_FA_R_*"
+      "ref": "Apron_Front"
     },
     {
       "body": "DM_BA_L_0",
-      "ref": "Apron_Back",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: back apron to left back post",
-      "replicas": "DM_BA_L_*"
+      "ref": "Apron_Back"
     },
     {
       "body": "DM_BA_R_0",
-      "ref": "Apron_Back",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: back apron to right back post",
-      "replicas": "DM_BA_R_*"
+      "ref": "Apron_Back"
     },
     {
       "body": "DM_LA_F_0",
-      "ref": "Apron_Left",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Domino void: left apron to front-left leg",
-      "replicas": "DM_LA_F_*"
+      "ref": "Apron_Left"
     },
     {
       "body": "DM_LA_B_0",
-      "ref": "Apron_Left",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Domino void: left apron to back-left post",
-      "replicas": "DM_LA_B_*"
+      "ref": "Apron_Left"
     },
     {
       "body": "DM_RA_F_0",
-      "ref": "Apron_Right",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Domino void: right apron to front-right leg",
-      "replicas": "DM_RA_F_*"
+      "ref": "Apron_Right"
     },
     {
       "body": "DM_RA_B_0",
-      "ref": "Apron_Right",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Domino void: right apron to back-right post",
-      "replicas": "DM_RA_B_*"
+      "ref": "Apron_Right"
     },
     {
       "body": "DM_BB_L",
-      "ref": "Back_Board",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: back board to left back post"
+      "ref": "Back_Board"
     },
     {
       "body": "DM_BB_R",
-      "ref": "Back_Board",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: back board to right back post"
+      "ref": "Back_Board"
     }
   ]
 }

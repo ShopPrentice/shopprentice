@@ -2,60 +2,23 @@
   "deps": [
     {
       "body": "Bottom",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Bottom rail sits at the base of the frame"
+      "ref": "origin"
     },
     {
       "body": "Top",
-      "ref": "Bottom",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Top rail is above the bottom rail (mirrored across ZMid)",
-      "contact": false
+      "ref": "Bottom"
     },
     {
       "body": "Left",
-      "ref": "Bottom",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Left stile spans between top and bottom rails"
+      "ref": "Bottom"
     },
     {
       "body": "Right",
-      "ref": "Bottom",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Right stile spans between top and bottom rails (mirrored across XMid)"
+      "ref": "Bottom"
     },
     {
       "body": "Glass",
-      "ref": "Bottom",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "contact": false,
-      "note": "Glass placeholder sits in the rabbet behind the frame, floating in the opening"
+      "ref": "Bottom"
     }
   ]
 }

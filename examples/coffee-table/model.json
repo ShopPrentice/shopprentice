@@ -2,116 +2,43 @@
   "deps": [
     {
       "body": "Leg_FL",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "front-left tapered leg, sits on ground"
+      "ref": "origin"
     },
     {
       "body": "Leg_FR",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "front-right tapered leg, sits on ground",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Leg_BL",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "back-left tapered leg, sits on ground",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Leg_BR",
-      "ref": "Leg_FR",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "back-right tapered leg, sits on ground",
-      "contact": false
+      "ref": "Leg_FR"
     },
     {
       "body": "Top",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "solid top panel rests on legs, domino-joined directly (no aprons)"
+      "ref": "Leg_FL"
     },
     {
       "body": "Shelf",
-      "ref": "Leg_FL",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "lower shelf between legs near floor"
+      "ref": "Leg_FL"
     },
     {
       "body": "DM_FL",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "domino: FL leg to top"
+      "ref": "Leg_FL"
     },
     {
       "body": "DM_FR",
-      "ref": "Leg_FR",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "domino: FR leg to top"
+      "ref": "Leg_FR"
     },
     {
       "body": "DM_BL",
-      "ref": "Leg_BL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "domino: BL leg to top"
+      "ref": "Leg_BL"
     },
     {
       "body": "DM_BR",
-      "ref": "Leg_BR",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "domino: BR leg to top"
+      "ref": "Leg_BR"
     }
   ]
 }

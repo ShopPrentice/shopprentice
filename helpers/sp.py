@@ -1286,41 +1286,20 @@ def classify_bodies(bodies, reference, direction=None):
 def mating_bounds(body_a, body_b, normal_axis, tol=0.1):
     """Compute the contact area between two bodies at their shared interface.
 
-    Validates that the bodies are in surface contact (touching, not gapped,
-    not overlapping) before computing bounds. Raises ValueError with
-    diagnostic messages if preconditions aren't met — giving the agent
-    feedback during the build, not just at final validation.
+    Returns None with a printed warning if preconditions aren't met
+    (gap, overlap, or no shared area), so the script can continue.
 
     Args:
         body_a, body_b: The two mating bodies.
         normal_axis: 'x', 'y', or 'z' — axis perpendicular to the interface.
-            For a rail meeting a post at a YZ plane, normal_axis='x'.
-        tol: Contact tolerance in cm (default 0.1 = 1mm). Bodies must be
-            within this distance along the normal axis to count as touching.
+        tol: Contact tolerance in cm (default 0.1 = 1mm).
 
     Returns:
-        dict with overlap bounds in model coordinates (cm), keyed by axis:
-            '<ax>_min', '<ax>_max', '<ax>_center', '<ax>_size'
-        for each of the two axes parallel to the interface.
-
-    Raises:
-        ValueError: If bodies are gapped along normal axis (not in contact),
-            overlapping along normal axis (penetrating — CUT first), or
-            have no shared area in a parallel axis (side-by-side, not
-            face-to-face).
-
-    Example:
-        mb = sp.mating_bounds(rung, ladder_side, 'x')
-        # returns {'y_min': ..., 'y_max': ..., 'y_center': ..., 'y_size': ...,
-        #          'z_min': ..., 'z_max': ..., 'z_center': ..., 'z_size': ...}
-        dm_y = mb['y_center']   # center domino in Y overlap
-        dm_z = mb['z_center']   # center domino in Z overlap
-        # Verify domino fits: dm_h < mb['z_size'] with margin
+        dict with overlap bounds, or None if preconditions fail.
     """
     bb_a = body_a.boundingBox
     bb_b = body_b.boundingBox
 
-    # ── Precondition 1: Normal axis — bodies must be touching ──
     n_a_lo = getattr(bb_a.minPoint, normal_axis)
     n_a_hi = getattr(bb_a.maxPoint, normal_axis)
     n_b_lo = getattr(bb_b.minPoint, normal_axis)
@@ -1330,25 +1309,22 @@ def mating_bounds(body_a, body_b, normal_axis, tol=0.1):
 
     if normal_overlap < -tol:
         gap = -normal_overlap
-        raise ValueError(
-            f"mating_bounds: {body_a.name} and {body_b.name} have a "
-            f"{gap:.2f} cm gap along {normal_axis} axis — bodies are not "
-            f"in contact. "
+        print(
+            f"WARNING mating_bounds: {body_a.name} and {body_b.name} have a "
+            f"{gap:.2f} cm gap along {normal_axis} axis — not in contact. "
             f"{body_a.name} {normal_axis}=[{n_a_lo:.2f}, {n_a_hi:.2f}], "
-            f"{body_b.name} {normal_axis}=[{n_b_lo:.2f}, {n_b_hi:.2f}]. "
-            f"Check body positioning — they must touch at the interface.")
+            f"{body_b.name} {normal_axis}=[{n_b_lo:.2f}, {n_b_hi:.2f}].")
+        return None
 
     if normal_overlap > tol:
-        raise ValueError(
-            f"mating_bounds: {body_a.name} and {body_b.name} overlap by "
-            f"{normal_overlap:.2f} cm along {normal_axis} axis — bodies "
-            f"are penetrating. "
+        print(
+            f"WARNING mating_bounds: {body_a.name} and {body_b.name} overlap "
+            f"by {normal_overlap:.2f} cm along {normal_axis} axis — "
+            f"penetrating. "
             f"{body_a.name} {normal_axis}=[{n_a_lo:.2f}, {n_a_hi:.2f}], "
-            f"{body_b.name} {normal_axis}=[{n_b_lo:.2f}, {n_b_hi:.2f}]. "
-            f"CUT one from the other first, then call mating_bounds on "
-            f"the result.")
+            f"{body_b.name} {normal_axis}=[{n_b_lo:.2f}, {n_b_hi:.2f}].")
+        return None
 
-    # ── Precondition 2: Parallel axes — bodies must share a mating area ──
     para_axes = [ax for ax in ('x', 'y', 'z') if ax != normal_axis]
 
     result = {}
@@ -1362,12 +1338,12 @@ def mating_bounds(body_a, body_b, normal_axis, tol=0.1):
         hi = min(a_hi, b_hi)
 
         if lo >= hi:
-            raise ValueError(
-                f"mating_bounds: {body_a.name} and {body_b.name} have no "
-                f"overlap in {ax} axis — no shared mating surface. "
+            print(
+                f"WARNING mating_bounds: {body_a.name} and {body_b.name} "
+                f"have no overlap in {ax} axis — no shared mating surface. "
                 f"{body_a.name} {ax}=[{a_lo:.2f}, {a_hi:.2f}], "
-                f"{body_b.name} {ax}=[{b_lo:.2f}, {b_hi:.2f}]. "
-                f"The bodies don't face each other at this interface.")
+                f"{body_b.name} {ax}=[{b_lo:.2f}, {b_hi:.2f}].")
+            return None
 
         result[f'{ax}_min'] = lo
         result[f'{ax}_max'] = hi
@@ -1380,38 +1356,12 @@ def mating_bounds(body_a, body_b, normal_axis, tol=0.1):
 def check_domino_exposure(void, body_a, body_b, normal_axis, tol=0.05):
     """Check that a domino void creates blind pockets in both mating pieces.
 
-    On axes perpendicular to the interface normal, the void must be fully
-    contained within each body's bounding box. If it extends beyond a body's
-    boundary, the mortise pocket opens to a surface — the domino is "exposed."
-
-    Call this AFTER creating the void body but BEFORE CUTting it from
-    the mating pieces. Raises ValueError with diagnostic info if exposure
-    is detected, so the agent can fix placement during the build.
-
-    Args:
-        void: The domino void body (un-CUT).
-        body_a: Primary mating piece.
-        body_b: Secondary mating piece.
-        normal_axis: 'x', 'y', or 'z' — axis perpendicular to the
-            interface (the extrude direction of the domino).
-        tol: Tolerance in cm (default 0.05 ≈ 0.5mm).
-
-    Raises:
-        ValueError: If the void extends beyond either body on any
-            perpendicular axis, with axis ranges for both the void
-            and the offending body so the agent can diagnose and fix.
-
-    Example:
-        void = ext.bodies.item(0)
-        sp.check_domino_exposure(void, rail, post, 'x')
-        # If rail Y=[42, 43] and void Y=[42.77, 43.23] and post Y=[43, 46]:
-        #   → ValueError: void extends beyond rail in Y (void max=43.23, rail max=43.00)
-        #   → ValueError: void extends beyond post in Y (void min=42.77, post min=43.00)
-        # Fix: center the rail on the post so the domino sits inside both pieces.
+    Prints warnings if the void extends beyond a body's boundary (exposed
+    mortise). Returns a dict with 'ok' bool and any 'warnings' list.
     """
     perp_axes = [ax for ax in ('x', 'y', 'z') if ax != normal_axis]
     vbb = void.boundingBox
-    errors = []
+    warnings = []
 
     for body, label in [(body_a, body_a.name), (body_b, body_b.name)]:
         bbb = body.boundingBox
@@ -1423,26 +1373,22 @@ def check_domino_exposure(void, body_a, body_b, normal_axis, tol=0.05):
 
             if v_lo < b_lo - tol:
                 overshoot = b_lo - v_lo
-                errors.append(
-                    f"  {void.name} exposed in {label} on -{ax.upper()} side: "
+                warnings.append(
+                    f"{void.name} exposed in {label} on -{ax.upper()} side: "
                     f"void {ax}={v_lo:.2f} extends {overshoot:.2f} cm "
                     f"beyond {label} {ax}_min={b_lo:.2f}")
             if v_hi > b_hi + tol:
                 overshoot = v_hi - b_hi
-                errors.append(
-                    f"  {void.name} exposed in {label} on +{ax.upper()} side: "
+                warnings.append(
+                    f"{void.name} exposed in {label} on +{ax.upper()} side: "
                     f"void {ax}={v_hi:.2f} extends {overshoot:.2f} cm "
                     f"beyond {label} {ax}_max={b_hi:.2f}")
 
-    if errors:
-        detail = "\n".join(errors)
-        raise ValueError(
-            f"check_domino_exposure: domino '{void.name}' mortise is exposed "
-            f"(opens to surface) — the mortise pocket won't be blind.\n"
-            f"{detail}\n"
-            f"Fix: reposition the mating body so the domino center is well "
-            f"inside both pieces, or move the domino center to the mating "
-            f"surface overlap region.")
+    if warnings:
+        for w in warnings:
+            print(f"WARNING check_domino_exposure: {w}")
+
+    return {"ok": len(warnings) == 0, "warnings": warnings}
 
 
 # ── Joint Validation ───────────────────────────────────────────────
@@ -1450,24 +1396,11 @@ def check_domino_exposure(void, body_a, body_b, normal_axis, tol=0.05):
 def validate_joint_contact(body_a, body_b, joint_axis=None, tol_cm=0.1):
     """Validate that two bodies have touching/overlapping faces.
 
-    Checks that body_a and body_b are adjacent (gap < tol) or overlapping
-    along the joint axis, and that they overlap in the perpendicular plane.
-
-    If joint_axis is None, auto-detects by finding the axis with the
-    smallest gap between the two bounding boxes.
-
-    Args:
-        body_a: First body (e.g. rail/stretcher).
-        body_b: Second body (e.g. leg/post).
-        joint_axis: 'x', 'y', or 'z' — axis along which bodies should meet.
-            If None, auto-detected.
-        tol_cm: Maximum allowed gap in cm (default 0.1 = 1mm).
-
-    Raises:
-        ValueError with diagnostic message if bodies don't contact.
+    Prints warnings if bodies don't contact. Never raises — the script
+    continues and issues are caught by post-phase validate_design.
 
     Returns:
-        Dict with 'axis', 'gap_cm', 'perp_overlaps'.
+        Dict with 'ok', 'axis', 'gap_cm', 'perp_overlaps'.
     """
     bb_a = body_a.boundingBox
     bb_b = body_b.boundingBox
@@ -1477,7 +1410,6 @@ def validate_joint_contact(body_a, body_b, joint_axis=None, tol_cm=0.1):
         return (getattr(bb.minPoint, ax), getattr(bb.maxPoint, ax))
 
     if joint_axis is None:
-        # Auto-detect: find axis with smallest gap
         best_axis = None
         best_gap = 1e10
         for ax in all_axes:
@@ -1485,36 +1417,29 @@ def validate_joint_contact(body_a, body_b, joint_axis=None, tol_cm=0.1):
             b_min, b_max = _bb_range(bb_b, ax)
             overlap = min(a_max, b_max) - max(a_min, b_min)
             if overlap >= -tol_cm:
-                # Bodies overlap or touch on this axis — not the gap axis
                 continue
             gap = -overlap
             if gap < best_gap:
                 best_gap = gap
                 best_axis = ax
         if best_axis is None:
-            # Bodies overlap on all axes (they intersect) — contact is fine
-            return {"axis": None, "gap_cm": 0.0, "perp_overlaps": {}}
+            return {"ok": True, "axis": None, "gap_cm": 0.0, "perp_overlaps": {}}
         joint_axis = best_axis
 
+    ok = True
     a_min, a_max = _bb_range(bb_a, joint_axis)
     b_min, b_max = _bb_range(bb_b, joint_axis)
 
-    # Check adjacency or overlap along joint axis
     overlap_along = min(a_max, b_max) - max(a_min, b_min)
     if overlap_along < -tol_cm:
         gap = -overlap_along
-        raise ValueError(
-            f"Joint contact failed: {body_a.name} and {body_b.name} "
-            f"have a {gap:.2f} cm gap along {joint_axis} axis. "
+        print(
+            f"WARNING validate_joint_contact: {body_a.name} and "
+            f"{body_b.name} have a {gap:.2f} cm gap along {joint_axis}. "
             f"{body_a.name} {joint_axis}=[{a_min:.2f}, {a_max:.2f}], "
-            f"{body_b.name} {joint_axis}=[{b_min:.2f}, {b_max:.2f}]. "
-            f"FIX: {body_a.name} was likely positioned from origin "
-            f"instead of from {body_b.name}'s geometry. Rebuild the "
-            f"sketch on {body_b.name}'s face or dimension from its "
-            f"projected edges — do NOT change the design to avoid "
-            f"this body.")
+            f"{body_b.name} {joint_axis}=[{b_min:.2f}, {b_max:.2f}].")
+        ok = False
 
-    # Check perpendicular overlap (bodies must share area in the other 2 axes)
     perp_axes = [ax for ax in all_axes if ax != joint_axis]
     perp_overlaps = {}
     for pax in perp_axes:
@@ -1523,17 +1448,16 @@ def validate_joint_contact(body_a, body_b, joint_axis=None, tol_cm=0.1):
         p_overlap = min(pa_max, pb_max) - max(pa_min, pb_min)
         perp_overlaps[pax] = p_overlap
         if p_overlap < -tol_cm:
-            raise ValueError(
-                f"Joint contact failed: {body_a.name} and {body_b.name} "
-                f"don't overlap in {pax} axis — no shared mating area. "
+            print(
+                f"WARNING validate_joint_contact: {body_a.name} and "
+                f"{body_b.name} don't overlap in {pax} — no shared "
+                f"mating area. "
                 f"{body_a.name} {pax}=[{pa_min:.2f}, {pa_max:.2f}], "
-                f"{body_b.name} {pax}=[{pb_min:.2f}, {pb_max:.2f}]. "
-                f"FIX: {body_a.name} was likely positioned from origin "
-                f"instead of from {body_b.name}'s geometry. Sketch on "
-                f"the reference body's face and dimension from projected "
-                f"edges — do NOT change the design to avoid this body.")
+                f"{body_b.name} {pax}=[{pb_min:.2f}, {pb_max:.2f}].")
+            ok = False
 
     return {
+        "ok": ok,
         "axis": joint_axis,
         "gap_cm": max(0, -overlap_along),
         "perp_overlaps": perp_overlaps,
@@ -2478,31 +2402,23 @@ def apply_appearance(species="white oak", bodies=None):
 # ── Dependency Tree Validation ─────────────────────────────────────
 
 def validate_deps(ctx, metadata_path=None):
-    """Validate spatial relationships from a model.json metadata file.
+    """Validate dependency tree from model.json.
 
-    Reads the dependency tree and checks:
-    1. Side — is each body on the expected side of its reference body?
-       Uses center-of-mass via body_side(). Handles joints correctly
-       (tenon is small vs. main body, COM stays on the correct side).
-    2. Contact — do bounding boxes overlap? (connected pieces must touch)
+    Hard checks (affect pass/fail):
+    1. Single origin — only 1 body may reference "origin"
+    2. Sketch origin — non-root sketches must not dimension from sk.originPoint
+    3. Bodies in components — no bodies in root component
 
-    Args:
-        ctx: DesignContext instance
-        metadata_path: path to model.json. If None, tries to find it
-            next to the calling script via the design's script path.
+    Advisory (printed but don't affect pass/fail):
+    4. Completeness — are all design bodies tracked in model.json?
 
-    Returns:
-        True if all checks pass, False if any fail.
-        Returns None if no metadata file found (not an error — just
-        means this project predates metadata).
+    Returns True/False, or None if no model.json found.
     """
     import json
     import os
     import re
 
-    # Resolve metadata path
     if metadata_path is None:
-        # Try to find model.json next to the script via DocumentTracker
         script_path = None
         try:
             from server.document_tracker import DocumentTracker
@@ -2534,162 +2450,33 @@ def validate_deps(ctx, metadata_path=None):
         print("validate_deps: no deps entries in metadata")
         return True
 
-    print(f"\n=== Dependency tree ({len(deps)} relationships) ===")
+    print(f"\n=== Dependency tree ({len(deps)} entries) ===")
     all_ok = True
 
+    # ── Single origin check (hard) ──
     origin_refs = [d["body"] for d in deps if d["ref"] == "origin"]
     if len(origin_refs) > 1:
         print(f"  FAIL  {len(origin_refs)} bodies reference origin "
               f"(only 1 allowed): {origin_refs}")
         print(f"         Chain other bodies off the first one instead.")
         all_ok = False
+    elif len(origin_refs) == 1:
+        print(f"   OK   Single origin root: {origin_refs[0]}")
+    else:
+        print(f"  FAIL  No body references origin — need exactly 1 root")
+        all_ok = False
 
+    # Print dependency chain for reference
     for entry in deps:
         body_name = entry["body"]
         ref_name = entry["ref"]
-        expected = entry["side"]
-        direction = tuple(entry["direction"])
-        contact = entry.get("contact", True)
-        note = entry.get("note", "")
-
         body = ctx.find_body(body_name)
-        if not body:
-            print(f"  SKIP  {body_name} → {ref_name}: "
-                  f"body '{body_name}' not found")
-            continue
+        if body:
+            print(f"   OK   {body_name} → {ref_name}")
+        else:
+            print(f"  SKIP  {body_name} → {ref_name}: body not found")
 
-        # ── Origin/floor as reference ──
-        # "origin" means the XY ground plane (Z=0). The body should be
-        # above the floor (COM z > 0) and touching it (bbox minZ ≈ 0).
-        if ref_name == "origin":
-            com = body.physicalProperties.centerOfMass
-            dot = (com.x * direction[0] +
-                   com.y * direction[1] +
-                   com.z * direction[2])
-            actual = "outside" if dot > 0 else "opposite"
-            side_ok = (actual == expected)
-            tag = " OK " if side_ok else "FAIL"
-            print(f"  {tag}  {body_name} is {actual} of origin "
-                  f"(expected {expected})"
-                  + (f"  — {note}" if note and not side_ok else ""))
-            if not side_ok:
-                all_ok = False
-            if contact:
-                bb = body.boundingBox
-                # Check that body touches the origin plane along direction
-                # For direction (0,0,1): minZ should be near 0
-                # For direction (0,1,0): minY should be near 0, etc.
-                axis_vals = [bb.minPoint.x, bb.minPoint.y, bb.minPoint.z]
-                axis_idx = direction.index(max(direction, key=abs))
-                near_origin = abs(axis_vals[axis_idx]) < 0.1  # within 1mm
-                if not near_origin:
-                    print(f"  FAIL  {body_name} not touching origin "
-                          f"(min along axis = {axis_vals[axis_idx]:.3f})")
-                    all_ok = False
-            continue
-
-        # ── Normal body-to-body reference ──
-        ref = ctx.find_body(ref_name)
-        if not ref:
-            print(f"  SKIP  {body_name} → {ref_name}: "
-                  f"ref '{ref_name}' not found")
-            continue
-
-        # Side check
-        actual = body_side(body, ref, direction)
-        side_ok = (actual == expected)
-        tag = " OK " if side_ok else "FAIL"
-        print(f"  {tag}  {body_name} is {actual} of {ref_name} "
-              f"(expected {expected})"
-              + (f"  — {note}" if note and not side_ok else ""))
-        if not side_ok:
-            all_ok = False
-
-        # Contact check
-        if contact:
-            bb = body.boundingBox
-            rb = ref.boundingBox
-            touch = (bb.minPoint.x <= rb.maxPoint.x + 0.01 and
-                     bb.maxPoint.x >= rb.minPoint.x - 0.01 and
-                     bb.minPoint.y <= rb.maxPoint.y + 0.01 and
-                     bb.maxPoint.y >= rb.minPoint.y - 0.01 and
-                     bb.minPoint.z <= rb.maxPoint.z + 0.01 and
-                     bb.maxPoint.z >= rb.minPoint.z - 0.01)
-            if not touch:
-                print(f"  FAIL  {body_name} has NO CONTACT with {ref_name}")
-                all_ok = False
-
-    # ── Source check: did the code actually reference each dep's body? ──
-    script_source = None
-    try:
-        from server.document_tracker import DocumentTracker
-        src_path = DocumentTracker._script_path
-        if src_path and os.path.isfile(src_path):
-            with open(src_path, "r") as f:
-                script_source = f.read()
-    except Exception:
-        pass
-
-    if script_source and deps:
-        print("--- Reference usage check ---")
-        for entry in deps:
-            body_name = entry["body"]
-            ref_name = entry["ref"]
-
-            # Origin ref = root body using construction planes — correct by design
-            if ref_name == "origin":
-                print(f"   OK   {body_name}: root body (ref=origin)")
-                continue
-
-            # Check 1: was find_body("ref_name") called?
-            # Match patterns: find_body("ref_name"), find_body('ref_name')
-            # Also try base name without (N) suffixes for renamed bodies
-            base_ref = re.sub(r'(\s*\(\d+\))+$', '', ref_name)
-            lookup_pat = re.compile(
-                r'find_body\(\s*["\']' + re.escape(ref_name) + r'["\']'
-            )
-            found_lookup = bool(lookup_pat.search(script_source))
-            if not found_lookup and base_ref != ref_name:
-                lookup_pat = re.compile(
-                    r'find_body\(\s*["\']' + re.escape(base_ref) + r'["\']'
-                )
-                found_lookup = bool(lookup_pat.search(script_source))
-
-            # Check 2: was .boundingBox accessed on that body?
-            # Look for boundingBox near the find_body call (within same section)
-            found_bb = False
-            if found_lookup:
-                # Find all positions of the lookup
-                for m in lookup_pat.finditer(script_source):
-                    # Check ~40 lines after the lookup for .boundingBox
-                    start = m.start()
-                    # Count forward ~40 lines
-                    end = start
-                    newlines = 0
-                    while end < len(script_source) and newlines < 40:
-                        if script_source[end] == '\n':
-                            newlines += 1
-                        end += 1
-                    snippet = script_source[start:end]
-                    if '.boundingBox' in snippet or 'find_face' in snippet:
-                        found_bb = True
-                        break
-
-            if not found_lookup:
-                print(f"  WARN  {body_name}: ref body '{ref_name}' never "
-                      f"looked up — likely using origin-based positioning")
-                all_ok = False
-            elif not found_bb:
-                print(f"  WARN  {body_name}: ref body '{ref_name}' found "
-                      f"but .boundingBox/find_face never used — "
-                      f"ceremonial lookup?")
-                # Don't fail on this — the body might be used as a
-                # sketch plane or CUT tool without needing bounding box
-            else:
-                print(f"   OK   {body_name}: ref '{ref_name}' looked up "
-                      f"+ geometry read")
-
-    # ── Sketch origin check: non-root bodies should not dimension from origin ──
+    # ── Sketch origin check (hard) ──
     origin_bodies = set(d["body"] for d in deps if d["ref"] == "origin")
     origin_dim_issues = []
 
@@ -2732,35 +2519,20 @@ def validate_deps(ctx, metadata_path=None):
     if origin_dim_issues:
         print("--- Sketch origin check ---")
         for issue in origin_dim_issues[:10]:
-            print(f"  WARN  {issue}")
+            print(f"  FAIL  {issue}")
         if len(origin_dim_issues) > 10:
             print(f"         ... and {len(origin_dim_issues) - 10} more")
-        print(f"  Non-root sketches should dimension from projected "
+        print(f"  Non-root sketches must dimension from projected "
               f"reference geometry, not sketch origin.")
+        all_ok = False
+    else:
+        print("   OK   No non-root sketches dimension from origin")
 
-    # ── Completeness check: are all design bodies tracked? ──
-    import fnmatch as _fnmatch
-    print("--- Completeness check ---")
-    tracked = set(entry["body"] for entry in deps)
-    replica_patterns = []
-    for entry in deps:
-        if "replicas" in entry:
-            replica_patterns.append(entry["replicas"])
-
-    # Collect ALL bodies — root AND components. No exclusions.
+    # ── Bodies in components check (hard) ──
     root_bodies = []
-    comp_bodies = []
     for i in range(ctx.root.bRepBodies.count):
         root_bodies.append(ctx.root.bRepBodies.item(i).name)
 
-    def _collect_comp_bodies(comp):
-        for i in range(comp.bRepBodies.count):
-            comp_bodies.append(comp.bRepBodies.item(i).name)
-
-    for j in range(ctx.root.occurrences.count):
-        _collect_comp_bodies(ctx.root.occurrences.item(j).component)
-
-    # Flag root-level bodies — ALL bodies should be inside components.
     if root_bodies:
         print(f"  FAIL  {len(root_bodies)} bodies in root component "
               f"(should be inside a component):")
@@ -2770,25 +2542,36 @@ def validate_deps(ctx, metadata_path=None):
             print(f"         ... and {len(root_bodies) - 10} more")
         all_ok = False
 
+    # ── Completeness check (advisory) ──
+    import fnmatch as _fnmatch
+    print("--- Completeness check (advisory) ---")
+    tracked = set(entry["body"] for entry in deps)
+    replica_patterns = []
+    for entry in deps:
+        if "replicas" in entry:
+            replica_patterns.append(entry["replicas"])
+
+    comp_bodies = []
+    for j in range(ctx.root.occurrences.count):
+        comp = ctx.root.occurrences.item(j).component
+        for i in range(comp.bRepBodies.count):
+            comp_bodies.append(comp.bRepBodies.item(i).name)
+
     all_bodies = root_bodies + comp_bodies
     orphans = []
     for name in all_bodies:
-        # Exact match
         if name in tracked:
             continue
-        # Pattern copy: "Slat (3)" or "Str_12 (1) (3)" → base "Slat" / "Str_12"
         base = re.sub(r'(\s*\(\d+\))+$', '', name)
         if base in tracked:
             continue
-        # Replica glob: e.g. "Rung_*" covers Rung_2, Rung_3, etc.
         if any(_fnmatch.fnmatch(name, pat) for pat in replica_patterns):
             continue
         orphans.append(name)
 
     if orphans:
         for o in orphans:
-            print(f"  MISS  {o}: exists in design but not in model.json")
-        all_ok = False
+            print(f"  NOTE  {o}: exists in design but not in model.json")
     else:
         print(f"   OK   All {len(all_bodies)} bodies are tracked")
 

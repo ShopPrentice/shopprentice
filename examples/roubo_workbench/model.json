@@ -2,187 +2,67 @@
   "deps": [
     {
       "body": "Leg_FL",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front-left leg, flush with front edge"
+      "ref": "origin"
     },
     {
       "body": "Leg_FR",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Front-right leg, mirrored across XMid from FL",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Leg_BL",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Back-left leg, mirrored across YMid from FL",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Leg_BR",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Back-right leg, mirrored across YMid from FR",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Top",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "5-inch slab top resting on legs, Roubo paired tenon joinery"
+      "ref": "Leg_FL"
     },
     {
       "body": "LS_Front",
-      "ref": "Leg_FL",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front long stretcher, through-tenons in legs, flush with front edge"
+      "ref": "Leg_FL"
     },
     {
       "body": "LS_Back",
-      "ref": "Leg_BL",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Back long stretcher, mirrored across YMid from LS_Front"
+      "ref": "Leg_BL"
     },
     {
       "body": "SS_Left",
-      "ref": "Leg_FL",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Left short stretcher, blind tenons into front/back legs"
+      "ref": "Leg_FL"
     },
     {
       "body": "SS_Right",
-      "ref": "Leg_FR",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Right short stretcher, mirrored across XMid from SS_Left"
+      "ref": "Leg_FR"
     },
     {
       "body": "Deadman",
-      "ref": "LS_Front",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Sliding deadman panel, tongue-and-groove between front LS and top"
+      "ref": "LS_Front"
     },
     {
       "body": "Vise_Chop",
-      "ref": "Leg_FL",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Vise chop in front of FL leg, parallel to front face",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Vise_Screw",
-      "ref": "Vise_Chop",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Vise screw cylinder passing through chop and leg"
+      "ref": "Vise_Chop"
     },
     {
       "body": "Vise_Handle",
-      "ref": "Vise_Screw",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Vise handle, cross-cylinder centered on leg at screw height",
-      "contact": true
+      "ref": "Vise_Screw"
     },
     {
       "body": "Vise_Guide",
-      "ref": "Vise_Chop",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Parallel guide bar below screw, passes through chop and leg",
-      "contact": false
+      "ref": "Vise_Chop"
     },
     {
       "body": "LSPinL_0",
-      "ref": "LS_Front",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Drawbore pin for left tenon of front long stretcher",
-      "replicas": "LSPinL_*"
+      "ref": "LS_Front"
     },
     {
       "body": "SSPinF_0",
-      "ref": "SS_Left",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Drawbore pin for front tenon of left short stretcher",
-      "replicas": "SSPinF_*"
+      "ref": "SS_Left"
     }
   ]
 }

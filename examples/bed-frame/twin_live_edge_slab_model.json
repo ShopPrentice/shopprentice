@@ -2,223 +2,79 @@
   "deps": [
     {
       "body": "Post_FL",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front-left corner post, short (front_post_h)"
+      "ref": "origin"
     },
     {
       "body": "Post_FR",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Front-right corner post, mirror of FL across X midplane",
-      "contact": false
+      "ref": "Post_FL"
     },
     {
       "body": "Post_BL",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Back-left corner post, tall (headboard_h)",
-      "contact": false
+      "ref": "Post_FL"
     },
     {
       "body": "Post_BR",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Back-right corner post, mirror of BL across X midplane",
-      "contact": false
+      "ref": "Post_FL"
     },
     {
       "body": "Rail_Left",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Left side rail between FL and BL posts"
+      "ref": "Post_FL"
     },
     {
       "body": "Rail_Right",
-      "ref": "Post_FR",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Right side rail, mirror of Rail_Left"
+      "ref": "Post_FR"
     },
     {
       "body": "Rail_Foot",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Foot rail between front posts"
+      "ref": "Post_FL"
     },
     {
       "body": "Rail_Back",
-      "ref": "Post_BL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Back rail between back posts, shorter (back_rail_h)"
+      "ref": "Post_BL"
     },
     {
       "body": "Ledger_Left",
-      "ref": "Rail_Left",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Left ledger strip on inside face of left rail"
+      "ref": "Rail_Left"
     },
     {
       "body": "Ledger_Right",
-      "ref": "Rail_Right",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Right ledger strip, mirror of Ledger_Left"
+      "ref": "Rail_Right"
     },
     {
       "body": "Slab",
-      "ref": "Post_BL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Live edge slab headboard, spans full outer_w, notched around back posts"
+      "ref": "Post_BL"
     },
     {
       "body": "BT_1",
-      "ref": "Slab",
-      "side": "outside",
-      "direction": [
-        0,
-        -1,
-        0
-      ],
-      "contact": true,
-      "note": "Bowtie inlay 1 across crack in slab"
+      "ref": "Slab"
     },
     {
       "body": "BT_2",
-      "ref": "Slab",
-      "side": "outside",
-      "direction": [
-        0,
-        -1,
-        0
-      ],
-      "contact": true,
-      "note": "Bowtie inlay 2 (center)"
+      "ref": "Slab"
     },
     {
       "body": "BT_3",
-      "ref": "Slab",
-      "side": "outside",
-      "direction": [
-        0,
-        -1,
-        0
-      ],
-      "contact": true,
-      "note": "Bowtie inlay 3"
+      "ref": "Slab"
     },
     {
       "body": "Slat_1",
-      "ref": "Ledger_Left",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Mattress support slat template, rests on ledger strips",
-      "replicas": "Slat_*"
+      "ref": "Ledger_Left"
     },
     {
       "body": "DM_SL_L_0",
-      "ref": "Slab",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino voids: slab to left back post (2 dominos)",
-      "replicas": "DM_SL_L_*"
+      "ref": "Slab"
     },
     {
       "body": "DM_SL_R_0",
-      "ref": "Slab",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino voids: slab to right back post (2 dominos)",
-      "replicas": "DM_SL_R_*"
+      "ref": "Slab"
     },
     {
       "body": "DM_LL_0",
-      "ref": "Ledger_Left",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino voids: left ledger to left rail (4 dominos)",
-      "replicas": "DM_LL_*"
+      "ref": "Ledger_Left"
     },
     {
       "body": "DM_LR_0",
-      "ref": "Ledger_Right",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino voids: right ledger to right rail (4 dominos)",
-      "replicas": "DM_LR_*"
+      "ref": "Ledger_Right"
     }
   ]
 }

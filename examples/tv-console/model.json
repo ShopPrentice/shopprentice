@@ -2,520 +2,155 @@
   "deps": [
     {
       "body": "Leg_FL",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front-left leg at floor level"
+      "ref": "origin"
     },
     {
       "body": "Leg_FR",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Front-right leg, mirror of FL across X midplane",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Leg_BL",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Back-left leg, mirror of FL across Y midplane",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Leg_BR",
-      "ref": "Leg_FR",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Back-right leg, mirror of FR across Y midplane",
-      "contact": false
+      "ref": "Leg_FR"
     },
     {
       "body": "FrontRail",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front rail M&T into front legs, at top of leg zone"
-    },
-    {
-      "body": "FrontRail",
-      "ref": "Leg_FR",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Front rail spans between front legs"
+      "ref": "Leg_FL"
     },
     {
       "body": "BackRail",
-      "ref": "FrontRail",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Back rail, mirror of front rail across Y midplane",
-      "contact": false
+      "ref": "FrontRail"
     },
     {
       "body": "SideRailL",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Left side rail M&T into FL and BL legs"
+      "ref": "Leg_FL"
     },
     {
       "body": "SideRailR",
-      "ref": "SideRailL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Right side rail, mirror of left across X midplane",
-      "contact": false
+      "ref": "SideRailL"
     },
     {
       "body": "Bottom",
-      "ref": "Leg_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Case bottom board above frame, at case_z",
-      "contact": false
+      "ref": "Leg_FL"
     },
     {
       "body": "Top",
-      "ref": "Bottom",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Case top board, above interior space",
-      "contact": false
+      "ref": "Bottom"
     },
     {
       "body": "Left",
-      "ref": "Bottom",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Left end board, dovetailed into Top and Bottom"
+      "ref": "Bottom"
     },
     {
       "body": "Right",
-      "ref": "Left",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Right end board, mirror of left across X midplane",
-      "contact": false
+      "ref": "Left"
     },
     {
       "body": "Back",
-      "ref": "Left",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Back panel in rabbet at rear of case"
+      "ref": "Left"
     },
     {
       "body": "Divider1",
-      "ref": "Bottom",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "First vertical divider at 1/3 width, dadoed into Top and Bottom"
-    },
-    {
-      "body": "Divider1",
-      "ref": "Left",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Divider1 is inboard of left end",
-      "contact": false
+      "ref": "Bottom"
     },
     {
       "body": "Divider2",
-      "ref": "Divider1",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Second vertical divider at 2/3 width",
-      "contact": false
-    },
-    {
-      "body": "Divider2",
-      "ref": "Bottom",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Divider2 dadoed into Top and Bottom"
+      "ref": "Divider1"
     },
     {
       "body": "DmDv1_Bot_0",
-      "ref": "Divider1",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "contact": true,
-      "note": "Domino void at Divider1-to-Bottom joint",
-      "replicas": "DmDv1_Bot_*"
+      "ref": "Divider1"
     },
     {
       "body": "DmDv1_Top_0",
-      "ref": "Divider1",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "contact": true,
-      "note": "Domino void at Divider1-to-Top joint",
-      "replicas": "DmDv1_Top_*"
+      "ref": "Divider1"
     },
     {
       "body": "DmDv2_Bot_0",
-      "ref": "Divider2",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "contact": true,
-      "note": "Domino void at Divider2-to-Bottom joint",
-      "replicas": "DmDv2_Bot_*"
+      "ref": "Divider2"
     },
     {
       "body": "DmDv2_Top_0",
-      "ref": "Divider2",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "contact": true,
-      "note": "Domino void at Divider2-to-Top joint",
-      "replicas": "DmDv2_Top_*"
+      "ref": "Divider2"
     },
     {
       "body": "dd_Front",
-      "ref": "Bottom",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Drawer front in center section",
-      "replicas": "dd_Front*",
-      "contact": false
+      "ref": "Bottom"
     },
     {
       "body": "dd_Back",
-      "ref": "dd_Front",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Drawer back behind drawer front",
-      "replicas": "dd_Back*",
-      "contact": false
+      "ref": "dd_Front"
     },
     {
       "body": "dd_Left",
-      "ref": "dd_Front",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Drawer left side connects front and back",
-      "replicas": "dd_Left*"
+      "ref": "dd_Front"
     },
     {
       "body": "dd_Right",
-      "ref": "dd_Left",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Drawer right side opposite left",
-      "replicas": "dd_Right*",
-      "contact": false
+      "ref": "dd_Left"
     },
     {
       "body": "dd_Bottom",
-      "ref": "dd_Front",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Drawer bottom panel",
-      "replicas": "dd_Bottom*"
+      "ref": "dd_Front"
     },
     {
       "body": "LeftDoor",
-      "ref": "Left",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Left door in left section opening",
-      "contact": false
-    },
-    {
-      "body": "LeftDoor",
-      "ref": "Divider1",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Left door between left end and divider1",
-      "contact": false
+      "ref": "Left"
     },
     {
       "body": "RightDoor",
-      "ref": "Right",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Right door in right section opening",
-      "contact": false
-    },
-    {
-      "body": "RightDoor",
-      "ref": "Divider2",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Right door between divider2 and right end",
-      "contact": false
+      "ref": "Right"
     },
     {
       "body": "Cleat1",
-      "ref": "Bottom",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Cleat under case bottom at 1/5 width, through-tenoned into rails"
+      "ref": "Bottom"
     },
     {
       "body": "Cleat1_R",
-      "ref": "Cleat1",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Right mirror of Cleat1 at 4/5 width",
-      "contact": false
+      "ref": "Cleat1"
     },
     {
       "body": "Cleat2",
-      "ref": "Bottom",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Cleat under case bottom at 2/5 width"
+      "ref": "Bottom"
     },
     {
       "body": "Cleat2_R",
-      "ref": "Cleat2",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Right mirror of Cleat2 at 3/5 width",
-      "contact": false
+      "ref": "Cleat2"
     },
     {
       "body": "DmCl1_0",
-      "ref": "Cleat1",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "contact": true,
-      "note": "Domino void at Cleat1-to-case bottom joint",
-      "replicas": "DmCl1_*"
+      "ref": "Cleat1"
     },
     {
       "body": "DmCl1R_0",
-      "ref": "Cleat1_R",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "contact": true,
-      "note": "Domino void at Cleat1_R-to-case bottom joint",
-      "replicas": "DmCl1R_*"
+      "ref": "Cleat1_R"
     },
     {
       "body": "DmCl2_0",
-      "ref": "Cleat2",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "contact": true,
-      "note": "Domino void at Cleat2-to-case bottom joint",
-      "replicas": "DmCl2_*"
+      "ref": "Cleat2"
     },
     {
       "body": "DmCl2R_0",
-      "ref": "Cleat2_R",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "contact": true,
-      "note": "Domino void at Cleat2_R-to-case bottom joint",
-      "replicas": "DmCl2R_*"
+      "ref": "Cleat2_R"
     },
     {
       "body": "LDoor_H_Lo_Leaf",
-      "ref": "LeftDoor",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "contact": false,
-      "note": "Hinge leaf"
+      "ref": "LeftDoor"
     },
     {
       "body": "LDoor_H_Hi_Leaf",
-      "ref": "LeftDoor",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "contact": false,
-      "note": "Hinge leaf"
+      "ref": "LeftDoor"
     },
     {
       "body": "RDoor_H_Lo_Leaf",
-      "ref": "RightDoor",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "contact": false,
-      "note": "Hinge leaf"
+      "ref": "RightDoor"
     },
     {
       "body": "RDoor_H_Hi_Leaf",
-      "ref": "RightDoor",
-      "side": "opposite",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "contact": false,
-      "note": "Hinge leaf"
+      "ref": "RightDoor"
     }
   ]
 }

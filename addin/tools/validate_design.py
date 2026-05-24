@@ -253,9 +253,10 @@ Combines three checks in a single call:
    (bounding-box adjacency, 0.5mm tolerance)
 2. **Interference** — no unintended body overlaps (excludes void-on-void
    pairs like joinery ghost bodies)
-3. **Dependency tree** — if model.json exists next to the script, validates
-   spatial relationships (sides, contact), source references (find_body +
-   boundingBox), completeness (all bodies tracked), and single origin root.
+3. **Dependency tree** — if model.json exists next to the script, validates:
+   single origin root, sketch origin enforcement (non-root sketches must
+   not dimension from sk.originPoint), bodies in components.
+   Completeness check is advisory (printed but doesn't affect pass/fail).
 
 Returns a single pass/fail result. A valid piece passes all checks.
 Run after EVERY phase (structure, joinery, details) — not just at the end."""

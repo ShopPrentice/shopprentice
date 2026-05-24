@@ -2,267 +2,95 @@
   "deps": [
     {
       "body": "Post_FL",
-      "ref": "origin",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Front-left corner post, short (front_post_h)"
+      "ref": "origin"
     },
     {
       "body": "Post_FR",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Front-right corner post, mirror of FL across X midplane",
-      "contact": false
+      "ref": "Post_FL"
     },
     {
       "body": "Post_BL",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Back-left corner post, tall (headboard_h)",
-      "contact": false
+      "ref": "Post_FL"
     },
     {
       "body": "Post_BR",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Back-right corner post, mirror of BL across X midplane",
-      "contact": false
+      "ref": "Post_FL"
     },
     {
       "body": "Rail_Left",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Left side rail, between FL and BL posts, attached with bed rail fasteners"
+      "ref": "Post_FL"
     },
     {
       "body": "Rail_Right",
-      "ref": "Post_FR",
-      "side": "outside",
-      "direction": [
-        0,
-        1,
-        0
-      ],
-      "note": "Right side rail, mirror of Rail_Left across X midplane"
+      "ref": "Post_FR"
     },
     {
       "body": "Rail_Foot",
-      "ref": "Post_FL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Foot rail between front posts, attached with bed rail fasteners"
+      "ref": "Post_FL"
     },
     {
       "body": "Rail_Back",
-      "ref": "Post_BL",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Back rail between back posts, shorter than side rails (back_rail_h)"
+      "ref": "Post_BL"
     },
     {
       "body": "Ledger_Left",
-      "ref": "Rail_Left",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Left ledger strip on inside face of left rail, supports slats"
+      "ref": "Rail_Left"
     },
     {
       "body": "Ledger_Right",
-      "ref": "Rail_Right",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Right ledger strip, mirror of Ledger_Left"
+      "ref": "Rail_Right"
     },
     {
       "body": "HB_TopRail",
-      "ref": "Post_BL",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Headboard top rail between back posts, at top of headboard"
+      "ref": "Post_BL"
     },
     {
       "body": "HB_BotRail",
-      "ref": "Post_BL",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Headboard bottom rail between back posts, at front_post_h"
+      "ref": "Post_BL"
     },
     {
       "body": "HBSlat_1",
-      "ref": "HB_BotRail",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Headboard vertical slat template, stub tenons into both rails",
-      "replicas": "HBSlat_*"
+      "ref": "HB_BotRail"
     },
     {
       "body": "Slat_1",
-      "ref": "Ledger_Left",
-      "side": "outside",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Mattress support slat template, rests on ledger strips",
-      "replicas": "Slat_*"
+      "ref": "Ledger_Left"
     },
     {
       "body": "CenterBeam",
-      "ref": "Slat_1",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Center support beam running lengthwise under slats"
+      "ref": "Slat_1"
     },
     {
       "body": "BeamLeg_1",
-      "ref": "CenterBeam",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "First beam support leg at 1/3 along bed length"
+      "ref": "CenterBeam"
     },
     {
       "body": "BeamLeg_2",
-      "ref": "CenterBeam",
-      "side": "opposite",
-      "direction": [
-        0,
-        0,
-        1
-      ],
-      "note": "Second beam support leg at 2/3 along bed length"
+      "ref": "CenterBeam"
     },
     {
       "body": "DM_HBT_L_0",
-      "ref": "HB_TopRail",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: headboard top rail to left back post",
-      "replicas": "DM_HBT_L_*"
+      "ref": "HB_TopRail"
     },
     {
       "body": "DM_HBT_R_0",
-      "ref": "HB_TopRail",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: headboard top rail to right back post",
-      "replicas": "DM_HBT_R_*"
+      "ref": "HB_TopRail"
     },
     {
       "body": "DM_HBB_L_0",
-      "ref": "HB_BotRail",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: headboard bottom rail to left back post",
-      "replicas": "DM_HBB_L_*"
+      "ref": "HB_BotRail"
     },
     {
       "body": "DM_HBB_R_0",
-      "ref": "HB_BotRail",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino void: headboard bottom rail to right back post",
-      "replicas": "DM_HBB_R_*"
+      "ref": "HB_BotRail"
     },
     {
       "body": "DM_LL_0",
-      "ref": "Ledger_Left",
-      "side": "opposite",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino voids: left ledger to left rail (4 dominos)",
-      "replicas": "DM_LL_*"
+      "ref": "Ledger_Left"
     },
     {
       "body": "DM_LR_0",
-      "ref": "Ledger_Right",
-      "side": "outside",
-      "direction": [
-        1,
-        0,
-        0
-      ],
-      "note": "Domino voids: right ledger to right rail (4 dominos)",
-      "replicas": "DM_LR_*"
+      "ref": "Ledger_Right"
     }
   ]
 }
