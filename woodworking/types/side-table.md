@@ -53,4 +53,8 @@ If shelf: shelf sits on stretchers or in dados on legs.
 | top_thick | 0.75 in | 0.75 in |
 | leg_size | 1.25–1.75 in | 1.5 in |
 
-Refer to `types/dining-table.md` for detailed build order and common mistakes.
+## Apron Placement
+
+**Aprons are flush with the leg outer face** — not set back on the inner face. Front apron at Y=[0, apron_thick] within front leg Y=[0, leg_size]. Side aprons fit between front/back aprons. Always call `sp.mating_bounds()` before placing dominos.
+
+Refer to `types/dining-table.md` for detailed build order, apron placement rules, and common mistakes.

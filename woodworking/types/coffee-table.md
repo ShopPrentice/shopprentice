@@ -47,8 +47,13 @@ No openings needed — coffee tables are open on all sides.
 6. Details (edge treatments, leg taper)
 ```
 
+## Apron Placement (when aprons are present)
+
+**Aprons are flush with the leg outer face** — not set back on the inner face. Front apron at Y=[0, apron_thick] within front leg Y=[0, leg_size]. Side aprons fit between front/back aprons. Always call `sp.mating_bounds()` before placing dominos.
+
 ## Common Mistakes
 
+- Aprons placed on leg INNER face instead of flush with OUTER face (visible gap)
 - **Over-building with unnecessary aprons** — many modern designs are just top + legs + dominos
 - Proportions too square — coffee tables are often elongated (2:1 to 3.5:1 length:width ratio)
 - Table too tall — 14–16" is standard, not 18" (lower than dining/side tables)

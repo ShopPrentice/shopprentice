@@ -57,13 +57,19 @@ Stretchers (if present) connect legs at a lower height
 6. Details (seat edge rounding, leg chamfers)
 ```
 
+## Apron Placement
+
+**Aprons are flush with the leg outer face** — not set back on the inner face. Front apron at Y=[0, apron_thick] within front leg Y=[0, leg_size]. Side aprons fit between front/back aprons. Always call `sp.mating_bounds()` before placing dominos.
+
 ## Common Mistakes
 
+- Aprons placed on leg INNER face instead of flush with OUTER face (visible gap)
 - **No joinery at all** — bodies positioned but not mechanically connected
 - Seat edges left square (should be rounded for comfort)
 - Bench too deep — 11–14" is correct for upright sitting
 - Long bench sagging (need center support or thicker seat for benches > 48")
 - Stretcher dominos at same height as apron dominos (collision inside leg)
+- Dominos placed without calling `mating_bounds()` first
 
 ## Parameter Suggestions
 
