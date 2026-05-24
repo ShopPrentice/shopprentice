@@ -180,12 +180,34 @@ def handler(exclude_prefixes: list = None) -> dict:
 
         passed = connectivity["connected"] and interference["realCount"] == 0
 
+        # Run dependency tree validation if model.json exists
+        deps_result = None
+        try:
+            from helpers import sp
+            import io, contextlib
+            ctx = sp.DesignContext()
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                deps_passed = sp.validate_deps(ctx)
+            deps_output = buf.getvalue()
+            if deps_passed is not None:
+                deps_result = {
+                    "passed": deps_passed,
+                    "output": deps_output.strip(),
+                }
+                if not deps_passed:
+                    passed = False
+        except Exception as de:
+            deps_result = {"passed": None, "error": str(de)}
+
         import json
         result = {
             "passed": passed,
             "connectivity": connectivity,
             "interference": interference,
         }
+        if deps_result is not None:
+            result["deps"] = deps_result
 
         # Build summary message
         parts = []
@@ -198,6 +220,12 @@ def handler(exclude_prefixes: list = None) -> dict:
             parts.append("interference OK (0 real)")
         else:
             parts.append(f"INTERFERENCE FAIL ({interference['realCount']} real)")
+
+        if deps_result is not None:
+            if deps_result.get("passed"):
+                parts.append("deps OK")
+            elif deps_result.get("passed") is False:
+                parts.append("DEPS FAIL")
 
         status = "PASSED" if passed else "FAILED"
         msg = f"{status}: {', '.join(parts)}"
@@ -218,17 +246,19 @@ def handler(exclude_prefixes: list = None) -> dict:
 
 
 TOOL_DESCRIPTION = \
-"""Run all structural validation checks on the current design.
+"""Run all validation checks on the current design.
 
-Combines connectivity + interference checks in a single call:
+Combines three checks in a single call:
 1. **Connectivity** — all structural bodies must form 1 connected cluster
    (bounding-box adjacency, 0.5mm tolerance)
 2. **Interference** — no unintended body overlaps (excludes void-on-void
    pairs like joinery ghost bodies)
+3. **Dependency tree** — if model.json exists next to the script, validates
+   spatial relationships (sides, contact), source references (find_body +
+   boundingBox), completeness (all bodies tracked), and single origin root.
 
-Returns a single pass/fail result. A valid piece of furniture passes both.
-Joinery void bodies (DM_* prefix by default) are excluded from connectivity
-and their mutual overlaps are excluded from interference."""
+Returns a single pass/fail result. A valid piece passes all checks.
+Run after EVERY phase (structure, joinery, details) — not just at the end."""
 
 tool = Tool.create_simple(
     name="validate_design",
