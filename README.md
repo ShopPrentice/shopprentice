@@ -101,7 +101,7 @@ Sculpted seats, turned legs, carved profiles, scooped surfaces, and lofted lens-
 2. You refine interactively: drag fit points in the Fusion UI, or prompt the agent ("make the back edge narrower", "round the corner more").
 3. Agent captures edited fit points via `get_timeline_state(include_sketches=True)` and bakes them back into the script as the new defaults — edits survive `clean=true` rebuilds.
 
-Supported organic techniques: revolved turned parts, closed-spline plan outlines, multi-section lofts with direction-tangent end conditions, rail-guided loft shaping, rounded apex tips (bullets/domes/eggs), spherical scoops, through-tenon trimming that follows curved surfaces. See `woodworking/organic-shapes.md` (shape taxonomy + inline recipes) and `woodworking/loft.md` (loft feature reference). The Esherick Stool example is the end-to-end showcase of the loop.
+Supported organic techniques: revolved turned parts, closed-spline plan outlines, multi-section lofts with direction-tangent end conditions, rail-guided loft shaping, rounded apex tips (bullets/domes/eggs), spherical scoops, through-tenon trimming that follows curved surfaces. See `docs/organic-shapes.md` (shape taxonomy + inline recipes) and `docs/loft.md` (loft feature reference). The Esherick Stool example is the end-to-end showcase of the loop.
 
 ### Parameter Editor
 
@@ -111,7 +111,7 @@ Dockable palette in Fusion 360 for iterating without Claude — edit parameters 
 
 12 joint types with reusable Python templates: mortise & tenon, dovetail, box joint, domino, drawbore, dowel, dado/rabbet, lap, bridle, miter, spline, pocket hole. Plus hardware templates for bed rail fasteners and tabletop brackets.
 
-All joinery uses the **combine-based** approach: build the tenon/tail as a body, CUT the receiving board, JOIN to the owner. See [joinery/README.md](woodworking/joinery/README.md) for the full reference.
+All joinery uses the **combine-based** approach: build the tenon/tail as a body, CUT the receiving board, JOIN to the owner. See [joinery/README.md](docs/joinery/README.md) for the full reference.
 
 ### Wood Appearance
 

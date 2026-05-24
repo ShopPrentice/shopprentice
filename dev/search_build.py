@@ -14,13 +14,13 @@ Key improvements over v1:
 
 Usage:
     # From live Fusion design (capture + build):
-    python tools/search_build.py --from-fusion -o /tmp/rebuilt.py -v
+    python dev/search_build.py --from-fusion -o /tmp/rebuilt.py -v
 
     # From saved capture JSON:
-    python tools/search_build.py --capture capture.json -o /tmp/rebuilt.py
+    python dev/search_build.py --capture capture.json -o /tmp/rebuilt.py
 
     # Dry-run: show ambiguous features without executing:
-    python tools/search_build.py --capture capture.json --dry-run
+    python dev/search_build.py --capture capture.json --dry-run
 
 Requires: Fusion 360 running with MCP server on localhost:9100
 """

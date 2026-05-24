@@ -8,7 +8,7 @@ Before writing any code, decide whether you are **building from scratch** or **a
 
 - **Empty document** → ground-up build. Use `execute_script(clean=True)` each phase; Ctrl+Z reverts.
 - **Existing model you built in this session (tracked)** → iterate by editing the script and re-running `execute_script(clean=True)`.
-- **Existing model the user built manually, or from a script you don't have** → **additive mode**. Do NOT use `clean=True` — it would wipe the user's work. Call `execute_script` WITHOUT `clean`, looking up bodies by name via `root.allOccurrences` and appending features to the timeline. Read `woodworking/mcp-advanced.md` (Approach 2) for the full pattern before writing code.
+- **Existing model the user built manually, or from a script you don't have** → **additive mode**. Do NOT use `clean=True` — it would wipe the user's work. Call `execute_script` WITHOUT `clean`, looking up bodies by name via `root.allOccurrences` and appending features to the timeline. Read `docs/mcp-advanced.md` (Approach 2) for the full pattern before writing code.
 - **Tracked model with unsynced UI changes** → call `sync_script` first, then decide rebuild vs additive.
 
 The `execute_script` tool enforces this at the tool level: `clean=True` is **rejected** on untracked or unsynced documents with a structured error telling you which mode to use. Treat the rejection as a signal that you picked the wrong mode — adjust, don't reach for `force_clean=True` unless you truly intend to wipe the document.
@@ -68,18 +68,18 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 
 | Topic | When to Read | Status | File |
 |-------|-------------|--------|------|
-| **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | Tested (counter stool) | `woodworking/angled-construction.md` |
-| **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | Planned — inline quick reference below | `woodworking/details-and-finishing.md` |
-| **MCP Advanced** | Modifying existing designs, fixing dimensions, adding features to built models, delete-and-rebuild timeline sections | Tested (bar side table) | `woodworking/mcp-advanced.md` |
-| **Appearance** | Applying wood species, grain direction, multi-species designs — read before calling `apply_appearance`. Includes the `# APPEARANCE SPEC` comment-block convention for persisting grain overrides / multi-pass finish across `execute_script(clean=True)` rebuilds | Tested (blanket box) | `woodworking/appearance.md` |
-| **Hardware Installation** | Importing STEP hardware (bed rail fasteners, hinges), positioning, caching, direction detection, component organization | Tested (queen + twin beds) | `woodworking/hardware-installation.md` |
-| **Joinery Rules** | Combine-based joinery, tooling bodies, edge rabbets, cross-component CUT patterns | Tested | `woodworking/joinery.md` |
-| **Screenshots** | Camera positioning, standard shots, transparent views, detail framing | Tested | `woodworking/screenshots.md` |
-| **Incremental Updates & Build Strategy** | Build order, component-by-component workflow, document management, script epilogue, interactive editing, rebuild-vs-patch | Tested | `woodworking/incremental-updates.md` |
-| **Replication & Common Errors** | Mirror, Pattern, body pattern ghost bodies, mirror+pattern limitation, 24-row error table | Tested | `woodworking/fusion-api-rules.md` |
-| **Helpers Reference** | `sp.*` function signatures, `sketch_rect_model`, `ev()`, feature builders | Tested | `woodworking/helpers-reference.md` |
-| **Organic Shapes** | Self-contained designer + recipe doc for sculpted forms. Shape taxonomy (5 classes): (1) turned/spindled parts — revolve, (2) flat-plan outlines — closed spline + extrude, (3) 3-D organic solids (lens-profile seats, rounded finial tips) — multi-section loft + tangent end conditions, (4) sculpted dish/saddle — sphere CUT, (5) character surfaces — Form T-splines (out-of-scope for scripting). Classes 1–4 include inline API snippets; also covers the approximate→refine→capture iteration loop and through-tenon trimming on organic surfaces | Tested (Esherick stool) | `woodworking/organic-shapes.md` |
-| **Loft** | Deep feature reference for advanced loft variants: closed-ring topology, rail/centerline guides, 1→N→1 branching manifolds, surface-only and loft-as-cut variants, closed-spline cross-section generators (kidney/star/cardioid), all end-condition types. **Don't preload** for common organic shapes — use the inline recipes in `organic-shapes.md` instead. Read this file only when a build actually needs one of these variants | Tested (18 fixtures) | `woodworking/loft.md` |
+| **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | Tested (counter stool) | `docs/angled-construction.md` |
+| **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | Planned — inline quick reference below | `docs/details-and-finishing.md` |
+| **MCP Advanced** | Modifying existing designs, fixing dimensions, adding features to built models, delete-and-rebuild timeline sections | Tested (bar side table) | `docs/mcp-advanced.md` |
+| **Appearance** | Applying wood species, grain direction, multi-species designs — read before calling `apply_appearance`. Includes the `# APPEARANCE SPEC` comment-block convention for persisting grain overrides / multi-pass finish across `execute_script(clean=True)` rebuilds | Tested (blanket box) | `docs/appearance.md` |
+| **Hardware Installation** | Importing STEP hardware (bed rail fasteners, hinges), positioning, caching, direction detection, component organization | Tested (queen + twin beds) | `docs/hardware-installation.md` |
+| **Joinery Rules** | Combine-based joinery, tooling bodies, edge rabbets, cross-component CUT patterns | Tested | `docs/joinery.md` |
+| **Screenshots** | Camera positioning, standard shots, transparent views, detail framing | Tested | `docs/screenshots.md` |
+| **Incremental Updates & Build Strategy** | Build order, component-by-component workflow, document management, script epilogue, interactive editing, rebuild-vs-patch | Tested | `docs/incremental-updates.md` |
+| **Replication & Common Errors** | Mirror, Pattern, body pattern ghost bodies, mirror+pattern limitation, 24-row error table | Tested | `docs/fusion-api-rules.md` |
+| **Helpers Reference** | `sp.*` function signatures, `sketch_rect_model`, `ev()`, feature builders | Tested | `docs/helpers-reference.md` |
+| **Organic Shapes** | Self-contained designer + recipe doc for sculpted forms. Shape taxonomy (5 classes): (1) turned/spindled parts — revolve, (2) flat-plan outlines — closed spline + extrude, (3) 3-D organic solids (lens-profile seats, rounded finial tips) — multi-section loft + tangent end conditions, (4) sculpted dish/saddle — sphere CUT, (5) character surfaces — Form T-splines (out-of-scope for scripting). Classes 1–4 include inline API snippets; also covers the approximate→refine→capture iteration loop and through-tenon trimming on organic surfaces | Tested (Esherick stool) | `docs/organic-shapes.md` |
+| **Loft** | Deep feature reference for advanced loft variants: closed-ring topology, rail/centerline guides, 1→N→1 branching manifolds, surface-only and loft-as-cut variants, closed-spline cross-section generators (kidney/star/cardioid), all end-condition types. **Don't preload** for common organic shapes — use the inline recipes in `organic-shapes.md` instead. Read this file only when a build actually needs one of these variants | Tested (18 fixtures) | `docs/loft.md` |
 
 ### Joinery Reference Files
 
@@ -90,19 +90,19 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | Joint | When to Read | Status | File |
 |-------|-------------|--------|------|
 | **Mortise & Tenon** | Leg-to-rail, stretcher-to-leg, frame-and-panel, table aprons, any rail-into-post connection | Tested (counter stool — blind, through & angled variants) | Inline in skill + `mortise_tenon` template |
-| **Drawbore M&T** | Stretcher-to-leg with offset pins for permanent tightness — workbenches, trestle tables, timber frames | Tested (Roubo workbench — through & blind variants) | `woodworking/joinery/drawbore.md` + `drawbore` template |
-| **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `woodworking/joinery/domino-joint.md` |
-| **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `woodworking/joinery/dovetail.md` |
-| **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `woodworking/joinery/box-joint.md` |
-| **Dado & Rabbet** | Shelves into sides, case backs, drawer bottoms, any panel-into-groove connection | Tested (bookshelf, template fixtures — through/stopped dado, rabbet, panel groove) | `woodworking/joinery/dado-rabbet.md` |
-| **Bridle Joint** | Frame corners, T-connections, open mortise-and-tenon at end of a rail | Draft | `woodworking/joinery/bridle-joint.md` |
-| **Lap Joint** | Flat frames, cross braces, grid assemblies, half-lap at crossings | Draft | `woodworking/joinery/lap-joint.md` |
-| **Miter Joint** | Picture frames, trim, hidden end grain at corners | Draft | `woodworking/joinery/miter-joint.md` |
-| **Spline Joint** | Reinforced miters, decorative accents across a joint line | Draft | `woodworking/joinery/spline-joint.md` |
-| **Dowel Joint** | Edge joining, panel glue-ups, face frames, spindle-to-rail, round-peg alignment | Tested | `woodworking/joinery/dowel-joint.md` + `woodworking/templates/dowel.py` |
-| **Pocket Hole** | Face frames, quick assemblies, tabletop attachment — screw-based | Draft | `woodworking/joinery/pocket-hole.md` |
-| **Bed Rail Fastener** | Bed rail to post — detachable STEP hardware (mortise bedlock, hooks + slots) | Tested (queen + twin beds) | `woodworking/templates/bed_rail_fastener.py` + `woodworking/hardware-installation.md` |
-| **Tenon Wedge** | Through tenon tightening, fox wedging (blind tenons), Windsor spindle/stretcher locking — rect (2 wedges) or round (1 centred, trimmed to cylinder). Grain detected via principal axes of inertia; pass `grain_dir=` for ambiguous mortise pieces (seats, slabs) | Tested (Windsor chair — splayed legs + angled stretchers) | `woodworking/joinery/tenon-wedge.md` + `tenon_wedge` template |
+| **Drawbore M&T** | Stretcher-to-leg with offset pins for permanent tightness — workbenches, trestle tables, timber frames | Tested (Roubo workbench — through & blind variants) | `docs/joinery/drawbore.md` + `drawbore` template |
+| **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `docs/joinery/domino-joint.md` |
+| **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `docs/joinery/dovetail.md` |
+| **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `docs/joinery/box-joint.md` |
+| **Dado & Rabbet** | Shelves into sides, case backs, drawer bottoms, any panel-into-groove connection | Tested (bookshelf, template fixtures — through/stopped dado, rabbet, panel groove) | `docs/joinery/dado-rabbet.md` |
+| **Bridle Joint** | Frame corners, T-connections, open mortise-and-tenon at end of a rail | Draft | `docs/joinery/bridle-joint.md` |
+| **Lap Joint** | Flat frames, cross braces, grid assemblies, half-lap at crossings | Draft | `docs/joinery/lap-joint.md` |
+| **Miter Joint** | Picture frames, trim, hidden end grain at corners | Draft | `docs/joinery/miter-joint.md` |
+| **Spline Joint** | Reinforced miters, decorative accents across a joint line | Draft | `docs/joinery/spline-joint.md` |
+| **Dowel Joint** | Edge joining, panel glue-ups, face frames, spindle-to-rail, round-peg alignment | Tested | `docs/joinery/dowel-joint.md` + `woodworking/templates/dowel.py` |
+| **Pocket Hole** | Face frames, quick assemblies, tabletop attachment — screw-based | Draft | `docs/joinery/pocket-hole.md` |
+| **Bed Rail Fastener** | Bed rail to post — detachable STEP hardware (mortise bedlock, hooks + slots) | Tested (queen + twin beds) | `woodworking/templates/bed_rail_fastener.py` + `docs/hardware-installation.md` |
+| **Tenon Wedge** | Through tenon tightening, fox wedging (blind tenons), Windsor spindle/stretcher locking — rect (2 wedges) or round (1 centred, trimmed to cylinder). Grain detected via principal axes of inertia; pass `grain_dir=` for ambiguous mortise pieces (seats, slabs) | Tested (Windsor chair — splayed legs + angled stretchers) | `docs/joinery/tenon-wedge.md` + `tenon_wedge` template |
 | **Bowtie / Butterfly Key** | Live edge slab crack stabilization, decorative inlay | Tested (twin bed) | `woodworking/templates/bowtie.py` |
 
 **Read the topic/joinery file BEFORE writing code** that uses those techniques. The core skill provides the routing — the reference files provide the implementation details. For Draft files, treat instructions as a starting point and validate aggressively.
@@ -115,39 +115,39 @@ Before planning, identify the **furniture type** and **design style** from the u
 
 | Type | Keywords | File |
 |------|----------|------|
-| Chair | chair, dining chair, side chair | `woodworking/types/chair.md` |
-| Stool | stool, counter stool, bar stool, step stool | `woodworking/types/stool.md` |
-| Bench | bench, entryway bench, garden bench | `woodworking/types/bench.md` |
-| Sofa | sofa, couch, settee, loveseat | `woodworking/types/sofa.md` |
-| Dining table | dining table, farm table, harvest table | `woodworking/types/dining-table.md` |
-| Coffee table | coffee table, cocktail table | `woodworking/types/coffee-table.md` |
-| Side table | side table, end table, nightstand, accent table | `woodworking/types/side-table.md` |
-| Desk | desk, writing desk, secretary | `woodworking/types/desk.md` |
-| Console table | console, TV console, media console, credenza | `woodworking/types/console-table.md` |
-| Chest | chest, trunk, blanket chest, toy box, hope chest | `woodworking/types/chest.md` |
-| Box | box, pencil box, jewelry box, keepsake box | `woodworking/types/box.md` |
-| Cabinet | cabinet, cupboard, pantry, hutch | `woodworking/types/cabinet.md` |
-| Dresser | dresser, bureau, chest of drawers | `woodworking/types/dresser.md` |
-| Bookshelf | bookshelf, bookcase, shelving unit | `woodworking/types/bookshelf.md` |
-| Wardrobe | wardrobe, armoire, closet | `woodworking/types/wardrobe.md` |
-| Sideboard | sideboard, buffet, server | `woodworking/types/sideboard.md` |
-| Bed frame | bed, bed frame, platform bed, four-poster | `woodworking/types/bed-frame.md` |
-| Crib | crib, baby crib, toddler bed | `woodworking/types/crib.md` |
-| Planter | planter, window box, plant stand | `woodworking/types/planter.md` |
-| Pergola | pergola, arbor, trellis, gazebo | `woodworking/types/pergola.md` |
-| Mirror frame | mirror, mirror frame, looking glass | `woodworking/types/mirror-frame.md` |
-| Shelf | shelf, floating shelf, wall shelf, ledge | `woodworking/types/shelf.md` |
+| Chair | chair, dining chair, side chair | `docs/types/chair.md` |
+| Stool | stool, counter stool, bar stool, step stool | `docs/types/stool.md` |
+| Bench | bench, entryway bench, garden bench | `docs/types/bench.md` |
+| Sofa | sofa, couch, settee, loveseat | `docs/types/sofa.md` |
+| Dining table | dining table, farm table, harvest table | `docs/types/dining-table.md` |
+| Coffee table | coffee table, cocktail table | `docs/types/coffee-table.md` |
+| Side table | side table, end table, nightstand, accent table | `docs/types/side-table.md` |
+| Desk | desk, writing desk, secretary | `docs/types/desk.md` |
+| Console table | console, TV console, media console, credenza | `docs/types/console-table.md` |
+| Chest | chest, trunk, blanket chest, toy box, hope chest | `docs/types/chest.md` |
+| Box | box, pencil box, jewelry box, keepsake box | `docs/types/box.md` |
+| Cabinet | cabinet, cupboard, pantry, hutch | `docs/types/cabinet.md` |
+| Dresser | dresser, bureau, chest of drawers | `docs/types/dresser.md` |
+| Bookshelf | bookshelf, bookcase, shelving unit | `docs/types/bookshelf.md` |
+| Wardrobe | wardrobe, armoire, closet | `docs/types/wardrobe.md` |
+| Sideboard | sideboard, buffet, server | `docs/types/sideboard.md` |
+| Bed frame | bed, bed frame, platform bed, four-poster | `docs/types/bed-frame.md` |
+| Crib | crib, baby crib, toddler bed | `docs/types/crib.md` |
+| Planter | planter, window box, plant stand | `docs/types/planter.md` |
+| Pergola | pergola, arbor, trellis, gazebo | `docs/types/pergola.md` |
+| Mirror frame | mirror, mirror frame, looking glass | `docs/types/mirror-frame.md` |
+| Shelf | shelf, floating shelf, wall shelf, ledge | `docs/types/shelf.md` |
 
 **Identify style** from visual cues, user description, or reference photos:
 
 | Style | Keywords / Visual Cues | File |
 |-------|----------------------|------|
-| Modern | clean lines, minimal, contemporary, square edges, hidden hardware | `woodworking/styles/modern.md` |
-| Shaker | through dovetails, tapered details, applied base, brass hardware, simple lines | `woodworking/styles/shaker.md` |
-| Craftsman | exposed tenons, corbels, quartersawn oak, thick stock, Arts & Crafts | `woodworking/styles/craftsman.md` |
-| Mid-century | tapered legs, floating tops, thin profiles, hidden joinery, Danish, Scandinavian | `woodworking/styles/mid-century.md` |
-| Rustic | thick boards, farmhouse, reclaimed, visible fasteners, breadboard ends | `woodworking/styles/rustic.md` |
-| Nakashima | live edge, natural edge, slab, organic, bowties, butterfly keys, walnut slab, free-form | `woodworking/styles/nakashima.md` |
+| Modern | clean lines, minimal, contemporary, square edges, hidden hardware | `docs/styles/modern.md` |
+| Shaker | through dovetails, tapered details, applied base, brass hardware, simple lines | `docs/styles/shaker.md` |
+| Craftsman | exposed tenons, corbels, quartersawn oak, thick stock, Arts & Crafts | `docs/styles/craftsman.md` |
+| Mid-century | tapered legs, floating tops, thin profiles, hidden joinery, Danish, Scandinavian | `docs/styles/mid-century.md` |
+| Rustic | thick boards, farmhouse, reclaimed, visible fasteners, breadboard ends | `docs/styles/rustic.md` |
+| Nakashima | live edge, natural edge, slab, organic, bowties, butterfly keys, walnut slab, free-form | `docs/styles/nakashima.md` |
 
 **If no style is specified or identifiable, default to Modern.**
 
@@ -473,7 +473,7 @@ Using `ObjectCollection` causes `TypeError`. Using no participant bodies causes 
 
 ### Fillet and Chamfer Features
 
-> **Full reference:** `woodworking/details-and-finishing.md` — edge selection strategies, chamfer types, code patterns, sizing constraints.
+> **Full reference:** `docs/details-and-finishing.md` — edge selection strategies, chamfer types, code patterns, sizing constraints.
 
 Quick reference:
 - **Fillet:** `filletFeatures.createInput()` -> `inp.addConstantRadiusEdgeSet(edges, radius, propagate)`
@@ -482,27 +482,27 @@ Quick reference:
 - The API requires `BRepEdge` objects, never `BRepFace`. Iterate face edges and deduplicate via `tempId`.
 
 
-> **Replication Strategy & Common Errors:** `woodworking/fusion-api-rules.md` — Mirror, Pattern, body pattern ghost bodies, mirror+pattern limitation, typical replication sequence, 24-row error table.
+> **Replication Strategy & Common Errors:** `docs/fusion-api-rules.md` — Mirror, Pattern, body pattern ghost bodies, mirror+pattern limitation, typical replication sequence, 24-row error table.
 
 ## Standard Helpers
 
-> **Full reference:** `woodworking/helpers-reference.md` — all `sp.*` function signatures, `sketch_rect_model` usage and limitations, `ev()` semantics, feature builder table.
+> **Full reference:** `docs/helpers-reference.md` — all `sp.*` function signatures, `sketch_rect_model` usage and limitations, `ev()` semantics, feature builder table.
 
 Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functions: `sketch_rect_model`, `ext_new`, `ext_op`, `combine`, `mirror_body`, `mirror_feats`, `body_pattern`, `off_plane`, `make_comp`, `find_face`, `probe_orientations`.
 
 ## Joinery Rules
 
-> **Full reference:** `woodworking/joinery.md` — combine-based workflow, tooling bodies, edge rabbets, cross-component CUT, bulk CUT, timeline ordering. Joint-specific files: see Joinery Reference Files table above.
+> **Full reference:** `docs/joinery.md` — combine-based workflow, tooling bodies, edge rabbets, cross-component CUT, bulk CUT, timeline ordering. Joint-specific files: see Joinery Reference Files table above.
 
 **Core principle:** Build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), JOIN to the owner. Timeline order: CUT first (root, assembly proxies), JOIN second (owning component). Cross-component: use `body.createForAssemblyContext(occ)` for CUT in root.
 
-**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `woodworking/joinery/README.md`.
+**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `docs/joinery/README.md`.
 
-**Hardware:** use `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` for hinges, plus the `pull` and `chest_lock` templates for non-hinge hardware. See `woodworking/hardware-installation.md`.
+**Hardware:** use `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` for hinges, plus the `pull` and `chest_lock` templates for non-hinge hardware. See `docs/hardware-installation.md`.
 
 ## Incremental Build Strategy
 
-> **Full reference:** `woodworking/incremental-updates.md` — component-by-component build order, what-goes-where, document management, script epilogue, interactive editing, rebuild-vs-patch.
+> **Full reference:** `docs/incremental-updates.md` — component-by-component build order, what-goes-where, document management, script epilogue, interactive editing, rebuild-vs-patch.
 
 **Script location:**
 - **ALWAYS create scripts in `~/shopprentice-projects/`.** Create the directory if it doesn't exist. Each project gets a subfolder named after the piece (e.g., `~/shopprentice-projects/dovetailed-box/`).
@@ -534,7 +534,7 @@ This allows the user (or a new agent session) to resume work by reading the READ
 
 ## MCP Live Execution
 
-> **Full reference:** `woodworking/mcp-advanced.md` — MCP tool table, execution + validation loop, error retry rules, sandbox mode, timeline rollback diagnosis, modifying existing designs.
+> **Full reference:** `docs/mcp-advanced.md` — MCP tool table, execution + validation loop, error retry rules, sandbox mode, timeline rollback diagnosis, modifying existing designs.
 
 **Default behavior:** When MCP is available, ALWAYS execute automatically after generating code. Do not wait for user to ask.
 

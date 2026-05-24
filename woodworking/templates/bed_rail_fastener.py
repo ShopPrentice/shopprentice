@@ -7,7 +7,7 @@ INSTALLATION RULE:
   - Templates hidden in _HW
 
 STEP files at: ~/.shopprentice/hardware/bed_rail_fastener/
-Generate with: tools/bed_rail_fastener.py
+Generate with: dev/bed_rail_fastener.py
 """
 
 import adsk.core
@@ -62,7 +62,7 @@ def install(comp, post_body, rail_body,
     strike_step = os.path.join(HARDWARE_DIR, f"strike_plate_{size}.step")
 
     if not os.path.exists(hook_step) or not os.path.exists(strike_step):
-        print(f">>> ERROR: STEP files not found. Run tools/bed_rail_fastener.py first.")
+        print(f">>> ERROR: STEP files not found. Run dev/bed_rail_fastener.py first.")
         return
 
     def _get_or_import(part_id, step_file):

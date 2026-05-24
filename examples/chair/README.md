@@ -29,7 +29,7 @@ apply_appearance(species="white oak")
 ```
 
 **Style:** Modern
-**Type guide:** [`woodworking/types/chair.md`](../../woodworking/types/chair.md)
+**Type guide:** [`docs/types/chair.md`](../../docs/types/chair.md)
 
 ### Joinery
 

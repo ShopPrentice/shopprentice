@@ -10,7 +10,7 @@ truth (from introspect_bodies.py), simulates geometry, and compares
 per-body volume and bounding box against ground truth.
 
 Usage:
-    python tools/simulate.py introspect.json --bodies bodies.json [--verbose]
+    python dev/simulate.py introspect.json --bodies bodies.json [--verbose]
 
 Dependencies:
     pip install manifold3d

@@ -18,25 +18,25 @@ After completing a build (or a build session with notable discoveries), when the
 | File | Purpose |
 |------|---------|
 | `commands/woodworking.md` | Core skill — design philosophy, API rules, parameter planning, routing tables, build order |
-| `woodworking/angled-construction.md` | Topic: splayed legs, compound angles, Move, Sweep, SplitBody, stretcher splay |
-| `woodworking/details-and-finishing.md` | Topic: fillets, chamfers, edge treatments (planned) |
-| `woodworking/mcp-advanced.md` | Topic: modify existing designs, sync, selection workflow (planned) |
+| `docs/angled-construction.md` | Topic: splayed legs, compound angles, Move, Sweep, SplitBody, stretcher splay |
+| `docs/details-and-finishing.md` | Topic: fillets, chamfers, edge treatments (planned) |
+| `docs/mcp-advanced.md` | Topic: modify existing designs, sync, selection workflow (planned) |
 
 ### Joinery reference files (in the repo, not in commands/)
 
 | File | Status |
 |------|--------|
 | Mortise & Tenon | Tested (inline in skill + `mortise_tenon` template) |
-| `woodworking/joinery/domino-joint.md` | Tested |
-| `woodworking/joinery/dovetail.md` | Tested |
-| `woodworking/joinery/dado-rabbet.md` | Tested |
-| `woodworking/joinery/box-joint.md` | Tested (template) |
-| `woodworking/joinery/bridle-joint.md` | Draft |
-| `woodworking/joinery/lap-joint.md` | Draft |
-| `woodworking/joinery/miter-joint.md` | Draft |
-| `woodworking/joinery/spline-joint.md` | Draft |
-| `woodworking/joinery/dowel-joint.md` | Draft |
-| `woodworking/joinery/pocket-hole.md` | Draft |
+| `docs/joinery/domino-joint.md` | Tested |
+| `docs/joinery/dovetail.md` | Tested |
+| `docs/joinery/dado-rabbet.md` | Tested |
+| `docs/joinery/box-joint.md` | Tested (template) |
+| `docs/joinery/bridle-joint.md` | Draft |
+| `docs/joinery/lap-joint.md` | Draft |
+| `docs/joinery/miter-joint.md` | Draft |
+| `docs/joinery/spline-joint.md` | Draft |
+| `docs/joinery/dowel-joint.md` | Draft |
+| `docs/joinery/pocket-hole.md` | Draft |
 
 Joinery files live at: `~/.shopprentice/repo/joinery/` (or the repo's `joinery/` directory)
 
@@ -86,8 +86,8 @@ Summarize findings to the user before making changes.
 |-------------|---------------|
 | New technique for an existing topic | New section in the topic file |
 | New pitfall for an existing topic | Add to that topic's Common Pitfalls table |
-| New topic area (doesn't fit existing files) | New file in `woodworking/` + routing entry in `woodworking.md` |
-| Joint-specific finding | The specific `woodworking/joinery/*.md` file |
+| New topic area (doesn't fit existing files) | New file in `docs/` + routing entry in `woodworking.md` |
+| Joint-specific finding | The specific `docs/joinery/*.md` file |
 | Routing gap (agent wouldn't have found the right file) | Update trigger phrases in the routing tables in `woodworking.md` |
 | General API rule | Core skill `woodworking.md` |
 | Stable pattern confirmed across multiple builds | Auto-memory `MEMORY.md` |

@@ -39,7 +39,7 @@ capture.json + ground_truth.json ──search_build.py──> pergola.py
 # get_timeline_state(index=0..N) → /tmp/pergola_gt.json
 
 # Rebuild with search
-python tools/search_build.py \
+python dev/search_build.py \
     --capture /tmp/pergola_capture.json \
     --ground-truth /tmp/pergola_gt.json \
     -v --no-stop

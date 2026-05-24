@@ -1,6 +1,6 @@
 # ShopPrentice Script Generator — Developer Workflow
 
-When working on the search-based script builder (`tools/search_build.py`) or the script generator (`addin/tools/_script_generator/`), follow these rules strictly.
+When working on the search-based script builder (`dev/search_build.py`) or the script generator (`addin/tools/_script_generator/`), follow these rules strictly.
 
 ## Document Safety — ABSOLUTE RULES
 

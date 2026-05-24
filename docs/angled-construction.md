@@ -262,7 +262,7 @@ When a stretcher meets a splayed leg, the standard flat shoulder CUT leaves a ga
 
 Instead of cutting shoulders from the stretcher ends, CUT the leg FROM the stretcher to create an angled mating face. Then sweep a tenon from that angled face along the stretcher axis. The shoulder naturally sits flush against the splayed leg.
 
-See `woodworking/joinery/mortise-tenon.md` section "Angled M&T Variant" for the complete 6-step technique.
+See `docs/joinery/mortise-tenon.md` section "Angled M&T Variant" for the complete 6-step technique.
 
 ### Key Points
 
@@ -388,7 +388,7 @@ for b in groups['outside']:
     comp.features.removeFeatures.add(b)  # excess tip
 ```
 
-These helpers use `body.physicalProperties.centerOfMass` for the test point and `body.pointContainment()` for inside/outside — works for any body shape, orientation, or complexity. See `woodworking/helpers-reference.md` for full API.
+These helpers use `body.physicalProperties.centerOfMass` for the test point and `body.pointContainment()` for inside/outside — works for any body shape, orientation, or complexity. See `docs/helpers-reference.md` for full API.
 
 ## Move Feature
 
