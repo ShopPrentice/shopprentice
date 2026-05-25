@@ -55,7 +55,7 @@ A Nakashima-inspired twin bed with a 2" thick slab headboard and 3 decorative bo
 
 **Script:** [`twin_live_edge_slab.py`](twin_live_edge_slab.py) — 24 structural bodies + hardware. Zero interferences.
 
-**Style:** [Nakashima / Live Edge](../../woodworking/styles/nakashima.md)
+**Style:** [Nakashima / Live Edge](../../docs/styles/nakashima.md)
 
 ### Joinery
 

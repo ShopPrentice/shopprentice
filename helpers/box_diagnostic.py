@@ -1,7 +1,7 @@
 """Deterministic helpers for BoxTextureMapProjection on parametric bodies.
 
 The functions in this module replace the prose "red marker iterate" recipe
-in `woodworking/appearance.md` with code: pure-math rule calculation,
+in `docs/appearance.md` with code: pure-math rule calculation,
 marker-image generation, analytical seam detection, and a structured
 calibration procedure that captures evidence and reports the smallest
 seam-free buffer.

@@ -16,10 +16,10 @@ This is how the skill learns — through real build sessions, not Wikipedia arti
 
 ### 2. Add a furniture type guide
 
-Type guides tell the agent what components a piece of furniture needs, how they connect, and what hardware is required. They live in `woodworking/types/`.
+Type guides tell the agent what components a piece of furniture needs, how they connect, and what hardware is required. They live in `docs/types/`.
 
 To add one:
-1. Copy `woodworking/types/TEMPLATE.md`
+1. Copy `docs/types/TEMPLATE.md`
 2. Fill in every section — components, connections, hardware, build order, common mistakes
 3. Submit a PR
 
@@ -27,9 +27,9 @@ To add one:
 
 ### 3. Add a style guide
 
-Style guides define aesthetic choices — proportions, edge treatments, hardware preferences, wood species. They live in `woodworking/styles/`.
+Style guides define aesthetic choices — proportions, edge treatments, hardware preferences, wood species. They live in `docs/styles/`.
 
-Copy `woodworking/styles/TEMPLATE.md` and fill it in. See `woodworking/styles/modern.md` for a complete example.
+Copy `docs/styles/TEMPLATE.md` and fill it in. See `docs/styles/modern.md` for a complete example.
 
 ### 4. Add a joinery reference
 

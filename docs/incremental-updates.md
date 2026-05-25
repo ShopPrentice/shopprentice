@@ -199,7 +199,7 @@ Details: fillets → bounded context → done
 8. **Details are the last cycle.** Fillets and chamfers require all geometry to exist first.
 9. **Show final result.** After the last cycle, call `apply_appearance` then `get_product_shots` to capture presentation-quality images and present to the user.
 10. **Replace, don't patch.** When an approach doesn't work and you rewrite it, **replace the old code block entirely** — don't add new code below while partially cleaning up the old (e.g., calling `deleteMe()` on an old sketch but leaving its extrude). Partial cleanup creates orphan bodies invisible in code review but visible in the model. The old code is always recoverable from git or undo, so replacing is safe.
-11. **Detect UI changes automatically.** When working on an existing design, call `get_changes` at conversation start and before any `execute_script`. If changes are detected, capture them with `sync_script`, interpret the user's intent (UI edits are design signals, not literal specs), then implement correctly following the decision framework in `woodworking/incremental-updates.md`. The default is to rebuild the affected section properly, not to replicate the UI edit verbatim.
+11. **Detect UI changes automatically.** When working on an existing design, call `get_changes` at conversation start and before any `execute_script`. If changes are detected, capture them with `sync_script`, interpret the user's intent (UI edits are design signals, not literal specs), then implement correctly following the decision framework in `docs/incremental-updates.md`. The default is to rebuild the affected section properly, not to replicate the UI edit verbatim.
 
 ### What Goes Where
 
@@ -263,6 +263,6 @@ print(f"Root: {len(names)} joinery voids")
 sp.apply_appearance("white oak")
 ```
 
-**Step 3 is required** — scripts without `sp.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `woodworking/appearance.md` for species and grain details.
+**Step 3 is required** — scripts without `sp.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `docs/appearance.md` for species and grain details.
 
 After the script runs, call `get_product_shots` via MCP to capture presentation images. It handles camera positioning, artifact cleanup, and framing automatically — no fit-view or hide-sketch code needed in the script.

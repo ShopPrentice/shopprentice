@@ -199,7 +199,7 @@ Using `ObjectCollection` causes `TypeError`. Using no participant bodies causes 
 
 ## Fillet and Chamfer Features
 
-> **Full reference:** `woodworking/details-and-finishing.md` — edge selection strategies, chamfer types, code patterns, sizing constraints.
+> **Full reference:** `docs/details-and-finishing.md` — edge selection strategies, chamfer types, code patterns, sizing constraints.
 
 Quick reference:
 - **Fillet:** `filletFeatures.createInput()` -> `inp.addConstantRadiusEdgeSet(edges, radius, propagate)`
@@ -310,6 +310,6 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 | Face-sketch extrudes wrong profile | Auto-projected face edges and `sketch.project()` reference lines split profiles into fragments — `smallest_profile` picks a fragment instead of the drawn shape | **Always call `sp.refs_to_construction(sk)` before profile selection.** This converts all reference/projected lines to construction geometry so they don't form profile boundaries. Then `sp.smallest_profile(sk)` returns the correct drawn profile. This is mandatory for ANY sketch on a face or with projected references. |
 | Symmetric extrude body 2x too thick | Passed full thickness to `ext_new_sym` — it applies `dist` to EACH side | Pass half-thickness: `ext_new_sym(comp, prof, "board_t / 2", ...)` |
 | `sketch_rect_model` places body on wrong side of origin | Position dimensions use absolute distance — negative coordinates reflect to positive | Use manual sketch with `modelToSketchSpace` + width/height dimensions only (no position dimensions) |
-| Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `woodworking/joinery/mortise-tenon.md`) |
+| Shoulder CUT extends outward instead of into body | Default extrude direction on a body face points away from the body | Use `flip=True` on face-sketch CUT extrudes (see `docs/joinery/mortise-tenon.md`) |
 | Orphan body in model from rewritten code | Rewrote a feature but only partially removed the old code (e.g., deleted old sketch but left its extrude) | Replace the entire old block when rewriting — don't patch around it. Partial cleanup like `deleteMe()` calls leaves orphan geometry. Old code is recoverable from git. |
-| Domino has square corners (rectangular cross-section) | Used `sketch_rect` instead of `sketch_slot` for domino void body | **Always use `sketch_slot`** — real Festool dominos have stadium (rounded-end) cross-sections. See `woodworking/joinery/domino-joint.md` for the full implementation. |
+| Domino has square corners (rectangular cross-section) | Used `sketch_rect` instead of `sketch_slot` for domino void body | **Always use `sketch_slot`** — real Festool dominos have stadium (rounded-end) cross-sections. See `docs/joinery/domino-joint.md` for the full implementation. |

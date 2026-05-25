@@ -186,7 +186,7 @@ After generating each component's code, run this loop:
    - Report: `"12 bodies, validate_design PASSED."`
 4. **If validation fails** — use `get_timeline_state` to bisect the timeline and pinpoint the problem feature (see Diagnosing with Timeline Rollback below). Fix and re-execute.
 5. **Auto-proceed** to the next component if validation passes.
-7. **Appearance + product shots at the end** — after structural validation passes, call `apply_appearance` then `get_product_shots`. Product shots auto-hide construction artifacts, frame the model properly, and capture multiple views in one call. See `woodworking/appearance.md` for species and grain details.
+7. **Appearance + product shots at the end** — after structural validation passes, call `apply_appearance` then `get_product_shots`. Product shots auto-hide construction artifacts, frame the model properly, and capture multiple views in one call. See `docs/appearance.md` for species and grain details.
 
 ### Diagnosing with Timeline Rollback
 
@@ -209,7 +209,7 @@ This is like `git bisect` for the modeling timeline — fast, cheap, and precise
 
 ### Modifying an Existing Design
 
-> **Full reference:** `woodworking/mcp-advanced.md` — provenance checking, selection-driven interaction, change detection, script sync, sandbox mode.
+> **Full reference:** `docs/mcp-advanced.md` — provenance checking, selection-driven interaction, change detection, script sync, sandbox mode.
 
 Quick reference:
 - **Dimension changes:** `get_document_status` → `modify_parameters` → `capture_design` to validate → update `.py` file.
@@ -272,7 +272,7 @@ Use `execute_script` with `sandbox=true` to run a script in a throwaway document
 
 ### Screenshots
 
-After the final phase, call `get_product_shots` for presentation images. It handles everything automatically — artifact cleanup, FOV-aware framing, multiple views, visual style. See [woodworking/screenshots.md](woodworking/screenshots.md) for camera direction details.
+After the final phase, call `get_product_shots` for presentation images. It handles everything automatically — artifact cleanup, FOV-aware framing, multiple views, visual style. See [docs/screenshots.md](docs/screenshots.md) for camera direction details.
 
 - **Validation during builds**: `get_screenshot` (quick, 1024x1024, as-is)
 - **Final presentation**: `get_product_shots` (2048x2048, cleaned up, multiple views)

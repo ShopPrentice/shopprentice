@@ -19,7 +19,7 @@ Components: Seat, Legs, Stretchers
 # After execute_script(clean=True), agent parses this block
 # and applies each coat in order via the apply_appearance MCP
 # tool. After coats, if hide_construction is true, hide all
-# sketches and construction geometry. See woodworking/appearance.md
+# sketches and construction geometry. See docs/appearance.md
 # for the full schema and agent workflow.
 # {
 #   "coats": [
