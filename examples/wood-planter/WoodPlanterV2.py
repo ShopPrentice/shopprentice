@@ -27,57 +27,72 @@ def run(context):
     # ==============================================================
     #  PARAMETERS
     # ==============================================================
-    for pname, expr, unit in [
-        ("planter_length",    "60 in",    "in"),
-        ("planter_width",     "20 in",    "in"),
-        ("total_height",      "40 in",    "in"),
-        ("leg_below_body",    "10 in",    "in"),
-        ("leg_size",          "3 in",     "in"),
-        ("rail_thickness",    "2 in",     "in"),
-        ("rail_height",       "3 in",     "in"),
-        ("tenon_depth",       "2 in",     "in"),
-        ("tenon_width",       "1.25 in",  "in"),
-        ("tenon_height",      "1.25 in",  "in"),
-        ("groove_width",      "0.375 in", "in"),
-        ("groove_depth",      "0.375 in", "in"),
-        ("frame_tongue_thick","0.34 in",  "in"),
-        ("bottom_thickness",  "4 in",     "in"),
-        ("slat_width",        "4 in",     "in"),
-        ("slat_thickness",    "0.5 in",   "in"),
-        ("slat_tg_width",     "0.25 in",  "in"),
-        ("slat_tg_depth",     "0.25 in",  "in"),
-        ("drainage_gap",      "0.25 in",  "in"),
-        ("dm_bt_w",           "0.25 in",  "in"),
-        ("dm_bt_h",           "0.5 in",   "in"),
-        ("dm_bt_d",           "0.75 in",  "in"),
+    for pname, expr, unit, desc in [
+        ("planter_length",    "50 in",    "in", "Overall length (X direction)"),
+        ("planter_width",     "20 in",    "in", "Overall width (Y direction)"),
+        ("total_height",      "35 in",    "in", "Top of leg posts to ground"),
+        ("leg_below_body",    "10 in",    "in", "Leg height below the planter body"),
+        ("leg_size",          "3.5 in",   "in", "Leg post cross-section (square)"),
+        ("post_reveal",       "0.5 in",   "in", "How far posts stick above the upper rail"),
+        ("post_chamfer",      "0.25 in",  "in", "Chamfer on top of each leg post"),
+        ("rail_thickness",    "1.8 in",   "in", "Rail depth front-to-back"),
+        ("rail_recess",       "0.125 in", "in", "How far rails/slats are recessed from leg face"),
+        ("rail_height_lo",    "3.5 in",   "in", "Lower rail height"),
+        ("rail_height_hi",    "2.5 in",   "in", "Upper rail height"),
+        ("tenon_clearance",   "0.3 in",   "in", "Wood left at far side of tenon in leg"),
+        ("tenon_width_lr",    "1.4 in",   "in", "Long rail tenon width (wider for interlock prongs)"),
+        ("tenon_width_sr",    "0.6 in",   "in", "Short rail tenon width (passes through long rail)"),
+        ("tenon_shoulder",    "0.25 in",  "in", "Vertical shoulder above/below tenon"),
+        ("groove_width",      "0.375 in", "in", "Groove width for slat frame tongues"),
+        ("groove_depth",      "0.375 in", "in", "Groove depth into rail/leg face"),
+        ("frame_tongue_thick","0.34 in",  "in", "Slat frame tongue thickness (fits in groove)"),
+        ("floor_board_w",  "4 in",     "in", "Floor board width"),
+        ("floor_thickness",   "1 in",     "in", "Floor board thickness"),
+        ("slat_width",        "4 in",     "in", "Side slat width"),
+        ("slat_thickness",    "0.5 in",   "in", "Side slat panel thickness"),
+        ("slat_tg_width",     "0.25 in",  "in", "Tongue-and-groove width between slats"),
+        ("slat_tg_depth",     "0.25 in",  "in", "Tongue-and-groove depth between slats"),
+        ("drainage_gap",      "0.25 in",  "in", "Gap between floor boards for drainage"),
+        ("dm_bt_w",           "0.25 in",  "in", "Bottom domino width"),
+        ("dm_bt_h",           "0.5 in",   "in", "Bottom domino height"),
+        ("dm_bt_d",           "0.75 in",  "in", "Bottom domino depth"),
     ]:
-        params.add(pname, adsk.core.ValueInput.createByString(expr), unit, "")
+        params.add(pname, adsk.core.ValueInput.createByString(expr), unit, desc)
 
-    for pname, expr, unit in [
-        ("long_shoulder",  "planter_length - 2 * leg_size",                            "in"),
-        ("short_shoulder", "planter_width - 2 * leg_size",                             "in"),
-        ("lo_z",           "leg_below_body",                                           "in"),
-        ("hi_z",           "total_height - rail_height",                               "in"),
-        ("groove_offset",  "(rail_thickness - groove_width) / 2",                      "in"),
-        ("long_t_zoff",    "(rail_height - 2 * tenon_height) / 3",                    "in"),
-        ("short_t_zoff",   "2 * (rail_height - 2 * tenon_height) / 3 + tenon_height", "in"),
-        ("body_z",         "leg_below_body + rail_height",                             "in"),
-        ("body_h",         "total_height - 2 * rail_height - leg_below_body",          "in"),
-        ("full_slat_h",    "total_height - 2 * rail_height + 2 * groove_depth - leg_below_body", "in"),
-        ("groove_span",    "total_height - rail_height - leg_below_body",               "in"),
-        ("mid_x",          "planter_length / 2",                                       "in"),
-        ("mid_y",          "planter_width / 2",                                        "in"),
-        ("bottom_slat_spacing", "bottom_thickness + drainage_gap",                     "in"),
-        ("bottom_slat_length", "planter_width - 2 * rail_thickness",                  "in"),
+    for pname, expr, unit, desc in [
+        ("long_shoulder",  "planter_length - 2 * leg_size",                            "in", "Rail span between legs (length direction)"),
+        ("short_shoulder", "planter_width - 2 * leg_size",                             "in", "Rail span between legs (width direction)"),
+        ("lo_z",           "leg_below_body",                                           "in", "Z of lower rail bottom"),
+        ("hi_z",           "total_height - post_reveal - rail_height_hi",               "in", "Z of upper rail bottom"),
+        ("groove_offset",  "rail_recess + (rail_thickness - groove_width) / 2",         "in", "Groove center offset from outer face"),
+        ("tenon_depth",    "leg_size - tenon_clearance",                              "in", "How deep tenon penetrates into leg"),
+        ("tenon_height_lo","rail_height_lo - 2 * tenon_shoulder",                    "in", "Lower rail tenon height"),
+        ("tenon_height_hi","rail_height_hi - 2 * tenon_shoulder",                    "in", "Upper rail tenon height"),
+        ("body_z",         "leg_below_body + rail_height_lo",                          "in", "Z of slat body bottom"),
+        ("body_h",         "total_height - post_reveal - rail_height_lo - rail_height_hi - leg_below_body", "in", "Slat body height"),
+        ("full_slat_h",    "total_height - post_reveal - rail_height_lo - rail_height_hi + 2 * groove_depth - leg_below_body", "in", "Full slat height including tongues"),
+        ("groove_span",    "total_height - post_reveal - rail_height_hi + groove_depth - leg_below_body", "in", "Leg groove height for slat edge tongues"),
+        ("mid_x",          "planter_length / 2",                                       "in", "X midplane for mirrors"),
+        ("mid_y",          "planter_width / 2",                                        "in", "Y midplane for mirrors"),
+        ("bottom_slat_spacing", "floor_board_w + drainage_gap",                     "in", "Floor board pattern spacing"),
+        ("floor_inset",     "groove_offset + (groove_width + slat_thickness) / 2",      "in", "Floor board edge offset (contacts slat inner face)"),
+        ("floor_span_x",    "planter_length - 2 * floor_inset",                        "in", "Floor board span in X (left slat to right slat)"),
+        ("floor_span_y",    "planter_width - 2 * floor_inset",                         "in", "Floor board span in Y (front slat to back slat)"),
     ]:
-        params.add(pname, adsk.core.ValueInput.createByString(expr), unit, "")
+        params.add(pname, adsk.core.ValueInput.createByString(expr), unit, desc)
 
-    for pname, expr in [
-        ("n_long_slats",    "floor(long_shoulder / slat_width)"),
-        ("n_short_slats",   "floor(short_shoulder / slat_width)"),
-        ("n_bottom_slats",  "floor((long_shoulder + drainage_gap) / (bottom_thickness + drainage_gap))"),
+    for pname, expr, desc in [
+        ("n_long_slats",    "floor(long_shoulder / slat_width)",                        "Number of full-width slats per long side"),
+        ("n_short_slats",   "floor(short_shoulder / slat_width)",                       "Number of full-width slats per short side"),
+        ("n_floor_slats",   "floor(floor_span_x / (floor_board_w + drainage_gap)) + 1", "Number of floor boards (fills span exactly)"),
     ]:
-        params.add(pname, adsk.core.ValueInput.createByString(expr), "", "")
+        params.add(pname, adsk.core.ValueInput.createByString(expr), "", desc)
+
+    for pname, expr, unit, desc in [
+        ("floor_board_w_fit", "(floor_span_x - (n_floor_slats - 1) * drainage_gap) / n_floor_slats", "in",
+         "Actual floor board width (adjusted to fill span exactly)"),
+    ]:
+        params.add(pname, adsk.core.ValueInput.createByString(expr), unit, desc)
 
     # ==============================================================
     #  HELPERS
@@ -101,22 +116,28 @@ def run(context):
         sk = comp.sketches.add(plane)
         sk.name = name
         x0, y0, w, h = ev(x0e), ev(y0e), ev(we), ev(he)
-        rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
-            adsk.core.Point3D.create(x0, y0, 0),
-            adsk.core.Point3D.create(x0 + w, y0 + h, 0))
+        P = adsk.core.Point3D.create
+        lines = sk.sketchCurves.sketchLines
+        gc = sk.geometricConstraints
+        H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+        V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+        l_bot = lines.addByTwoPoints(P(x0, y0, 0), P(x0 + w, y0, 0))
+        l_right = lines.addByTwoPoints(l_bot.endSketchPoint, P(x0 + w, y0 + h, 0))
+        l_top = lines.addByTwoPoints(l_right.endSketchPoint, P(x0, y0 + h, 0))
+        l_left = lines.addByTwoPoints(l_top.endSketchPoint, l_bot.startSketchPoint)
+        gc.addHorizontal(l_bot)
+        gc.addHorizontal(l_top)
+        gc.addVertical(l_right)
+        gc.addVertical(l_left)
         d = sk.sketchDimensions
-        d.addDistanceDimension(rect[0].startSketchPoint, rect[0].endSketchPoint,
-            adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation,
-            adsk.core.Point3D.create(x0+w/2, y0-1, 0)).parameter.expression = we
-        d.addDistanceDimension(rect[1].startSketchPoint, rect[1].endSketchPoint,
-            adsk.fusion.DimensionOrientations.VerticalDimensionOrientation,
-            adsk.core.Point3D.create(x0+w+1, y0+h/2, 0)).parameter.expression = he
-        d.addDistanceDimension(sk.originPoint, rect[0].startSketchPoint,
-            adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation,
-            adsk.core.Point3D.create(x0/2, y0-2, 0)).parameter.expression = x0e
-        d.addDistanceDimension(sk.originPoint, rect[0].startSketchPoint,
-            adsk.fusion.DimensionOrientations.VerticalDimensionOrientation,
-            adsk.core.Point3D.create(x0-1, y0/2, 0)).parameter.expression = y0e
+        d.addDistanceDimension(l_bot.startSketchPoint, l_bot.endSketchPoint,
+            H, P(x0 + w/2, y0 - 1, 0)).parameter.expression = we
+        d.addDistanceDimension(l_right.startSketchPoint, l_right.endSketchPoint,
+            V, P(x0 + w + 1, y0 + h/2, 0)).parameter.expression = he
+        d.addDistanceDimension(sk.originPoint, l_bot.startSketchPoint,
+            H, P(x0/2, y0 - 2, 0)).parameter.expression = x0e
+        d.addDistanceDimension(sk.originPoint, l_bot.startSketchPoint,
+            V, P(x0 - 1, y0/2, 0)).parameter.expression = y0e
         return sk, sk.profiles.item(0)
 
     def sketch_slot(comp, plane, cxe, cye, long_e, short_e, vertical=True, name="Sk"):
@@ -250,6 +271,7 @@ def run(context):
             adsk.core.ValueInput.createByString(count_expr),
             adsk.core.ValueInput.createByString(spacing_expr),
             adsk.fusion.PatternDistanceType.SpacingPatternDistanceType)
+        inp.quantityTwo = adsk.core.ValueInput.createByString("1")
         pat = comp.features.rectangularPatternFeatures.add(inp)
         pat.name = name
         return pat
@@ -302,6 +324,23 @@ def run(context):
         "groove_width", "groove_depth", "FL_Groove_Y_Sk")
     ext_cut(leg_c, pr, "groove_span", fl_leg, "Cut_Groove_Y")
 
+    # Chamfer top edges of FL leg (find highest +Z face)
+    top_face = None
+    max_z = -float('inf')
+    for i in range(fl_leg.faces.count):
+        f = fl_leg.faces.item(i)
+        if hasattr(f.geometry, 'normal') and abs(f.geometry.normal.z - 1.0) < 0.01:
+            if f.centroid.z > max_z:
+                max_z = f.centroid.z
+                top_face = f
+    if top_face:
+        ch_edges = adsk.core.ObjectCollection.create()
+        for i in range(top_face.edges.count):
+            ch_edges.add(top_face.edges.item(i))
+        ch_inp = leg_c.features.chamferFeatures.createInput(ch_edges, False)
+        ch_inp.setToEqualDistance(adsk.core.ValueInput.createByString("post_chamfer"))
+        leg_c.features.chamferFeatures.add(ch_inp).name = "FL_TopChamfer"
+
     # Midplanes + mirror: FL→FR, [FL,FR]→BL,BR
     mid_yz = off_plane(leg_c, leg_c.yZConstructionPlane, "mid_x", "MidYZ")
     mid_xz = off_plane(leg_c, leg_c.xZConstructionPlane, "mid_y", "MidXZ")
@@ -330,22 +369,22 @@ def run(context):
     # --- Front lower rail ---
     flo_pl = off_plane(lr_c, lr_c.xYConstructionPlane, "lo_z", "FLo_Pl")
     _, pr = sketch_rect(lr_c, flo_pl,
-        "leg_size", "0 in", "long_shoulder", "rail_thickness", "FLo_Rail_Sk")
-    ext_flo = ext_new(lr_c, pr, "rail_height", "FLo_Rail")
+        "leg_size", "rail_recess", "long_shoulder", "rail_thickness", "FLo_Rail_Sk")
+    ext_flo = ext_new(lr_c, pr, "rail_height_lo", "FLo_Rail")
     flo_body = ext_flo.bodies.item(0)
     flo_body.name = "LR_Front_Lower"
 
-    # Left tenon (NewBody)
+    # Left tenon (NewBody) — tall, with half-lap interlock
     flo_t_pl = off_plane(lr_c, lr_c.xYConstructionPlane,
-        "lo_z + long_t_zoff", "FLo_Tenon_Pl")
+        "lo_z + tenon_shoulder", "FLo_Tenon_Pl")
     _, pr = sketch_rect(lr_c, flo_t_pl,
-        "leg_size - tenon_depth", "(rail_thickness - tenon_width) / 2",
-        "tenon_depth", "tenon_width", "FLo_Tenon_L_Sk")
-    ext_flo_t = ext_new(lr_c, pr, "tenon_height", "FLo_Tenon_L")
+        "leg_size - tenon_depth", "rail_recess + (rail_thickness - tenon_width_lr) / 2",
+        "tenon_depth", "tenon_width_lr", "FLo_Tenon_L_Sk")
+    ext_flo_t = ext_new(lr_c, pr, "tenon_height_lo", "FLo_Tenon_L")
     flo_tenon_l = ext_flo_t.bodies.item(0)
     flo_tenon_l.name = "FLo_Tenon_L"
 
-    # Mirror left tenon across rail X-midpoint → right tenon
+    # Mirror left tenon → right tenon
     flo_xmid = off_plane(lr_c, lr_c.yZConstructionPlane,
         "leg_size + long_shoulder / 2", "FLo_XMid")
     mir_flo_t = mirror_feat(lr_c, [ext_flo_t], flo_xmid, "FLo_MirTenon")
@@ -357,7 +396,7 @@ def run(context):
 
     # Groove on top of front lower rail (for slat frame tongues)
     flo_grv_pl = off_plane(lr_c, lr_c.xYConstructionPlane,
-        "lo_z + rail_height - groove_depth", "FLo_Groove_Pl")
+        "lo_z + rail_height_lo - groove_depth", "FLo_Groove_Pl")
     _, pr = sketch_rect(lr_c, flo_grv_pl,
         "leg_size", "groove_offset",
         "long_shoulder", "groove_width", "FLo_Groove_Sk")
@@ -370,22 +409,22 @@ def run(context):
     # --- Front upper rail ---
     fhi_pl = off_plane(lr_c, lr_c.xYConstructionPlane, "hi_z", "FHi_Pl")
     _, pr = sketch_rect(lr_c, fhi_pl,
-        "leg_size", "0 in", "long_shoulder", "rail_thickness", "FHi_Rail_Sk")
-    ext_fhi = ext_new(lr_c, pr, "rail_height", "FHi_Rail")
+        "leg_size", "rail_recess", "long_shoulder", "rail_thickness", "FHi_Rail_Sk")
+    ext_fhi = ext_new(lr_c, pr, "rail_height_hi", "FHi_Rail")
     fhi_body = ext_fhi.bodies.item(0)
     fhi_body.name = "LR_Front_Upper"
 
-    # Left tenon
+    # Left tenon — tall, with half-lap interlock
     fhi_t_pl = off_plane(lr_c, lr_c.xYConstructionPlane,
-        "hi_z + long_t_zoff", "FHi_Tenon_Pl")
+        "hi_z + tenon_shoulder", "FHi_Tenon_Pl")
     _, pr = sketch_rect(lr_c, fhi_t_pl,
-        "leg_size - tenon_depth", "(rail_thickness - tenon_width) / 2",
-        "tenon_depth", "tenon_width", "FHi_Tenon_L_Sk")
-    ext_fhi_t = ext_new(lr_c, pr, "tenon_height", "FHi_Tenon_L")
+        "leg_size - tenon_depth", "rail_recess + (rail_thickness - tenon_width_lr) / 2",
+        "tenon_depth", "tenon_width_lr", "FHi_Tenon_L_Sk")
+    ext_fhi_t = ext_new(lr_c, pr, "tenon_height_hi", "FHi_Tenon_L")
     fhi_tenon_l = ext_fhi_t.bodies.item(0)
     fhi_tenon_l.name = "FHi_Tenon_L"
 
-    # Mirror left tenon → right tenon (reuse same midplane)
+    # Mirror left tenon → right tenon
     mir_fhi_t = mirror_feat(lr_c, [ext_fhi_t], flo_xmid, "FHi_MirTenon")
     fhi_tenon_r = mir_fhi_t.bodies.item(0)
     fhi_tenon_r.name = "FHi_Tenon_R"
@@ -421,29 +460,79 @@ def run(context):
     #  Same pattern as long rails but rotated, staggered tenon Z.
     # ==============================================================
 
-    # Body-relative reference: left short rail refs Leg_FL (already looked up above)
-    # Re-read bounding box for short rail context
-    ref_leg_fl_bb = ref_leg_fl.boundingBox
-
-    # --- Left lower rail ---
+    # --- Left lower rail (projected leg face reference) ---
     llo_pl = off_plane(sr_c, sr_c.xYConstructionPlane, "lo_z", "LLo_Pl")
-    _, pr = sketch_rect(sr_c, llo_pl,
-        "0 in", "leg_size", "rail_thickness", "short_shoulder", "LLo_Rail_Sk")
-    ext_llo = ext_new(sr_c, pr, "rail_height", "LLo_Rail")
+
+    def sr_sketch_from_leg(comp, plane, leg_body, leg_occ_ref, we, he, name):
+        """Short rail sketch anchored to projected leg inner face, offset by rail_recess."""
+        sk = comp.sketches.add(plane)
+        sk.name = name
+        P = adsk.core.Point3D.create
+        H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+        V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+
+        leg_proxy = leg_body.createForAssemblyContext(leg_occ_ref)
+        proj = sk.project(leg_proxy)
+        for i in range(proj.count):
+            e = proj.item(i)
+            if hasattr(e, 'isConstruction'):
+                e.isConstruction = True
+
+        leg_y = ev("leg_size")
+        recess = ev("rail_recess")
+        ref_pt = None
+        for i in range(sk.sketchPoints.count):
+            pt = sk.sketchPoints.item(i)
+            if pt == sk.originPoint:
+                continue
+            if abs(pt.geometry.x) < 0.01 and abs(pt.geometry.y - leg_y) < 0.01:
+                ref_pt = pt
+                break
+
+        w, h = ev(we), ev(he)
+        lines = sk.sketchCurves.sketchLines
+        gc = sk.geometricConstraints
+        y0 = leg_y
+        x0 = recess
+        l_bot = lines.addByTwoPoints(P(x0, y0, 0), P(x0 + w, y0, 0))
+        l_right = lines.addByTwoPoints(l_bot.endSketchPoint, P(x0 + w, y0 + h, 0))
+        l_top = lines.addByTwoPoints(l_right.endSketchPoint, P(x0, y0 + h, 0))
+        l_left = lines.addByTwoPoints(l_top.endSketchPoint, l_bot.startSketchPoint)
+        gc.addHorizontal(l_bot)
+        gc.addHorizontal(l_top)
+        gc.addVertical(l_right)
+        gc.addVertical(l_left)
+
+        d = sk.sketchDimensions
+        if ref_pt:
+            d.addDistanceDimension(ref_pt, l_bot.startSketchPoint,
+                V, P(x0 - 1, y0 / 2, 0)).parameter.expression = "0 in"
+            d.addDistanceDimension(ref_pt, l_bot.startSketchPoint,
+                H, P(x0 / 2, y0 - 2, 0)).parameter.expression = "rail_recess"
+
+        d.addDistanceDimension(l_bot.startSketchPoint, l_bot.endSketchPoint,
+            H, P(x0 + w / 2, y0 - 1, 0)).parameter.expression = we
+        d.addDistanceDimension(l_right.startSketchPoint, l_right.endSketchPoint,
+            V, P(x0 + w + 1, y0 + h / 2, 0)).parameter.expression = he
+        return sk, sk.profiles.item(0)
+
+    _, pr = sr_sketch_from_leg(sr_c, llo_pl, fl_leg, leg_occ,
+        "rail_thickness", "short_shoulder", "LLo_Rail_Sk")
+    ext_llo = ext_new(sr_c, pr, "rail_height_lo", "LLo_Rail")
     llo_body = ext_llo.bodies.item(0)
     llo_body.name = "SR_Left_Lower"
 
-    # Front tenon (NewBody)
+    # Front tenon (NewBody) — tall, with half-lap interlock
     llo_t_pl = off_plane(sr_c, sr_c.xYConstructionPlane,
-        "lo_z + short_t_zoff", "LLo_Tenon_Pl")
+        "lo_z + tenon_shoulder", "LLo_Tenon_Pl")
     _, pr = sketch_rect(sr_c, llo_t_pl,
-        "(rail_thickness - tenon_width) / 2", "leg_size - tenon_depth",
-        "tenon_width", "tenon_depth", "LLo_Tenon_F_Sk")
-    ext_llo_t = ext_new(sr_c, pr, "tenon_height", "LLo_Tenon_F")
+        "rail_recess + (rail_thickness - tenon_width_sr) / 2", "leg_size - tenon_depth",
+        "tenon_width_sr", "tenon_depth", "LLo_Tenon_F_Sk")
+    ext_llo_t = ext_new(sr_c, pr, "tenon_height_lo", "LLo_Tenon_F")
     llo_tenon_f = ext_llo_t.bodies.item(0)
     llo_tenon_f.name = "LLo_Tenon_F"
 
-    # Mirror front tenon across rail Y-midpoint → back tenon
+    # Mirror front tenon → back tenon
     llo_ymid = off_plane(sr_c, sr_c.xZConstructionPlane,
         "leg_size + short_shoulder / 2", "LLo_YMid")
     mir_llo_t = mirror_feat(sr_c, [ext_llo_t], llo_ymid, "LLo_MirTenon")
@@ -455,7 +544,7 @@ def run(context):
 
     # Groove on top of left lower rail
     llo_grv_pl = off_plane(sr_c, sr_c.xYConstructionPlane,
-        "lo_z + rail_height - groove_depth", "LLo_Groove_Pl")
+        "lo_z + rail_height_lo - groove_depth", "LLo_Groove_Pl")
     _, pr = sketch_rect(sr_c, llo_grv_pl,
         "groove_offset", "leg_size",
         "groove_width", "short_shoulder", "LLo_Groove_Sk")
@@ -465,25 +554,25 @@ def run(context):
     ref_sllo = find_body("SR_Left_Lower")
     ref_sllo_bb = ref_sllo.boundingBox
 
-    # --- Left upper rail ---
+    # --- Left upper rail (projected leg face reference) ---
     lhi_pl = off_plane(sr_c, sr_c.xYConstructionPlane, "hi_z", "LHi_Pl")
-    _, pr = sketch_rect(sr_c, lhi_pl,
-        "0 in", "leg_size", "rail_thickness", "short_shoulder", "LHi_Rail_Sk")
-    ext_lhi = ext_new(sr_c, pr, "rail_height", "LHi_Rail")
+    _, pr = sr_sketch_from_leg(sr_c, lhi_pl, fl_leg, leg_occ,
+        "rail_thickness", "short_shoulder", "LHi_Rail_Sk")
+    ext_lhi = ext_new(sr_c, pr, "rail_height_hi", "LHi_Rail")
     lhi_body = ext_lhi.bodies.item(0)
     lhi_body.name = "SR_Left_Upper"
 
-    # Front tenon
+    # Front tenon — tall, with half-lap interlock
     lhi_t_pl = off_plane(sr_c, sr_c.xYConstructionPlane,
-        "hi_z + short_t_zoff", "LHi_Tenon_Pl")
+        "hi_z + tenon_shoulder", "LHi_Tenon_Pl")
     _, pr = sketch_rect(sr_c, lhi_t_pl,
-        "(rail_thickness - tenon_width) / 2", "leg_size - tenon_depth",
-        "tenon_width", "tenon_depth", "LHi_Tenon_F_Sk")
-    ext_lhi_t = ext_new(sr_c, pr, "tenon_height", "LHi_Tenon_F")
+        "rail_recess + (rail_thickness - tenon_width_sr) / 2", "leg_size - tenon_depth",
+        "tenon_width_sr", "tenon_depth", "LHi_Tenon_F_Sk")
+    ext_lhi_t = ext_new(sr_c, pr, "tenon_height_hi", "LHi_Tenon_F")
     lhi_tenon_f = ext_lhi_t.bodies.item(0)
     lhi_tenon_f.name = "LHi_Tenon_F"
 
-    # Mirror front tenon → back tenon (reuse same midplane)
+    # Mirror front tenon → back tenon
     mir_lhi_t = mirror_feat(sr_c, [ext_lhi_t], llo_ymid, "LHi_MirTenon")
     lhi_tenon_b = mir_lhi_t.bodies.item(0)
     lhi_tenon_b.name = "LHi_Tenon_B"
@@ -535,15 +624,25 @@ def run(context):
     rlo_proxy = rlo_body.createForAssemblyContext(sr_occ)
     rhi_proxy = rhi_body.createForAssemblyContext(sr_occ)
 
-    # CUT each leg with its 4 adjacent rails
-    combine(root, fl_proxy, [flo_proxy, fhi_proxy, llo_proxy, lhi_proxy],
-            CUT, True, "Mort_FL")
-    combine(root, fr_proxy, [flo_proxy, fhi_proxy, rlo_proxy, rhi_proxy],
-            CUT, True, "Mort_FR")
-    combine(root, bl_proxy, [blo_proxy, bhi_proxy, llo_proxy, lhi_proxy],
-            CUT, True, "Mort_BL")
-    combine(root, br_proxy, [blo_proxy, bhi_proxy, rlo_proxy, rhi_proxy],
-            CUT, True, "Mort_BR")
+    # Tenon interlock: CUT long rail tenons with short rail bodies
+    all_sr_proxies = [llo_proxy, lhi_proxy, rlo_proxy, rhi_proxy]
+    combine(root, flo_proxy, all_sr_proxies, CUT, True, "Interlock_FLo")
+    combine(root, fhi_proxy, all_sr_proxies, CUT, True, "Interlock_FHi")
+    combine(root, blo_proxy, all_sr_proxies, CUT, True, "Interlock_BLo")
+    combine(root, bhi_proxy, all_sr_proxies, CUT, True, "Interlock_BHi")
+
+    # Re-collect ALL rail bodies (including interlock fragments) for mortise CUTs
+    all_lr_proxies = [lr_c.bRepBodies.item(i).createForAssemblyContext(lr_occ)
+                      for i in range(lr_c.bRepBodies.count)]
+    all_sr_proxies_m = [sr_c.bRepBodies.item(i).createForAssemblyContext(sr_occ)
+                        for i in range(sr_c.bRepBodies.count)]
+    all_rail_proxies = all_lr_proxies + all_sr_proxies_m
+
+    # CUT each leg with ALL rail bodies
+    combine(root, fl_proxy, all_rail_proxies, CUT, True, "Mort_FL")
+    combine(root, fr_proxy, all_rail_proxies, CUT, True, "Mort_FR")
+    combine(root, bl_proxy, all_rail_proxies, CUT, True, "Mort_BL")
+    combine(root, br_proxy, all_rail_proxies, CUT, True, "Mort_BR")
 
     # ==============================================================
     #  5. SLATS  (Slats component)
@@ -553,7 +652,7 @@ def run(context):
     sl_body_pl = off_plane(sl_c, sl_c.xYConstructionPlane, "body_z", "Slat_BodyZ")
     sl_top_pl  = off_plane(sl_c, sl_c.xYConstructionPlane, "hi_z", "Slat_TopZ")
     sl_bot_pl  = off_plane(sl_c, sl_c.xYConstructionPlane,
-        "lo_z + rail_height - groove_depth", "Slat_BotZ")
+        "lo_z + rail_height_lo - groove_depth", "Slat_BotZ")
     sl_mid_xz = off_plane(sl_c, sl_c.xZConstructionPlane, "mid_y", "Slat_MidXZ")
     sl_mid_yz = off_plane(sl_c, sl_c.yZConstructionPlane, "mid_x", "Slat_MidYZ")
 
@@ -635,10 +734,10 @@ def run(context):
             fg_x, fy_tg, "slat_tg_depth", "slat_tg_width", "FGap_LGroove_Sk")
         fgap_feats.append(ext_cut(sl_c, pr, "body_h", fg_body, "FGap_LGroove"))
 
-        _, pr = sketch_rect(sl_c, sl_bot_pl,
+        _, pr = sketch_rect(sl_c, sl_body_pl,
             "leg_size + long_shoulder", fy_tng,
             "groove_depth", "frame_tongue_thick", "FGap_REdge_Sk")
-        fgap_feats.append(ext_join(sl_c, pr, "full_slat_h", fg_body, "FGap_REdge"))
+        fgap_feats.append(ext_join(sl_c, pr, "body_h", fg_body, "FGap_REdge"))
 
         _, pr = sketch_rect(sl_c, sl_top_pl,
             fg_x, fy_tng, fg_w, "frame_tongue_thick", "FGap_TopTng_Sk")
@@ -729,10 +828,10 @@ def run(context):
             lx_tg, lg_y, "slat_tg_width", "slat_tg_depth", "LGap_FGroove_Sk")
         lgap_feats.append(ext_cut(sl_c, pr, "body_h", lg_body, "LGap_FGroove"))
 
-        _, pr = sketch_rect(sl_c, sl_bot_pl,
+        _, pr = sketch_rect(sl_c, sl_body_pl,
             lx_tng, "leg_size + short_shoulder",
             "frame_tongue_thick", "groove_depth", "LGap_BEdge_Sk")
-        lgap_feats.append(ext_join(sl_c, pr, "full_slat_h", lg_body, "LGap_BEdge"))
+        lgap_feats.append(ext_join(sl_c, pr, "body_h", lg_body, "LGap_BEdge"))
 
         _, pr = sketch_rect(sl_c, sl_top_pl,
             lx_tng, lg_y, "frame_tongue_thick", lg_h, "LGap_TopTng_Sk")
@@ -747,73 +846,45 @@ def run(context):
             mir_rgap.bodies.item(i).name = f"Slat_Right_{n_sp + 1}"
 
     # ==============================================================
-    #  6. BOTTOM SLATS + DOMINO JOINERY  (Bottom component)
+    #  6. FLOOR BOARDS  (Bottom component)
     #
-    #  Slats run along Y (width), patterned along X (length).
-    #  Each slat butts against front/back lower rail inner face.
-    #  Domino voids at each mating face CUT both slat and rail.
+    #  1" thick boards on top of lower rails, spanning full interior.
+    #  Patterned across X. Corner boards CUT by leg posts via proxies.
     # ==============================================================
     bt_pl = off_plane(bt_c, bt_c.xYConstructionPlane,
-        "lo_z", "Bottom_Pl")
+        "lo_z + rail_height_lo", "Floor_Pl")
+
+    # Template board — width auto-adjusted to fill span exactly (no gap board needed)
     _, pr = sketch_rect(bt_c, bt_pl,
-        "leg_size", "rail_thickness",
-        "bottom_thickness", "bottom_slat_length", "BottomSlat_Sk")
-    ext_bt = ext_new(bt_c, pr, "bottom_thickness", "BottomSlat_1")
+        "floor_inset", "floor_inset",
+        "floor_board_w_fit", "floor_span_y", "FloorSlat_Sk")
+    ext_bt = ext_new(bt_c, pr, "floor_thickness", "FloorSlat_Ext")
     bt_tmpl = ext_bt.bodies.item(0)
-    bt_tmpl.name = "BottomSlat_1"
+    bt_tmpl.name = "FloorSlat_1"
 
-    # Body-relative reference for domino positioning
-    ref_bt1 = find_body("BottomSlat_1")
-    ref_bt1_bb = ref_bt1.boundingBox
-
-    # --- Domino voids (sketched on slat mating face, not origin) ---
-    # Find the front mating face of the template slat (min Y face)
-    bt_front_face = None
-    min_y = float('inf')
-    for i in range(bt_tmpl.faces.count):
-        f = bt_tmpl.faces.item(i)
-        if f.pointOnFace.y < min_y:
-            min_y = f.pointOnFace.y
-            bt_front_face = f
-
-    # Stadium slot on the slat's front face, centered on the face
-    _, pr = sketch_slot(bt_c, bt_front_face,
-        "leg_size + bottom_thickness / 2",
-        "lo_z + bottom_thickness / 2",
-        "dm_bt_h", "dm_bt_w", vertical=True, name="BtDm_Front_Sk")
-    ext_dm_f = ext_new_sym(bt_c, pr, "dm_bt_d", "BtDm_Front_Void")
-    dm_f_body = ext_dm_f.bodies.item(0)
-    dm_f_body.name = "BtDm_Front"
-
-    # Mirror front void → back void
-    bt_mid_xz = off_plane(bt_c, bt_c.xZConstructionPlane, "mid_y", "Bt_MidXZ")
-    mir_dm = mirror_feat(bt_c, [ext_dm_f], bt_mid_xz, "BtDm_MirBack")
-    dm_b_body = mir_dm.bodies.item(0)
-    dm_b_body.name = "BtDm_Back"
-
-    # CUT domino pockets from template slat (voids survive for rail CUT)
-    combine(bt_c, bt_tmpl, [dm_f_body, dm_b_body], CUT, True, "BtDm_CutSlat")
-
-    # Pattern slat + void bodies along X
+    # Pattern across full X span — spacing = board width + drainage gap
+    n_floor = int(ev("n_floor_slats"))
+    print(f"Floor: n={n_floor}, board_w_fit={ev('floor_board_w_fit')/2.54:.3f}in")
     pat_bt = body_pattern(bt_c, bt_tmpl, bt_c.xConstructionAxis,
-        "n_bottom_slats", "bottom_slat_spacing", "Pat_BottomSlats")
+        str(n_floor), "floor_board_w_fit + drainage_gap", "Pat_FloorSlats")
     for i in range(pat_bt.bodies.count):
-        pat_bt.bodies.item(i).name = f"BottomSlat_{i + 2}"
+        pat_bt.bodies.item(i).name = f"FloorSlat_{i + 2}"
 
-    pat_dm_f = body_pattern(bt_c, dm_f_body, bt_c.xConstructionAxis,
-        "n_bottom_slats", "bottom_slat_spacing", "Pat_BtDm_Front")
-    pat_dm_b = body_pattern(bt_c, dm_b_body, bt_c.xConstructionAxis,
-        "n_bottom_slats", "bottom_slat_spacing", "Pat_BtDm_Back")
-
-    # Collect all void bodies
-    dm_f_all = [dm_f_body] + [pat_dm_f.bodies.item(i) for i in range(pat_dm_f.bodies.count)]
-    dm_b_all = [dm_b_body] + [pat_dm_b.bodies.item(i) for i in range(pat_dm_b.bodies.count)]
-
-    # CUT front/back lower rails via assembly proxies
-    dm_f_proxies = [b.createForAssemblyContext(bt_occ) for b in dm_f_all]
-    dm_b_proxies = [b.createForAssemblyContext(bt_occ) for b in dm_b_all]
-    combine(root, flo_proxy, dm_f_proxies, CUT, True, "BtDm_CutFrontRail")
-    combine(root, blo_proxy, dm_b_proxies, CUT, True, "BtDm_CutBackRail")
+    # CUT leg posts from ALL floor boards that overlap with legs
+    leg_pairs = [(fl_leg, fl_proxy), (fr_leg, fr_proxy),
+                 (bl_leg, bl_proxy), (br_leg, br_proxy)]
+    for bi in range(bt_c.bRepBodies.count):
+        board = bt_c.bRepBodies.item(bi)
+        bb = board.boundingBox
+        legs_to_cut = []
+        for leg_body, lp in leg_pairs:
+            lbb = leg_body.boundingBox
+            if (bb.maxPoint.x > lbb.minPoint.x and bb.minPoint.x < lbb.maxPoint.x and
+                bb.maxPoint.y > lbb.minPoint.y and bb.minPoint.y < lbb.maxPoint.y):
+                legs_to_cut.append(lp)
+        if legs_to_cut:
+            bp = board.createForAssemblyContext(bt_occ)
+            combine(root, bp, legs_to_cut, CUT, True, f"FloorNotch_{board.name}")
 
     # ==============================================================
     #  7. EPILOGUE
