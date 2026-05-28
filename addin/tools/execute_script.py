@@ -331,13 +331,24 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
         if session and session.document is None:
             if clean or force_clean:
                 import adsk.core as _ac, adsk.fusion as _af
-                app.log("[exec] creating new scratch doc for session")
-                new_doc = app.documents.add(
-                    _ac.DocumentTypes.FusionDesignDocumentType)
-                _design = _af.Design.cast(app.activeProduct)
-                _design.designType = _af.DesignTypes.ParametricDesignType
-                sm.bind_document(sid, new_doc)
-                app.log(f"[exec] bound doc={new_doc.name} docs_open={app.documents.count}")
+                from server.session_manager import find_document_by_script_path
+                # Auto-reclaim: reuse an open document this script already built
+                reclaimed = False
+                if script_path:
+                    existing_doc, _ = find_document_by_script_path(script_path)
+                    if existing_doc:
+                        app.log(f"[exec] auto-reclaim: found doc tagged with {script_path}")
+                        existing_doc.activate()
+                        sm.bind_document(sid, existing_doc)
+                        reclaimed = True
+                if not reclaimed:
+                    app.log("[exec] creating new scratch doc for session")
+                    new_doc = app.documents.add(
+                        _ac.DocumentTypes.FusionDesignDocumentType)
+                    _design = _af.Design.cast(app.activeProduct)
+                    _design.designType = _af.DesignTypes.ParametricDesignType
+                    sm.bind_document(sid, new_doc)
+                    app.log(f"[exec] bound doc={new_doc.name} docs_open={app.documents.count}")
             else:
                 return {
                     "content": [{
@@ -439,8 +450,13 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
             DocumentTracker.on_script_executed(original_script, app.activeDocument)
             if script_path:
                 DocumentTracker._script_path = script_path
-        except Exception:
-            pass
+        except Exception as e:
+            app.log(f"[exec] provenance tracking error: {e}")
+
+        # Persist script_path as Fusion attribute for auto-reclaim
+        if script_path:
+            from server.session_manager import tag_script_path
+            tag_script_path(app.activeDocument, script_path)
 
         # Set visual style to Shaded with Visible Edges after every build
         try:

@@ -45,6 +45,16 @@ The installer creates a `~/.shopprentice/repo` symlink pointing at your clone, s
 
 For Codex, the installer creates a managed skill directory at `~/.codex/skills/woodworking`, generates a local `WOODWORKING.md` from the canonical `commands/woodworking.md`, applies the user's screenshot-mode config, and rewrites repo references to absolute paths. It refuses to overwrite an existing non-ShopPrentice Codex skill at that path.
 
+## Upgrading the Fusion Add-in
+
+> **Restart Fusion 360 after upgrading.** A `git pull` updates the skill files immediately (they're read fresh each run), but the **Fusion add-in is a long-running process** — its Python modules and singletons (e.g. `SessionManager`) are loaded once when Fusion starts. Reloading the add-in re-imports modules but does **not** rebuild already-instantiated singletons, so a reload can leave you with a half-updated state (new module code, stale singleton objects). A full Fusion restart is the only way to guarantee the new version is loaded cleanly.
+
+This is a one-time cost per upgrade. Thanks to script-path document tracking (see below), a restart no longer loses your work: re-running `execute_script` with the same `script_path` auto-reclaims the document you were building.
+
+### Document auto-reclaim
+
+When you call `execute_script(script_path=...)`, the add-in tags the resulting Fusion document with a hidden `ShopPrentice.scriptPath` attribute. If your MCP session later drops (timeout, add-in restart, Fusion restart) and you re-run with the same `script_path`, the add-in finds the tagged document among the open documents and rebinds it to your session instead of creating a new scratch document. The document — not the in-memory session — is the durable owner of its provenance.
+
 ## Model Compatibility
 
 This skill requires a frontier-level LLM with strong long-context reasoning, code generation, and instruction-following abilities.
