@@ -30,6 +30,49 @@ import adsk.core
 app = adsk.core.Application.get()
 
 
+# ── document-attribute helpers (module-level, not singleton methods) ──
+# These are stateless operations on a Fusion document. Keeping them at
+# module level (rather than as SessionManager methods) means a hot add-in
+# reload re-binds them immediately — a cached singleton instance does not
+# need to be rebuilt. Call sites import them directly:
+#     from server.session_manager import tag_script_path
+def tag_script_path(doc, script_path: str) -> None:
+    """Persist script_path as a Fusion document attribute for auto-reclaim."""
+    try:
+        import adsk.fusion
+        design = adsk.fusion.Design.cast(
+            doc.products.itemByProductType("DesignProductType"))
+        if design:
+            design.rootComponent.attributes.add(
+                "ShopPrentice", "scriptPath", script_path)
+    except Exception as e:
+        app.log(f"[session] failed to tag scriptPath: {e}")
+
+
+def find_document_by_script_path(script_path: str):
+    """Scan open documents for one tagged with the given scriptPath.
+
+    Returns (doc, doc_key) if found, else (None, None).
+    """
+    import adsk.fusion
+    for i in range(app.documents.count):
+        doc = app.documents.item(i)
+        try:
+            design = adsk.fusion.Design.cast(
+                doc.products.itemByProductType("DesignProductType"))
+            if not design:
+                continue
+            root = design.rootComponent
+            attr = root.attributes.itemByName("ShopPrentice", "scriptPath")
+            if attr and attr.value == script_path:
+                dk_attr = root.attributes.itemByName("ShopPrentice", "docKey")
+                doc_key = dk_attr.value if dk_attr else None
+                return doc, doc_key
+        except Exception:
+            continue
+    return None, None
+
+
 class Session:
     """State for one MCP client connection."""
 
