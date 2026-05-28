@@ -21,22 +21,6 @@
       "ref": "Leg_NL"
     },
     {
-      "body": "DM_NL",
-      "ref": "Seat"
-    },
-    {
-      "body": "DM_NR",
-      "ref": "Seat"
-    },
-    {
-      "body": "DM_FL",
-      "ref": "Seat"
-    },
-    {
-      "body": "DM_FR",
-      "ref": "Seat"
-    },
-    {
       "body": "Str_Back",
       "ref": "Leg_NR"
     },

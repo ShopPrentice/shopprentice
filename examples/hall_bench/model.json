@@ -39,46 +39,6 @@
     {
       "body": "Back_Board",
       "ref": "Post_BL"
-    },
-    {
-      "body": "DM_FA_L_0",
-      "ref": "Apron_Front"
-    },
-    {
-      "body": "DM_FA_R_0",
-      "ref": "Apron_Front"
-    },
-    {
-      "body": "DM_BA_L_0",
-      "ref": "Apron_Back"
-    },
-    {
-      "body": "DM_BA_R_0",
-      "ref": "Apron_Back"
-    },
-    {
-      "body": "DM_LA_F_0",
-      "ref": "Apron_Left"
-    },
-    {
-      "body": "DM_LA_B_0",
-      "ref": "Apron_Left"
-    },
-    {
-      "body": "DM_RA_F_0",
-      "ref": "Apron_Right"
-    },
-    {
-      "body": "DM_RA_B_0",
-      "ref": "Apron_Right"
-    },
-    {
-      "body": "DM_BB_L",
-      "ref": "Back_Board"
-    },
-    {
-      "body": "DM_BB_R",
-      "ref": "Back_Board"
     }
   ]
 }

@@ -114,7 +114,8 @@
     },
     {
       "body": "TB_L_1",
-      "ref": "Apron_Left"
+      "ref": "Apron_Left",
+      "replicas": "TB_L_*"
     },
     {
       "body": "TB_R_0",
@@ -122,7 +123,8 @@
     },
     {
       "body": "TB_R_1",
-      "ref": "Apron_Right"
+      "ref": "Apron_Right",
+      "replicas": "TB_R_*"
     },
     {
       "body": "TB_FL",
@@ -131,46 +133,6 @@
     {
       "body": "TB_FR",
       "ref": "Apron_FrontStretcher"
-    },
-    {
-      "body": "DM_BA_L_0",
-      "ref": "Apron_Back"
-    },
-    {
-      "body": "DM_BA_R_0",
-      "ref": "Apron_Back"
-    },
-    {
-      "body": "DM_LA_F_0",
-      "ref": "Apron_Left"
-    },
-    {
-      "body": "DM_LA_B_0",
-      "ref": "Apron_Left"
-    },
-    {
-      "body": "DM_RA_F_0",
-      "ref": "Apron_Right"
-    },
-    {
-      "body": "DM_RA_B_0",
-      "ref": "Apron_Right"
-    },
-    {
-      "body": "DM_FR_L_0",
-      "ref": "Apron_FrontStretcher"
-    },
-    {
-      "body": "DM_FR_R_0",
-      "ref": "Apron_FrontStretcher"
-    },
-    {
-      "body": "DM_Div_F_0",
-      "ref": "Divider"
-    },
-    {
-      "body": "DM_Div_B_0",
-      "ref": "Divider"
     }
   ]
 }

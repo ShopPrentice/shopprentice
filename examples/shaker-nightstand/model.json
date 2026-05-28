@@ -1,0 +1,86 @@
+{
+  "deps": [
+    {
+      "body": "Side_Left",
+      "ref": "origin"
+    },
+    {
+      "body": "Side_Right",
+      "ref": "Side_Left"
+    },
+    {
+      "body": "SubTop",
+      "ref": "Side_Left"
+    },
+    {
+      "body": "BotSh_Stretcher",
+      "ref": "Side_Left"
+    },
+    {
+      "body": "BotSh_Board",
+      "ref": "BotSh_Stretcher"
+    },
+    {
+      "body": "Sh_Stretcher",
+      "ref": "Side_Left"
+    },
+    {
+      "body": "Sh_Board",
+      "ref": "Sh_Stretcher"
+    },
+    {
+      "body": "Div_FrontRail",
+      "ref": "Side_Left"
+    },
+    {
+      "body": "Div_BackRail",
+      "ref": "Div_FrontRail"
+    },
+    {
+      "body": "Div_LeftStile",
+      "ref": "Div_FrontRail"
+    },
+    {
+      "body": "Div_RightStile",
+      "ref": "Div_FrontRail"
+    },
+    {
+      "body": "Top",
+      "ref": "Side_Left"
+    },
+    {
+      "body": "Back",
+      "ref": "Side_Left"
+    },
+    {
+      "body": "dd_Front",
+      "ref": "Div_FrontRail",
+      "replicas": "dd_Front (*)"
+    },
+    {
+      "body": "dd_Back",
+      "ref": "dd_Front",
+      "replicas": "dd_Back (*)"
+    },
+    {
+      "body": "dd_Left",
+      "ref": "dd_Front",
+      "replicas": "dd_Left (*)"
+    },
+    {
+      "body": "dd_Right",
+      "ref": "dd_Front",
+      "replicas": "dd_Right (*)"
+    },
+    {
+      "body": "dd_Bottom",
+      "ref": "dd_Front",
+      "replicas": "dd_Bottom (*)"
+    },
+    {
+      "body": "Knob",
+      "ref": "dd_Front",
+      "replicas": "Knob (*)"
+    }
+  ]
+}

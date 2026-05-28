@@ -14,7 +14,7 @@
     },
     {
       "body": "Post_BR",
-      "ref": "Post_FL"
+      "ref": "Post_FR"
     },
     {
       "body": "Rail_Left",
@@ -22,7 +22,7 @@
     },
     {
       "body": "Rail_Right",
-      "ref": "Post_FR"
+      "ref": "Rail_Left"
     },
     {
       "body": "Rail_Foot",
@@ -38,7 +38,7 @@
     },
     {
       "body": "Ledger_Right",
-      "ref": "Rail_Right"
+      "ref": "Rail_Left"
     },
     {
       "body": "Slab",
@@ -46,35 +46,13 @@
     },
     {
       "body": "BT_1",
-      "ref": "Slab"
-    },
-    {
-      "body": "BT_2",
-      "ref": "Slab"
-    },
-    {
-      "body": "BT_3",
-      "ref": "Slab"
+      "ref": "Slab",
+      "replicas": "BT_*"
     },
     {
       "body": "Slat_1",
-      "ref": "Ledger_Left"
-    },
-    {
-      "body": "DM_SL_L_0",
-      "ref": "Slab"
-    },
-    {
-      "body": "DM_SL_R_0",
-      "ref": "Slab"
-    },
-    {
-      "body": "DM_LL_0",
-      "ref": "Ledger_Left"
-    },
-    {
-      "body": "DM_LR_0",
-      "ref": "Ledger_Right"
+      "ref": "Ledger_Left",
+      "replicas": "Slat_*"
     }
   ]
 }

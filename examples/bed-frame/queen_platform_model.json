@@ -14,7 +14,7 @@
     },
     {
       "body": "Post_BR",
-      "ref": "Post_FL"
+      "ref": "Post_FR"
     },
     {
       "body": "Rail_Left",
@@ -22,7 +22,7 @@
     },
     {
       "body": "Rail_Right",
-      "ref": "Post_FR"
+      "ref": "Rail_Left"
     },
     {
       "body": "Rail_Foot",
@@ -38,7 +38,7 @@
     },
     {
       "body": "Ledger_Right",
-      "ref": "Rail_Right"
+      "ref": "Rail_Left"
     },
     {
       "body": "HB_TopRail",
@@ -50,11 +50,13 @@
     },
     {
       "body": "HBSlat_1",
-      "ref": "HB_BotRail"
+      "ref": "HB_BotRail",
+      "replicas": "HBSlat_*"
     },
     {
       "body": "Slat_1",
-      "ref": "Ledger_Left"
+      "ref": "Ledger_Left",
+      "replicas": "Slat_*"
     },
     {
       "body": "CenterBeam",
@@ -62,35 +64,8 @@
     },
     {
       "body": "BeamLeg_1",
-      "ref": "CenterBeam"
-    },
-    {
-      "body": "BeamLeg_2",
-      "ref": "CenterBeam"
-    },
-    {
-      "body": "DM_HBT_L_0",
-      "ref": "HB_TopRail"
-    },
-    {
-      "body": "DM_HBT_R_0",
-      "ref": "HB_TopRail"
-    },
-    {
-      "body": "DM_HBB_L_0",
-      "ref": "HB_BotRail"
-    },
-    {
-      "body": "DM_HBB_R_0",
-      "ref": "HB_BotRail"
-    },
-    {
-      "body": "DM_LL_0",
-      "ref": "Ledger_Left"
-    },
-    {
-      "body": "DM_LR_0",
-      "ref": "Ledger_Right"
+      "ref": "CenterBeam",
+      "replicas": "BeamLeg_*"
     }
   ]
 }

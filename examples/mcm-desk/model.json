@@ -38,23 +38,8 @@
     },
     {
       "body": "BT_apron_F_v22_1",
-      "ref": "apron_F"
-    },
-    {
-      "body": "BT_apron_F_v22_2",
-      "ref": "apron_F"
-    },
-    {
-      "body": "BT_apron_F_v22_3",
-      "ref": "apron_F"
-    },
-    {
-      "body": "BT_apron_F_v22_4",
-      "ref": "apron_F"
-    },
-    {
-      "body": "BT_apron_F_v22_5",
-      "ref": "apron_F"
+      "ref": "apron_F",
+      "replicas": "BT_apron_F_v22_*"
     },
     {
       "body": "outerSlat_F",

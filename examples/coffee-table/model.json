@@ -23,22 +23,6 @@
     {
       "body": "Shelf",
       "ref": "Leg_FL"
-    },
-    {
-      "body": "DM_FL",
-      "ref": "Leg_FL"
-    },
-    {
-      "body": "DM_FR",
-      "ref": "Leg_FR"
-    },
-    {
-      "body": "DM_BL",
-      "ref": "Leg_BL"
-    },
-    {
-      "body": "DM_BR",
-      "ref": "Leg_BR"
     }
   ]
 }

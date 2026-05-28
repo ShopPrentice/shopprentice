@@ -58,11 +58,8 @@
     },
     {
       "body": "TW_SR_0",
-      "ref": "Str_Right"
-    },
-    {
-      "body": "TW_SR_1",
-      "ref": "Str_Right"
+      "ref": "Str_Right",
+      "replicas": "TW_SR_*"
     },
     {
       "body": "TW_SC_L",
@@ -74,43 +71,12 @@
     },
     {
       "body": "Spin_0",
-      "ref": "Seat"
-    },
-    {
-      "body": "Spin_1",
-      "ref": "Seat"
-    },
-    {
-      "body": "Spin_2",
-      "ref": "Seat"
-    },
-    {
-      "body": "Spin_3",
-      "ref": "Seat"
-    },
-    {
-      "body": "Spin_4",
-      "ref": "Seat"
-    },
-    {
-      "body": "Spin_5",
-      "ref": "Seat"
-    },
-    {
-      "body": "Spin_6",
-      "ref": "Seat"
+      "ref": "Seat",
+      "replicas": "Spin_*"
     },
     {
       "body": "CrestRail",
-      "ref": "Spin_3"
-    },
-    {
-      "body": "TW_SR_2",
-      "ref": "Str_Right"
-    },
-    {
-      "body": "TW_SR_3",
-      "ref": "Str_Right"
+      "ref": "Spin_0"
     }
   ]
 }

@@ -7,15 +7,15 @@
     },
     {
       "body": "Post_FR",
-      "ref": "origin"
+      "ref": "Post_FL"
     },
     {
       "body": "Post_BL",
-      "ref": "origin"
+      "ref": "Post_FL"
     },
     {
       "body": "Post_BR",
-      "ref": "origin"
+      "ref": "Post_FR"
     },
     {
       "body": "SideRail_L",
@@ -67,11 +67,11 @@
     },
     {
       "body": "DeskLeg_L",
-      "ref": "origin"
+      "ref": "Post_FL"
     },
     {
       "body": "DeskLeg_R",
-      "ref": "origin"
+      "ref": "DeskLeg_L"
     },
     {
       "body": "DeskRail_Front",
@@ -96,10 +96,6 @@
     {
       "body": "Rung_5",
       "ref": "LadderSide_L"
-    },
-    {
-      "body": "DM_SR_L_F1",
-      "ref": "SideRail_L"
     }
   ]
 }
