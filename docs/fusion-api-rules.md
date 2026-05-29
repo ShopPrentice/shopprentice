@@ -108,7 +108,73 @@ This replaces `probe_sketch_axes` and `probe_sketch_signs` — it returns the or
    - **No body exists yet** — first body in a component has no face to sketch on.
    - **Midplane for Mirror or Pattern** — no face exists at the midpoint.
    - **Sketch will be mirrored** — face-based sketches CANNOT be mirrored. MirrorFeature fails with NO_TARGET_BODY because the mirror can't find an equivalent face on the mirrored side.
-   - **Root-level sketch on a component body** — assembly proxy faces CANNOT host sketches. `comp.sketches.add(proxy_face)` throws `RuntimeError: invalid argument planarEntity`. Root-level cross-component operations must use construction planes.
+   - **Root-level sketch on a component body** — assembly proxy faces CANNOT host sketches. `comp.sketches.add(proxy_face)` throws `RuntimeError: invalid argument planarEntity`. Root-level cross-component operations must use construction planes. However, you CAN **project** a proxy face INTO a child sketch for associative referencing — see Cross-Component Sketch References below.
+
+### Cross-Component Sketch References
+
+**Rule: Only the very first (root) sketch may reference the origin. Every other sketch must be fully traceable to real geometry — every line and profile in it is located relative to a projected reference (a body, face, or edge), never positioned by a coordinate computed in the script.** The test of success: deleting all coordinate arithmetic from the script would not change where the geometry lands, because Fusion solves position from the references. For fit-point splines, interior points may stay free (the drag-to-shape workflow), but the start and end points must anchor to a reference.
+
+When a child component needs to position geometry relative to a parent body in another component, use `createForAssemblyContext` to create a proxy of the parent body, find the desired face on the proxy, and project that face into the child's sketch. The projected edges are associative — when the parent body moves or resizes, the projected references update automatically.
+
+**Verified API behaviors:**
+
+| Approach | Works? | Notes |
+|----------|--------|-------|
+| `sk.project(proxy)` where proxy = `body.createForAssemblyContext(occ)` face | **YES** — associative, tracks parent changes | The key technique |
+| `sk.project(native_face)` cross-component | NO — RuntimeError | Can't project a face from another component directly |
+| `intersectWithSketchPlane` cross-component | NO — returns empty | Same failure as in Fusion UI |
+| Consuming cross-component profile in another comp's feature | NO — wrong-profile or fail | Can't reuse profiles across components |
+| Hosting a sketch ON a proxy face | NO — RuntimeError: invalid argument planarEntity | Must use a construction plane, then project INTO the sketch |
+
+**Recipe** (use the real helper `sp.sketch_on_plane`, which projects, converts refs to construction, and identifies anchor points in one call):
+
+```python
+# Goal: In child_comp, anchor a sketch to a face of parent_body (in parent_comp)
+
+# 1. Proxy the parent body into root context and find the face you want
+parent_occ = root.allOccurrencesByComponent(parent_comp).item(0)
+parent_body_proxy = parent_body.createForAssemblyContext(parent_occ)
+face_proxy = sp.find_face(parent_body_proxy, "z", 1)  # e.g., top face
+
+# 2. Read the locator from REAL geometry (the parent's bounding box), not params
+bb = parent_body.boundingBox
+seed = adsk.core.Point3D.create(bb.minPoint.x, bb.minPoint.y, bb.maxPoint.z)
+
+# 3. Project the proxy face into the child sketch and identify the anchor point.
+#    `identify` matches the nearest projected vertex — the seed only SELECTS it;
+#    the anchor's position comes from the projected geometry (associative).
+child_sk, anchors = sp.sketch_on_plane(
+    child_comp, child_plane,
+    project=[face_proxy],
+    identify={"corner": seed},
+    name="ChildSk")
+pt = anchors["corner"]
+
+# 4. Draw FROM pt. New geometry derives its position from real reference
+#    geometry; offsets are parametric dimensions measured from pt, never a
+#    coordinate computed in Python.
+line = child_sk.sketchCurves.sketchLines.addByTwoPoints(pt, other_anchor)
+```
+
+**Helpers:** `sp.sketch_on_plane(comp, plane, project=, intersect=, identify=, name=)` is the one-stop helper — it projects parent geometry, converts references to construction, and returns identified anchor SketchPoints. `sp.drop_to_line(sketch, point, ref_line)` returns an associative projected point on a reference line. `sp.refs_to_construction(sk)` (called automatically by `sketch_on_plane`) converts projected refs to construction so only drawn curves form profiles.
+
+> **Anti-pattern — banned.** There is NO `strip_origin_dims` helper, and you must
+> not emulate one: computing coordinates from parameters, placing geometry, then
+> deleting origin dimensions to pass the deps check. That just moves the numbers
+> from a dimension into a Python variable — the sketch is still floating. Note
+> that `sketch_rect_model`/`sketch_slot_model` dimension from the sketch origin,
+> so they are origin-anchored helpers — only the root sketch may use them.
+
+**Caveats:**
+- **Can't project the sketch's own plane-face.** If the construction plane was built from the same face you want to project, project its edges individually instead.
+- **Perpendicular projections collapse to an edge-line.** A face perpendicular to the sketch plane projects as a single line, not a rectangle. Use the line's endpoints as anchors.
+- **The body belongs to the feature's component.** Verify the body you're proxying actually lives in the component you think — use `body.parentComponent`.
+- **Draggable splines must still be anchored.** A fit-point spline's interior points may stay free, but its start and end points must be drawn from (or coincident-constrained to) projected reference geometry. A spline floating entirely on computed coordinates is not acceptable and now fails `validate_deps`.
+- **Construction-plane-off-face is a real dependency, but project anyway.** When a child sketch sits on a plane built from a parent face (`sp.off_plane` off a face proxy), the dependency lives in the *plane*, not in an in-sketch curve — so to be fully constrained in-plane the sketch still has to either project something or dimension from its (face-derived) origin. `validate_deps` requires an in-sketch projection, so the off-plane-only pattern can flag. This is intentional: projecting the face into the sketch is the more robust habit (the in-plane position then tracks the parent too). If you deliberately rely on the plane alone, expect to add a projection to satisfy the check.
+
+**Validation:** `sp.validate_deps` enforces this. Beyond the origin check, its **traceability check** fails any non-root sketch unless it (1) projects real reference geometry, (2) uses no Fix/Ground constraint on drawn geometry, and (3) is **fully constrained** (`sketch.isFullyConstrained`). Rather than re-implement a constraint solver, the check lets Fusion's solver be the judge of "no free coordinate remains": a fully-constrained, origin-free, Fix-free sketch must be grounded to the projection, because a rigid sketch that floats freely is by definition not fully constrained. The one exception is fit-point spline **interiors**, which may stay free for the drag-to-shape workflow. To isolate that, when a sketch isn't fully constrained the check temporarily pins the spline interior points and re-asks the solver — so a "constrained frame + draggable sculpted edge" profile (lines + one spline edge: Foot, Cap, Stretcher, …) passes, while a genuinely loose line, a free radius, or an unanchored spline start/end still fails. Using `sketch_on_plane` + `identify`, drawing from the returned points, and fully constraining everything except spline interiors is what makes the check pass.
+
+> **Why not just walk the constraint graph?** An earlier version did, propagating "grounding" only through coincident + dimension edges. It false-positived on correct closed profiles: a fully-constrained rectangle's opposite corner is solved by Fusion through shared endpoints + H/V constraints (no dimension touches it), and a slot's second arc center through tangent + radius — so the per-point walk flagged correct geometry and pushed toward bad fixes (Fix constraints, dummy projections, dumbed-down geometry). `isFullyConstrained` is the ground truth and sidesteps all of it.
 
 **During design-first planning, audit every sketch plane:** for each sketch in the plan, ask "does a body face already exist here?" If yes, use it. Only reach for a construction plane if one of the four exceptions above applies. Fewer construction planes = cleaner timeline, faster recompute, and geometry that moves parametrically with the body it belongs to.
 

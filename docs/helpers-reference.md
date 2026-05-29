@@ -199,4 +199,45 @@ All feature builders take `comp` as first arg. Available via `from helpers impor
 | `probe_sketch_signs` | `(sk)` | (h_axis, v_axis, h_sign, v_sign) | Extends `probe_sketch_axes` with sign detection for non-XY planes. |
 | `mating_bounds` | `(body_a, body_b, normal_axis, tol=0.1)` | dict | Contact area between two bodies at interface. Returns `{ax_min, ax_max, ax_center, ax_size}` for each axis parallel to the interface. **Raises ValueError** if bodies are gapped (not touching), overlapping (penetrating — CUT first), or have no shared mating surface. Provides diagnostic messages with axis ranges so the agent can fix placement during the build. |
 | `check_domino_exposure` | `(void, body_a, body_b, normal_axis, tol=0.05)` | None | Checks that a domino void creates blind pockets in both mating pieces. On axes perpendicular to the interface normal, the void must be fully contained within each body's bounding box. **Raises ValueError** if the void extends beyond either body — the mortise opens to a surface (exposed domino). Call AFTER creating the void body but BEFORE CUTting. Error message includes axis ranges and overshoot distance for diagnosis. |
-| `validate_deps` | `(ctx, metadata_path=None)` | bool or None | Validates dependency tree from `model.json`. Checks: (1) side — body_side vs expected, (2) contact — bounding box overlap, (3) completeness — all bodies in design are tracked (including root), (4) root bodies — flags bodies in root that should be in components, (5) source — find_body + boundingBox usage. Returns `True` (all pass), `False` (failures), or `None` (no metadata file). Dep entries support optional `"replicas": "glob_pattern"` to cover pattern copies (e.g., `"Rung_*"`). |
+| `sketch_on_plane` | `(comp, plane, project=None, intersect=None, identify=None, name="Sk")` | (sketch, found_pts) | **The sanctioned way to anchor a child sketch to a parent body/face.** Creates the sketch, projects each entity in `project` (proxy faces/bodies/edges from `createForAssemblyContext`), optionally intersects bodies, auto-converts all references to construction, and — for each `{name: model_Point3D}` in `identify` — returns the nearest resulting SketchPoint. The identify point is only a *locator* (it selects which projected vertex); the anchor's real position comes from the projected geometry, so nothing is computed. Draw new geometry FROM the returned points. |
+| `drop_to_line` | `(sketch, point, ref_line, approximate_target=None)` | SketchPoint | Drops a perpendicular construction line from a SketchPoint to a reference line and returns the associative projected point (updates when source/reference move). |
+| `refs_to_construction` | `(sk)` | None | Converts all projected/reference lines in a sketch to construction geometry so only drawn curves define profiles. Called automatically by `sketch_on_plane`. |
+| `validate_deps` | `(ctx, metadata_path=None)` | bool or None | Validates the dependency tree from `model.json`. Hard checks (affect pass/fail): (1) single origin root — only 1 body may reference `"origin"`; (2) sketch origin — non-root sketches must not dimension from `sk.originPoint`; (3) **sketch traceability** — every non-root sketch must project real reference geometry, use no Fix/Ground constraint on drawn geometry, and be fully constrained relative to that reference (Fusion's `sketch.isFullyConstrained` is the judge — a rigid sketch that floats is not fully constrained; only fit-point spline interiors may remain free, and their start/end must anchor); (4) no bodies in the root component. Advisory: completeness (tracked-body coverage). Returns `True`/`False`/`None` (no metadata). Dep entries support optional `"replicas": "glob_pattern"` for pattern copies. |
+
+### Cross-Component Proxy Projection
+
+Use `sketch_on_plane` with `project=` and `identify=` when a child component's sketch needs to anchor to a parent body in another component. New geometry is drawn FROM the identified projected points, so there is no origin-based parameter math and no computed coordinate to drift.
+
+```python
+# Example: Position a shelf sketch relative to a side panel in another component
+parent_occ = root.allOccurrencesByComponent(side_comp).item(0)
+side_proxy = side_body.createForAssemblyContext(parent_occ)
+inner_face = sp.find_face(side_proxy, "y", +1)   # inner face of side panel
+
+# Read the locator from REAL parent geometry (bounding box), not parameters.
+bb = side_body.boundingBox
+corner_seed = adsk.core.Point3D.create(bb.minPoint.x, bb.minPoint.y, bb.maxPoint.z)
+
+# Project the proxy face into the child sketch and identify the anchor point.
+sk, anchors = sp.sketch_on_plane(
+    shelf_comp, shelf_plane,
+    project=[inner_face],
+    identify={"corner": corner_seed},
+    name="ShelfSk")
+pt = anchors["corner"]          # associative projected point — moves with the parent
+
+# Draw FROM the anchor point. The shelf inset is a parametric dimension measured
+# from the projected reference, not a coordinate computed in Python.
+line = sk.sketchCurves.sketchLines.addByTwoPoints(pt, other_anchor)
+d = sk.sketchDimensions
+d.addDistanceDimension(pt, line.endSketchPoint, H, placement
+).parameter.expression = "shelf_inset"
+```
+
+> **Anti-pattern — do NOT do this.** Computing corner coordinates from parameters
+> (`P(inset, depth, h)`), placing the geometry there, and then deleting the
+> origin dimensions to "pass" the deps check. That satisfies the origin check on
+> paper while the numbers simply moved from a dimension into a Python variable —
+> the sketch is still floating, not referenced. The traceability check in
+> `validate_deps` now catches this: a sketch with no projected reference, or with
+> drawn anchor points not coincident/dimensioned to one, fails.
