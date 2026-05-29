@@ -114,12 +114,17 @@ def rdim(sk, d, p1, p2, orient, axis, expr):
     """Relative distance dimension between two sketch points along a model axis.
 
     Tolerant: if the dimension would over-constrain (the points are already
-    determined by prior constraints), it is silently skipped — the geometry is
-    already correctly placed via modelToSketchSpace. ``orient`` is a dict from
+    determined by prior constraints), it is skipped — the geometry is already
+    correctly placed via modelToSketchSpace. ``orient`` is a dict from
     ``probe_orientations`` mapping a model axis to a DimensionOrientation.
 
+    A skip is LOGGED (not silent): an over-constrain skip is benign, but a skip
+    caused by a real error would otherwise leave the sketch under-constrained
+    with no signal — which validate_deps would later flag as a mysterious
+    UNDER-CONSTRAINED failure. The log makes the cause traceable.
+
     Args:
-        sk: Sketch (only used for skip-tracking context).
+        sk: Sketch (used for the skip log label).
         d: ``sk.sketchDimensions`` collection.
         p1, p2: SketchPoints to dimension between.
         orient: Dict {'x'/'y'/'z': DimensionOrientation} (probe_orientations).
@@ -133,8 +138,11 @@ def rdim(sk, d, p1, p2, orient, axis, expr):
             Point3D.create((g1.x + g2.x) / 2 + 0.4,
                            (g1.y + g2.y) / 2 + 0.4, 0)
         ).parameter.expression = expr
-    except Exception:
-        pass
+    except Exception as e:
+        name = getattr(sk, "name", "?")
+        print(f"  rdim skip [{name}] axis={axis} expr={expr!r}: {e} "
+              f"(geometry placed; dim not added — verify the sketch is fully "
+              f"constrained)")
 
 
 def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
