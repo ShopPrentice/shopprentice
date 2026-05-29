@@ -247,6 +247,52 @@ sk.geometricConstraints.addVertical(bot)     # bot varies in model-Y → sketch-
 sk.geometricConstraints.addHorizontal(vert)  # vert varies in model-Z → sketch-H
 ```
 
+## Fully constraining sketches: hard-won pitfalls
+
+The traceability check (above) wants every non-root sketch fully constrained against a
+projected reference. These traps make a sketch *look* done while it isn't — or pass validation
+while being geometrically wrong. (All hit during the trestle-table build.)
+
+**1. `addTwoPointRectangle` lays its edges along SKETCH axes — so model-axis dimensions on a
+tilted/non-XY face come out degenerate and are silently dropped.** You add a width dim along
+model-X, but the rectangle's edge runs along sketch-H (which maps to model-Y on that face), so
+the dimension measures a near-zero span, Fusion rejects it, and a tolerant helper swallows the
+error — leaving the rectangle under-constrained with no visible sign. **Fix:** when you must
+dimension along model axes on a non-XY face, build the rectangle from explicit MODEL-space
+corners with `addByTwoPoints`, and choose each edge's `addHorizontal`/`addVertical` from the
+*sketch-space* delta of its endpoints (`abs(dx) >= abs(dy)` → horizontal). Then dimension
+adjacent corners along the model axis you intend.
+
+**2. An anchor helper that snaps to the "nearest projected point" can grab the WRONG endpoint
+and translate your geometry.** Projecting a parent face yields a reference whose endpoints are at
+the parent's extremities; if you aim your anchor target midway between them it can latch onto the
+far one, and the offset dimension then shoves the part across the model (a wedge ended up 12 cm
+out of place — and still passed `validate_design`). **Fix:** aim the anchor target at the specific
+corner you mean (e.g. the post's *top* corner, not its mid-height), so the reference is
+deterministic.
+
+**3. Passing `validate_design` ≠ correct geometry.** The dependency check guarantees *provenance*
+(every coordinate traces to a parent), not *position*. A sketch can be fully constrained,
+reference-anchored, origin-free — and still build the part in the wrong place if it's anchored to
+the wrong reference point (pitfall #2). **Always keep a geometry regression baseline:**
+`capture_design` body volumes + `check_interference` *before* a constraint refactor, and confirm
+they're unchanged *after*. The deps check and the geometry check are orthogonal; you need both green.
+
+**4. Closed rectilinear loops admit only N−2 independent length dims.** Don't dimension all N
+edges of a closed rectangle/hexagon — the extras over-constrain, get dropped, and grounding
+silently breaks. Anchor one vertex, add H/V to every edge, add a *spanning chain* of length dims,
+and let the last corner fall out of the H/V + closure. (`sketch.isFullyConstrained` confirms it.)
+
+**5. Don't reference a body that is itself being patterned/mirrored.** A child sketch that
+projects a parent which the same feature then patterns will pin to the template instance — the
+pattern collapses or fails (`NO_TARGET`). Reference a *non-patterned* parent, or build the
+replicated holes as solid tool bodies (NewBody), pattern them with the part, then bulk-cut once.
+
+**6. Beware tolerant "skip-if-over-constrained" dimension helpers.** They keep a build running by
+swallowing failed dimensions — harmless under the old origin-only check, but under full-constraint
+a skipped dim is *silent under-constraint*. Prefer dims that fail loudly, or assert
+`sketch.isFullyConstrained` per sketch as you build rather than discovering gaps at the end.
+
 ## Extrude Operations
 
 | Operation | Use For |
