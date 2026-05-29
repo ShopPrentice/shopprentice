@@ -340,7 +340,11 @@ Combines three checks in a single call:
    pairs like joinery ghost bodies)
 3. **Dependency tree** — if model.json exists next to the script, validates:
    single origin root, sketch origin enforcement (non-root sketches must
-   not dimension from sk.originPoint), bodies in components.
+   not dimension from sk.originPoint), sketch traceability (every non-root
+   sketch must project real reference geometry, use no Fix/Ground constraint,
+   and be fully constrained relative to that reference — Fusion's solver is
+   the judge; only fit-point spline interiors may stay free), bodies in
+   components.
    Completeness check is advisory (printed but doesn't affect pass/fail).
 
 Returns a single pass/fail result. Fails if disconnected, has weak

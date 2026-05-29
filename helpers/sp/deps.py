@@ -2,6 +2,190 @@ import adsk.core
 import adsk.fusion
 
 
+def _resolves(curve):
+    """True if a reference curve resolves to real BRep geometry it was projected from."""
+    try:
+        return curve.referencedEntity is not None
+    except Exception:
+        # Some projected/intersected refs (e.g. intersectWithSketchPlane) have
+        # no referencedEntity but are still genuine references — treat as resolved.
+        return True
+
+
+def _curve_points(curve):
+    """All defining SketchPoints of a curve (start/end/center where present)."""
+    pts = []
+    for attr in ("startSketchPoint", "endSketchPoint", "centerSketchPoint"):
+        try:
+            p = getattr(curve, attr, None)
+            if p:
+                pts.append(p)
+        except Exception:
+            pass
+    return pts
+
+
+def _is_spline(curve):
+    try:
+        return hasattr(curve, "fitPoints")
+    except Exception:
+        return False
+
+
+def _fc_modulo_spline_interiors(sk):
+    """Is the sketch fully constrained once fit-point spline INTERIORS are
+    exempted?
+
+    A free spline interior point makes the whole sketch report
+    isFullyConstrained == False, which on its own can't tell a legitimate
+    'constrained frame + draggable sculpted edge' profile apart from a genuinely
+    loose one. So we temporarily pin each spline's interior fit points (start/end
+    excluded — those must still anchor), ask Fusion's solver, then restore the
+    exact prior state. If the answer is True, the ONLY free DOF were the
+    draggable spline interiors; if False, something else (a loose line, a free
+    radius, an unanchored spline end) remains under-constrained.
+
+    Mutates-and-restores within a try/finally so the model is left untouched.
+    """
+    saved = []
+    try:
+        for ci in range(sk.sketchCurves.count):
+            cur = sk.sketchCurves.item(ci)
+            if getattr(cur, "isReference", False) or not _is_spline(cur):
+                continue
+            try:
+                fps = cur.fitPoints
+            except Exception:
+                continue
+            for k in range(1, fps.count - 1):       # interiors only
+                fp = fps.item(k)
+                try:
+                    saved.append((fp, fp.isFixed))
+                    fp.isFixed = True
+                except Exception:
+                    pass
+        return _is_fully_constrained(sk)
+    finally:
+        for fp, val in saved:
+            try:
+                fp.isFixed = val
+            except Exception:
+                pass
+
+
+def _is_fixed(entity):
+    """True if the entity is pinned by a Fix/Ground constraint (absolute coords)."""
+    try:
+        return bool(entity.isFixed)
+    except Exception:
+        return False
+
+
+def _is_fully_constrained(sk):
+    """Fusion's own verdict that zero free DOF remain. Ground truth for 'no
+    unreferenced coordinate survives' — defaults False (stricter) if unavailable."""
+    try:
+        return bool(sk.isFullyConstrained)
+    except Exception:
+        return False
+
+
+def _curve_kind(curve):
+    try:
+        return curve.objectType.split("::")[-1]
+    except Exception:
+        return "curve"
+
+
+def _check_sketch_anchoring(comp, comp_name, is_root_comp, issues):
+    """Verify every drawn sketch entity is positioned by a reference, not a
+    computed coordinate — using Fusion's own solver as the judge of 'no free
+    coordinate remains', rather than re-implementing constraint propagation.
+
+    Per non-root sketch, all of:
+      (a) ANCHORED — contains >=1 projected reference resolving to real BRep
+          geometry. (Root component exempt: may anchor to the world origin.)
+      (b) NO FIX — no drawn curve/point is pinned by a Fix/Ground constraint
+          (that bypasses the reference with an absolute coordinate).
+      (c) DETERMINED — the sketch is fully constrained, EXCEPT that fit-point
+          spline interiors may stay free (the drag-to-shape workflow). Combined
+          with (a), (b), and the separate origin check, full constraint proves
+          every point is solved relative to the projected reference (a rigid
+          sketch that floats freely is, by definition, NOT fully constrained).
+
+    For (c): if sketch.isFullyConstrained is True, done. Otherwise the only
+    sanctioned freedom is spline interiors — so pin those interiors and re-ask
+    the solver (`_fc_modulo_spline_interiors`). This lets a 'constrained frame +
+    draggable sculpted edge' profile pass (the common real case: Foot, Cap,
+    Stretcher, …) while still failing a genuinely loose line, a free radius, or
+    an unanchored spline END. It does NOT re-implement constraint propagation,
+    so it never false-positives a correct rectangle/slot/arc whose interior
+    vertices the solver grounds through geometry rather than dimensions.
+    """
+    for si in range(comp.sketches.count):
+        sk = comp.sketches.item(si)
+
+        ref_curves, drawn_curves = [], []
+        for ci in range(sk.sketchCurves.count):
+            c = sk.sketchCurves.item(ci)
+            is_ref = bool(getattr(c, "isReference", False))
+            is_con = bool(getattr(c, "isConstruction", False))
+            if is_ref:
+                ref_curves.append(c)
+            elif not is_con:
+                drawn_curves.append(c)
+
+        if not drawn_curves:
+            continue  # pure reference / identify sketch — nothing to anchor
+
+        resolved = [c for c in ref_curves if _resolves(c)]
+
+        # (a) Anchored to real projected geometry.
+        if not is_root_comp and not resolved:
+            issues.append(
+                f"{comp_name}/{sk.name}: NOT ANCHORED — no projected reference "
+                f"geometry; {len(drawn_curves)} drawn curve(s) placed at computed "
+                f"coordinates")
+            continue
+
+        # (b) No Fix/Ground shortcut.
+        fixed = [c for c in drawn_curves
+                 if _is_fixed(c) or any(_is_fixed(p) for p in _curve_points(c))]
+        if fixed:
+            issues.append(
+                f"{comp_name}/{sk.name}: {len(fixed)} drawn curve(s) use a "
+                f"Fix/Ground constraint — pins absolute coordinates instead of "
+                f"referencing a parent")
+            continue
+
+        # (c) Let Fusion's solver decide. Fully constrained ⟹ every point is
+        # determined relative to the projected reference (given a, b, no-origin).
+        if _is_fully_constrained(sk):
+            continue
+
+        # Not fully constrained. The only sanctioned freedom is fit-point spline
+        # interiors. If there's no spline at all, the free DOF can't be excused.
+        if not any(_is_spline(c) for c in drawn_curves):
+            kinds = ", ".join(sorted({_curve_kind(c) for c in drawn_curves}))
+            issues.append(
+                f"{comp_name}/{sk.name}: UNDER-CONSTRAINED — free coordinates "
+                f"remain ({kinds}) and there is no draggable spline to excuse "
+                f"them. Fully constrain against the projected reference.")
+            continue
+
+        # Pin spline interiors and re-ask the solver. If still not fully
+        # constrained, something beyond the interiors is loose — a line, a
+        # radius, or an unanchored spline start/end.
+        if not _fc_modulo_spline_interiors(sk):
+            issues.append(
+                f"{comp_name}/{sk.name}: UNDER-CONSTRAINED — free coordinates "
+                f"remain even after exempting spline interiors. Anchor every "
+                f"line/arc and each spline's start/end to the projected reference "
+                f"(only fit-point spline interiors may stay free).")
+            continue
+        # else: only spline interiors are free → legitimate sculpted profile.
+
+
 def validate_deps(ctx, metadata_path=None):
     """Validate dependency tree from model.json.
 
@@ -77,6 +261,7 @@ def validate_deps(ctx, metadata_path=None):
 
     origin_bodies = set(d["body"] for d in deps if d["ref"] == "origin")
     origin_dim_issues = []
+    anchor_issues = []
 
     def _check_sketch_origin(comp, comp_name):
         for si in range(comp.sketches.count):
@@ -113,6 +298,7 @@ def validate_deps(ctx, metadata_path=None):
         has_root_body = bool(comp_bodies_in & origin_bodies)
         if not has_root_body:
             _check_sketch_origin(comp, comp.name)
+        _check_sketch_anchoring(comp, comp.name, has_root_body, anchor_issues)
 
     if origin_dim_issues:
         print("--- Sketch origin check ---")
@@ -125,6 +311,20 @@ def validate_deps(ctx, metadata_path=None):
         all_ok = False
     else:
         print("   OK   No non-root sketches dimension from origin")
+
+    if anchor_issues:
+        print("--- Sketch traceability check ---")
+        for issue in anchor_issues[:15]:
+            print(f"  FAIL  {issue}")
+        if len(anchor_issues) > 15:
+            print(f"         ... and {len(anchor_issues) - 15} more")
+        print(f"  Every non-root sketch must (1) project real reference geometry, "
+              f"(2) avoid Fix/Ground constraints, and (3) be fully constrained "
+              f"relative to that reference (Fusion's solver is the judge). Only "
+              f"fit-point spline interiors may remain free; their start/end may not.")
+        all_ok = False
+    else:
+        print("   OK   All non-root sketches fully constrained against references")
 
     root_bodies = []
     for i in range(ctx.root.bRepBodies.count):
