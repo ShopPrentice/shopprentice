@@ -270,7 +270,18 @@ def validate_deps(ctx, metadata_path=None):
     print(f"\n=== Dependency tree ({len(deps)} entries) ===")
     all_ok = True
 
-    origin_refs = [d["body"] for d in deps if d["ref"] == "origin"]
+    def _parents(entry):
+        """Parent reference(s) for a dep entry. Accepts a single "ref" string OR
+        a list (a body may bear on more than one parent — e.g. a wedge that seats
+        against a post AND rides a stretcher; a shelf into two sides). Every body
+        must reference at least one parent, but the count is not capped at one —
+        only the ORIGIN root is unique. Returns a list of parent names."""
+        r = entry.get("refs", entry.get("ref"))
+        if r is None:
+            return []
+        return list(r) if isinstance(r, (list, tuple)) else [r]
+
+    origin_refs = [d["body"] for d in deps if "origin" in _parents(d)]
     if len(origin_refs) > 1:
         print(f"  FAIL  {len(origin_refs)} bodies reference origin "
               f"(only 1 allowed): {origin_refs}")
@@ -284,14 +295,14 @@ def validate_deps(ctx, metadata_path=None):
 
     for entry in deps:
         body_name = entry["body"]
-        ref_name = entry["ref"]
         body = ctx.find_body(body_name)
-        if body:
-            print(f"   OK   {body_name} → {ref_name}")
-        else:
-            print(f"  SKIP  {body_name} → {ref_name}: body not found")
+        for ref_name in _parents(entry):
+            if body:
+                print(f"   OK   {body_name} → {ref_name}")
+            else:
+                print(f"  SKIP  {body_name} → {ref_name}: body not found")
 
-    origin_bodies = set(d["body"] for d in deps if d["ref"] == "origin")
+    origin_bodies = set(d["body"] for d in deps if "origin" in _parents(d))
     origin_dim_issues = []
     anchor_issues = []
 

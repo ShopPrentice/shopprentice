@@ -540,7 +540,7 @@ This allows the user (or a new agent session) to resume work by reading the READ
 
 **Loop:** execute_script → on error: fix + retry (max 3 per error) → on success: capture_design + validate_design (MANDATORY) → auto-proceed.
 
-**model.json:** Before writing the build script, create a `model.json` in the same directory with the dependency tree. Each entry has `"body"` and `"ref"` — the body it was positioned from. Only ONE body may reference `"origin"` — all others chain off existing bodies. Example: `{"deps": [{"body": "Leg_FL", "ref": "origin"}, {"body": "Top", "ref": "Leg_FL"}]}`.
+**model.json:** Before writing the build script, create a `model.json` dependency tree — each entry pairs a `"body"` with its `"ref"`, the parent it was positioned from. `"ref"` may be one name or a list: every body needs ≥1 parent (a part seating against two lists both), and exactly one body references `"origin"` (the root). A two-parent sketch anchors to each parent's projected geometry on the axis that parent controls.
 
 **Phase validation:** `validate_design` runs connectivity, interference, and dependency checks (single origin, sketch origin enforcement, bodies in components). Run it after EVERY phase. Completeness (all bodies tracked) is advisory — it won't fail the build.
 
