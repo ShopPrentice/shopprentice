@@ -14,6 +14,7 @@ from helpers.sp.context import *
 from helpers.sp.faces import *
 from helpers.sp.sketch import *
 from helpers.sp.sketch_slot import *
+from helpers.sp.anchoring import *
 from helpers.sp.features import *
 from helpers.sp.spatial import *
 from helpers.sp.mating import *

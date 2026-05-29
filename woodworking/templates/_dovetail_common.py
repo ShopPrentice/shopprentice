@@ -22,7 +22,7 @@ V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
 
 def trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
                      thick_expr, short_joint_expr, short_base_expr,
-                     prefix, name, narrow_w_expr=None):
+                     prefix, name, narrow_w_expr=None, anchor=None):
     """Shared dovetail trapezoid sketch (through + half-blind + houndstooth).
 
     The four model-space corner points define the trapezoid:
@@ -49,6 +49,19 @@ def trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
             to ``{prefix}_narrow_w``. Override for a secondary (e.g.
             houndstooth void) trapezoid that shares the main angle but
             has its own narrow width.
+        anchor: Optional dict enabling ANCHORED mode (for NON-root dovetails).
+            Default None keeps the existing origin-dimensioned behavior
+            (backward compatible). When provided, the two origin position dims
+            (Dim 3 / Dim 4) are replaced by offset dims from a PROJECTED parent
+            corner, and a second flank angle is added so the trapezoid is fully
+            constrained against real parent geometry (deps rules 1-3). Keys:
+              parent_body, parent_occ, face_axis, face_dir — the parent
+                reference face (see ``sp.sketch_rect_model``).
+              anchor_xyz: (x_expr, y_expr, z_expr) — model point on the parent
+                face whose projected corner anchors the short-face low endpoint.
+              off1, off2: (axis, expr) offset dims from that projected corner to
+                the short-face low endpoint (``l_short.startSketchPoint``).
+                POSITIVE magnitudes.
 
     Returns:
         The smallest profile in the sketch.
@@ -100,20 +113,50 @@ def trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
         l_short.startSketchPoint, l_wide.endSketchPoint,
         THICK_DIM, Point3D.create((m1.x + m4.x) / 2, (m1.y + m4.y) / 2, 0)
     ).parameter.expression = thick_expr
-    # Dim 3: origin → short-face low endpoint, joint axis.
-    d.addDistanceDimension(
-        sk.originPoint, l_short.startSketchPoint,
-        JOINT_DIM, Point3D.create(m4.x + 1, m4.y / 2, 0)
-    ).parameter.expression = short_joint_expr
-    # Dim 4: origin → short-face low endpoint, thickness axis.
-    d.addDistanceDimension(
-        sk.originPoint, l_short.startSketchPoint,
-        THICK_DIM, Point3D.create(m4.x / 2, m4.y + 1, 0)
-    ).parameter.expression = short_base_expr
+    if anchor is None:
+        # ORIGIN mode (root sketches): position the short-face low endpoint
+        # with two origin dims. FAILS the validator for non-root sketches.
+        # Dim 3: origin → short-face low endpoint, joint axis.
+        d.addDistanceDimension(
+            sk.originPoint, l_short.startSketchPoint,
+            JOINT_DIM, Point3D.create(m4.x + 1, m4.y / 2, 0)
+        ).parameter.expression = short_joint_expr
+        # Dim 4: origin → short-face low endpoint, thickness axis.
+        d.addDistanceDimension(
+            sk.originPoint, l_short.startSketchPoint,
+            THICK_DIM, Point3D.create(m4.x / 2, m4.y + 1, 0)
+        ).parameter.expression = short_base_expr
+
     # Dim 5: flank angle — measured at base (narrow/short face).
     d.addAngularDimension(
         l_front, l_short,
         Point3D.create((m1.x + m4.x) / 2, (m1.y + m4.y) / 2, 0)
     ).parameter.expression = f"90 deg - {p}_angle"
+
+    if anchor is not None:
+        # ANCHORED mode (non-root): project the parent face and anchor the
+        # short-face low endpoint to its projected corner instead of origin
+        # (deps rules 1 & 2). Add the second flank angle so both flanks are
+        # determined → fully constrained trapezoid (deps rule 3).
+        from helpers.sp.anchoring import project_face, anchor_pt, rdim
+        from helpers.sp.sketch import probe_orientations
+
+        # Second flank: l_back (P3→P2) mirrors l_front's angle off l_short.
+        d.addAngularDimension(
+            l_back, l_short,
+            Point3D.create((m2.x + m3.x) / 2, (m2.y + m3.y) / 2, 0)
+        ).parameter.expression = f"90 deg - {p}_angle"
+
+        project_face(sk, anchor["parent_body"], anchor.get("parent_occ"),
+                     anchor["face_axis"], anchor["face_dir"])
+        ev = sp._make_ev()
+        ax = anchor["anchor_xyz"]
+        axv = [ev(c) if isinstance(c, str) else c for c in ax]
+        aP = anchor_pt(sk, axv[0], axv[1], axv[2])
+        orient = probe_orientations(sk, m4_pt.x, m4_pt.y, m4_pt.z)
+        o1, o2 = anchor["off1"], anchor["off2"]
+        if aP is not None:
+            rdim(sk, d, aP, l_short.startSketchPoint, orient, o1[0], o1[1])
+            rdim(sk, d, aP, l_short.startSketchPoint, orient, o2[0], o2[1])
 
     return sp.smallest_profile(sk)

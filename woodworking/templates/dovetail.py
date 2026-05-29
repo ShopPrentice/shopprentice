@@ -233,7 +233,7 @@ def corner(pin_body, tail_body, plane,
            x_model, y_wide, y_narrow,
            y_wide_expr, thick_expr, dist_expr,
            name="DT", prefix="dt", variant="through", ev=None,
-           pattern_axis=None, z_base_expr=None):
+           pattern_axis=None, z_base_expr=None, anchor=None):
     """Create a through dovetail joint at one corner.
 
     Topology (matches ``box(..., corners=1)``):
@@ -277,6 +277,10 @@ def corner(pin_body, tail_body, plane,
             Default: ``tail_body.parentComponent.zConstructionAxis``.
         z_base_expr: Expression for joint-axis offset of the first
             half-pin. Default: ``f"{prefix}_half_pin"``.
+        anchor: Optional ``trapezoid_sketch`` anchor dict. When provided the
+            trapezoid is anchored to a PROJECTED parent face (deps rules 1-3)
+            instead of the sketch origin; default None keeps origin mode
+            (backward compatible). See ``_dovetail_common.trapezoid_sketch``.
 
     Returns:
         Dict with keys: ``join_feat``, ``pattern``, ``cut_combine``.
@@ -318,7 +322,7 @@ def corner(pin_body, tail_body, plane,
         thick_expr=thick_expr,
         short_joint_expr=f"{z_dim_expr} + {thick_expr} * tan({p}_angle)",
         short_base_expr=f"{y_wide_expr} + {thick_expr}",
-        prefix=prefix, name=name)
+        prefix=prefix, name=name, anchor=anchor)
 
     # JOIN into tail_body (intra-component)
     join_feat = sp.ext_op(comp_tail, prof, dist_expr, JOIN, tail_body,
@@ -354,7 +358,8 @@ def box(comp, front, left,
         joint_axis="z", thick_axis="y",
         joint_base_expr=None,
         thick_dir=1,
-        proud_offset_expr=None):
+        proud_offset_expr=None,
+        anchor=None):
     """Create through dovetails at box corners.
 
     Supports 1-corner, 2-corner, or 4-corner dovetails on any axis
@@ -482,7 +487,7 @@ def box(comp, front, left,
             f"({front_expr}) + {thick_expr}" if thick_dir >= 0
             else f"({front_expr}) - {thick_expr}"
         ),
-        prefix=prefix, name=name)
+        prefix=prefix, name=name, anchor=anchor)
 
     # ── ext_op JOIN with participantBodies ──
     # At FL position the extrude touches left → merges into left.

@@ -53,6 +53,32 @@ METADATA = {
 }
 
 
+def _anchor_first_finger(sk, corner_pt, anchor, x_model, y_wide, j_base, ev):
+    """Anchor a finger-rectangle corner to a PROJECTED parent face.
+
+    Replaces the two origin position dims (deps rules 1 & 2) with offset dims
+    from the projected parent corner to ``corner_pt`` (the first finger's low
+    corner). The rectangle's H/V + 2 size dims already determine its shape, so
+    these two anchor dims fully constrain it (deps rule 3). ``anchor`` keys:
+    parent_body, parent_occ, face_axis, face_dir, anchor_xyz, off1, off2 —
+    see ``sp.sketch_rect_model``. ``anchor_xyz`` defaults to the first-finger
+    corner model point; ``off1``/``off2`` default to ("0 in", "0 in") on the
+    sketch's two model axes if omitted.
+    """
+    sp.project_face(sk, anchor["parent_body"], anchor.get("parent_occ"),
+                    anchor["face_axis"], anchor["face_dir"])
+    ax = anchor.get("anchor_xyz", (x_model, y_wide, j_base))
+    axv = [ev(c) if isinstance(c, str) else c for c in ax]
+    aP = sp.anchor_pt(sk, axv[0], axv[1], axv[2])
+    orient = sp.probe_orientations(sk, axv[0], axv[1], axv[2])
+    if aP is not None:
+        for key in ("off1", "off2"):
+            o = anchor.get(key)
+            if o is not None:
+                sp.rdim(sk, sk.sketchDimensions, aP, corner_pt,
+                        orient, o[0], o[1])
+
+
 def define_params(params, prefix="fj", finger_w="0.375 in",
                   joint_h_expr="open_height",
                   thick_expr="board_thick"):
@@ -102,7 +128,7 @@ def corner(comp, plane, thick_expr, dist_expr,
            pin_body, finger_body, name="FJ",
            prefix="fj", ev=None,
            pattern_axis=None, joint_base_expr=None,
-           x_model=0.0, y_wide=0.0, y_wide_expr="0 in"):
+           x_model=0.0, y_wide=0.0, y_wide_expr="0 in", anchor=None):
     """Create a finger joint at one corner.
 
     Sketches a single rectangular finger, extrudes CUT into the pin board
@@ -126,6 +152,12 @@ def corner(comp, plane, thick_expr, dist_expr,
         x_model: Model coordinate of the sketch plane position on ext_axis.
         y_wide: Model coordinate of the outer face on thick_axis.
         y_wide_expr: Parametric expression for outer face position.
+        anchor: Optional anchor dict — when provided the first finger is
+            anchored to a PROJECTED parent face (deps rules 1-3) instead of the
+            sketch origin. Default None = origin mode (backward compatible).
+            Keys: parent_body, parent_occ, face_axis, face_dir, off1, off2,
+            optional anchor_xyz (see ``_anchor_first_finger`` /
+            ``sp.sketch_rect_model``).
 
     Returns:
         Dict with keys: 'cut_feat', 'join_feat', 'cut_pattern',
@@ -192,17 +224,24 @@ def corner(comp, plane, thick_expr, dist_expr,
         TD, Point3D.create((m1.x + m4.x) / 2, m1.y - 0.5, 0)
     ).parameter.expression = thick_expr
 
-    # Dim 3: origin → first finger along joint axis
-    d.addDistanceDimension(
-        sk.originPoint, l1.startSketchPoint,
-        JD, Point3D.create(m1.x - 1, m1.y / 2, 0)
-    ).parameter.expression = j_expr
+    if anchor is None:
+        # ORIGIN mode (root sketches): position the first finger via origin dims.
+        # Dim 3: origin → first finger along joint axis
+        d.addDistanceDimension(
+            sk.originPoint, l1.startSketchPoint,
+            JD, Point3D.create(m1.x - 1, m1.y / 2, 0)
+        ).parameter.expression = j_expr
 
-    # Dim 4: origin → first finger along thickness axis
-    d.addDistanceDimension(
-        sk.originPoint, l1.startSketchPoint,
-        TD, Point3D.create(m1.x / 2, m1.y - 1, 0)
-    ).parameter.expression = y_wide_expr
+        # Dim 4: origin → first finger along thickness axis
+        d.addDistanceDimension(
+            sk.originPoint, l1.startSketchPoint,
+            TD, Point3D.create(m1.x / 2, m1.y - 1, 0)
+        ).parameter.expression = y_wide_expr
+    else:
+        # ANCHORED mode (non-root): anchor the first finger corner to a
+        # PROJECTED parent face instead of origin (deps rules 1-3).
+        _anchor_first_finger(sk, l1.startSketchPoint, anchor,
+                             x_model, y_wide, j_base, ev)
 
     prof = sp.smallest_profile(sk)
 
@@ -247,7 +286,7 @@ def box(comp, front, left,
         fl_plane=None,
         front_expr="0 in",
         joint_axis="z", thick_axis="y",
-        joint_base_expr=None):
+        joint_base_expr=None, anchor=None):
     """Create finger joints at box corners.
 
     Same structure as dovetail.box() but with rectangular fingers:
@@ -281,6 +320,10 @@ def box(comp, front, left,
         joint_axis: Model axis along which fingers repeat ("x", "y", or "z").
         thick_axis: Model axis along which slot board thickness runs.
         joint_base_expr: Expression for joint-axis offset of first board edge.
+        anchor: Optional anchor dict — when provided the first finger is
+            anchored to a PROJECTED parent face (deps rules 1-3) instead of the
+            sketch origin. Default None = origin mode (backward compatible).
+            See ``_anchor_first_finger`` / ``sp.sketch_rect_model``.
 
     Returns:
         Dict with feature references.
@@ -374,17 +417,24 @@ def box(comp, front, left,
         TD, Point3D.create((m1.x + m4.x) / 2, m1.y - 0.5, 0)
     ).parameter.expression = thick_expr
 
-    # Dim 3: origin → first finger along joint axis
-    d.addDistanceDimension(
-        sk.originPoint, l1.startSketchPoint,
-        JD, Point3D.create(m1.x - 1, m1.y / 2, 0)
-    ).parameter.expression = j_expr
+    if anchor is None:
+        # ORIGIN mode (root sketches): position the first finger via origin dims.
+        # Dim 3: origin → first finger along joint axis
+        d.addDistanceDimension(
+            sk.originPoint, l1.startSketchPoint,
+            JD, Point3D.create(m1.x - 1, m1.y / 2, 0)
+        ).parameter.expression = j_expr
 
-    # Dim 4: origin → first finger along thickness axis
-    d.addDistanceDimension(
-        sk.originPoint, l1.startSketchPoint,
-        TD, Point3D.create(m1.x / 2, m1.y - 1, 0)
-    ).parameter.expression = front_expr
+        # Dim 4: origin → first finger along thickness axis
+        d.addDistanceDimension(
+            sk.originPoint, l1.startSketchPoint,
+            TD, Point3D.create(m1.x / 2, m1.y - 1, 0)
+        ).parameter.expression = front_expr
+    else:
+        # ANCHORED mode (non-root): anchor the first finger corner to a
+        # PROJECTED parent face instead of origin (deps rules 1-3).
+        _anchor_first_finger(sk, l1.startSketchPoint, anchor,
+                             px, f_wide, j_base, ev)
 
     prof = sp.smallest_profile(sk)
 

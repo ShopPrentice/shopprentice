@@ -120,7 +120,7 @@ def select_variant(purpose, angled=False):
 
 def blind(comp, plane, origin, size, depth_expr,
           tenon_body, mortise_body, name="MT",
-          ev=None, mirror_plane=None):
+          ev=None, mirror_plane=None, anchor=None):
     """Create a blind M&T joint.
 
     Sketches tenon cross-section on the rail end face, extrudes into
@@ -147,6 +147,12 @@ def blind(comp, plane, origin, size, depth_expr,
         ev: Evaluator function.
         mirror_plane: If provided, mirrors the tenon to the opposite end
             and JOINs both into tenon_body.
+        anchor: Optional ``sketch_rect_model`` anchor dict. When provided, the
+            tenon cross-section is anchored to a PROJECTED parent face instead
+            of the sketch origin, so the resulting non-root sketch passes the
+            validator (deps rules 1-3). Default None keeps the existing
+            origin-dimensioned behavior (backward compatible). See
+            ``sp.sketch_rect_model`` for the dict shape.
 
     Returns:
         Dict with 'tenon_ext', 'join', 'mirror' (if mirror_plane).
@@ -158,7 +164,7 @@ def blind(comp, plane, origin, size, depth_expr,
     sp.validate_joint_contact(tenon_body, mortise_body)
 
     sk, _prof = sp.sketch_rect_model(comp, plane, origin, size,
-                                      name=f"{name}_Sk", ev=ev)
+                                      name=f"{name}_Sk", ev=ev, anchor=anchor)
     # On body-face sketches the face boundary creates multiple profiles.
     # smallest_profile picks the drawn rectangle, not the surrounding region.
     prof = sp.smallest_profile(sk)
@@ -187,7 +193,7 @@ def blind(comp, plane, origin, size, depth_expr,
 
 def through(comp, plane, origin, size, depth_expr,
             tenon_body, mortise_body, name="TT",
-            ev=None, mirror_plane=None):
+            ev=None, mirror_plane=None, anchor=None):
     """Create a through M&T joint.
 
     Unlike blind(), CUTs the mortise body with the tenon body directly
@@ -198,6 +204,11 @@ def through(comp, plane, origin, size, depth_expr,
 
     The depth_expr should include any proud amount
     (e.g. "leg_size + tt_proud").
+
+    ``anchor``: optional ``sketch_rect_model`` anchor dict — when supplied the
+    tenon cross-section is anchored to a PROJECTED parent face (deps rules 1-3)
+    instead of the sketch origin. Default None = origin mode (backward
+    compatible). See ``sp.sketch_rect_model``.
 
     Cross-component: when ``tenon_body`` and ``mortise_body`` live in
     different components, the mortise CUT is automatically placed at
@@ -216,7 +227,7 @@ def through(comp, plane, origin, size, depth_expr,
     sp.validate_joint_contact(tenon_body, mortise_body)
 
     sk, _prof = sp.sketch_rect_model(comp, plane, origin, size,
-                                      name=f"{name}_Sk", ev=ev)
+                                      name=f"{name}_Sk", ev=ev, anchor=anchor)
     prof = sp.smallest_profile(sk)
     tenon_ext = sp.ext_new(comp, prof, depth_expr, f"{name}_Tenon")
     tenon_b = tenon_ext.bodies.item(0)
