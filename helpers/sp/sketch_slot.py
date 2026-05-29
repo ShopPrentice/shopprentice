@@ -59,6 +59,13 @@ def sketch_slot(comp, plane, cx_expr, cy_expr, long_expr, short_expr,
         sk.geometricConstraints.addTangent(a_t, l_l)
         sk.geometricConstraints.addTangent(l_l, a_b)
         sk.geometricConstraints.addTangent(a_b, l_r)
+        # Join the line<->arc junctions: lines/arcs were built from independent
+        # points, so tangent alone leaves sliding DOF. Coincident at all four
+        # corners is what makes the stadium fully constrainable.
+        sk.geometricConstraints.addCoincident(l_r.endSketchPoint, a_t.startSketchPoint)
+        sk.geometricConstraints.addCoincident(a_t.endSketchPoint, l_l.startSketchPoint)
+        sk.geometricConstraints.addCoincident(l_l.endSketchPoint, a_b.startSketchPoint)
+        sk.geometricConstraints.addCoincident(a_b.endSketchPoint, l_r.startSketchPoint)
         d = sk.sketchDimensions
         d.addRadialDimension(a_b,
             Point3D.create(cx + r + 1, cy - hl, 0)
@@ -92,6 +99,13 @@ def sketch_slot(comp, plane, cx_expr, cy_expr, long_expr, short_expr,
         sk.geometricConstraints.addTangent(a_r, l_t)
         sk.geometricConstraints.addTangent(l_t, a_l)
         sk.geometricConstraints.addTangent(a_l, l_b)
+        # Join the line<->arc junctions: lines/arcs were built from independent
+        # points, so tangent alone leaves sliding DOF. Coincident at all four
+        # corners is what makes the stadium fully constrainable.
+        sk.geometricConstraints.addCoincident(l_b.endSketchPoint, a_r.startSketchPoint)
+        sk.geometricConstraints.addCoincident(a_r.endSketchPoint, l_t.startSketchPoint)
+        sk.geometricConstraints.addCoincident(l_t.endSketchPoint, a_l.startSketchPoint)
+        sk.geometricConstraints.addCoincident(a_l.endSketchPoint, l_b.startSketchPoint)
         d = sk.sketchDimensions
         d.addRadialDimension(a_l,
             Point3D.create(cx - hl - 1, cy + r + 1, 0)
@@ -237,6 +251,13 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
         sk.geometricConstraints.addTangent(a_t, l_l)
         sk.geometricConstraints.addTangent(l_l, a_b)
         sk.geometricConstraints.addTangent(a_b, l_r)
+        # Join the line<->arc junctions: lines/arcs were built from independent
+        # points, so tangent alone leaves sliding DOF. Coincident at all four
+        # corners is what makes the stadium fully constrainable.
+        sk.geometricConstraints.addCoincident(l_r.endSketchPoint, a_t.startSketchPoint)
+        sk.geometricConstraints.addCoincident(a_t.endSketchPoint, l_l.startSketchPoint)
+        sk.geometricConstraints.addCoincident(l_l.endSketchPoint, a_b.startSketchPoint)
+        sk.geometricConstraints.addCoincident(a_b.endSketchPoint, l_r.startSketchPoint)
         d = sk.sketchDimensions
         d.addRadialDimension(a_b,
             Point3D.create(cx + r + 1, cy - hl, 0)
@@ -272,6 +293,13 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
         sk.geometricConstraints.addTangent(a_r, l_t)
         sk.geometricConstraints.addTangent(l_t, a_l)
         sk.geometricConstraints.addTangent(a_l, l_b)
+        # Join the line<->arc junctions: lines/arcs were built from independent
+        # points, so tangent alone leaves sliding DOF. Coincident at all four
+        # corners is what makes the stadium fully constrainable.
+        sk.geometricConstraints.addCoincident(l_b.endSketchPoint, a_r.startSketchPoint)
+        sk.geometricConstraints.addCoincident(a_r.endSketchPoint, l_t.startSketchPoint)
+        sk.geometricConstraints.addCoincident(l_t.endSketchPoint, a_l.startSketchPoint)
+        sk.geometricConstraints.addCoincident(a_l.endSketchPoint, l_b.startSketchPoint)
         d = sk.sketchDimensions
         d.addRadialDimension(a_l,
             Point3D.create(cx - hl - 1, cy + r + 1, 0)
