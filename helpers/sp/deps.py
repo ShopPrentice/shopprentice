@@ -46,8 +46,13 @@ def _fc_modulo_spline_interiors(sk):
     radius, an unanchored spline end) remains under-constrained.
 
     Mutates-and-restores within a try/finally so the model is left untouched.
+    This is safe for the document tracker: ActionLog logs UI commandTerminated
+    events, not API mutations, so this toggle adds no entries and does not affect
+    pendingChanges / clean=True gating. Cost is one solver recompute per
+    under-constrained spline sketch.
     """
     saved = []
+    pin_failures = 0
     try:
         for ci in range(sk.sketchCurves.count):
             cur = sk.sketchCurves.item(ci)
@@ -63,7 +68,14 @@ def _fc_modulo_spline_interiors(sk):
                     saved.append((fp, fp.isFixed))
                     fp.isFixed = True
                 except Exception:
-                    pass
+                    pin_failures += 1
+        if pin_failures:
+            # Don't fail silently: a legitimate sculpted profile would look
+            # under-constrained if pinning didn't take (e.g. a Fusion-version
+            # regression making SketchPoint.isFixed unsettable).
+            print(f"  WARN  could not pin {pin_failures} spline interior point(s) "
+                  f"in '{getattr(sk, 'name', '?')}' — traceability result may be "
+                  f"spurious (is SketchPoint.isFixed settable in this Fusion build?)")
         return _is_fully_constrained(sk)
     finally:
         for fp, val in saved:
@@ -79,6 +91,27 @@ def _is_fixed(entity):
         return bool(entity.isFixed)
     except Exception:
         return False
+
+
+def _has_fix(curve):
+    """True if a drawn curve, or ANY of its points (including spline fit points),
+    is pinned by a Fix/Ground constraint. Inspecting fit points matters: an
+    author could pin spline interiors to force full constraint and slip the
+    absolute-coordinate shortcut past the check."""
+    if _is_fixed(curve):
+        return True
+    for p in _curve_points(curve):
+        if _is_fixed(p):
+            return True
+    if _is_spline(curve):
+        try:
+            fps = curve.fitPoints
+            for k in range(fps.count):
+                if _is_fixed(fps.item(k)):
+                    return True
+        except Exception:
+            pass
+    return False
 
 
 def _is_fully_constrained(sk):
@@ -148,9 +181,8 @@ def _check_sketch_anchoring(comp, comp_name, is_root_comp, issues):
                 f"coordinates")
             continue
 
-        # (b) No Fix/Ground shortcut.
-        fixed = [c for c in drawn_curves
-                 if _is_fixed(c) or any(_is_fixed(p) for p in _curve_points(c))]
+        # (b) No Fix/Ground shortcut (inspects spline fit points too).
+        fixed = [c for c in drawn_curves if _has_fix(c)]
         if fixed:
             issues.append(
                 f"{comp_name}/{sk.name}: {len(fixed)} drawn curve(s) use a "

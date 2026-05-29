@@ -15,13 +15,14 @@ interior fit point is unfixed, else `frame_ok` (whether the rest is determined).
 Pinning interiors (what the real check does) therefore flips it exactly as
 Fusion would — so this genuinely tests the modulo logic, not a frozen flag.
 """
-import sys, types, importlib.util
+import os, sys, types, importlib.util
 
 for m in ("adsk", "adsk.core", "adsk.fusion"):
     sys.modules[m] = types.ModuleType(m)
 
-spec = importlib.util.spec_from_file_location(
-    "deps", "/Users/frankzha/projects/shopprentice/helpers/sp/deps.py")
+_DEPS = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", "helpers", "sp", "deps.py"))
+spec = importlib.util.spec_from_file_location("deps", _DEPS)
 deps = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(deps)
 
@@ -39,7 +40,7 @@ class Coll:
 
 class Curve:
     def __init__(self, kind, isRef=False, isCon=False, resolved=True,
-                 spline=False, fixed=False, n_interior=1):
+                 spline=False, fixed=False, n_interior=1, fixed_interior=False):
         self.objectType = f"adsk::fusion::Sketch{kind}"
         self.isReference = isRef
         self.isConstruction = isCon
@@ -48,7 +49,7 @@ class Curve:
         self.startSketchPoint = Pt()
         self.endSketchPoint = Pt()
         if spline:
-            interior = [Pt(False) for _ in range(n_interior)]
+            interior = [Pt(fixed_interior) for _ in range(n_interior)]
             self.fitPoints = Coll([self.startSketchPoint] + interior + [self.endSketchPoint])
 
 class Sketch:
@@ -153,6 +154,14 @@ R.append(run("bad spline: unanchored start/end",
 R.append(run("neutral: reference + construction only",
              Comp([Sketch("S", [Curve("Line", isRef=True), Curve("Line", isCon=True)],
                           frame_ok=False)]), False, False))
+
+# 12. BAD: spline interior pinned with Fix to force full constraint -> check (b)
+#     must catch it (the absolute-coordinate shortcut on fit points).
+ref12 = Curve("Line", isRef=True)
+R.append(run("bad: spline interior pinned with Fix (shortcut)",
+             Comp([Sketch("S", [ref12, Curve("FittedSpline", spline=True,
+                                              fixed_interior=True)], frame_ok=True)]),
+             False, True))
 
 print(f"\n{sum(R)}/{len(R)} cases passed")
 sys.exit(0 if all(R) else 1)
