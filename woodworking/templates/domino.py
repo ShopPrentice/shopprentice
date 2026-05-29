@@ -73,7 +73,7 @@ METADATA = {
 
 def single(comp, plane, center, long_axis, long_expr, short_expr,
            depth_expr, body_a=None, body_b=None, name="DM", ev=None,
-           use_model_coords=True, cut=True):
+           use_model_coords=True, cut=True, anchor=None):
     """Create a single domino joint between two bodies.
 
     Sketches a stadium-shaped void body, extrudes symmetrically about the
@@ -95,6 +95,11 @@ def single(comp, plane, center, long_axis, long_expr, short_expr,
             If False, use sketch_slot with center as sketch-space (cx, cy) only.
         cut: If True (default), CUT into body_a and body_b. If False, create
             geometry only — use for pattern-first, CUT-later workflows.
+        anchor: Optional ``sketch_slot_model`` anchor dict — when provided the
+            slot is anchored to a PROJECTED parent face (deps rules 1-3)
+            instead of the sketch origin. Default None = origin mode (backward
+            compatible). Only used when ``use_model_coords=True``. See
+            ``sp.sketch_slot_model``.
 
     Returns:
         The domino void body (BRepBody).
@@ -109,7 +114,7 @@ def single(comp, plane, center, long_axis, long_expr, short_expr,
     if use_model_coords:
         sk, prof = sp.sketch_slot_model(
             comp, plane, center, long_axis,
-            long_expr, short_expr, name=f"{name}_Sk", ev=ev)
+            long_expr, short_expr, name=f"{name}_Sk", ev=ev, anchor=anchor)
     else:
         # center is (cx_expr, cy_expr) in sketch space, long_axis ignored
         vertical = (long_axis == "v" or long_axis == "vertical")
@@ -134,7 +139,8 @@ def single(comp, plane, center, long_axis, long_expr, short_expr,
 
 def grid(comp, plane, start, step_axis, step_expr, count_expr,
          long_axis, long_expr, short_expr, depth_expr,
-         body_a=None, body_b=None, name="DM", ev=None, cut=True):
+         body_a=None, body_b=None, name="DM", ev=None, cut=True,
+         anchor=None):
     """Create a grid of dominos along a joint line.
 
     Creates one template void, then uses body_pattern to replicate along
@@ -154,6 +160,9 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
         ev: Evaluator function.
         cut: If True (default), bulk CUT all voids into body_a and body_b.
             If False, create geometry only.
+        anchor: Optional ``sketch_slot_model`` anchor dict — anchors the
+            template slot to a PROJECTED parent face (deps rules 1-3) instead
+            of the origin. Default None = origin mode (backward compatible).
 
     Returns:
         List of void bodies (template + pattern copies).
@@ -168,7 +177,7 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
     # Build ONE template void at start position
     sk, prof = sp.sketch_slot_model(
         comp, plane, start, long_axis,
-        long_expr, short_expr, name=f"{name}_Sk", ev=ev)
+        long_expr, short_expr, name=f"{name}_Sk", ev=ev, anchor=anchor)
     ext = sp.ext_new_sym(comp, prof, depth_expr, f"{name}")
     template = ext.bodies.item(0)
     template.name = f"{name}_0"
@@ -416,7 +425,7 @@ def between(comp, plane, body_a, body_b, interface_axis,
 
 def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
                  depth_expr, top_body, leg_bodies, x_mid, y_mid,
-                 name="DM", ev=None):
+                 name="DM", ev=None, anchor=None):
     """Create 4 symmetric dominos for leg-to-seat/top joints.
 
     Builds one domino at the near-left position, mirrors across YMid → NR,
@@ -435,6 +444,10 @@ def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
         y_mid: Y midplane (ConstructionPlane) for mirror.
         name: Feature name prefix.
         ev: Evaluator function.
+        anchor: Optional ``sketch_slot_model`` anchor dict — anchors the
+            near-left defining slot to a PROJECTED parent face (deps rules 1-3)
+            instead of the origin (the 3 mirrors inherit it). Default None =
+            origin mode (backward compatible).
 
     Returns:
         List of 4 void bodies [NL, NR, FL, FR].
@@ -449,7 +462,7 @@ def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
     # 1. Build near-left domino
     sk, prof = sp.sketch_slot_model(
         comp, plane, center, long_axis,
-        long_expr, short_expr, name=f"{name}_NL_Sk", ev=ev)
+        long_expr, short_expr, name=f"{name}_NL_Sk", ev=ev, anchor=anchor)
     ext = sp.ext_new_sym(comp, prof, depth_expr, f"{name}_NL")
     nl_body = ext.bodies.item(0)
     nl_body.name = f"{name}_NL"

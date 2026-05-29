@@ -171,7 +171,7 @@ def corner(pin_body, tail_body, plane,
            x_model, y_wide, y_narrow,
            y_wide_expr, socket_depth_expr, dist_expr,
            name="HBD", prefix="hbd", ev=None,
-           pattern_axis=None, z_base_expr=None):
+           pattern_axis=None, z_base_expr=None, anchor=None):
     """Create a half-blind dovetail joint at one corner.
 
     Works for both same-component and cross-component cases. The sketch,
@@ -195,6 +195,10 @@ def corner(pin_body, tail_body, plane,
         pattern_axis: Construction axis for the tail pattern.
         z_base_expr: Expression for joint-axis offset of the first
             half-pin. Default: ``f"{prefix}_pin_w / 2"``.
+        anchor: Optional ``trapezoid_sketch`` anchor dict — when provided the
+            socket trapezoid is anchored to a PROJECTED parent face (deps
+            rules 1-3) instead of the origin. Default None = origin mode
+            (backward compatible). See ``_dovetail_common.trapezoid_sketch``.
 
     Returns:
         Dict with keys: ``join_feat``, ``pattern``, ``cut_combine``.
@@ -229,7 +233,7 @@ def corner(pin_body, tail_body, plane,
         short_joint_expr=(
             f"{z_dim_expr} + {socket_depth_expr} * tan({p}_angle)"),
         short_base_expr=f"({y_wide_expr}) + ({socket_depth_expr})",
-        prefix=prefix, name=name)
+        prefix=prefix, name=name, anchor=anchor)
 
     join_feat = sp.ext_op(comp_tail, prof, dist_expr, JOIN, tail_body,
                           f"{name}_Join")
@@ -259,7 +263,7 @@ def box(comp, front, left,
         fl_plane=None,
         front_expr="0 in",
         joint_axis="z", thick_axis="y",
-        joint_base_expr=None):
+        joint_base_expr=None, anchor=None):
     """Create half-blind dovetails at box corners.
 
     Same mirror/pattern strategy as through dovetails, but the tail
@@ -284,6 +288,10 @@ def box(comp, front, left,
         joint_axis: Model axis along which tails repeat.
         thick_axis: Model axis along which pin board thickness runs.
         joint_base_expr: Expression for joint-axis offset of first board edge.
+        anchor: Optional ``trapezoid_sketch`` anchor dict — when provided the
+            socket trapezoid is anchored to a PROJECTED parent face (deps
+            rules 1-3) instead of the origin. Default None = origin mode
+            (backward compatible). See ``_dovetail_common.trapezoid_sketch``.
 
     Returns:
         Dict with feature references.
@@ -357,7 +365,7 @@ def box(comp, front, left,
         thick_expr=f"{p}_socket_depth",
         short_joint_expr=f"{j_expr} + {p}_socket_depth * tan({p}_angle)",
         short_base_expr=f"({wide_face_expr}) + ({p}_socket_depth)",
-        prefix=prefix, name=name)
+        prefix=prefix, name=name, anchor=anchor)
 
     # ext_op JOIN into tail boards
     tail_boards = [left, right] if right is not None else [left]

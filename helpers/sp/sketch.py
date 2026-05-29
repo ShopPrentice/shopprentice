@@ -86,11 +86,28 @@ def sketch_rect(comp, plane, x0_expr, y0_expr, w_expr, h_expr,
 
 
 def sketch_rect_model(comp, plane, model_origin, model_size,
-                      name="Sk", ev=None):
+                      name="Sk", ev=None, anchor=None):
     """Parametric rectangle on ANY plane via modelToSketchSpace.
 
     Adds explicit H/V geometric constraints (dresser.py original omitted
     these — fixed here per MEMORY.md).
+
+    Two modes:
+
+    * ORIGIN mode (``anchor=None``, the default and BACKWARD-COMPATIBLE
+      behavior): the rectangle is positioned with two
+      ``addDistanceDimension(sk.originPoint, ...)`` dims. Correct for ROOT
+      sketches (the root component may anchor to the world origin), but it
+      FAILS the validator for non-root sketches (deps rules 1 & 2: an
+      origin-touching dim, and no projected parent reference).
+
+    * ANCHORED mode (``anchor=dict(...)``): builds the rectangle from explicit
+      model corners with ``addByTwoPoints`` (so every edge runs along a model
+      axis), adds H/V to ALL FOUR edges, two size dims, PROJECTS the parent
+      face (assembly-context proxy → resolves to BRep) and demotes it to
+      construction, then anchors a chosen NON-origin corner to the projected
+      parent corner with two POSITIVE offset dims — no origin dims. This is
+      what every non-root sketch needs to pass ``helpers/sp/deps.py``.
 
     Args:
         comp: Component to create sketch in.
@@ -99,12 +116,35 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
         model_size: {axis: expr, axis: expr} — 2 model-axis sizes.
         name: Sketch name.
         ev: Evaluator function. If None, creates one from active design.
+        anchor: Optional dict enabling ANCHORED mode. Keys:
+            parent_body: BRepBody whose face is the reference.
+            parent_occ: occurrence for the assembly-context proxy (None for a
+                same-component native parent).
+            face_axis: 'x'/'y'/'z' — reference face normal axis.
+            face_dir: +1 / -1 — outermost face along ``face_axis``.
+            anchor_xyz: (x_expr, y_expr, z_expr) — model point ON the parent
+                face to anchor to (its projected corner). Must NOT coincide
+                with the projection of the model origin onto the sketch plane.
+            off1, off2: (axis, expr) tuples — the two offset dims from the
+                anchored corner to the rectangle corner being anchored.
+                Pass POSITIVE magnitudes. ``axis`` is a model axis name.
+            which: 0..3 — which rectangle corner to anchor (default 0). Corner
+                order is the 2 model axes of ``model_size``: 0 = origin corner,
+                1 = +axis_a, 2 = +axis_a +axis_b, 3 = +axis_b. Use a non-origin
+                corner (1/2/3) when corner 0 sits on the sketch origin.
+            size_far: If True, size the FAR edges (opposite corner 0) instead
+                of the near edges, so no size dim touches an origin-coincident
+                vertex (trestle's "size the far edge" trick). Default False.
 
     Returns:
         (sketch, profile)
     """
     if ev is None:
         ev = _make_ev()
+
+    if anchor is not None:
+        return _sketch_rect_model_anchored(
+            comp, plane, model_origin, model_size, name, ev, anchor)
 
     sk = comp.sketches.add(plane)
     sk.name = name
@@ -162,6 +202,107 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
     ).parameter.expression = _to_expr(axis_to_origin[v_axis])
 
     return sk, sk.profiles.item(0)
+
+
+def _sketch_rect_model_anchored(comp, plane, model_origin, model_size,
+                                name, ev, anchor):
+    """ANCHORED-mode rectangle for non-root sketches (see sketch_rect_model).
+
+    Satisfies deps.py rules:
+      (1) no dim touches the sketch origin — corners are anchored to a
+          PROJECTED parent corner via offset dims;
+      (2) projects real parent geometry (assembly-context proxy → BRep);
+      (3) fully constrained — H/V on all four edges + 2 size dims + 2 anchor
+          dims fix all 8 vertex DOF, no Fix/Ground.
+    """
+    from .anchoring import project_face, anchor_pt, rdim
+
+    sk = comp.sketches.add(plane)
+    sk.name = name
+
+    ox, oy, oz = ev(model_origin[0]), ev(model_origin[1]), ev(model_origin[2])
+
+    # The two model axes spanned by model_size, in dict-insertion order.
+    size_axes = list(model_size.keys())
+    a, b = size_axes[0], size_axes[1]
+    _ai = {"x": 0, "y": 1, "z": 2}
+
+    def _corner(da, db):
+        c = [ox, oy, oz]
+        if da:
+            c[_ai[a]] += ev(model_size[a])
+        if db:
+            c[_ai[b]] += ev(model_size[b])
+        return c
+
+    # Corner order: 0 = origin corner, 1 = +a, 2 = +a+b, 3 = +b.
+    corners_model = [_corner(0, 0), _corner(1, 0), _corner(1, 1), _corner(0, 1)]
+
+    m2s = sk.modelToSketchSpace
+
+    def _sp(cm):
+        s = m2s(Point3D.create(cm[0], cm[1], cm[2]))
+        return Point3D.create(s.x, s.y, 0)
+
+    # Build the loop from explicit model corners (NOT addTwoPointRectangle):
+    # every edge runs along a model axis, so model-axis dims stay well-defined.
+    # Chain each line off the previous endpoint (shared SketchPoints), and
+    # close the loop on the first line's start so all 4 vertices coincide.
+    lines = sk.sketchCurves.sketchLines
+    L = [lines.addByTwoPoints(_sp(corners_model[0]), _sp(corners_model[1]))]
+    L.append(lines.addByTwoPoints(L[0].endSketchPoint, _sp(corners_model[2])))
+    L.append(lines.addByTwoPoints(L[1].endSketchPoint, _sp(corners_model[3])))
+    L.append(lines.addByTwoPoints(L[2].endSketchPoint, L[0].startSketchPoint))
+
+    gc = sk.geometricConstraints
+
+    def _is_h(ln):
+        g1 = ln.startSketchPoint.geometry
+        g2 = ln.endSketchPoint.geometry
+        return abs(g1.x - g2.x) >= abs(g1.y - g2.y)
+
+    # H/V on ALL FOUR edges (omitting the closing edge leaves a free DOF).
+    for ln in L:
+        if _is_h(ln):
+            gc.addHorizontal(ln)
+        else:
+            gc.addVertical(ln)
+
+    orient = probe_orientations(sk, ox, oy, oz)
+    d = sk.sketchDimensions
+
+    # Two size dims (one per spanning model axis). size_far sizes the edges
+    # opposite corner 0 so no size dim touches an origin-coincident vertex.
+    size_far = bool(anchor.get("size_far", False))
+    # Corner→SketchPoint (chain): c0=L0.start, c1=L1.start, c2=L2.start,
+    # c3=L3.start. Near edges touch c0; far edges touch c2 (opposite c0).
+    c0, c1, c2, c3 = (L[0].startSketchPoint, L[1].startSketchPoint,
+                      L[2].startSketchPoint, L[3].startSketchPoint)
+    if size_far:
+        rdim(sk, d, c3, c2, orient, a, model_size[a])  # far edge along a (3↔2)
+        rdim(sk, d, c1, c2, orient, b, model_size[b])  # far edge along b (1↔2)
+    else:
+        rdim(sk, d, c0, c1, orient, a, model_size[a])  # near edge along a (0↔1)
+        rdim(sk, d, c0, c3, orient, b, model_size[b])  # near edge along b (0↔3)
+
+    # Project the parent face and anchor a chosen NON-origin corner to it.
+    project_face(sk, anchor["parent_body"], anchor.get("parent_occ"),
+                 anchor["face_axis"], anchor["face_dir"])
+
+    which = int(anchor.get("which", 0))
+    ax_pt = anchor["anchor_xyz"]
+    aP = anchor_pt(sk, ev(ax_pt[0]), ev(ax_pt[1]), ev(ax_pt[2]))
+
+    # Map corner index → its SketchPoint (chain order, computed above).
+    tgt = {0: c0, 1: c1, 2: c2, 3: c3}[which]
+
+    off1 = anchor["off1"]   # (axis, expr)
+    off2 = anchor["off2"]
+    if aP is not None:
+        rdim(sk, d, aP, tgt, orient, off1[0], off1[1])
+        rdim(sk, d, aP, tgt, orient, off2[0], off2[1])
+
+    return sk, smallest_profile(sk)
 
 
 def refs_to_construction(sk):
