@@ -81,6 +81,12 @@ def anchor_pt(child_sk, mx, my, mz,
 
     Returns None if no eligible construction point exists (e.g. nothing
     projected, or every candidate sits on the origin).
+
+    CAUTION: this returns the nearest projected VERTEX, which on a JOINTED parent
+    (dovetail / groove / proud overhang) may be a clipped corner offset from the
+    clean geometric corner — projecting such a face anchors you to the wrong
+    point. Prefer projecting a clean rectangular body's face (see ``reanchor``'s
+    failure modes).
     """
     t = child_sk.modelToSketchSpace(Point3D.create(mx, my, mz))
     o = child_sk.originPoint.geometry
@@ -186,6 +192,35 @@ def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
     (dimensioning it would re-touch the origin). For a part whose own corner is
     at world (0,0), anchor an adjacent corner instead (``sketch_rect_model``'s
     ``anchor=`` with ``size_far``).
+
+    ── FAILURE MODES (read before using; these bite on real builds) ─────────────
+    A built-in GEOMETRY SELF-CHECK snapshots each anchored vertex and, if the
+    retarget MOVED it (the anchor was wrong), reverts to origin mode, returns
+    ``None``, and prints ``reanchor [Sk]: ANCHOR REJECTED — retarget moved the
+    part N cm``. Treat that as a HARD FAILURE — the sketch is left unanchored and
+    still fails the validator. Do not ship a build that prints it. Causes & fixes:
+
+    * Wrong / CLIPPED corner. ``anchor_pt`` returns the nearest projected VERTEX.
+      If the parent's corners are clipped by dovetails / grooves / proud
+      overhangs, it grabs a clipped vertex and the part shifts. Tell-tale: the
+      SAME small shift no matter which face of that parent you project. Fix:
+      anchor to a nearby CLEAN rectangular body — a panel that is a CUT tool
+      (``combine(board, panel, CUT, keepTool=True)``) is never cut, so its
+      corners are pristine (e.g. anchor a lid rail to the bottom panel, not the
+      dovetailed case end). For a PROUD / overhanging board the real corner is at
+      ``dim ± proud_offset``, not ``dim`` — passing the un-proud value snaps to
+      the nearest real corner and shifts by the overhang.
+
+    * NEGATIVE-side corner (sign flip). If the anchored corner sits on the
+      negative side of the anchor (e.g. an overhang sketched at ``-off``), the
+      ``abs()`` distance dim can resolve to the WRONG side — shift = ``2 * off``.
+      Fix: use ``sketch_rect_model(anchor=...)`` instead; anchored mode pre-places
+      the corners and LOCKS the offsets, so there is no flip.
+
+    * NON-XY plane. ``reanchor`` restricts its axis search to the sketch plane's
+      two IN-PLANE model axes, so on xZ / yZ planes it no longer mis-maps an
+      in-plane Z dim onto the out-of-plane axis. If it still rejects on a tilted
+      plane, fall back to ``sketch_rect_model(anchor=...)`` (offset axes explicit).
     """
     from .sketch import probe_orientations
     from ._util import _make_ev
@@ -229,6 +264,23 @@ def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
 
     om = sk.sketchToModelSpace(og)
     d = sk.sketchDimensions
+
+    # The sketch's two IN-PLANE model axes. The out-of-plane (normal) axis maps
+    # to a near-zero in-plane delta, so its unit vector barely moves in sketch
+    # space. Restricting axis selection below to these two prevents the classic
+    # failure: on an xZ plane the normal Y and in-plane Z BOTH map to the V
+    # orientation, so a naive `next(a for a in (x,y,z) if orient[a]==ori)` grabs
+    # 'y' (it comes first) for a Z dim — building the retarget on the wrong axis
+    # and MOVING the part. Excluding the normal axis fixes that whole class.
+    _m2s = sk.modelToSketchSpace
+    _ob = _m2s(Point3D.create(0, 0, 0))
+    inplane = []
+    for _a, (_dx, _dy, _dz) in (("x", (1, 0, 0)), ("y", (0, 1, 0)),
+                                ("z", (0, 0, 1))):
+        _t = _m2s(Point3D.create(_dx, _dy, _dz))
+        if (_t.x - _ob.x) ** 2 + (_t.y - _ob.y) ** 2 > 0.25:
+            inplane.append(_a)
+
     # Original MODEL position of each anchored vertex — a correct anchor must
     # leave these unchanged (it only re-expresses the SAME position relative to a
     # projected reference). Used by the geometry-preservation self-check below.
@@ -239,10 +291,10 @@ def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
         orient = probe_orientations(sk, vm.x, vm.y, vm.z)
         axis = None
         if ori is not None:
-            axis = next((a for a in ("x", "y", "z") if orient[a] == ori), None)
+            axis = next((a for a in inplane if orient[a] == ori), None)
         if axis is None:  # fallback: match the measured value to an axis delta
             axis = next(
-                (a for a in ("x", "y", "z")
+                (a for a in inplane
                  if abs(abs(getattr(vm, a) - getattr(om, a)) - val) < _eps),
                 None)
         if axis is None:

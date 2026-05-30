@@ -181,6 +181,8 @@ sp.ext_new(comp, prof, "shelf_thick", "Shelf")   # extrude the RETURNED profile
 ```
 **Extrude the profile `reanchor` RETURNS, not one captured before the call.** `reanchor` projects the parent face into the sketch, which invalidates any `Profile` captured earlier (`sketch_rect_model`'s second return value) — reusing it raises "invalid profile for extrude". This also resolves the old "position dimensions are always positive" problem — `reanchor` rewrites each offset as `abs(<orig expr> - <anchor expr>)`, so arbitrarily-positioned parts (splay-adjusted stretchers, etc.) get the correct sign automatically, with geometry unchanged. **Do NOT** use a manual `addTwoPointRectangle` with width/height only and no position dims — it leaves the sketch under-constrained and fails the validator.
 
+**`reanchor` failure modes — read the `reanchor` docstring before using it.** If it prints `ANCHOR REJECTED — retarget moved the part N cm`, that is a HARD failure (the self-check reverted the sketch to origin mode). The docstring covers all three causes and fixes: a clipped/wrong parent corner (anchor a clean CUT-tool panel, or use the proud-aware corner), a negative-side corner sign-flip (use `sketch_rect_model(anchor=…)`), and non-XY planes (in-plane-axis restricted; fall back to `anchor=`).
+
 ### Feature Builder Reference (`sp.*`)
 
 All feature builders take `comp` as first arg. Available via `from helpers import sp`.
