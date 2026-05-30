@@ -19,7 +19,9 @@ Before writing any code, plan the modeling steps the way an experienced designer
 
 1. **Plan before building.** Before writing code, outline every modeling step in order: which component, which feature, which replication strategy. Think: "If I were clicking through the Fusion 360 UI, what would I do next?" Write the plan as a step list (see Design-First Planning below).
 
-2. **Build one, replicate the rest.** Prefer building one template and using **Mirror** and **Rectangular Pattern** features for the rest. If you find yourself reaching for a Python `for` loop to create geometry, stop — use a Fusion 360 pattern instead. **Exception:** Per-corner joinery (dovetails, box joints) where CUT/JOIN targets differ per corner requires independent construction at each corner — mirrors of CUT/JOIN extrudes inherit the original `participantBodies` reference and fail.
+2. **Build one, replicate the rest.** Prefer building one template and using **Mirror** and **Rectangular Pattern** features for the rest. If you find yourself reaching for a Python `for` loop to create geometry, stop — use a Fusion 360 pattern instead. Building each congruent part from its own sketch is also the *token-expensive* path; one template + a pattern is cheaper AND parametric. **Exception:** Per-corner joinery (dovetails, box joints) where CUT/JOIN targets differ per corner requires independent construction at each corner — mirrors of CUT/JOIN extrudes inherit the original `participantBodies` reference and fail.
+
+   `validate_design` surfaces a **replication advisory** when it finds congruent structural bodies built independently — it names the group and whether to Mirror or Pattern. It is **advisory only** (never fails the build), so don't let it derail a working build: finish the phase, then at a natural break refactor the named group to one template + Mirror/Pattern. To keep your build context lean, **delegate that refactor to a sub-agent** (give it the model + "replace these N congruent bodies with one template + Mirror/Pattern, preserve geometry, keep `validate_design` green"). For the per-corner-joinery exception above — or any intentionally-independent part — put `_norep` in the body name to opt out of the advisory.
 
 3. **Everything parametric.** When the user changes any dimension in Modify > Change Parameters, the entire model must recompute automatically — lengths, mirror positions, pattern counts, everything.
 
@@ -640,4 +642,4 @@ Name every feature and body for a readable timeline and easy debugging:
 5. Section Analysis > verify joinery alignment
 6. Verify no overlapping joints at corners
 7. Body count matches expected (diagnostic print confirms no accidental merges or orphans)
-8. **`validate_design` → passed.** Single call checks connectivity (1 cluster) + interference (0 real overlaps) + dependency tree (single origin root, sketch origin enforcement, bodies in components). Run after EVERY phase.
+8. **`validate_design` → passed.** Single call checks connectivity (1 cluster) + interference (0 real overlaps) + dependency tree (single origin root, sketch origin enforcement, bodies in components). It also prints a **replication advisory** (congruent bodies built independently → Mirror/Pattern) — advisory only, does NOT affect pass/fail; address it per rule 2 (sub-agent refactor) or tag with `_norep`. Run after EVERY phase.
