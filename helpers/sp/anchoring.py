@@ -57,29 +57,52 @@ def project_face(child_sk, parent_body, parent_occ, axis, direction):
     refs_to_construction(child_sk)
 
 
-def anchor_pt(child_sk, mx, my, mz):
-    """Return the projected-reference construction endpoint nearest a model point.
+def anchor_pt(child_sk, mx, my, mz,
+              include_centers=True, exclude_origin=True, _eps=1e-4):
+    """Return the projected-reference construction point nearest a model point.
 
     After ``project_face`` has demoted the projected parent face to
-    construction, this finds the construction-curve start/end SketchPoint
-    closest to model coordinate ``(mx, my, mz)``. Dimension drawn geometry
-    FROM the returned point (never from the sketch origin) to anchor the
-    sketch to the parent (deps rule 1).
+    construction, this finds the construction point closest to model coordinate
+    ``(mx, my, mz)``. Dimension drawn geometry FROM the returned point (never
+    from the sketch origin) to anchor the sketch to the parent (deps rule 1).
 
-    Returns None if no construction endpoint exists (e.g. nothing projected).
+    Candidate points are each construction curve's ``startSketchPoint`` /
+    ``endSketchPoint`` and — when ``include_centers`` is True — its
+    ``centerSketchPoint``. The centre is essential for ROUND parents: a
+    projected circular/cylindrical face has no start/end vertices, so its only
+    usable anchor is the circle/arc centre (e.g. a turned leg's top face).
+
+    When ``exclude_origin`` is True (default) any candidate whose geometry
+    coincides with the sketch origin (within ``_eps``) is skipped, so the
+    returned anchor never lands on the sketch-origin projection — dimensioning
+    to it would re-introduce the very origin reference the validator forbids
+    (deps rules 1-2). This removes the manual "don't pick the origin corner"
+    burden from callers.
+
+    Returns None if no eligible construction point exists (e.g. nothing
+    projected, or every candidate sits on the origin).
     """
     t = child_sk.modelToSketchSpace(Point3D.create(mx, my, mz))
+    o = child_sk.originPoint.geometry
+    attrs = ("startSketchPoint", "endSketchPoint", "centerSketchPoint") \
+        if include_centers else ("startSketchPoint", "endSketchPoint")
     best = None
     bd = 1e18
     for ci in range(child_sk.sketchCurves.count):
         c = child_sk.sketchCurves.item(ci)
-        if not c.isConstruction:
+        # Projected parent geometry is either demoted to construction
+        # (refs_to_construction handles lines) or left as a reference curve
+        # (projected circles/arcs are NOT demoted) — both are valid anchors.
+        # Drawn geometry is neither, so it is still excluded.
+        if not (c.isConstruction or getattr(c, "isReference", False)):
             continue
-        for attr in ("startSketchPoint", "endSketchPoint"):
+        for attr in attrs:
             p = getattr(c, attr, None)
             if not p:
                 continue
             g = p.geometry
+            if exclude_origin and abs(g.x - o.x) < _eps and abs(g.y - o.y) < _eps:
+                continue
             d = (g.x - t.x) ** 2 + (g.y - t.y) ** 2
             if d < bd:
                 bd = d
