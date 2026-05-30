@@ -168,6 +168,8 @@ def run(context):
         P3(ls_v + 1, az_v / 2, 0)).parameter.expression = "apron_z"
     d_tx.addDistanceDimension(lb.startSketchPoint, lb.endSketchPoint, H,
         P3(ls_v - lt_v / 2, -1, 0)).parameter.expression = "leg_taper"
+    d_tx.addDistanceDimension(la.startSketchPoint, la.endSketchPoint, V,
+        P3(ls_v + 1, az_v / 2, 0)).parameter.expression = "apron_z"
     sk_tx.name = "TaperX_Sk"
     sp.ext_op(leg_c, sp.smallest_profile(sk_tx), "leg_size",
               CUT, leg_fl, "TaperX_Cut")
@@ -202,6 +204,9 @@ def run(context):
     d_ty.addDistanceDimension(lb2.startSketchPoint, lb2.endSketchPoint,
         orient['y'], P3((b2.x + c2.x) / 2, b2.y - 1, 0)
         ).parameter.expression = "leg_taper"
+    d_ty.addDistanceDimension(la2.startSketchPoint, la2.endSketchPoint,
+        orient['z'], P3(a2.x + 1, (a2.y + b2.y) / 2, 0)
+        ).parameter.expression = "apron_z"
     sk_ty.name = "TaperY_Sk"
     sp.ext_op(leg_c, sp.smallest_profile(sk_ty), "leg_size",
               CUT, leg_fl, "TaperY_Cut")
@@ -542,7 +547,10 @@ def run(context):
                 "apron_z + str_h + drawer_gap + drawer_h / 2"),
         pull_axis="x", depth_axis="y",
         prefix="pl", name="Pull", ev=ev, flip=False,
-        board_thick_expr="dd_ft")
+        board_thick_expr="dd_ft",
+        anchor=dict(parent_body=dd_front, parent_occ=None,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("dd_xo", "0 in", "dd_zo")))
 
     # -- Body-relative reference: pull posts relative to pull bar --
     ref_pull_bar = find_body("Pull_Bar")
