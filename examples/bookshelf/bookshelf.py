@@ -358,6 +358,8 @@ def run(context):
     d.addAngularDimension(
         l_front, l_short, Point3D.create(bt / 2, hp + tw / 2, 0)
     ).parameter.expression = "90 deg - dt_angle"
+    d.addDistanceDimension(l_wide.startSketchPoint, l_wide.endSketchPoint,
+        V, Point3D.create(-1, hp + tw / 2, 0)).parameter.expression = "dt_tail_w"
 
     # Anchor: replace the two origin-position dims on p4 (l_short.start) with
     # dims from a projected Side_Left top-face corner (z=+1). Non-root sketch

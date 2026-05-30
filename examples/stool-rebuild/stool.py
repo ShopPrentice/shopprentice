@@ -129,6 +129,7 @@ def run(context):
     gc = Seat_Sk.geometricConstraints
     gc.addHorizontal(rect[0]); gc.addHorizontal(rect[2])
     gc.addVertical(rect[1]); gc.addVertical(rect[3])
+    gc.addCoincident(rect[0].startSketchPoint, Seat_Sk.originPoint)
     d = Seat_Sk.sketchDimensions
     d.addDistanceDimension(rect[0].startSketchPoint, rect[0].endSketchPoint,
         H, P(x0 + w/2, y0 - 1, 0)).parameter.expression = "seat_l"
@@ -345,6 +346,10 @@ def run(context):
     d.addDistanceDimension(_nearest_proj(*_xf(6.4181, -4.9068)), ln7.endSketchPoint,
         adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, P(0, 0, 0)).parameter.expression = "tenon_shoulder_w"
     gc = Sketch3.geometricConstraints
+    gc.addCoincident(ln4.endSketchPoint, _pcurve_4)
+    gc.addCoincident(ln5.endSketchPoint, _pcurve_6)
+    gc.addCoincident(ln6.endSketchPoint, _pcurve_4)
+    gc.addCoincident(ln7.endSketchPoint, _pcurve_6)
     _best_pi, _best_a = 0, float('inf')
     for _pi in range(Sketch3.profiles.count):
         _bb = Sketch3.profiles.item(_pi).boundingBox
