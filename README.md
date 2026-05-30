@@ -83,6 +83,9 @@ The agent can also work from images — show it a photo or sketch of a piece and
 <td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a><br />Writing desk with aprons</td>
 <td align="center"><a href="examples/trestle-table/"><img src="examples/trestle-table/screenshots/iso-top-right.png" width="200" /><br /><b>Trestle Table</b></a><br />Knock-down wedged through-tenons (tusk wedges), drawbore pegs, tabletop buttons</td>
 </tr>
+<tr>
+<td align="center"><a href="examples/moravian-workbench/"><img src="examples/moravian-workbench/screenshots/iso-top-left.png" width="200" /><br /><b>Moravian Workbench</b></a><br />Splayed-leg knock-down trestle, tusk + fox-wedged tenons, leg vise, 16 dog holes</td>
+</tr>
 </table>
 
 The **Step Stool** and **Pergola** were reverse-engineered from existing Fusion 360 designs using the capture-and-rebuild pipeline (search-based feature matching with per-body volume validation at 0.000% tolerance).
