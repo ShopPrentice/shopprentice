@@ -147,6 +147,19 @@ def run(context):
     l1 = lines.addByTwoPoints(P3.create(pt1.x, pt1.y, 0), P3.create(pt2.x, pt2.y, 0))
     l2 = lines.addByTwoPoints(l1.endSketchPoint, P3.create(pt3.x, pt3.y, 0))
     lines.addByTwoPoints(l2.endSketchPoint, l1.startSketchPoint)
+    H_o = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V_o = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    sk_tx.geometricConstraints.addVertical(l1)
+    sk_tx.geometricConstraints.addHorizontal(l2)
+    dtx = sk_tx.sketchDimensions
+    dtx.addDistanceDimension(sk_tx.originPoint, l1.startSketchPoint, H_o,
+        P3.create(pt1.x / 2, pt1.y - 1, 0)).parameter.expression = "leg_size"
+    dtx.addDistanceDimension(sk_tx.originPoint, l1.startSketchPoint, V_o,
+        P3.create(pt1.x + 1, pt1.y / 2, 0)).parameter.expression = "apron_z"
+    dtx.addDistanceDimension(l2.startSketchPoint, l2.endSketchPoint, H_o,
+        P3.create((pt2.x + pt3.x) / 2, pt2.y - 1, 0)).parameter.expression = "leg_taper"
+    dtx.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint, V_o,
+        P3.create(pt1.x + 1, (pt1.y + pt2.y) / 2, 0)).parameter.expression = "apron_z"
     taper_prof = sk_tx.profiles.item(0)
     sp.ext_op(leg_c, taper_prof, "leg_size", CUT, leg_fl, "TaperX_Cut")
 
@@ -161,6 +174,25 @@ def run(context):
     l1 = lines.addByTwoPoints(P3.create(pt1.x, pt1.y, 0), P3.create(pt2.x, pt2.y, 0))
     l2 = lines.addByTwoPoints(l1.endSketchPoint, P3.create(pt3.x, pt3.y, 0))
     lines.addByTwoPoints(l2.endSketchPoint, l1.startSketchPoint)
+    orient = sp.probe_orientations(sk_ty, 0, ev("leg_size"), ev("apron_z"))
+    V_enum = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    if orient['z'] == V_enum:
+        sk_ty.geometricConstraints.addVertical(l1)
+    else:
+        sk_ty.geometricConstraints.addHorizontal(l1)
+    if orient['y'] == V_enum:
+        sk_ty.geometricConstraints.addVertical(l2)
+    else:
+        sk_ty.geometricConstraints.addHorizontal(l2)
+    dty = sk_ty.sketchDimensions
+    dty.addDistanceDimension(sk_ty.originPoint, l1.startSketchPoint, orient['y'],
+        P3.create(pt1.x - 1, pt1.y + 1, 0)).parameter.expression = "leg_size"
+    dty.addDistanceDimension(sk_ty.originPoint, l1.startSketchPoint, orient['z'],
+        P3.create(pt1.x + 1, (pt1.y + pt2.y) / 2, 0)).parameter.expression = "apron_z"
+    dty.addDistanceDimension(l2.startSketchPoint, l2.endSketchPoint, orient['y'],
+        P3.create((pt2.x + pt3.x) / 2, pt2.y - 1, 0)).parameter.expression = "leg_taper"
+    dty.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint, orient['z'],
+        P3.create(pt1.x + 1, (pt1.y + pt2.y) / 2, 0)).parameter.expression = "apron_z"
     taper_prof = sk_ty.profiles.item(0)
     sp.ext_op(leg_c, taper_prof, "leg_size", CUT, leg_fl, "TaperY_Cut")
 
