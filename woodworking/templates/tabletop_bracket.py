@@ -69,7 +69,8 @@ def _apply_steel(comp, bodies):
         pass
 
 
-def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
+def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None,
+           anchor=None):
     """Create a single L-bracket.
 
     Built from two rectangular plates joined together:
@@ -86,6 +87,10 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         prefix: Parameter prefix (default "tb").
         name: Feature name prefix.
         ev: Evaluator function.
+        anchor: Optional dict for non-root components. Keys:
+            parent_body, parent_occ, face_axis, face_dir, anchor_xyz
+            (same as sp.reanchor). When provided, both VP and HP sketches
+            are retargeted from origin dims to projected-parent-corner dims.
 
     Returns:
         The bracket body (BRepBody).
@@ -119,10 +124,16 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         vp_y = cy if face_dir > 0 else cy - thick
         vp_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                               cm(vp_y), f"{name}_VP_Pl")
-        _, vp_prof = sp.sketch_rect_model(comp, vp_pl,
+        vp_sk, vp_prof = sp.sketch_rect_model(comp, vp_pl,
             (cm(cx - w/2), cm(vp_y), cm(cz - v_h)),
             {"x": f"{prefix}_w", "z": f"{prefix}_leg_h"},
             f"{name}_VP_Sk", ev)
+        if anchor is not None:
+            vp_prof = (sp.reanchor(vp_sk, anchor["parent_body"],
+                                   anchor.get("parent_occ"),
+                                   anchor["face_axis"], anchor["face_dir"],
+                                   anchor["anchor_xyz"])
+                       or sp.smallest_profile(vp_sk))
         vp_ext = sp.ext_new(comp, vp_prof, f"{prefix}_thick", f"{name}_VP")
         vert_body = vp_ext.bodies.item(0)
         vert_body.name = f"{name}_V"
@@ -131,10 +142,16 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         hp_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                               cm(cz - thick), f"{name}_HP_Pl")
         hp_y0 = cy if face_dir > 0 else cy - h_w
-        _, hp_prof = sp.sketch_rect_model(comp, hp_pl,
+        hp_sk, hp_prof = sp.sketch_rect_model(comp, hp_pl,
             (cm(cx - w/2), cm(hp_y0), cm(cz - thick)),
             {"x": f"{prefix}_w", "y": f"{prefix}_leg_w"},
             f"{name}_HP_Sk", ev)
+        if anchor is not None:
+            hp_prof = (sp.reanchor(hp_sk, anchor["parent_body"],
+                                   anchor.get("parent_occ"),
+                                   anchor["face_axis"], anchor["face_dir"],
+                                   anchor["anchor_xyz"])
+                       or sp.smallest_profile(hp_sk))
         hp_ext = sp.ext_new(comp, hp_prof, f"{prefix}_thick", f"{name}_HP")
         horiz_body = hp_ext.bodies.item(0)
         horiz_body.name = f"{name}_H"
@@ -147,10 +164,16 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         vp_x = cx if face_dir > 0 else cx - thick
         vp_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                               cm(vp_x), f"{name}_VP_Pl")
-        _, vp_prof = sp.sketch_rect_model(comp, vp_pl,
+        vp_sk, vp_prof = sp.sketch_rect_model(comp, vp_pl,
             (cm(vp_x), cm(cy - w/2), cm(cz - v_h)),
             {"y": f"{prefix}_w", "z": f"{prefix}_leg_h"},
             f"{name}_VP_Sk", ev)
+        if anchor is not None:
+            vp_prof = (sp.reanchor(vp_sk, anchor["parent_body"],
+                                   anchor.get("parent_occ"),
+                                   anchor["face_axis"], anchor["face_dir"],
+                                   anchor["anchor_xyz"])
+                       or sp.smallest_profile(vp_sk))
         vp_ext = sp.ext_new(comp, vp_prof, f"{prefix}_thick", f"{name}_VP")
         vert_body = vp_ext.bodies.item(0)
         vert_body.name = f"{name}_V"
@@ -158,10 +181,16 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
         hp_pl = sp.off_plane(comp, comp.xYConstructionPlane,
                               cm(cz - thick), f"{name}_HP_Pl")
         hp_x0 = cx if face_dir > 0 else cx - h_w
-        _, hp_prof = sp.sketch_rect_model(comp, hp_pl,
+        hp_sk, hp_prof = sp.sketch_rect_model(comp, hp_pl,
             (cm(hp_x0), cm(cy - w/2), cm(cz - thick)),
             {"x": f"{prefix}_leg_w", "y": f"{prefix}_w"},
             f"{name}_HP_Sk", ev)
+        if anchor is not None:
+            hp_prof = (sp.reanchor(hp_sk, anchor["parent_body"],
+                                   anchor.get("parent_occ"),
+                                   anchor["face_axis"], anchor["face_dir"],
+                                   anchor["anchor_xyz"])
+                       or sp.smallest_profile(hp_sk))
         hp_ext = sp.ext_new(comp, hp_prof, f"{prefix}_thick", f"{name}_HP")
         horiz_body = hp_ext.bodies.item(0)
         horiz_body.name = f"{name}_H"
@@ -177,7 +206,7 @@ def single(comp, face_axis, face_dir, pos, prefix="tb", name="TB", ev=None):
 
 def row(comp, face_axis, face_dir,
         start, step_axis, step_expr, count,
-        prefix="tb", name="TB", ev=None):
+        prefix="tb", name="TB", ev=None, anchor=None):
     """Create a row of L-brackets along an apron.
 
     Args:
@@ -216,7 +245,7 @@ def row(comp, face_axis, face_dir,
             pos = (sx, sy, sz + offset)
 
         b = single(comp, face_axis, face_dir, pos,
-                   prefix=prefix, name=f"{name}_{i}", ev=ev)
+                   prefix=prefix, name=f"{name}_{i}", ev=ev, anchor=anchor)
         brackets.append(b)
 
     return brackets

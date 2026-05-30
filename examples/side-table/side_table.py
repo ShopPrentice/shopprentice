@@ -501,7 +501,10 @@ def run(context):
                ev("leg_size") + tb_sp,
                ev("leg_h")),
         step_axis="y", step_expr=tb_sp, count=2,
-        name="TB_L", ev=ev)
+        name="TB_L", ev=ev,
+        anchor=dict(parent_body=apron_left, parent_occ=apron_occ,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=("apron_thick", "leg_size", "leg_h")))
 
     # Right side apron: 2 brackets (face_axis="x", face_dir=-1)
     tabletop_bracket.row(bracket_c, face_axis="x", face_dir=-1,
@@ -509,7 +512,10 @@ def run(context):
                ev("leg_size") + tb_sp,
                ev("leg_h")),
         step_axis="y", step_expr=tb_sp, count=2,
-        name="TB_R", ev=ev)
+        name="TB_R", ev=ev,
+        anchor=dict(parent_body=apron_right, parent_occ=apron_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("table_l - apron_thick", "leg_size", "leg_h")))
 
     print(">>> Brackets: 4 tabletop brackets (2 per side apron)")
 
