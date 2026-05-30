@@ -361,30 +361,49 @@ This replaces `probe_sketch_axes` and `probe_sketch_signs` — it returns the or
 
 **During design-first planning, audit every sketch plane:** for each sketch in the plan, ask "does a body face already exist here?" If yes, use it. Only reach for a construction plane if one of the four exceptions above applies. Fewer construction planes = cleaner timeline, faster recompute, and geometry that moves parametrically with the body it belongs to.
 
-**Dimension from reference geometry, never from sketch origin (MANDATORY for non-root bodies):**
-Every non-root body's sketch position must be anchored to the reference body's geometry — not to the sketch origin (`sk.originPoint`). The sketch origin maps to the world origin; dimensioning from it encodes absolute position and breaks when the reference body moves.
+**Anchor every non-root sketch to projected parent geometry, never to the sketch origin (MANDATORY):**
+For each sketch INSIDE a component that does NOT hold the root body, `validate_deps` (run by
+`validate_design`) requires all three of: (1) it PROJECTS real parent geometry (an assembly-context
+proxy face for a cross-component parent), (2) it uses NO Fix/Ground constraint, and (3) it is FULLY
+constrained relative to that projection with **no dimension touching the sketch origin** — the only
+free DOF allowed are fit-point spline INTERIORS (each spline's start/end must be anchored). The single
+root body (`ref=origin`) is exempt: its own component's sketches may dimension from the origin.
 
-**Correct pattern:** Project a reference body edge or point into the sketch, then dimension all geometry from that projected point:
-```python
-# Apron sketch on leg's inner face — position anchored to leg
-leg_face = sp.find_face(leg_fl, "y", +1)  # leg inner face
-sk = apron_c.sketches.add(leg_face)
-# Project leg top edge for Z reference
-top_edge = [e for e in leg_face.edges if ...][0]
-proj = sk.project(top_edge)
-# Dimension apron rectangle from projected edge, NOT from sk.originPoint
-d.addDistanceDimension(proj_point, rect_corner, V, ...).parameter.expression = "apron_h"
-```
+**Pick ONE of these three ways to comply — simplest first. Do NOT hand-roll origin math.**
 
-**Wrong pattern (origin-based):**
-```python
-# Apron on construction plane — position from sketch origin = world origin
-sk = apron_c.sketches.add(construction_plane)
-d.addDistanceDimension(sk.originPoint, rect_corner, H, ...).parameter.expression = "leg_size"
-# ↑ "leg_size" is distance from world origin — origin-based positioning
-```
+1. **`anchor=` on the sketch helper or joinery template (preferred — compliant from the start).**
+   `sketch_rect_model`, `sketch_slot_model`, and the joinery templates (`mortise_tenon`, `dovetail`,
+   `half_blind_dovetail`, `domino`, `finger_joint`, …) all take an optional `anchor=dict(...)` that
+   projects a parent face and dimensions the part from a projected corner instead of the origin:
+   ```python
+   sk, prof = sp.sketch_rect_model(comp, plane, (x0,y0,z0), {"x":"w","y":"d"}, "Shelf_Sk", ev=ev,
+       anchor=dict(parent_body=side_left, parent_occ=sides_occ, face_axis="z", face_dir=+1,
+                   anchor_xyz=("0 in","board_thick","z0"), off1=("x","w_off"), off2=("y","d_off")))
+   ```
 
-The root body (ref=origin) is exempt — it legitimately dimensions from the sketch origin. All other bodies must anchor to their reference body's geometry. `validate_deps` enforces this: non-root sketches with dimensions from `sk.originPoint` fail validation.
+2. **`sp.reanchor(...)` — build normally, then ONE call (easiest retrofit).** Build the sketch in the
+   default (origin) mode, then hand it a parent face + ONE real parent corner; it retargets every
+   origin dimension automatically (signs via `abs()`, the origin is auto-excluded, geometry unchanged,
+   full constraint preserved):
+   ```python
+   sk, prof = sp.sketch_rect_model(comp, plane, (x0,y0,z0), {"x":"w","y":"d"}, "Shelf_Sk", ev=ev)
+   sp.reanchor(sk, side_left, sides_occ, "z", +1, ("table_l", "0 in", "z0"))
+   ```
+
+3. **Hand-anchor with the primitives** (custom geometry): `sp.project_face(sk, parent, occ, axis, dir)`,
+   then `a = sp.anchor_pt(sk, mx,my,mz)`, then `sp.rdim(sk, d, a, my_pt, orient, axis, expr)`. Draw the
+   profile from explicit MODEL corners with `addByTwoPoints` (NOT `addTwoPointRectangle`) and add an
+   H/V constraint to EVERY edge (omitting the closing edge leaves a free DOF).
+
+**Gotchas the tools already handle:** `anchor_pt` skips the sketch-origin point (you cannot accidentally
+re-anchor to it) and finds projected CIRCLE/ARC centres (round/turned parts have no corner vertices).
+The one case to watch: if the part's OWN corner sits at world (0,0), don't dimension that vertex — use
+`sketch_rect_model(anchor=..., size_far=True)` to size the far edges and anchor an adjacent corner.
+
+**Wrong pattern:** a plain `sketch_rect_model(...)` / `sketch_slot_model(...)` / template call, or any
+`addDistanceDimension(sk.originPoint, …)`, on a NON-root sketch with no anchoring follow-up — it fails
+`validate_deps` (origin reference + not anchored). After building, confirm `validate_design` prints
+"All non-root sketches fully constrained against references".
 
 ### Sketch + Extrude Workflow
 
