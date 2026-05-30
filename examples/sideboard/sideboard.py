@@ -146,22 +146,34 @@ def run(context):
     ref_side_right = find_body("Side_Right")
     ref_side_right_bb = ref_side_right.boundingBox
 
+    # Anchor Top sketches to Side_Left's top face (z,+1) at its front-left
+    # corner (0, 0, top_z). The Top board's own corner is at (-top_overhang,
+    # -top_overhang) — off1/off2 are the positive overhang magnitudes.
+    top_anchor = dict(parent_body=ref_side_left, parent_occ=case_occ,
+                      face_axis="z", face_dir=+1,
+                      anchor_xyz=("0 in", "0 in", "top_z"),
+                      off1=("x", "top_overhang"), off2=("y", "top_overhang"))
     _, pr = sp.sketch_rect_model(top_c, top_c.xYConstructionPlane,
         ("-top_overhang", "-top_overhang", "top_z"),
         {"x": "case_w + 2 * top_overhang", "y": "case_d + top_overhang"},
-        "Top_Sk", ev)
+        "Top_Sk", ev, anchor=top_anchor)
     top_pl = sp.off_plane(top_c, top_c.xYConstructionPlane, "top_z", "TopPl")
     _, pr = sp.sketch_rect_model(top_c, top_pl,
         ("-top_overhang", "-top_overhang", "top_z"),
         {"x": "case_w + 2 * top_overhang", "y": "case_d + top_overhang"},
-        "Top_Sk2", ev)
+        "Top_Sk2", ev, anchor=top_anchor)
     sp.ext_new(top_c, pr, "top_thick", "TopBoard").bodies.item(0).name = "Top"
     print(">>> Top: 1")
 
     # ==== KICK ====
-    _, pr = sp.sketch_rect_model(kick_c, kick_c.xZConstructionPlane,
+    # Anchor to Side_Left (clean Case body). KickFront_Sk is on the xZ plane
+    # (normal y); project Side_Left's front face (y,-1) at corner (0,0,kick_h)
+    # and let reanchor retarget the x/z origin dims (signs via abs()).
+    sk, pr = sp.sketch_rect_model(kick_c, kick_c.xZConstructionPlane,
         ("kick_inset", "kick_inset", "0 in"),
         {"x": "case_w - 2 * kick_inset", "z": "kick_h"}, "KickFront_Sk", ev)
+    pr = (sp.reanchor(sk, ref_side_left, case_occ, "y", -1,
+                      ("0 in", "0 in", "kick_h")) or sp.smallest_profile(sk))
     kf_ext = sp.ext_new(kick_c, pr, "board_thick", "KickFront")
     kf_ext.bodies.item(0).name = "Kick_Front"
 
@@ -172,10 +184,14 @@ def run(context):
     k_ymid = sp.off_plane(kick_c, kick_c.xZConstructionPlane, "case_d / 2", "KYMid")
     sp.mirror_feats(kick_c, [kf_ext], k_ymid, "KickBackMir").bodies.item(0).name = "Kick_Back"
 
-    _, pr = sp.sketch_rect_model(kick_c, kick_c.yZConstructionPlane,
+    # KickLeft_Sk on the yZ plane (normal x); project Side_Left's left face
+    # (x,-1) at corner (0,0,kick_h) and reanchor the y/z origin dims.
+    sk, pr = sp.sketch_rect_model(kick_c, kick_c.yZConstructionPlane,
         ("kick_inset", "kick_inset + board_thick", "0 in"),
         {"y": "case_d - 2 * kick_inset - 2 * board_thick", "z": "kick_h"},
         "KickLeft_Sk", ev)
+    pr = (sp.reanchor(sk, ref_side_left, case_occ, "x", -1,
+                      ("0 in", "0 in", "kick_h")) or sp.smallest_profile(sk))
     kl_ext = sp.ext_new(kick_c, pr, "board_thick", "KickLeft")
     kl_ext.bodies.item(0).name = "Kick_Left"
 
@@ -188,9 +204,13 @@ def run(context):
     print(">>> Kick: 4")
 
     # ==== DOORS (2 — left and right sections) ====
-    _, pr = sp.sketch_rect_model(door_c, door_c.xZConstructionPlane,
+    # DoorL_Sk on the xZ plane (normal y); project Side_Left's front face
+    # (y,-1) at corner (0,0,kick_h) and reanchor the x/z origin dims.
+    sk, pr = sp.sketch_rect_model(door_c, door_c.xZConstructionPlane,
         ("board_thick + door_gap", "0 in", "kick_h + board_thick + door_gap"),
         {"x": "door_w", "z": "door_h"}, "DoorL_Sk", ev)
+    pr = (sp.reanchor(sk, ref_side_left, case_occ, "y", -1,
+                      ("0 in", "0 in", "kick_h")) or sp.smallest_profile(sk))
     dl_ext = sp.ext_new(door_c, pr, "door_thick", "DoorLeft")
     dl_ext.bodies.item(0).name = "Door_Left"
 
@@ -203,7 +223,15 @@ def run(context):
     print(">>> Doors: 2")
 
     # ==== DRAWER (center section) ====
-    dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev)
+    # Anchor the drawer's front board to the adjacent clean Case divider
+    # (Div_Left), front face (y,-1) at its front-bottom corner. The template
+    # then reanchors the drawer's other boards internally to the front board.
+    drawer_anchor = dict(parent_body=ref_div_left, parent_occ=case_occ,
+                         face_axis="y", face_dir=-1,
+                         anchor_xyz=("board_thick + section_w", "0 in",
+                                     "kick_h + board_thick"))
+    dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev,
+                                        anchor=drawer_anchor)
 
     # Body-relative ref: dd_Back/dd_Left/dd_Right/dd_Bottom relative to dd_Front
     ref_dd_front = find_body("dd_Front")
@@ -216,9 +244,13 @@ def run(context):
     print(">>> Drawer: %d" % len(dd_result["all_bodies"]))
 
     # ==== BACK PANEL ====
-    _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
+    # Back_Sk on the xZ plane (normal y); project Side_Left's back face (y,+1)
+    # at corner (0, case_d, kick_h) and reanchor the x/z origin dims.
+    sk, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
         ("board_thick", "case_d - back_thick", "kick_h + board_thick"),
         {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev)
+    pr = (sp.reanchor(sk, ref_side_left, case_occ, "y", +1,
+                      ("0 in", "case_d", "kick_h")) or sp.smallest_profile(sk))
     sp.ext_new(back_c, pr, "back_thick", "BackPanel").bodies.item(0).name = "BackPanel"
     print(">>> Back: 1")
 

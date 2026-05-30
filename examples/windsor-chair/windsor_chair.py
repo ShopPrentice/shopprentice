@@ -756,22 +756,21 @@ def run(context):
         P(s_front.x, s_front.y, 0), P(s_back.x, s_back.y, 0))
     side_line.isConstruction = True
 
-    # Parametric dimensions: pin start at origin, dimension end point
-    orient_side = _sp_mir.probe_orientations(side_sk, bex/2, sd/2, 0)
-    side_dims = side_sk.sketchDimensions
-    # Fix start point to origin
-    side_sk.geometricConstraints.addCoincident(
-        side_line.startSketchPoint, side_sk.originPoint)
-    # End point X = back_edge_x
-    side_dims.addDistanceDimension(
-        side_sk.originPoint, side_line.endSketchPoint, orient_side["x"],
-        P(s_back.x / 2, s_back.y + 1, 0)
-    ).parameter.expression = "back_edge_x"
-    # End point Y = seat_d
-    side_dims.addDistanceDimension(
-        side_sk.originPoint, side_line.endSketchPoint, orient_side["y"],
-        P(s_back.x + 1, s_back.y / 2, 0)
-    ).parameter.expression = "seat_d"
+    # ANCHOR (non-root: Legs component): the side line runs between the seat's
+    # front-left corner (0,0) and back-left corner (back_edge_x, seat_d). Project
+    # the Seat (parent) outline and tie BOTH endpoints to the projected seat
+    # corners via coincidence — no dimension touches the sketch origin. The
+    # front-left corner sits at world (0,0), so anchor_pt is called with
+    # exclude_origin=False to grab that real projected parent vertex (the
+    # constraint references parent geometry, NOT side_sk.originPoint).
+    _sp_mir.project_face(side_sk, Seat_body_ref, Seat_occ_ref, "z", -1)
+    _front_anchor = _sp_mir.anchor_pt(side_sk, 0, 0, 0, exclude_origin=False)
+    _back_anchor = _sp_mir.anchor_pt(side_sk, bex, sd, 0)
+    if _front_anchor and _back_anchor:
+        side_sk.geometricConstraints.addCoincident(
+            side_line.startSketchPoint, _front_anchor)
+        side_sk.geometricConstraints.addCoincident(
+            side_line.endSketchPoint, _back_anchor)
 
     # Create path from side line, then plane at midpoint (0.5 = 50%)
     side_path = comp.features.createPath(side_line, False)

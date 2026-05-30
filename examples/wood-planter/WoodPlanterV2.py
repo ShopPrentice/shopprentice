@@ -368,8 +368,10 @@ def run(context):
 
     # --- Front lower rail ---
     flo_pl = off_plane(lr_c, lr_c.xYConstructionPlane, "lo_z", "FLo_Pl")
-    _, pr = sketch_rect(lr_c, flo_pl,
+    sk, pr = sketch_rect(lr_c, flo_pl,
         "leg_size", "rail_recess", "long_shoulder", "rail_thickness", "FLo_Rail_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z")) or pr
     ext_flo = ext_new(lr_c, pr, "rail_height_lo", "FLo_Rail")
     flo_body = ext_flo.bodies.item(0)
     flo_body.name = "LR_Front_Lower"
@@ -377,9 +379,11 @@ def run(context):
     # Left tenon (NewBody) — tall, with half-lap interlock
     flo_t_pl = off_plane(lr_c, lr_c.xYConstructionPlane,
         "lo_z + tenon_shoulder", "FLo_Tenon_Pl")
-    _, pr = sketch_rect(lr_c, flo_t_pl,
+    sk, pr = sketch_rect(lr_c, flo_t_pl,
         "leg_size - tenon_depth", "rail_recess + (rail_thickness - tenon_width_lr) / 2",
         "tenon_depth", "tenon_width_lr", "FLo_Tenon_L_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z + tenon_shoulder")) or pr
     ext_flo_t = ext_new(lr_c, pr, "tenon_height_lo", "FLo_Tenon_L")
     flo_tenon_l = ext_flo_t.bodies.item(0)
     flo_tenon_l.name = "FLo_Tenon_L"
@@ -397,9 +401,11 @@ def run(context):
     # Groove on top of front lower rail (for slat frame tongues)
     flo_grv_pl = off_plane(lr_c, lr_c.xYConstructionPlane,
         "lo_z + rail_height_lo - groove_depth", "FLo_Groove_Pl")
-    _, pr = sketch_rect(lr_c, flo_grv_pl,
+    sk, pr = sketch_rect(lr_c, flo_grv_pl,
         "leg_size", "groove_offset",
         "long_shoulder", "groove_width", "FLo_Groove_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z + rail_height_lo - groove_depth")) or pr
     ext_cut(lr_c, pr, "groove_depth", flo_body, "FLo_Groove")
 
     # Body-relative reference for upper rail positioning
@@ -408,8 +414,10 @@ def run(context):
 
     # --- Front upper rail ---
     fhi_pl = off_plane(lr_c, lr_c.xYConstructionPlane, "hi_z", "FHi_Pl")
-    _, pr = sketch_rect(lr_c, fhi_pl,
+    sk, pr = sketch_rect(lr_c, fhi_pl,
         "leg_size", "rail_recess", "long_shoulder", "rail_thickness", "FHi_Rail_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "hi_z")) or pr
     ext_fhi = ext_new(lr_c, pr, "rail_height_hi", "FHi_Rail")
     fhi_body = ext_fhi.bodies.item(0)
     fhi_body.name = "LR_Front_Upper"
@@ -417,9 +425,11 @@ def run(context):
     # Left tenon — tall, with half-lap interlock
     fhi_t_pl = off_plane(lr_c, lr_c.xYConstructionPlane,
         "hi_z + tenon_shoulder", "FHi_Tenon_Pl")
-    _, pr = sketch_rect(lr_c, fhi_t_pl,
+    sk, pr = sketch_rect(lr_c, fhi_t_pl,
         "leg_size - tenon_depth", "rail_recess + (rail_thickness - tenon_width_lr) / 2",
         "tenon_depth", "tenon_width_lr", "FHi_Tenon_L_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "hi_z + tenon_shoulder")) or pr
     ext_fhi_t = ext_new(lr_c, pr, "tenon_height_hi", "FHi_Tenon_L")
     fhi_tenon_l = ext_fhi_t.bodies.item(0)
     fhi_tenon_l.name = "FHi_Tenon_L"
@@ -433,9 +443,11 @@ def run(context):
     combine(lr_c, fhi_body, [fhi_tenon_l, fhi_tenon_r], JOIN, False, "FHi_JoinTenons")
 
     # Groove on bottom of front upper rail
-    _, pr = sketch_rect(lr_c, fhi_pl,
+    sk, pr = sketch_rect(lr_c, fhi_pl,
         "leg_size", "groove_offset",
         "long_shoulder", "groove_width", "FHi_Groove_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "hi_z")) or pr
     ext_cut(lr_c, pr, "groove_depth", fhi_body, "FHi_Groove")
 
     # Body-relative reference for back rails
@@ -525,9 +537,11 @@ def run(context):
     # Front tenon (NewBody) — tall, with half-lap interlock
     llo_t_pl = off_plane(sr_c, sr_c.xYConstructionPlane,
         "lo_z + tenon_shoulder", "LLo_Tenon_Pl")
-    _, pr = sketch_rect(sr_c, llo_t_pl,
+    sk, pr = sketch_rect(sr_c, llo_t_pl,
         "rail_recess + (rail_thickness - tenon_width_sr) / 2", "leg_size - tenon_depth",
         "tenon_width_sr", "tenon_depth", "LLo_Tenon_F_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z + tenon_shoulder")) or pr
     ext_llo_t = ext_new(sr_c, pr, "tenon_height_lo", "LLo_Tenon_F")
     llo_tenon_f = ext_llo_t.bodies.item(0)
     llo_tenon_f.name = "LLo_Tenon_F"
@@ -545,9 +559,11 @@ def run(context):
     # Groove on top of left lower rail
     llo_grv_pl = off_plane(sr_c, sr_c.xYConstructionPlane,
         "lo_z + rail_height_lo - groove_depth", "LLo_Groove_Pl")
-    _, pr = sketch_rect(sr_c, llo_grv_pl,
+    sk, pr = sketch_rect(sr_c, llo_grv_pl,
         "groove_offset", "leg_size",
         "groove_width", "short_shoulder", "LLo_Groove_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z + rail_height_lo - groove_depth")) or pr
     ext_cut(sr_c, pr, "groove_depth", llo_body, "LLo_Groove")
 
     # Body-relative reference for left upper short rail
@@ -565,9 +581,11 @@ def run(context):
     # Front tenon — tall, with half-lap interlock
     lhi_t_pl = off_plane(sr_c, sr_c.xYConstructionPlane,
         "hi_z + tenon_shoulder", "LHi_Tenon_Pl")
-    _, pr = sketch_rect(sr_c, lhi_t_pl,
+    sk, pr = sketch_rect(sr_c, lhi_t_pl,
         "rail_recess + (rail_thickness - tenon_width_sr) / 2", "leg_size - tenon_depth",
         "tenon_width_sr", "tenon_depth", "LHi_Tenon_F_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "hi_z + tenon_shoulder")) or pr
     ext_lhi_t = ext_new(sr_c, pr, "tenon_height_hi", "LHi_Tenon_F")
     lhi_tenon_f = ext_lhi_t.bodies.item(0)
     lhi_tenon_f.name = "LHi_Tenon_F"
@@ -581,9 +599,11 @@ def run(context):
     combine(sr_c, lhi_body, [lhi_tenon_f, lhi_tenon_b], JOIN, False, "LHi_JoinTenons")
 
     # Groove on bottom of left upper rail
-    _, pr = sketch_rect(sr_c, lhi_pl,
+    sk, pr = sketch_rect(sr_c, lhi_pl,
         "groove_offset", "leg_size",
         "groove_width", "short_shoulder", "LHi_Groove_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "hi_z")) or pr
     ext_cut(sr_c, pr, "groove_depth", lhi_body, "LHi_Groove")
 
     # Body-relative reference for right short rails
@@ -664,31 +684,41 @@ def run(context):
     # ---- FRONT SLAT TEMPLATE ----
     front_feats = []
 
-    _, pr = sketch_rect(sl_c, sl_body_pl,
+    sk, pr = sketch_rect(sl_c, sl_body_pl,
         "leg_size", fy_body, "slat_width", "slat_thickness", "FSlat_Body_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "body_z")) or pr
     ext_fs = ext_new(sl_c, pr, "body_h", "FSlat_Body")
     front_feats.append(ext_fs)
     front_tmpl = ext_fs.bodies.item(0)
     front_tmpl.name = "Slat_Front_1"
 
     # Left-face T&G groove
-    _, pr = sketch_rect(sl_c, sl_body_pl,
+    sk, pr = sketch_rect(sl_c, sl_body_pl,
         "leg_size", fy_tg, "slat_tg_depth", "slat_tg_width", "FSlat_LGroove_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "body_z")) or pr
     front_feats.append(ext_cut(sl_c, pr, "body_h", front_tmpl, "FSlat_LGroove"))
 
     # Right-edge T&G tongue
-    _, pr = sketch_rect(sl_c, sl_body_pl,
+    sk, pr = sketch_rect(sl_c, sl_body_pl,
         "leg_size + slat_width", fy_tg, "slat_tg_depth", "slat_tg_width", "FSlat_RTongue_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "body_z")) or pr
     front_feats.append(ext_join(sl_c, pr, "body_h", front_tmpl, "FSlat_RTongue"))
 
     # Top frame tongue
-    _, pr = sketch_rect(sl_c, sl_top_pl,
+    sk, pr = sketch_rect(sl_c, sl_top_pl,
         "leg_size", fy_tng, "slat_width", "frame_tongue_thick", "FSlat_TopTng_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "hi_z")) or pr
     front_feats.append(ext_join(sl_c, pr, "groove_depth", front_tmpl, "FSlat_TopTng"))
 
     # Bottom frame tongue
-    _, pr = sketch_rect(sl_c, sl_bot_pl,
+    sk, pr = sketch_rect(sl_c, sl_bot_pl,
         "leg_size", fy_tng, "slat_width", "frame_tongue_thick", "FSlat_BotTng_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z + rail_height_lo - groove_depth")) or pr
     front_feats.append(ext_join(sl_c, pr, "groove_depth", front_tmpl, "FSlat_BotTng"))
 
     # ---- MIRROR FRONT → BACK ----
@@ -709,9 +739,11 @@ def run(context):
         pat_back.bodies.item(i).name = f"Slat_Back_{i + 2}"
 
     # ---- FRONT LEFT-EDGE TONGUE ----
-    _, pr = sketch_rect(sl_c, sl_bot_pl,
+    sk, pr = sketch_rect(sl_c, sl_bot_pl,
         "leg_size - groove_depth", fy_tng,
         "groove_depth", "frame_tongue_thick", "FSlat_LEdge_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z + rail_height_lo - groove_depth")) or pr
     f_edge = ext_join(sl_c, pr, "full_slat_h", front_tmpl, "FSlat_LEdge")
     mirror_feat(sl_c, [f_edge], sl_mid_xz, "Mir_FEdge_Back")
 
@@ -723,28 +755,38 @@ def run(context):
         fg_w = "long_shoulder - slat_width * n_long_slats"
         fgap_feats = []
 
-        _, pr = sketch_rect(sl_c, sl_body_pl,
+        sk, pr = sketch_rect(sl_c, sl_body_pl,
             fg_x, fy_body, fg_w, "slat_thickness", "FGap_Body_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "body_z")) or pr
         ext_fg = ext_new(sl_c, pr, "body_h", "FGap_Body")
         fgap_feats.append(ext_fg)
         fg_body = ext_fg.bodies.item(0)
         fg_body.name = f"Slat_Front_{n_lp + 1}"
 
-        _, pr = sketch_rect(sl_c, sl_body_pl,
+        sk, pr = sketch_rect(sl_c, sl_body_pl,
             fg_x, fy_tg, "slat_tg_depth", "slat_tg_width", "FGap_LGroove_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "body_z")) or pr
         fgap_feats.append(ext_cut(sl_c, pr, "body_h", fg_body, "FGap_LGroove"))
 
-        _, pr = sketch_rect(sl_c, sl_body_pl,
+        sk, pr = sketch_rect(sl_c, sl_body_pl,
             "leg_size + long_shoulder", fy_tng,
             "groove_depth", "frame_tongue_thick", "FGap_REdge_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "body_z")) or pr
         fgap_feats.append(ext_join(sl_c, pr, "body_h", fg_body, "FGap_REdge"))
 
-        _, pr = sketch_rect(sl_c, sl_top_pl,
+        sk, pr = sketch_rect(sl_c, sl_top_pl,
             fg_x, fy_tng, fg_w, "frame_tongue_thick", "FGap_TopTng_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "hi_z")) or pr
         fgap_feats.append(ext_join(sl_c, pr, "groove_depth", fg_body, "FGap_TopTng"))
 
-        _, pr = sketch_rect(sl_c, sl_bot_pl,
+        sk, pr = sketch_rect(sl_c, sl_bot_pl,
             fg_x, fy_tng, fg_w, "frame_tongue_thick", "FGap_BotTng_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "lo_z + rail_height_lo - groove_depth")) or pr
         fgap_feats.append(ext_join(sl_c, pr, "groove_depth", fg_body, "FGap_BotTng"))
 
         mir_bgap = mirror_feat(sl_c, fgap_feats, sl_mid_xz, "Mir_FGap_Back")
@@ -758,31 +800,41 @@ def run(context):
     lx_tng  = "groove_offset + groove_width / 2 - frame_tongue_thick / 2"
     lx_tg   = "groove_offset + groove_width / 2 - slat_tg_width / 2"
 
-    _, pr = sketch_rect(sl_c, sl_body_pl,
+    sk, pr = sketch_rect(sl_c, sl_body_pl,
         lx_body, "leg_size", "slat_thickness", "slat_width", "LSlat_Body_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "body_z")) or pr
     ext_ls = ext_new(sl_c, pr, "body_h", "LSlat_Body")
     left_feats.append(ext_ls)
     left_tmpl = ext_ls.bodies.item(0)
     left_tmpl.name = "Slat_Left_1"
 
     # Front-face T&G groove
-    _, pr = sketch_rect(sl_c, sl_body_pl,
+    sk, pr = sketch_rect(sl_c, sl_body_pl,
         lx_tg, "leg_size", "slat_tg_width", "slat_tg_depth", "LSlat_FGroove_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "body_z")) or pr
     left_feats.append(ext_cut(sl_c, pr, "body_h", left_tmpl, "LSlat_FGroove"))
 
     # Back-edge T&G tongue
-    _, pr = sketch_rect(sl_c, sl_body_pl,
+    sk, pr = sketch_rect(sl_c, sl_body_pl,
         lx_tg, "leg_size + slat_width", "slat_tg_width", "slat_tg_depth", "LSlat_BTongue_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "body_z")) or pr
     left_feats.append(ext_join(sl_c, pr, "body_h", left_tmpl, "LSlat_BTongue"))
 
     # Top frame tongue
-    _, pr = sketch_rect(sl_c, sl_top_pl,
+    sk, pr = sketch_rect(sl_c, sl_top_pl,
         lx_tng, "leg_size", "frame_tongue_thick", "slat_width", "LSlat_TopTng_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "hi_z")) or pr
     left_feats.append(ext_join(sl_c, pr, "groove_depth", left_tmpl, "LSlat_TopTng"))
 
     # Bottom frame tongue
-    _, pr = sketch_rect(sl_c, sl_bot_pl,
+    sk, pr = sketch_rect(sl_c, sl_bot_pl,
         lx_tng, "leg_size", "frame_tongue_thick", "slat_width", "LSlat_BotTng_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z + rail_height_lo - groove_depth")) or pr
     left_feats.append(ext_join(sl_c, pr, "groove_depth", left_tmpl, "LSlat_BotTng"))
 
     # ---- MIRROR LEFT → RIGHT ----
@@ -803,9 +855,11 @@ def run(context):
         pat_right.bodies.item(i).name = f"Slat_Right_{i + 2}"
 
     # ---- LEFT FRONT-EDGE TONGUE ----
-    _, pr = sketch_rect(sl_c, sl_bot_pl,
+    sk, pr = sketch_rect(sl_c, sl_bot_pl,
         lx_tng, "leg_size - groove_depth",
         "frame_tongue_thick", "groove_depth", "LSlat_FEdge_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z + rail_height_lo - groove_depth")) or pr
     l_edge = ext_join(sl_c, pr, "full_slat_h", left_tmpl, "LSlat_FEdge")
     mirror_feat(sl_c, [l_edge], sl_mid_yz, "Mir_LEdge_Right")
 
@@ -817,28 +871,38 @@ def run(context):
         lg_h = "short_shoulder - slat_width * n_short_slats"
         lgap_feats = []
 
-        _, pr = sketch_rect(sl_c, sl_body_pl,
+        sk, pr = sketch_rect(sl_c, sl_body_pl,
             lx_body, lg_y, "slat_thickness", lg_h, "LGap_Body_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "body_z")) or pr
         ext_lg = ext_new(sl_c, pr, "body_h", "LGap_Body")
         lgap_feats.append(ext_lg)
         lg_body = ext_lg.bodies.item(0)
         lg_body.name = f"Slat_Left_{n_sp + 1}"
 
-        _, pr = sketch_rect(sl_c, sl_body_pl,
+        sk, pr = sketch_rect(sl_c, sl_body_pl,
             lx_tg, lg_y, "slat_tg_width", "slat_tg_depth", "LGap_FGroove_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "body_z")) or pr
         lgap_feats.append(ext_cut(sl_c, pr, "body_h", lg_body, "LGap_FGroove"))
 
-        _, pr = sketch_rect(sl_c, sl_body_pl,
+        sk, pr = sketch_rect(sl_c, sl_body_pl,
             lx_tng, "leg_size + short_shoulder",
             "frame_tongue_thick", "groove_depth", "LGap_BEdge_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "body_z")) or pr
         lgap_feats.append(ext_join(sl_c, pr, "body_h", lg_body, "LGap_BEdge"))
 
-        _, pr = sketch_rect(sl_c, sl_top_pl,
+        sk, pr = sketch_rect(sl_c, sl_top_pl,
             lx_tng, lg_y, "frame_tongue_thick", lg_h, "LGap_TopTng_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "hi_z")) or pr
         lgap_feats.append(ext_join(sl_c, pr, "groove_depth", lg_body, "LGap_TopTng"))
 
-        _, pr = sketch_rect(sl_c, sl_bot_pl,
+        sk, pr = sketch_rect(sl_c, sl_bot_pl,
             lx_tng, lg_y, "frame_tongue_thick", lg_h, "LGap_BotTng_Sk")
+        pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+            ("leg_size", "leg_size", "lo_z + rail_height_lo - groove_depth")) or pr
         lgap_feats.append(ext_join(sl_c, pr, "groove_depth", lg_body, "LGap_BotTng"))
 
         mir_rgap = mirror_feat(sl_c, lgap_feats, sl_mid_yz, "Mir_LGap_Right")
@@ -855,9 +919,11 @@ def run(context):
         "lo_z + rail_height_lo", "Floor_Pl")
 
     # Template board — width auto-adjusted to fill span exactly (no gap board needed)
-    _, pr = sketch_rect(bt_c, bt_pl,
+    sk, pr = sketch_rect(bt_c, bt_pl,
         "floor_inset", "floor_inset",
         "floor_board_w_fit", "floor_span_y", "FloorSlat_Sk")
+    pr = sp.reanchor(sk, fl_leg, leg_occ, "z", -1,
+        ("leg_size", "leg_size", "lo_z + rail_height_lo")) or pr
     ext_bt = ext_new(bt_c, pr, "floor_thickness", "FloorSlat_Ext")
     bt_tmpl = ext_bt.bodies.item(0)
     bt_tmpl.name = "FloorSlat_1"

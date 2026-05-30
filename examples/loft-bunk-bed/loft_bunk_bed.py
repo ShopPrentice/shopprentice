@@ -112,7 +112,12 @@ def run(context):
         rail_c, rail_pl,
         ("post_size", "post_size / 2 - rail_thick / 2", "loft_h"),
         {"x": "bed_l", "y": "rail_thick"},
-        "SideRail_L_Sk", ev=ev)
+        "SideRail_L_Sk", ev=ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("x", "0 in"), off2=("y", "post_size / 2 - rail_thick / 2"),
+                    which=0))
     ext_sr = sp.ext_new(rail_c, prof_sr, "rail_h", "SideRail_L")
     sr_l = ext_sr.bodies.item(0)
     sr_l.name = "SideRail_L"
@@ -127,7 +132,12 @@ def run(context):
         rail_c, rail_pl,
         ("outer_l - post_size / 2 - rail_thick / 2", "post_size", "loft_h"),
         {"x": "rail_thick", "y": "outer_w - 2 * post_size"},
-        "EndRail_Head_Sk", ev=ev)
+        "EndRail_Head_Sk", ev=ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("outer_l - post_size", "post_size", "0 in"),
+                    off1=("x", "post_size / 2 - rail_thick / 2"), off2=("y", "0 in"),
+                    which=0))
     ext_er = sp.ext_new(rail_c, prof_er, "rail_h", "EndRail_Head")
     er_head = ext_er.bodies.item(0)
     er_head.name = "EndRail_Head"
@@ -157,7 +167,12 @@ def run(context):
         guard_c, guard_pl,
         ("post_size", "outer_w - post_size / 2 - guard_thick / 2", "guard_z"),
         {"x": "bed_l", "y": "guard_thick"},
-        "GuardRail_R_Sk", ev=ev)
+        "GuardRail_R_Sk", ev=ev,
+        anchor=dict(parent_body=post_fr, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "outer_w - post_size", "0 in"),
+                    off1=("x", "0 in"), off2=("y", "post_size / 2 - guard_thick / 2"),
+                    which=0))
     ext_gr = sp.ext_new(guard_c, prof_gr, "guard_w", "GuardRail_R")
     gr_r = ext_gr.bodies.item(0)
     gr_r.name = "GuardRail_R"
@@ -167,7 +182,12 @@ def run(context):
         guard_c, guard_pl,
         ("outer_l - post_size / 2 - guard_thick / 2", "post_size", "guard_z"),
         {"x": "guard_thick", "y": "outer_w - 2 * post_size"},
-        "GuardRail_Head_Sk", ev=ev)
+        "GuardRail_Head_Sk", ev=ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("outer_l - post_size", "post_size", "0 in"),
+                    off1=("x", "post_size / 2 - guard_thick / 2"), off2=("y", "0 in"),
+                    which=0))
     ext_gh = sp.ext_new(guard_c, prof_gh, "guard_w", "GuardRail_Head")
     gr_head = ext_gh.bodies.item(0)
     gr_head.name = "GuardRail_Head"
@@ -177,7 +197,12 @@ def run(context):
         guard_c, guard_pl,
         ("post_size / 2 - guard_thick / 2", "post_size", "guard_z"),
         {"x": "guard_thick", "y": "outer_w - 2 * post_size"},
-        "GuardRail_Foot_Sk", ev=ev)
+        "GuardRail_Foot_Sk", ev=ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    off1=("x", "post_size / 2 + guard_thick / 2"), off2=("y", "0 in"),
+                    which=0))
     ext_gf = sp.ext_new(guard_c, prof_gf, "guard_w", "GuardRail_Foot")
     gr_foot = ext_gf.bodies.item(0)
     gr_foot.name = "GuardRail_Foot"
@@ -195,7 +220,13 @@ def run(context):
         guard_c, guard_pl,
         ("fence_front_x", "post_size / 2 - guard_thick / 2", "guard_z"),
         {"x": "fence_front_len", "y": "guard_thick"},
-        "GuardRail_Front_Sk", ev=ev)
+        "GuardRail_Front_Sk", ev=ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    off1=("x", "fence_front_x - post_size"),
+                    off2=("y", "post_size / 2 + guard_thick / 2"),
+                    which=0))
     ext_gfr = sp.ext_new(guard_c, prof_gfr, "guard_w", "GuardRail_Front")
     gr_front = ext_gfr.bodies.item(0)
     gr_front.name = "GuardRail_Front"
@@ -213,7 +244,13 @@ def run(context):
         guard_c, fsp_pl,
         ("fence_front_x", "post_size / 2 - guard_thick / 2", "fence_support_z"),
         {"x": "post_size", "y": "guard_thick"},
-        "FenceSupport_Sk", ev=ev)
+        "FenceSupport_Sk", ev=ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    off1=("x", "fence_front_x - post_size"),
+                    off2=("y", "post_size / 2 + guard_thick / 2"),
+                    which=0))
     ext_fsp = sp.ext_new(guard_c, prof_fsp2, "fence_support_h", "FenceSupport")
     fsp_body = ext_fsp.bodies.item(0)
     fsp_body.name = "FenceSupport"
@@ -231,7 +268,13 @@ def run(context):
         ledger_c, ledger_pl,
         ("post_size + rail_thick", "post_size / 2 + rail_thick / 2", "ledger_z"),
         {"x": "bed_l - 2 * rail_thick", "y": "ledger_thick"},
-        "Ledger_L_Sk", ev=ev)
+        "Ledger_L_Sk", ev=ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    off1=("x", "rail_thick"),
+                    off2=("y", "post_size / 2 - rail_thick / 2"),
+                    which=0))
     ext_ll = sp.ext_new(ledger_c, prof_ll, "ledger_h", "Ledger_L")
     led_l = ext_ll.bodies.item(0)
     led_l.name = "Ledger_L"
@@ -256,7 +299,13 @@ def run(context):
         slat_c, slat_pl,
         ("post_size + slat_pitch - slat_w / 2", "post_size / 2 + rail_thick / 2", "slat_z"),
         {"x": "slat_w", "y": "outer_w - post_size - rail_thick"},
-        "Slat_Sk", ev=ev)
+        "Slat_Sk", ev=ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    off1=("x", "slat_pitch - slat_w / 2"),
+                    off2=("y", "post_size / 2 - rail_thick / 2"),
+                    which=0))
     ext_sl = sp.ext_new(slat_c, prof_sl, "slat_thick", "Slat")
     slat_body = ext_sl.bodies.item(0)
     slat_body.name = "Slat"
@@ -281,7 +330,12 @@ def run(context):
         desk_c, desk_leg_pl,
         ("post_size", "desk_front_y", "0 in"),
         {"x": "desk_leg_size", "y": "desk_leg_size"},
-        "DeskLeg_L_Sk", ev=ev)
+        "DeskLeg_L_Sk", ev=ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    off1=("x", "0 in"), off2=("y", "desk_front_y - post_size"),
+                    which=0))
     dl_l = sp.ext_new(desk_c, prof_dll, "desk_h - desk_thick", "DeskLeg_L").bodies.item(0)
     dl_l.name = "DeskLeg_L"
 
@@ -289,7 +343,12 @@ def run(context):
         desk_c, desk_leg_pl,
         ("outer_l - post_size - desk_leg_size", "desk_front_y", "0 in"),
         {"x": "desk_leg_size", "y": "desk_leg_size"},
-        "DeskLeg_R_Sk", ev=ev)
+        "DeskLeg_R_Sk", ev=ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("outer_l - post_size", "post_size", "0 in"),
+                    off1=("x", "desk_leg_size"), off2=("y", "desk_front_y - post_size"),
+                    which=0))
     dl_r = sp.ext_new(desk_c, prof_dlr, "desk_h - desk_thick", "DeskLeg_R").bodies.item(0)
     dl_r.name = "DeskLeg_R"
 
@@ -303,7 +362,13 @@ def run(context):
         desk_c, desk_rail_pl,
         ("post_size + desk_leg_size", "desk_front_y + desk_leg_size / 2 - desk_rail_thick / 2", "desk_rail_z"),
         {"x": "bed_l - 2 * desk_leg_size", "y": "desk_rail_thick"},
-        "DeskRail_Front_Sk", ev=ev)
+        "DeskRail_Front_Sk", ev=ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    off1=("x", "desk_leg_size"),
+                    off2=("y", "desk_front_y + desk_leg_size / 2 - desk_rail_thick / 2 - post_size"),
+                    which=0))
     dr_front = sp.ext_new(desk_c, prof_drf, "desk_rail_h", "DeskRail_Front").bodies.item(0)
     dr_front.name = "DeskRail_Front"
 
@@ -312,7 +377,13 @@ def run(context):
         desk_c, desk_rail_pl,
         ("post_size", "outer_w - post_size / 2 - desk_rail_thick / 2", "desk_rail_z"),
         {"x": "bed_l", "y": "desk_rail_thick"},
-        "DeskRail_Back_Sk", ev=ev)
+        "DeskRail_Back_Sk", ev=ev,
+        anchor=dict(parent_body=post_fr, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "outer_w - post_size", "0 in"),
+                    off1=("x", "0 in"),
+                    off2=("y", "post_size / 2 - desk_rail_thick / 2"),
+                    which=0))
     dr_back = sp.ext_new(desk_c, prof_drb, "desk_rail_h", "DeskRail_Back").bodies.item(0)
     dr_back.name = "DeskRail_Back"
 
@@ -326,7 +397,12 @@ def run(context):
         desk_c, desk_top_pl,
         ("post_size", "desk_front_y", "desk_h - desk_thick"),
         {"x": "bed_l", "y": "desk_depth + desk_rail_thick"},
-        "DeskTop_Sk", ev=ev)
+        "DeskTop_Sk", ev=ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    off1=("x", "0 in"), off2=("y", "desk_front_y - post_size"),
+                    which=0))
     sp.ext_new(desk_c, prof_dt, "desk_thick", "DeskTop").bodies.item(0).name = "DeskTop"
 
     print(f"Desk: {desk_c.bRepBodies.count} bodies")
@@ -555,9 +631,9 @@ def run(context):
     print("Ladder: hook CUTs applied to both sides")
 
     # Helper: create domino void INSIDE body_a's component, CUT both pieces
-    def domino_joint(plane, center, long_axis, h_e, t_e, d_e, name, body_a, occ_a, body_b, occ_b):
+    def domino_joint(plane, center, long_axis, h_e, t_e, d_e, name, body_a, occ_a, body_b, occ_b, anchor=None):
         comp_a = occ_a.component
-        sk, prof = sp.sketch_slot_model(comp_a, plane, center, long_axis, h_e, t_e, name=name+"_Sk", ev=ev)
+        sk, prof = sp.sketch_slot_model(comp_a, plane, center, long_axis, h_e, t_e, name=name+"_Sk", ev=ev, anchor=anchor)
         ext = sp.ext_new_sym(comp_a, prof, d_e, name)
         void = ext.bodies.item(0)
         void.name = name

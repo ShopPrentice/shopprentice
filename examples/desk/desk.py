@@ -184,16 +184,24 @@ def run(context):
     # ==============================================================
     az_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "AZ_Pl")
 
-    # Back apron (full height)
-    _, pr = sp.sketch_rect_model(apron_c, az_pl,
+    # Back apron (full height) — anchored to Leg_BL top face (clean, parallel)
+    sk_ba, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("leg_size", "desk_w - leg_size - apron_thick", "apron_z"),
         {"x": "long_apron_l", "y": "apron_thick"}, "BackApron_Sk", ev)
+    # Anchor to Leg_BL's outer-back-inner corner (both offsets non-zero).
+    pr = sp.reanchor(sk_ba, ref_bl, leg_occ, "z", +1,
+                     ("0 in", "desk_w - leg_size", "leg_h")) \
+        or sp.smallest_profile(sk_ba)
     sp.ext_new(apron_c, pr, "apron_h", "BackApron").bodies.item(0).name = "Apron_Back"
 
-    # Left side apron (full height)
-    _, pr = sp.sketch_rect_model(apron_c, az_pl,
+    # Left side apron (full height) — anchored to Leg_FL top face
+    sk_la, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("0 in", "leg_size", "apron_z"),
         {"x": "apron_thick", "y": "short_apron_l"}, "LeftApron_Sk", ev)
+    # Anchor to Leg_FL corner (leg_size, 0) so both offsets are non-zero.
+    pr = sp.reanchor(sk_la, ref_fl, leg_occ, "z", +1,
+                     ("leg_size", "0 in", "leg_h")) \
+        or sp.smallest_profile(sk_la)
     la_ext = sp.ext_new(apron_c, pr, "apron_h", "LeftApron")
     la_ext.bodies.item(0).name = "Apron_Left"
 
@@ -201,24 +209,37 @@ def run(context):
     sp.mirror_feats(apron_c, [la_ext], a_xmid, "RightApronMir").bodies.item(0).name = "Apron_Right"
 
     # Front stretcher (below drawers, at bottom of apron zone)
-    _, pr = sp.sketch_rect_model(apron_c, az_pl,
+    # — anchored to Leg_FL top face
+    sk_fs, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("leg_size", "0 in", "apron_z"),
         {"x": "long_apron_l", "y": "apron_thick"}, "FrontStretcher_Sk", ev)
+    # Anchor to Leg_FL corner (0, leg_size) so both offsets are non-zero.
+    pr = sp.reanchor(sk_fs, ref_fl, leg_occ, "z", +1,
+                     ("0 in", "leg_size", "leg_h")) \
+        or sp.smallest_profile(sk_fs)
     sp.ext_new(apron_c, pr, "stretcher_h", "FrontStretcher").bodies.item(0).name = "Apron_FrontStretcher"
 
     # Center divider — runs between front rail back face and back apron front face
-    _, pr = sp.sketch_rect_model(apron_c, az_pl,
+    # — anchored to Leg_BL top face
+    sk_div, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("mid_x - divider_thick / 2", "apron_thick", "apron_z"),
         {"x": "divider_thick", "y": "desk_w - leg_size - 2 * apron_thick"}, "Divider_Sk", ev)
+    pr = sp.reanchor(sk_div, ref_bl, leg_occ, "z", +1,
+                     ("leg_size", "desk_w - leg_size", "leg_h")) \
+        or sp.smallest_profile(sk_div)
     div_ext = sp.ext_new(apron_c, pr, "apron_h", "Divider")
     div_body = div_ext.bodies.item(0); div_body.name = "Divider"
 
     # Divider front extension — fills gap between drawer fronts above stretcher
+    # — anchored to Leg_FL top face
     div_front_z_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane,
                                    "apron_z + stretcher_h", "DivFrontZ_Pl")
-    _, pr = sp.sketch_rect_model(apron_c, div_front_z_pl,
+    sk_dvf, pr = sp.sketch_rect_model(apron_c, div_front_z_pl,
         ("mid_x - divider_thick / 2", "0 in", "apron_z + stretcher_h"),
         {"x": "divider_thick", "y": "apron_thick"}, "DivFront_Sk", ev)
+    pr = sp.reanchor(sk_dvf, ref_fl, leg_occ, "z", +1,
+                     ("leg_size", "leg_size", "leg_h")) \
+        or sp.smallest_profile(sk_dvf)
     sp.ext_new(apron_c, pr, "drawer_opening", "DivFront").bodies.item(0).name = "Divider_Front"
 
     # Drawer runners — 2 on side aprons only (divider sides have no runners
@@ -226,10 +247,14 @@ def run(context):
     runner_z = "apron_z + stretcher_h + drawer_gap"
     runner_z_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, runner_z, "RunnerZ_Pl")
 
-    # Left apron runner
-    _, pr = sp.sketch_rect_model(apron_c, runner_z_pl,
+    # Left apron runner — anchored to Leg_FL top face
+    sk_rl, pr = sp.sketch_rect_model(apron_c, runner_z_pl,
         ("apron_thick", "leg_size", runner_z),
         {"x": "runner_w", "y": "short_apron_l"}, "RunnerL_Sk", ev)
+    # Anchor to Leg_FL corner (leg_size, 0) so both offsets are non-zero.
+    pr = sp.reanchor(sk_rl, ref_fl, leg_occ, "z", +1,
+                     ("leg_size", "0 in", "leg_h")) \
+        or sp.smallest_profile(sk_rl)
     lr_ext = sp.ext_new(apron_c, pr, "runner_h", "RunnerL")
     lr_ext.bodies.item(0).name = "Runner_L"
 
@@ -239,9 +264,13 @@ def run(context):
     # Drawer stops — 2 blocks at back of each runner
     stop_z = "apron_z + stretcher_h + drawer_gap + runner_h"
     stop_z_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, stop_z, "StopZ_Pl")
-    _, pr = sp.sketch_rect_model(apron_c, stop_z_pl,
+    # Drawer stop — anchored to Leg_BL top face
+    sk_sl, pr = sp.sketch_rect_model(apron_c, stop_z_pl,
         ("apron_thick", "desk_w - leg_size - apron_thick - stop_l", stop_z),
         {"x": "runner_w", "y": "stop_l"}, "StopL_Sk", ev)
+    pr = sp.reanchor(sk_sl, ref_bl, leg_occ, "z", +1,
+                     ("leg_size", "desk_w - leg_size", "leg_h")) \
+        or sp.smallest_profile(sk_sl)
     sl_ext = sp.ext_new(apron_c, pr, "drawer_h_inner / 2", "StopL")
     sl_ext.bodies.item(0).name = "Stop_L"
     sp.mirror_feats(apron_c, [sl_ext], a_xmid, "StopRMir").bodies.item(0).name = "Stop_R"
@@ -267,32 +296,50 @@ def run(context):
     # Use a YZ offset plane at -overhang so the sketch starts in negative X
     top_x_pl = sp.off_plane(top_c, top_c.yZConstructionPlane,
                              "0 in - top_overhang", "TopX_Pl")
-    sk_top = top_c.sketches.add(top_pl)
-    sk_top.name = "Top_Sk"
     P3 = adsk.core.Point3D
-    m2s = sk_top.modelToSketchSpace
-    p1 = m2s(P3.create(-ev("top_overhang"), 0, ev("leg_h")))
-    p2 = m2s(P3.create(ev("desk_l") + ev("top_overhang"), ev("desk_w"), ev("leg_h")))
-    rect = sk_top.sketchCurves.sketchLines.addTwoPointRectangle(
-        P3.create(p1.x, p1.y, 0), P3.create(p2.x, p2.y, 0))
-    sk_top.geometricConstraints.addHorizontal(rect[0])
-    sk_top.geometricConstraints.addHorizontal(rect[2])
-    sk_top.geometricConstraints.addVertical(rect[1])
-    sk_top.geometricConstraints.addVertical(rect[3])
-    pr = sk_top.profiles.item(0)
+    # Top board — anchored to Leg_FL top face (clean, coplanar with top_pl).
+    # Corner0 = (-top_overhang, 0, leg_h); sized x/y; anchored to leg inner
+    # corner (leg_size, leg_size, leg_h). Geometry is byte-identical to the
+    # original manual rectangle, now fully constrained against the leg.
+    sk_top, pr = sp.sketch_rect_model(top_c, top_pl,
+        ("0 in - top_overhang", "0 in", "leg_h"),
+        {"x": "desk_l + 2 * top_overhang", "y": "desk_w"}, "Top_Sk", ev,
+        anchor=dict(parent_body=ref_fl_top, parent_occ=leg_occ,
+                    face_axis="z", face_dir=+1,
+                    anchor_xyz=("leg_size", "leg_size", "leg_h"),
+                    off1=("x", "leg_size + top_overhang"),
+                    off2=("y", "leg_size"), which=0))
     top_ext = sp.ext_new(top_c, pr, "top_thick", "TopBoard")
     top_body = top_ext.bodies.item(0); top_body.name = "Top"
 
-    # Cable grommet — circular CUT at back-right corner
+    # Cable grommet — circular CUT at back-right corner.
+    # Anchored to the Top body's own top face (native parent, parent_occ=None):
+    # project the face, dimension the circle radius parametrically, and pin the
+    # center from the projected back-right corner — no origin reference.
     grommet_pl = sp.off_plane(top_c, top_c.xYConstructionPlane,
                                "leg_h", "Grommet_Pl")
     sk_g = top_c.sketches.add(grommet_pl)
     sk_g.name = "Grommet_Sk"
     gx = ev("desk_l") - ev("grommet_inset")
     gy = ev("desk_w") - ev("grommet_inset")
-    sk_g.sketchCurves.sketchCircles.addByCenterRadius(
+    circ = sk_g.sketchCurves.sketchCircles.addByCenterRadius(
         P3.create(gx, gy, 0), ev("grommet_dia") / 2)
-    grommet_prof = sk_g.profiles.item(0)
+    # Project the Top's top face (clean rectangle — grommet not cut yet) and
+    # anchor the circle center to its projected back-right corner.
+    sp.project_face(sk_g, top_body, None, "z", +1)
+    g_anchor = sp.anchor_pt(sk_g,
+        ev("desk_l") + ev("top_overhang"), ev("desk_w"), ev("leg_h"))
+    g_d = sk_g.sketchDimensions
+    g_d.addRadialDimension(circ,
+        P3.create(gx + 0.4, gy + 0.4, 0)).parameter.expression = "grommet_dia / 2"
+    if g_anchor is not None:
+        g_orient = sp.probe_orientations(sk_g, gx, gy, ev("leg_h"))
+        sp.rdim(sk_g, g_d, g_anchor, circ.centerSketchPoint, g_orient,
+                "x", "top_overhang + grommet_inset")
+        sp.rdim(sk_g, g_d, g_anchor, circ.centerSketchPoint, g_orient,
+                "y", "grommet_inset")
+    sp.refs_to_construction(sk_g)
+    grommet_prof = sp.smallest_profile(sk_g)
     sp.ext_op(top_c, grommet_prof, "top_thick", CUT, top_body, "GrommetCut")
 
     print(">>> Top: 1 (with grommet)")
@@ -308,8 +355,18 @@ def run(context):
     # ==============================================================
     #  4. DRAWERS — left and right, separated by center divider
     # ==============================================================
-    ddl_result = dovetailed_drawer.build(drawer_l_c, prefix="ddl", ev=ev)
-    ddr_result = dovetailed_drawer.build(drawer_r_c, prefix="ddr", ev=ev)
+    # Anchor each drawer's front board to the front-left leg's clean front
+    # face (y=0, Y-normal, parallel to the front-board sketch plane). The
+    # template then anchors the back/left/bottom boards + dovetails internally
+    # off the front board. anchor_xyz is a real corner of Leg_FL's front face.
+    ddl_result = dovetailed_drawer.build(drawer_l_c, prefix="ddl", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_size", "0 in", "0 in")))
+    ddr_result = dovetailed_drawer.build(drawer_r_c, prefix="ddr", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_size", "0 in", "0 in")))
     print(f">>> Drawers: {len(ddl_result['all_bodies'])} + {len(ddr_result['all_bodies'])} bodies")
 
     # Body-relative refs: drawer parts reference drawer fronts
@@ -359,29 +416,64 @@ def run(context):
     dm_lb = sp.off_plane(apron_c, apron_c.xZConstructionPlane, "desk_w - leg_size", "DM_LB")
 
     # Back apron → BL, BR legs (native body_a, leg proxy body_b)
+    # Anchor each template slot to the mating leg's clean OUTER face (parallel
+    # to the slot plane, never cut). off = (lateral, vertical) from that leg
+    # corner to the slot's reference (lower) arc center.
     domino.grid(apron_c, dm_fl, ("leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_body, bl_p, "DM_BA_L", ev)
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_body, bl_p, "DM_BA_L", ev,
+        anchor=dict(parent_body=leg_bl, parent_occ=leg_occ, face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "desk_w - leg_size", "0 in"),
+                    off=(("y", "apron_thick / 2"),
+                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, dm_fr, ("desk_l - leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_body, br_p, "DM_BA_R", ev)
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_body, br_p, "DM_BA_R", ev,
+        anchor=dict(parent_body=leg_br, parent_occ=leg_occ, face_axis="x", face_dir=+1,
+                    anchor_xyz=("desk_l", "desk_w - leg_size", "0 in"),
+                    off=(("y", "apron_thick / 2"),
+                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
 
     # Left apron → FL, BL
     domino.grid(apron_c, dm_lf, ("apron_thick/2", "leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_body, fl_p, "DM_LA_F", ev)
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_body, fl_p, "DM_LA_F", ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=leg_occ, face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_size", "0 in", "0 in"),
+                    off=(("x", "leg_size - apron_thick / 2"),
+                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, dm_lb, ("apron_thick/2", "desk_w - leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_body, bl_p, "DM_LA_B", ev)
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_body, bl_p, "DM_LA_B", ev,
+        anchor=dict(parent_body=leg_bl, parent_occ=leg_occ, face_axis="y", face_dir=+1,
+                    anchor_xyz=("leg_size", "desk_w", "0 in"),
+                    off=(("x", "leg_size - apron_thick / 2"),
+                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
 
     # Right apron → FR, BR
     domino.grid(apron_c, dm_lf, ("desk_l - apron_thick/2", "leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_body, fr_p, "DM_RA_F", ev)
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_body, fr_p, "DM_RA_F", ev,
+        anchor=dict(parent_body=leg_fr, parent_occ=leg_occ, face_axis="y", face_dir=-1,
+                    anchor_xyz=("desk_l - leg_size", "0 in", "0 in"),
+                    off=(("x", "leg_size - apron_thick / 2"),
+                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, dm_lb, ("desk_l - apron_thick/2", "desk_w - leg_size", "dm_z_start"),
-        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_body, br_p, "DM_RA_B", ev)
+        "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_body, br_p, "DM_RA_B", ev,
+        anchor=dict(parent_body=leg_br, parent_occ=leg_occ, face_axis="y", face_dir=+1,
+                    anchor_xyz=("desk_l - leg_size", "desk_w", "0 in"),
+                    off=(("x", "leg_size - apron_thick / 2"),
+                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
 
     # Front stretcher → FL, FR legs (1 domino each, centered in stretcher)
     params.add("fr_dm_z", VI("apron_z + stretcher_h / 2"), "in", "")
     domino.grid(apron_c, dm_fl, ("leg_size", "apron_thick / 2", "fr_dm_z"),
-        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_body, fl_p, "DM_FR_L", ev)
+        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_body, fl_p, "DM_FR_L", ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=leg_occ, face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "leg_size", "0 in"),
+                    off=(("y", "leg_size - apron_thick / 2"),
+                         ("z", "fr_dm_z - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
-        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_body, fr_p, "DM_FR_R", ev)
+        "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_body, fr_p, "DM_FR_R", ev,
+        anchor=dict(parent_body=leg_fr, parent_occ=leg_occ, face_axis="x", face_dir=+1,
+                    anchor_xyz=("desk_l", "leg_size", "0 in"),
+                    off=(("y", "leg_size - apron_thick / 2"),
+                         ("z", "fr_dm_z - (dm_w - dm_t) / 2"))))
 
     # Divider → front rail and back apron (auto-placed in mating area)
     # domino.between() finds where the bodies overlap and places dominos there.

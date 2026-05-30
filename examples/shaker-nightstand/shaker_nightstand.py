@@ -203,7 +203,12 @@ def run(context):
     sk_st, prof_st = sp.sketch_rect_model(case_c, root.xZConstructionPlane,
         ("board_thick", "0 in", "sub_top_z"),
         {"x": "inner_w", "z": "board_thick"},
-        "SubTop_Sk", ev=ev)
+        "SubTop_Sk", ev=ev,
+        anchor=dict(parent_body=side_l, parent_occ=sides_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("0 in", "0 in", "side_h"),
+                    off1=("x", "board_thick"),
+                    off2=("z", "side_h - sub_top_z"), which=0))
     sub_top_ext = sp.ext_new(case_c, prof_st, "case_d", "SubTop")
     sub_top = sub_top_ext.bodies.item(0)
     sub_top.name = "SubTop"
@@ -225,7 +230,12 @@ def run(context):
         sk_s, prof_s = sp.sketch_rect_model(case_c, root.xZConstructionPlane,
             ("board_thick", "0 in", z_expr),
             {"x": "inner_w", "z": "board_thick"},
-            f"{tag}Str_Sk", ev=ev)
+            f"{tag}Str_Sk", ev=ev,
+            anchor=dict(parent_body=side_l, parent_occ=sides_occ,
+                        face_axis="y", face_dir=-1,
+                        anchor_xyz=("0 in", "0 in", "side_h"),
+                        off1=("x", "board_thick"),
+                        off2=("z", f"side_h - ({z_expr})"), which=0))
         s_ext = sp.ext_new(case_c, prof_s, "stretcher_d", f"{tag}Str")
         stretcher = s_ext.bodies.item(0)
         stretcher.name = f"{tag}_Stretcher"
@@ -283,7 +293,12 @@ def run(context):
         sk_b, prof_b = sp.sketch_rect_model(case_c, brd_pl,
             ("board_thick - dado_depth", "stretcher_d", z_expr),
             {"x": "inner_w + 2 * dado_depth", "z": "board_thick"},
-            f"{tag}Brd_Sk", ev=ev)
+            f"{tag}Brd_Sk", ev=ev,
+            anchor=dict(parent_body=side_l, parent_occ=sides_occ,
+                        face_axis="y", face_dir=-1,
+                        anchor_xyz=("0 in", "0 in", "side_h"),
+                        off1=("x", "board_thick - dado_depth"),
+                        off2=("z", f"side_h - ({z_expr})"), which=0))
         b_ext = sp.ext_new(case_c, prof_b, "inner_d - stretcher_d",
                             f"{tag}Brd")
         board = b_ext.bodies.item(0)
@@ -300,7 +315,12 @@ def run(context):
     sk_dfr, prof_dfr = sp.sketch_rect_model(case_c, root.xZConstructionPlane,
         ("board_thick", "0 in", "div_z"),
         {"x": "inner_w", "z": "board_thick"},
-        "DivFR_Sk", ev=ev)
+        "DivFR_Sk", ev=ev,
+        anchor=dict(parent_body=side_l, parent_occ=sides_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("0 in", "0 in", "side_h"),
+                    off1=("x", "board_thick"),
+                    off2=("z", "side_h - div_z"), which=0))
     dfr_ext = sp.ext_new(case_c, prof_dfr, "frame_w", "DivFR")
     div_front_rail = dfr_ext.bodies.item(0)
     div_front_rail.name = "Div_FrontRail"
@@ -353,7 +373,12 @@ def run(context):
     sk_dbr, prof_dbr = sp.sketch_rect_model(case_c, div_br_pl,
         ("board_thick - dado_depth", "inner_d - frame_w", "div_z"),
         {"x": "inner_w + 2 * dado_depth", "z": "board_thick"},
-        "DivBR_Sk", ev=ev)
+        "DivBR_Sk", ev=ev,
+        anchor=dict(parent_body=side_l, parent_occ=sides_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("0 in", "0 in", "side_h"),
+                    off1=("x", "board_thick - dado_depth"),
+                    off2=("z", "side_h - div_z"), which=0))
     dbr_ext = sp.ext_new(case_c, prof_dbr, "frame_w", "DivBR")
     div_back_rail = dbr_ext.bodies.item(0)
     div_back_rail.name = "Div_BackRail"
@@ -364,7 +389,12 @@ def run(context):
     sk_dls, prof_dls = sp.sketch_rect_model(case_c, div_stile_pl,
         ("board_thick - dado_depth", "frame_w", "div_z"),
         {"x": "frame_w + dado_depth", "z": "board_thick"},
-        "DivLS_Sk", ev=ev)
+        "DivLS_Sk", ev=ev,
+        anchor=dict(parent_body=side_l, parent_occ=sides_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("0 in", "0 in", "side_h"),
+                    off1=("x", "board_thick - dado_depth"),
+                    off2=("z", "side_h - div_z"), which=0))
     dls_ext = sp.ext_new(case_c, prof_dls, "inner_d - 2 * frame_w", "DivLS")
     div_left_stile = dls_ext.bodies.item(0)
     div_left_stile.name = "Div_LeftStile"
@@ -413,6 +443,17 @@ def run(context):
         orient_t['y'], m2s_t(P(cw + ovh + 3, cd_val / 2, sh))
     ).parameter.expression = "case_d + 2 * top_overhang"
 
+    # Anchor position to the left side panel's projected top (+Z) face corner
+    # (corner s0 at (-overhang, -overhang)); side_l top stays clean (no joinery
+    # at the top-front-outer corner). Two offset dims pin the corner in X and Y.
+    sp.project_face(sk_top, side_l, sides_occ, "z", +1)
+    a_top = sp.anchor_pt(sk_top, 0, 0, sh)
+    if a_top is not None:
+        sp.rdim(sk_top, dt_top, a_top, rect_t.item(0).startSketchPoint,
+                orient_t, "x", "top_overhang")
+        sp.rdim(sk_top, dt_top, a_top, rect_t.item(0).startSketchPoint,
+                orient_t, "y", "top_overhang")
+
     sp.refs_to_construction(sk_top)
     prof_top = sp.smallest_profile(sk_top)
     top_ext = sp.ext_new(top_c, prof_top, "top_thick", "TopBoard")
@@ -432,7 +473,12 @@ def run(context):
     sk_bk, prof_bk = sp.sketch_rect_model(back_c, back_pl,
         ("board_thick - back_thick", "case_d - back_thick", "0 in"),
         {"x": "inner_w + 2 * back_thick", "z": "sub_top_z"},
-        "Back_Sk", ev=ev)
+        "Back_Sk", ev=ev,
+        anchor=dict(parent_body=side_l, parent_occ=sides_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("0 in", "0 in", "side_h"),
+                    off1=("x", "board_thick - back_thick"),
+                    off2=("z", "side_h"), which=0))
     back_ext = sp.ext_new(back_c, prof_bk, "back_thick", "BackPanel")
     back_body = back_ext.bodies.item(0)
     back_body.name = "Back"
@@ -441,7 +487,12 @@ def run(context):
     sk_bkl, prof_bkl = sp.sketch_rect_model(back_c, back_pl,
         ("board_thick - back_thick + leg_w", "case_d - back_thick", "0 in"),
         {"x": "inner_w + 2 * back_thick - 2 * leg_w", "z": "leg_h"},
-        "BackLegCut_Sk", ev=ev)
+        "BackLegCut_Sk", ev=ev,
+        anchor=dict(parent_body=side_l, parent_occ=sides_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("0 in", "0 in", "side_h"),
+                    off1=("x", "board_thick - back_thick + leg_w"),
+                    off2=("z", "side_h"), which=0))
     sp.ext_op(back_c, prof_bkl, "back_thick", CUT, back_body, "BackLegCut")
 
     # Foot tapers on back panel — left foot inner edge
@@ -499,7 +550,10 @@ def run(context):
         x_offset="board_thick + drawer_gap",
         z_offset="shelf_z + board_thick + drawer_gap")
 
-    dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev)
+    dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev,
+        anchor=dict(parent_body=side_l, parent_occ=sides_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("0 in", "0 in", "side_h")))
 
     # -- Drawer knob (revolved spline — drag fit points to reshape) --
     knob_sk_pl = sp.off_plane(drawer_c, root.yZConstructionPlane,

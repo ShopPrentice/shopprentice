@@ -203,7 +203,11 @@ def run(context):
     _, pr = sp.sketch_rect_model(apr_c, front_apr_pl,
         ("leg_size", "front_inset", "apron_z"),
         {"x": "inner_l", "z": "apron_h"},
-        "AprFront_Sk", ev=ev)
+        "AprFront_Sk", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_size", "front_inset", "0 in"),
+                    which=1, off1=("x", "inner_l"), off2=("z", "apron_z")))
     apr_front = sp.ext_new(apr_c, pr, "apron_thick", "AprFront").bodies.item(0)
     apr_front.name = "Apron_Front"
 
@@ -212,14 +216,22 @@ def run(context):
     _, pr = sp.sketch_rect_model(apr_c, back_apr_pl,
         ("leg_size", "0 in", "apron_z"),
         {"x": "inner_l", "z": "apron_h"},
-        "AprBack_Sk", ev=ev)
+        "AprBack_Sk", ev=ev,
+        anchor=dict(parent_body=post_bl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_size", "bench_d - leg_size", "0 in"),
+                    which=1, off1=("x", "inner_l"), off2=("z", "apron_z")))
     apr_back = sp.ext_new(apr_c, pr, "apron_thick", "AprBack").bodies.item(0)
     apr_back.name = "Apron_Back"
 
     _, pr = sp.sketch_rect_model(apr_c, root.yZConstructionPlane,
         ("0 in", "front_inset + leg_size", "apron_z"),
         {"y": "inner_d", "z": "apron_h"},
-        "AprLeft_Sk", ev=ev)
+        "AprLeft_Sk", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=("leg_size", "front_inset + leg_size", "0 in"),
+                    which=1, off1=("y", "inner_d"), off2=("z", "apron_z")))
     apr_left = sp.ext_new(apr_c, pr, "apron_thick", "AprLeft").bodies.item(0)
     apr_left.name = "Apron_Left"
 
@@ -243,7 +255,11 @@ def run(context):
     _, pr = sp.sketch_rect_model(back_c, bb_y_pl,
         ("leg_size", "0 in", "back_board_z"),
         {"x": "inner_l", "z": "back_board_w"},
-        "BackBoard_Sk", ev=ev)
+        "BackBoard_Sk", ev=ev,
+        anchor=dict(parent_body=post_bl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_size", "bench_d - leg_size", "0 in"),
+                    which=1, off1=("x", "inner_l"), off2=("z", "back_board_z")))
     back_board = sp.ext_new(back_c, pr, "back_board_t", "BackBoard").bodies.item(0)
     back_board.name = "Back_Board"
 
@@ -269,7 +285,14 @@ def run(context):
     _, pr = sp.sketch_rect_model(seat_c, seat_z_pl,
         ("0 in", "0 in", "seat_h - seat_thick"),
         {"x": "bench_l", "y": "bench_d"},
-        "Seat_Sk", ev=ev)
+        "Seat_Sk", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
+                    face_axis="z", face_dir=+1,
+                    anchor_xyz=("leg_size", "front_inset + leg_size",
+                                "seat_h - seat_thick"),
+                    which=2, size_far=True,
+                    off1=("x", "bench_l - leg_size"),
+                    off2=("y", "bench_d - front_inset - leg_size")))
     seat_body = sp.ext_new(seat_c, pr, "seat_thick", "SeatBoard").bodies.item(0)
     seat_body.name = "Seat"
 
@@ -307,42 +330,86 @@ def run(context):
         start=("leg_size", "front_inset + apron_thick / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=apr_front, body_b=fl_p, name="DM_FA_L", ev=ev)
+        depth_expr="dm_d", body_a=apr_front, body_b=fl_p, name="DM_FA_L", ev=ev,
+        anchor=dict(parent_body=apr_front, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("leg_size", "front_inset", "apron_z"),
+                    off=(("y", "apron_thick / 2"),
+                         ("z", "dm_sp - (dm_w - dm_t) / 2"))))
     domino.grid(apr_c, dm_yz_r,
         start=("bench_l - leg_size", "front_inset + apron_thick / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=apr_front, body_b=fr_p, name="DM_FA_R", ev=ev)
+        depth_expr="dm_d", body_a=apr_front, body_b=fr_p, name="DM_FA_R", ev=ev,
+        anchor=dict(parent_body=apr_front, parent_occ=None,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=("bench_l - leg_size", "front_inset", "apron_z"),
+                    off=(("y", "apron_thick / 2"),
+                         ("z", "dm_sp - (dm_w - dm_t) / 2"))))
     domino.grid(apr_c, dm_yz_l,
         start=("leg_size", "bench_d - leg_size / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=apr_back, body_b=bl_p, name="DM_BA_L", ev=ev)
+        depth_expr="dm_d", body_a=apr_back, body_b=bl_p, name="DM_BA_L", ev=ev,
+        anchor=dict(parent_body=apr_back, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("leg_size",
+                                "bench_d - leg_size + (leg_size - apron_thick) / 2",
+                                "apron_z"),
+                    off=(("y", "apron_thick / 2"),
+                         ("z", "dm_sp - (dm_w - dm_t) / 2"))))
     domino.grid(apr_c, dm_yz_r,
         start=("bench_l - leg_size", "bench_d - leg_size / 2", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=apr_back, body_b=br_p, name="DM_BA_R", ev=ev)
+        depth_expr="dm_d", body_a=apr_back, body_b=br_p, name="DM_BA_R", ev=ev,
+        anchor=dict(parent_body=apr_back, parent_occ=None,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=("bench_l - leg_size",
+                                "bench_d - leg_size + (leg_size - apron_thick) / 2",
+                                "apron_z"),
+                    off=(("y", "apron_thick / 2"),
+                         ("z", "dm_sp - (dm_w - dm_t) / 2"))))
     domino.grid(apr_c, dm_xz_f,
         start=("apron_thick / 2", "front_inset + leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=apr_left, body_b=fl_p, name="DM_LA_F", ev=ev)
+        depth_expr="dm_d", body_a=apr_left, body_b=fl_p, name="DM_LA_F", ev=ev,
+        anchor=dict(parent_body=apr_left, parent_occ=None,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("0 in", "front_inset + leg_size", "apron_z"),
+                    off=(("x", "apron_thick / 2"),
+                         ("z", "dm_sp - (dm_w - dm_t) / 2"))))
     domino.grid(apr_c, dm_xz_b,
         start=("apron_thick / 2", "bench_d - leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=apr_left, body_b=bl_p, name="DM_LA_B", ev=ev)
+        depth_expr="dm_d", body_a=apr_left, body_b=bl_p, name="DM_LA_B", ev=ev,
+        anchor=dict(parent_body=apr_left, parent_occ=None,
+                    face_axis="y", face_dir=+1,
+                    anchor_xyz=("0 in", "bench_d - leg_size", "apron_z"),
+                    off=(("x", "apron_thick / 2"),
+                         ("z", "dm_sp - (dm_w - dm_t) / 2"))))
     domino.grid(apr_c, dm_xz_f,
         start=("bench_l - apron_thick / 2", "front_inset + leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=apr_right, body_b=fr_p, name="DM_RA_F", ev=ev)
+        depth_expr="dm_d", body_a=apr_right, body_b=fr_p, name="DM_RA_F", ev=ev,
+        anchor=dict(parent_body=apr_right, parent_occ=None,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("bench_l - apron_thick", "front_inset + leg_size", "apron_z"),
+                    off=(("x", "apron_thick / 2"),
+                         ("z", "dm_sp - (dm_w - dm_t) / 2"))))
     domino.grid(apr_c, dm_xz_b,
         start=("bench_l - apron_thick / 2", "bench_d - leg_size", "apron_z + dm_sp"),
         step_axis="z", step_expr="dm_sp", count_expr="dm_count",
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
-        depth_expr="dm_d", body_a=apr_right, body_b=br_p, name="DM_RA_B", ev=ev)
+        depth_expr="dm_d", body_a=apr_right, body_b=br_p, name="DM_RA_B", ev=ev,
+        anchor=dict(parent_body=apr_right, parent_occ=None,
+                    face_axis="y", face_dir=+1,
+                    anchor_xyz=("bench_l - apron_thick", "bench_d - leg_size", "apron_z"),
+                    off=(("x", "apron_thick / 2"),
+                         ("z", "dm_sp - (dm_w - dm_t) / 2"))))
 
     # -- Back board dominos (voids live in back component) --
     bb_off = ev("back_board_offset")

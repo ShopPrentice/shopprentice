@@ -140,7 +140,13 @@ def run(context):
     _, pr = sp.sketch_rect_model(shelf_c, shelf_z_pl,
         ("leg_inset", "leg_inset", "shelf_z"),
         {"x": "shelf_l", "y": "shelf_w"},
-        "Shelf_Sk", ev)
+        "Shelf_Sk", ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("leg_inset + leg_top / 2",
+                                "leg_inset + leg_top / 2", "0 in"),
+                    off1=("x", "leg_top / 2"), off2=("y", "leg_top / 2"),
+                    which=0))
     shelf_ext = sp.ext_new(shelf_c, pr, "shelf_thick", "ShelfBoard")
     shelf_body = shelf_ext.bodies.item(0)
     shelf_body.name = "Shelf"

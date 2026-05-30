@@ -235,18 +235,22 @@ def run(context):
         "apron_z", "ApronZ_Pl")
 
     # Back apron — flush with back of legs
-    _, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
+    sk_ba, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
         ("leg_size", "table_w - apron_thick", "apron_z"),
         {"x": "long_apron_l", "y": "apron_thick"},
         "BackApron_Sk", ev)
+    pr = sp.reanchor(sk_ba, leg_bl, leg_occ, "z", +1,
+        ("0 in", "table_w - leg_size", "leg_h")) or sp.smallest_profile(sk_ba)
     apron_back = sp.ext_new(apron_c, pr, "apron_h", "BackApron").bodies.item(0)
     apron_back.name = "Apron_Back"
 
     # Left side apron — between front and back legs on left side
-    _, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
+    sk_la, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
         ("0 in", "leg_size", "apron_z"),
         {"x": "apron_thick", "y": "short_apron_l"},
         "LeftApron_Sk", ev)
+    pr = sp.reanchor(sk_la, leg_fl, leg_occ, "z", +1,
+        ("leg_size", "0 in", "leg_h")) or sp.smallest_profile(sk_la)
     apron_left = sp.ext_new(apron_c, pr, "apron_h", "LeftApron").bodies.item(0)
     apron_left.name = "Apron_Left"
 
@@ -255,18 +259,22 @@ def run(context):
     # Upper front stretcher — top rail framing drawer opening
     str_upper_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane,
         "apron_z + apron_h - str_h", "StrUpperZ_Pl")
-    _, pr = sp.sketch_rect_model(apron_c, str_upper_pl,
+    sk_su, pr = sp.sketch_rect_model(apron_c, str_upper_pl,
         ("leg_size", "0 in", "apron_z + apron_h - str_h"),
         {"x": "long_apron_l", "y": "str_thick"},
         "UpperStr_Sk", ev)
+    pr = sp.reanchor(sk_su, leg_fl, leg_occ, "z", +1,
+        ("0 in", "leg_size", "leg_h")) or sp.smallest_profile(sk_su)
     str_upper = sp.ext_new(apron_c, pr, "str_h", "UpperStr").bodies.item(0)
     str_upper.name = "Str_Upper"
 
     # Lower front stretcher — bottom rail framing drawer opening
-    _, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
+    sk_sl, pr = sp.sketch_rect_model(apron_c, apron_z_pl,
         ("leg_size", "0 in", "apron_z"),
         {"x": "long_apron_l", "y": "str_thick"},
         "LowerStr_Sk", ev)
+    pr = sp.reanchor(sk_sl, leg_fl, leg_occ, "z", +1,
+        ("0 in", "leg_size", "leg_h")) or sp.smallest_profile(sk_sl)
     str_lower = sp.ext_new(apron_c, pr, "str_h", "LowerStr").bodies.item(0)
     str_lower.name = "Str_Lower"
 
@@ -316,7 +324,12 @@ def run(context):
         step_axis="z", step_expr="dm_ap_sp", count_expr="2",
         long_axis="z", long_expr="dm_ap_w", short_expr="dm_ap_t",
         depth_expr="dm_ap_d", body_a=apron_back, body_b=bl_proxy,
-        name="DM_BA_L", ev=ev)
+        name="DM_BA_L", ev=ev,
+        anchor=dict(parent_body=apron_back, parent_occ=None,
+            face_axis="x", face_dir=-1,
+            anchor_xyz=("leg_size", "table_w - apron_thick", "apron_z"),
+            off=(("y", "apron_thick / 2"),
+                 ("z", "dm_ap_sp - (dm_ap_w - dm_ap_t) / 2"))))
 
     domino.grid(apron_c, dm_xr,
         start=("table_l - leg_size", "table_w - apron_thick / 2",
@@ -324,7 +337,12 @@ def run(context):
         step_axis="z", step_expr="dm_ap_sp", count_expr="2",
         long_axis="z", long_expr="dm_ap_w", short_expr="dm_ap_t",
         depth_expr="dm_ap_d", body_a=apron_back, body_b=br_proxy,
-        name="DM_BA_R", ev=ev)
+        name="DM_BA_R", ev=ev,
+        anchor=dict(parent_body=apron_back, parent_occ=None,
+            face_axis="x", face_dir=+1,
+            anchor_xyz=("table_l - leg_size", "table_w - apron_thick", "apron_z"),
+            off=(("y", "apron_thick / 2"),
+                 ("z", "dm_ap_sp - (dm_ap_w - dm_ap_t) / 2"))))
 
     # -- Left side apron: 2 dominos per end, along Z --
     domino.grid(apron_c, dm_yf,
@@ -332,7 +350,12 @@ def run(context):
         step_axis="z", step_expr="dm_ap_sp", count_expr="2",
         long_axis="z", long_expr="dm_ap_w", short_expr="dm_ap_t",
         depth_expr="dm_ap_d", body_a=apron_left, body_b=fl_proxy,
-        name="DM_LA_F", ev=ev)
+        name="DM_LA_F", ev=ev,
+        anchor=dict(parent_body=apron_left, parent_occ=None,
+            face_axis="y", face_dir=-1,
+            anchor_xyz=("0 in", "leg_size", "apron_z"),
+            off=(("x", "apron_thick / 2"),
+                 ("z", "dm_ap_sp - (dm_ap_w - dm_ap_t) / 2"))))
 
     domino.grid(apron_c, dm_yb,
         start=("apron_thick / 2", "table_w - leg_size",
@@ -340,7 +363,12 @@ def run(context):
         step_axis="z", step_expr="dm_ap_sp", count_expr="2",
         long_axis="z", long_expr="dm_ap_w", short_expr="dm_ap_t",
         depth_expr="dm_ap_d", body_a=apron_left, body_b=bl_proxy,
-        name="DM_LA_B", ev=ev)
+        name="DM_LA_B", ev=ev,
+        anchor=dict(parent_body=apron_left, parent_occ=None,
+            face_axis="y", face_dir=+1,
+            anchor_xyz=("0 in", "table_w - leg_size", "apron_z"),
+            off=(("x", "apron_thick / 2"),
+                 ("z", "dm_ap_sp - (dm_ap_w - dm_ap_t) / 2"))))
 
     # -- Right side apron: 2 dominos per end, along Z --
     domino.grid(apron_c, dm_yf,
@@ -349,7 +377,12 @@ def run(context):
         step_axis="z", step_expr="dm_ap_sp", count_expr="2",
         long_axis="z", long_expr="dm_ap_w", short_expr="dm_ap_t",
         depth_expr="dm_ap_d", body_a=apron_right, body_b=fr_proxy,
-        name="DM_RA_F", ev=ev)
+        name="DM_RA_F", ev=ev,
+        anchor=dict(parent_body=apron_right, parent_occ=None,
+            face_axis="y", face_dir=-1,
+            anchor_xyz=("table_l", "leg_size", "apron_z"),
+            off=(("x", "apron_thick / 2"),
+                 ("z", "dm_ap_sp - (dm_ap_w - dm_ap_t) / 2"))))
 
     domino.grid(apron_c, dm_yb,
         start=("table_l - apron_thick / 2", "table_w - leg_size",
@@ -357,7 +390,12 @@ def run(context):
         step_axis="z", step_expr="dm_ap_sp", count_expr="2",
         long_axis="z", long_expr="dm_ap_w", short_expr="dm_ap_t",
         depth_expr="dm_ap_d", body_a=apron_right, body_b=br_proxy,
-        name="DM_RA_B", ev=ev)
+        name="DM_RA_B", ev=ev,
+        anchor=dict(parent_body=apron_right, parent_occ=None,
+            face_axis="y", face_dir=+1,
+            anchor_xyz=("table_l", "table_w - leg_size", "apron_z"),
+            off=(("x", "apron_thick / 2"),
+                 ("z", "dm_ap_sp - (dm_ap_w - dm_ap_t) / 2"))))
 
     # -- Upper stretcher: 1 domino per end --
     domino.single(apron_c, dm_xl,
@@ -365,28 +403,48 @@ def run(context):
                 "apron_z + apron_h - str_h / 2"),
         long_axis="z", long_expr="dm_st_w", short_expr="dm_st_t",
         depth_expr="dm_st_d", body_a=str_upper, body_b=fl_proxy,
-        name="DM_SU_L", ev=ev)
+        name="DM_SU_L", ev=ev,
+        anchor=dict(parent_body=str_upper, parent_occ=None,
+            face_axis="x", face_dir=-1,
+            anchor_xyz=("leg_size", "0 in", "apron_z + apron_h - str_h"),
+            off=(("y", "str_thick / 2"),
+                 ("z", "str_h / 2 - (dm_st_w - dm_st_t) / 2"))))
 
     domino.single(apron_c, dm_xr,
         center=("table_l - leg_size", "str_thick / 2",
                 "apron_z + apron_h - str_h / 2"),
         long_axis="z", long_expr="dm_st_w", short_expr="dm_st_t",
         depth_expr="dm_st_d", body_a=str_upper, body_b=fr_proxy,
-        name="DM_SU_R", ev=ev)
+        name="DM_SU_R", ev=ev,
+        anchor=dict(parent_body=str_upper, parent_occ=None,
+            face_axis="x", face_dir=+1,
+            anchor_xyz=("table_l - leg_size", "0 in", "apron_z + apron_h - str_h"),
+            off=(("y", "str_thick / 2"),
+                 ("z", "str_h / 2 - (dm_st_w - dm_st_t) / 2"))))
 
     # -- Lower stretcher: 1 domino per end --
     domino.single(apron_c, dm_xl,
         center=("leg_size", "str_thick / 2", "apron_z + str_h / 2"),
         long_axis="z", long_expr="dm_st_w", short_expr="dm_st_t",
         depth_expr="dm_st_d", body_a=str_lower, body_b=fl_proxy,
-        name="DM_SL_L", ev=ev)
+        name="DM_SL_L", ev=ev,
+        anchor=dict(parent_body=str_lower, parent_occ=None,
+            face_axis="x", face_dir=-1,
+            anchor_xyz=("leg_size", "0 in", "apron_z"),
+            off=(("y", "str_thick / 2"),
+                 ("z", "str_h / 2 - (dm_st_w - dm_st_t) / 2"))))
 
     domino.single(apron_c, dm_xr,
         center=("table_l - leg_size", "str_thick / 2",
                 "apron_z + str_h / 2"),
         long_axis="z", long_expr="dm_st_w", short_expr="dm_st_t",
         depth_expr="dm_st_d", body_a=str_lower, body_b=fr_proxy,
-        name="DM_SL_R", ev=ev)
+        name="DM_SL_R", ev=ev,
+        anchor=dict(parent_body=str_lower, parent_occ=None,
+            face_axis="x", face_dir=+1,
+            anchor_xyz=("table_l - leg_size", "0 in", "apron_z"),
+            off=(("y", "str_thick / 2"),
+                 ("z", "str_h / 2 - (dm_st_w - dm_st_t) / 2"))))
 
     print(">>> Dominos: 16 loose tenons (12 apron + 4 stretcher)")
 
@@ -414,6 +472,15 @@ def run(context):
         rect_top[1].startSketchPoint, rect_top[1].endSketchPoint,
         V, P3(c1.x + 1, (c0.y + c1.y) / 2, 0)
     ).parameter.expression = "table_w + 2 * top_oh"
+    # Anchor the top's -oh,-oh corner to Leg_FL's clean top face (z,+1)
+    sp.project_face(sk_top, leg_fl, leg_occ, "z", +1)
+    top_anchor = sp.anchor_pt(sk_top, ls_v, ls_v, lh)
+    top_orient = sp.probe_orientations(sk_top, ls_v, ls_v, lh)
+    if top_anchor is not None:
+        sp.rdim(sk_top, d_top, top_anchor, rect_top[0].startSketchPoint,
+                top_orient, "x", "leg_size + top_oh")
+        sp.rdim(sk_top, d_top, top_anchor, rect_top[0].startSketchPoint,
+                top_orient, "y", "leg_size + top_oh")
     sk_top.name = "Top_Sk"
     top_body = sp.ext_new(top_c, sp.smallest_profile(sk_top),
         "top_thick", "TopBoard").bodies.item(0)
@@ -453,7 +520,10 @@ def run(context):
     # ==============================================================
     #  7. DRAWER — dovetailed box + bar pull
     # ==============================================================
-    dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev)
+    dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev,
+        anchor=dict(parent_body=str_lower, parent_occ=apron_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_size", "0 in", "apron_z")))
     dd_front = dd_result["front"]
 
     # -- Body-relative references: drawer parts + pull relative to dd_Front --

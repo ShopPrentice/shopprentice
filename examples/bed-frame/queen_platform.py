@@ -173,7 +173,11 @@ def run(context):
                           "post_size / 2 - rail_thick / 2", "LR_Pl")
     _, pr = sp.sketch_rect_model(rail_c, lr_pl,
         ("post_size / 2 - rail_thick / 2", "post_size", "rail_z"),
-        {"y": "side_rail_l", "z": "rail_h - post_chamfer"}, "LeftRail_Sk", ev)
+        {"y": "side_rail_l", "z": "rail_h - post_chamfer"}, "LeftRail_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("y", "post_size"), off2=("z", "rail_z")))
     lr_ext = sp.ext_new(rail_c, pr, "rail_thick", "LeftRail")
     rail_left = lr_ext.bodies.item(0); rail_left.name = "Rail_Left"
 
@@ -186,7 +190,11 @@ def run(context):
                           "post_size / 2 - rail_thick / 2", "FR_Pl")
     _, pr = sp.sketch_rect_model(rail_c, fr_pl,
         ("post_size", "post_size / 2 - rail_thick / 2", "rail_z"),
-        {"x": "end_rail_l", "z": "rail_h - post_chamfer"}, "FootRail_Sk", ev)
+        {"x": "end_rail_l", "z": "rail_h - post_chamfer"}, "FootRail_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="y", face_dir=+1,
+                    anchor_xyz=("0 in", "post_size", "0 in"),
+                    off1=("x", "post_size"), off2=("z", "rail_z")))
     fr_ext = sp.ext_new(rail_c, pr, "rail_thick", "FootRail")
     rail_foot = fr_ext.bodies.item(0); rail_foot.name = "Rail_Foot"
 
@@ -195,7 +203,11 @@ def run(context):
                           "outer_l - post_size + post_size / 2 - rail_thick / 2", "BR_Pl")
     _, pr = sp.sketch_rect_model(rail_c, br_pl,
         ("post_size", "outer_l - post_size + post_size / 2 - rail_thick / 2", "rail_z"),
-        {"x": "end_rail_l", "z": "back_rail_h"}, "BackRail_Sk", ev)
+        {"x": "end_rail_l", "z": "back_rail_h"}, "BackRail_Sk", ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("0 in", "bed_l + post_size", "0 in"),
+                    off1=("x", "post_size"), off2=("z", "rail_z")))
     back_rail_ext = sp.ext_new(rail_c, pr, "rail_thick", "BackRail")
     rail_back = back_rail_ext.bodies.item(0); rail_back.name = "Rail_Back"
 
@@ -210,7 +222,11 @@ def run(context):
                            "post_size / 2 + rail_thick / 2", "LDG_Pl")
     _, pr = sp.sketch_rect_model(rail_c, ldg_pl,
         ("post_size / 2 + rail_thick / 2", "post_size", "ledger_z"),
-        {"y": "side_rail_l", "z": "ledger_h"}, "LedgerL_Sk", ev)
+        {"y": "side_rail_l", "z": "ledger_h"}, "LedgerL_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("y", "post_size"), off2=("z", "ledger_z")))
     ll_ext = sp.ext_new(rail_c, pr, "ledger_thick", "LedgerLeft")
     ledger_left = ll_ext.bodies.item(0); ledger_left.name = "Ledger_Left"
 
@@ -227,14 +243,23 @@ def run(context):
     # Top rail (between posts)
     _, pr = sp.sketch_rect_model(hb_c, hb_y_pl,
         ("post_size", "hb_face_y", "headboard_h - hb_top_rail_h"),
-        {"x": "end_rail_l", "z": "hb_top_rail_h"}, "HBTopRail_Sk", ev)
+        {"x": "end_rail_l", "z": "hb_top_rail_h"}, "HBTopRail_Sk", ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="y", face_dir=+1,
+                    anchor_xyz=("0 in", "outer_l", "0 in"),
+                    off1=("x", "post_size"),
+                    off2=("z", "headboard_h - hb_top_rail_h")))
     hb_tr_ext = sp.ext_new(hb_c, pr, "hb_rail_thick", "HBTopRail")
     hb_top_rail = hb_tr_ext.bodies.item(0); hb_top_rail.name = "HB_TopRail"
 
     # Bottom rail (between posts, at side rail height)
     _, pr = sp.sketch_rect_model(hb_c, hb_y_pl,
         ("post_size", "hb_face_y", "front_post_h"),
-        {"x": "end_rail_l", "z": "hb_bot_rail_h"}, "HBBotRail_Sk", ev)
+        {"x": "end_rail_l", "z": "hb_bot_rail_h"}, "HBBotRail_Sk", ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="y", face_dir=+1,
+                    anchor_xyz=("0 in", "outer_l", "0 in"),
+                    off1=("x", "post_size"), off2=("z", "front_post_h")))
     hb_br_ext = sp.ext_new(hb_c, pr, "hb_rail_thick", "HBBotRail")
     hb_bot_rail = hb_br_ext.bodies.item(0); hb_bot_rail.name = "HB_BotRail"
 
@@ -248,7 +273,12 @@ def run(context):
     _, pr = sp.sketch_rect_model(hb_c, hb_y_pl,
         ("hb_slat_start - hb_slat_w / 2", "hb_face_y",
          "front_post_h + hb_bot_rail_h - hb_slat_tenon"),
-        {"x": "hb_slat_w", "z": "hb_zone_h + 2 * hb_slat_tenon"}, "HBSlat_Sk", ev)
+        {"x": "hb_slat_w", "z": "hb_zone_h + 2 * hb_slat_tenon"}, "HBSlat_Sk", ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="y", face_dir=+1,
+                    anchor_xyz=("0 in", "outer_l", "0 in"),
+                    off1=("x", "hb_slat_start - hb_slat_w / 2"),
+                    off2=("z", "front_post_h + hb_bot_rail_h - hb_slat_tenon")))
     hb_slat_ext = sp.ext_new(hb_c, pr, "hb_slat_thick", "HBSlat_1")
     hb_slat = hb_slat_ext.bodies.item(0); hb_slat.name = "HBSlat_1"
 
@@ -273,7 +303,12 @@ def run(context):
     slat_z_pl = sp.off_plane(slat_c, slat_c.xYConstructionPlane, "slat_z", "SlatZ_Pl")
     _, pr = sp.sketch_rect_model(slat_c, slat_z_pl,
         ("post_size / 2 + rail_thick / 2", "post_size", "slat_z"),
-        {"x": "slat_l", "y": "slat_w"}, "Slat_Sk", ev)
+        {"x": "slat_l", "y": "slat_w"}, "Slat_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("x", "post_size / 2 - rail_thick / 2"),
+                    off2=("y", "post_size")))
     slat_ext = sp.ext_new(slat_c, pr, "slat_thick", "Slat_1")
     slat_body = slat_ext.bodies.item(0); slat_body.name = "Slat_1"
 
@@ -298,7 +333,11 @@ def run(context):
                             "mid_x - beam_thick / 2", "Beam_Pl")
     _, pr = sp.sketch_rect_model(support_c, beam_pl,
         ("mid_x - beam_thick / 2", "post_size", "beam_h - beam_w"),
-        {"y": "bed_l", "z": "beam_w"}, "Beam_Sk", ev)
+        {"y": "bed_l", "z": "beam_w"}, "Beam_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("y", "post_size"), off2=("z", "beam_h - beam_w")))
     beam_ext = sp.ext_new(support_c, pr, "beam_thick", "CenterBeam")
     beam = beam_ext.bodies.item(0); beam.name = "CenterBeam"
 
@@ -309,13 +348,23 @@ def run(context):
     # Two legs under the beam (at 1/3 and 2/3 along length)
     _, pr = sp.sketch_rect_model(support_c, support_c.xYConstructionPlane,
         ("mid_x - beam_leg_size / 2", "post_size + bed_l / 3 - beam_leg_size / 2", "0 in"),
-        {"x": "beam_leg_size", "y": "beam_leg_size"}, "BeamLeg1_Sk", ev)
+        {"x": "beam_leg_size", "y": "beam_leg_size"}, "BeamLeg1_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("x", "mid_x - beam_leg_size / 2 - post_size"),
+                    off2=("y", "post_size + bed_l / 3 - beam_leg_size / 2")))
     bl1_ext = sp.ext_new(support_c, pr, "beam_h - beam_w", "BeamLeg1")
     bl1_ext.bodies.item(0).name = "BeamLeg_1"
 
     _, pr = sp.sketch_rect_model(support_c, support_c.xYConstructionPlane,
         ("mid_x - beam_leg_size / 2", "post_size + 2 * bed_l / 3 - beam_leg_size / 2", "0 in"),
-        {"x": "beam_leg_size", "y": "beam_leg_size"}, "BeamLeg2_Sk", ev)
+        {"x": "beam_leg_size", "y": "beam_leg_size"}, "BeamLeg2_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("x", "mid_x - beam_leg_size / 2 - post_size"),
+                    off2=("y", "post_size + 2 * bed_l / 3 - beam_leg_size / 2")))
     bl2_ext = sp.ext_new(support_c, pr, "beam_h - beam_w", "BeamLeg2")
     bl2_ext.bodies.item(0).name = "BeamLeg_2"
 

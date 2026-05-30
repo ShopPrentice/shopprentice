@@ -564,9 +564,15 @@ def _run(app):
     # ----------------------------------------------------------
     bk_pl = off_plane(back_c, back_c.xYConstructionPlane,
                       "kick_h", "Back_Pl")
-    _, pr = sketch_rect(back_c, bk_pl,
+    back_sk, pr = sketch_rect(back_c, bk_pl,
         "board_thick", "case_d - back_thick",
         "inner_w", "back_thick", "Back_Sk")
+    # ANCHOR (non-root): project TopBoard's bottom face (z=case_h-top_thick,
+    # a clean Z-normal rectangle, parallel to Back_Pl — TopBoard is built
+    # before this) and retarget the origin dims to its back-left corner.
+    pr = (sp.reanchor(back_sk, find_body("TopBoard"), top_occ, "z", -1,
+                      ("board_thick", "case_d", "case_h - top_thick"))
+          or sp.smallest_profile(back_sk))
     back_ext = ext_new(back_c, pr,
         "case_h - kick_h - top_thick", "BackPanel")
     back_body = back_ext.bodies.item(0)
@@ -674,9 +680,14 @@ def _run(app):
     # ----------------------------------------------------------
     bot_pl = off_plane(bottom_c, bottom_c.xYConstructionPlane,
                        "kick_h", "Bot_Pl")
-    _, pr = sketch_rect(bottom_c, bot_pl,
+    bot_sk, pr = sketch_rect(bottom_c, bot_pl,
         "board_thick", "0 in",
         "inner_w", "case_d", "Bottom_Sk")
+    # ANCHOR (non-root): project Kick_Front's top face (z=kick_h, clean
+    # rectangle) and retarget the origin dims to its front-left corner.
+    pr = (sp.reanchor(bot_sk, find_body("Kick_Front"), kick_occ, "z", +1,
+                      ("kick_inset", "kick_inset", "kick_h"))
+          or sp.smallest_profile(bot_sk))
     bot_ext = ext_new(bottom_c, pr, "bot_thick", "BottomBoard")
     bot_body = bot_ext.bodies.item(0)
     bot_body.name = "BottomBoard"
@@ -768,7 +779,15 @@ def _run(app):
     #     Half-blind dovetails at front, through dovetails at back,
     #     bottom panel in grooves, pull groove on front face.
     # ----------------------------------------------------------
-    dd_result = dovetailed_drawer.build(drawers_c, prefix="dd", ev=ev)
+    # ANCHOR (non-root): the drawer's front board sits against the case front,
+    # directly above BottomBoard. Project BottomBoard's front face (y=0, a clean
+    # Y-normal rectangle parallel to the front-board sketch) and anchor the
+    # drawer's local root (the front board) to its front-left-bottom corner;
+    # the template then anchors back/left/bottom boards + dovetails internally.
+    dd_result = dovetailed_drawer.build(drawers_c, prefix="dd", ev=ev,
+        anchor=dict(parent_body=bot_body, parent_occ=bottom_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("board_thick", "0 in", "kick_h")))
     dd_front = dd_result["front"]
 
     # Body-relative ref: dd_Back/dd_Left/dd_Right/dd_Bottom positioned relative to dd_Front
@@ -778,9 +797,18 @@ def _run(app):
     # Pull groove on front face (template doesn't include this)
     pull_pl = sp.off_plane(drawers_c, drawers_c.xYConstructionPlane,
                            "dd_zo", "Pull_Pl")
+    # ANCHOR (non-root): the pull groove sits on the drawer front. Project the
+    # front board's bottom face (z=dd_zo, Z-normal, parallel to Pull_Pl, same
+    # component → parent_occ=None) and anchor the near corner to its
+    # front-left-bottom corner with explicit offsets (anchor= mode locks the
+    # offset dims, so no origin reference).
     _, pr = sp.sketch_rect_model(drawers_c, pull_pl,
         ("dd_xo", "-pull_depth", "dd_zo"),
-        {"x": "dd_w", "y": "pull_depth"}, "Pull_Sk", ev)
+        {"x": "dd_w", "y": "pull_depth"}, "Pull_Sk", ev,
+        anchor=dict(parent_body=dd_front, parent_occ=None,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("dd_xo", "0 in", "dd_zo"),
+                    off1=("x", "0 in"), off2=("y", "pull_depth"), which=0))
     sp.ext_op(drawers_c, pr, "pull_h", CUT, dd_front, "PullGroove")
 
     # Pattern drawers 2..n

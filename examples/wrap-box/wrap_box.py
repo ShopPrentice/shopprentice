@@ -343,23 +343,27 @@ def run(context):
     ref_bb = ref_body.boundingBox
 
     # 6. FULL BOARD at tongue footprint
-    _, pr = sketch_rect_model(bot_c, bot_c.xYConstructionPlane,
+    sk, pr = sketch_rect_model(bot_c, bot_c.xYConstructionPlane,
         ("board_thick - groove_depth",
          "board_thick - groove_depth",
          "0 in"),
         {"x": "box_length - 2 * board_thick + 2 * groove_depth",
          "y": "box_width - 2 * board_thick + 2 * groove_depth"},
         "Bottom_Sk")
+    pr = sp.reanchor(sk, front_body, case_occ, "z", -1,
+                     ("box_length", "board_thick", "0 in")) or pr
     bot_ext = ext_new(bot_c, pr, "bottom_thick", "Bottom")
     bot_body = bot_ext.bodies.item(0)
     bot_body.name = "Bottom"
 
     # 7. FRONT EDGE RABBET (through: full X extent)
-    _, pr = sketch_rect_model(bot_c, bot_c.xYConstructionPlane,
+    sk, pr = sketch_rect_model(bot_c, bot_c.xYConstructionPlane,
         ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
         {"x": "box_length - 2 * board_thick + 2 * groove_depth",
          "y": "groove_depth"},
         "BotRab_F_Sk")
+    pr = sp.reanchor(sk, front_body, case_occ, "z", -1,
+                     ("box_length", "board_thick", "0 in")) or pr
     rab_f = ext_op(bot_c, pr, "groove_up", CUT, bot_body, "BotRab_F")
 
     # 8. MIRROR front -> back across Y midplane
@@ -368,11 +372,13 @@ def run(context):
     mirror_feats(bot_c, [rab_f], y_mid_pl, "BotRab_MirrorY")
 
     # 9. LEFT EDGE RABBET (through: full Y extent)
-    _, pr = sketch_rect_model(bot_c, bot_c.xYConstructionPlane,
+    sk, pr = sketch_rect_model(bot_c, bot_c.xYConstructionPlane,
         ("board_thick - groove_depth", "board_thick - groove_depth", "0 in"),
         {"x": "groove_depth",
          "y": "box_width - 2 * board_thick + 2 * groove_depth"},
         "BotRab_L_Sk")
+    pr = sp.reanchor(sk, front_body, case_occ, "z", -1,
+                     ("box_length", "board_thick", "0 in")) or pr
     rab_l = ext_op(bot_c, pr, "groove_up", CUT, bot_body, "BotRab_L")
 
     # 10. MIRROR left -> right across X midplane
@@ -395,33 +401,39 @@ def run(context):
                            "box_height - lid_down", "LidRab_Pl")
 
     # 11. FULL BOARD (no front tongue, back tongue into thickened lip)
-    _, pr = sketch_rect_model(lid_c, lid_base_pl,
+    sk, pr = sketch_rect_model(lid_c, lid_base_pl,
         ("board_thick - groove_depth",
          "0 in",
          "open_height"),
         {"x": "box_length - 2 * board_thick + 2 * groove_depth",
          "y": "box_width - board_thick - cutter_lip_depth + groove_depth"},
         "Lid_Sk")
+    pr = sp.reanchor(sk, front_body, case_occ, "z", -1,
+                     ("box_length", "board_thick", "0 in")) or pr
     lid_ext = ext_new(lid_c, pr, "lid_thick", "Lid")
     lid_body = lid_ext.bodies.item(0)
     lid_body.name = "Lid"
 
     # 12. BACK EDGE RABBET (through: full X extent of lid)
-    _, pr = sketch_rect_model(lid_c, lid_rab_pl,
+    sk, pr = sketch_rect_model(lid_c, lid_rab_pl,
         ("board_thick - groove_depth",
          "box_width - board_thick - cutter_lip_depth",
          "box_height - lid_down"),
         {"x": "box_length - 2 * board_thick + 2 * groove_depth",
          "y": "groove_depth"},
         "LidRab_B_Sk")
+    pr = sp.reanchor(sk, front_body, case_occ, "z", -1,
+                     ("box_length", "board_thick", "0 in")) or pr
     ext_op(lid_c, pr, "lid_down", CUT, lid_body, "LidRab_B")
 
     # 13. LEFT EDGE RABBET (through: full Y extent of lid)
-    _, pr = sketch_rect_model(lid_c, lid_rab_pl,
+    sk, pr = sketch_rect_model(lid_c, lid_rab_pl,
         ("board_thick - groove_depth", "0 in", "box_height - lid_down"),
         {"x": "groove_depth",
          "y": "box_width - board_thick - cutter_lip_depth + groove_depth"},
         "LidRab_L_Sk")
+    pr = sp.reanchor(sk, front_body, case_occ, "z", -1,
+                     ("box_length", "board_thick", "0 in")) or pr
     lid_rab_l = ext_op(lid_c, pr, "lid_down", CUT, lid_body, "LidRab_L")
 
     # 14. MIRROR left -> right across X midplane

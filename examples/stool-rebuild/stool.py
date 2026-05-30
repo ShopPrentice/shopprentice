@@ -180,7 +180,16 @@ def run(context):
     gc = Leg_NL_Sk.geometricConstraints
     gc.addHorizontal(ln0)
     gc.addHorizontal(ln2)
-    Leg_NL_Sk_prof = Leg_NL_Sk.profiles.item(0)  # 1 profile(s)
+    # ── ANCHOR (non-root sketch): retarget the two origin dims (the V/H
+    # positioning of ln0.startSketchPoint) to a projected Seat corner. The
+    # Seat front face (y, -1 at Y=0) is PARALLEL to this xZ sketch plane and
+    # its bottom corners (Z = leg_h = seat_z) are un-beveled/clean. reanchor
+    # rewrites each origin dim as abs(orig - anchor_axis), geometry unchanged
+    # (self-check reverts if the part moves), and RETURNS a fresh profile
+    # (the projection invalidates any profile captured before this call).
+    Leg_NL_Sk_prof = sp.reanchor(
+        Leg_NL_Sk, Seat, seat_occ, "y", -1,
+        ("0 in", "0 in", "leg_h")) or Leg_NL_Sk.profiles.item(0)
 
     # [7] Extrude: Leg_NL (in legs_c)
     inp = legs_c.features.extrudeFeatures.createInput(Leg_NL_Sk_prof, NEWBODY)
