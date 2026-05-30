@@ -132,7 +132,7 @@ def define_params(params, prefix="dd",
     }
 
 
-def build(comp, prefix="dd", ev=None):
+def build(comp, prefix="dd", ev=None, anchor=None):
     """Build a dovetailed drawer box.
 
     Creates 5 bodies: front, back, left, right, bottom.
@@ -143,6 +143,17 @@ def build(comp, prefix="dd", ev=None):
         comp: Component to build in.
         prefix: Parameter prefix (from define_params).
         ev: Evaluator function.
+        anchor: Optional dict to make the drawer's sketches pass the validator
+            when ``comp`` is a NON-root component. The FRONT board (the drawer's
+            local root) is anchored to an EXTERNAL parent via this dict
+            (keys ``parent_body, parent_occ, face_axis, face_dir, anchor_xyz`` —
+            as in ``sp.reanchor``); the back/left/bottom boards are then anchored
+            internally to the front board (a parallel front face, so the
+            projection is a clean rectangle). When None (default), boards keep
+            origin-mode dims — correct only if ``comp`` holds the model's root
+            body. The dovetail corner sketches are built by
+            ``half_blind_dovetail.box`` / ``dovetail.box`` on real BRep faces and
+            are already reference-anchored.
 
     Returns:
         Dict with body references and feature info.
@@ -164,19 +175,26 @@ def build(comp, prefix="dd", ev=None):
     left_pl = sp.off_plane(comp, comp.yZConstructionPlane,
                             xo, f"{p}_LeftPl")
 
-    # ── Front board (thicker, possibly taller) ──
-    _, pr = sp.sketch_rect_model(comp, comp.xZConstructionPlane,
+    # ── Front board (thicker, possibly taller) — the drawer's local root ──
+    sk_f, pr = sp.sketch_rect_model(comp, comp.xZConstructionPlane,
         (xo, "0 in", zo),
         {"x": f"{p}_w", "z": f"{p}_fh"}, f"{p}_Front_Sk", ev)
+    if anchor is not None:
+        pr = (sp.reanchor(sk_f, anchor["parent_body"], anchor.get("parent_occ"),
+                          anchor["face_axis"], anchor["face_dir"],
+                          anchor["anchor_xyz"]) or sp.smallest_profile(sk_f))
     front = sp.ext_new(comp, pr, f"{p}_ft", f"{p}_Front").bodies.item(0)
     front.name = f"{p}_Front"
 
-    # ── Back board ──
+    # ── Back board ── anchored to the front board's parallel (-Y) face ──
     back_pl = sp.off_plane(comp, comp.xZConstructionPlane,
                             f"{p}_d - {p}_st", f"{p}_Back_Pl")
-    _, pr = sp.sketch_rect_model(comp, back_pl,
+    sk_b, pr = sp.sketch_rect_model(comp, back_pl,
         (xo, f"{p}_d - {p}_st", zo),
         {"x": f"{p}_w", "z": f"{p}_h"}, f"{p}_Back_Sk", ev)
+    if anchor is not None:
+        pr = (sp.reanchor(sk_b, front, None, "y", -1,
+                          (f"{xo} + {p}_w", "0 in", zo)) or sp.smallest_profile(sk_b))
     back = sp.ext_new(comp, pr, f"{p}_st", f"{p}_Back").bodies.item(0)
     back.name = f"{p}_Back"
 
@@ -186,10 +204,13 @@ def build(comp, prefix="dd", ev=None):
     y_mid = sp.off_plane(comp, comp.xZConstructionPlane,
                           f"{p}_d / 2", f"{p}_YMid")
 
-    # ── Left side (thinner, narrower in Y) ──
-    _, pr = sp.sketch_rect_model(comp, left_pl,
+    # ── Left side (thinner, narrower in Y) — anchored to front's (-X) face ──
+    sk_l, pr = sp.sketch_rect_model(comp, left_pl,
         (xo, f"{p}_ft", zo),
         {"y": f"{p}_sd", "z": f"{p}_h"}, f"{p}_Left_Sk", ev)
+    if anchor is not None:
+        pr = (sp.reanchor(sk_l, front, None, "x", -1,
+                          (xo, f"{p}_ft", zo)) or sp.smallest_profile(sk_l))
     left = sp.ext_new(comp, pr, f"{p}_st", f"{p}_Left").bodies.item(0)
     left.name = f"{p}_Left"
 
@@ -205,13 +226,17 @@ def build(comp, prefix="dd", ev=None):
     # ── Bottom panel ──
     # Panel extends bgd into all 4 boards (front, back, left, right),
     # creating grooves via CUT — "if it fits, it cuts."
-    _, pr = sp.sketch_rect_model(comp, bg_pl,
+    sk_bot, pr = sp.sketch_rect_model(comp, bg_pl,
         (f"{xo} + {p}_st - {p}_bgd",
          f"{p}_ft - {p}_bgd",
          f"{zo} + {p}_bgu"),
         {"x": f"{p}_w - 2 * {p}_st + 2 * {p}_bgd",
          "y": f"{p}_d - {p}_ft - {p}_st + 2 * {p}_bgd"},
         f"{p}_Bottom_Sk", ev)
+    if anchor is not None:
+        pr = (sp.reanchor(sk_bot, front, None, "z", -1,
+                          (f"{xo} + {p}_w", f"{p}_ft", f"{zo} + {p}_bgu"))
+              or sp.smallest_profile(sk_bot))
     bottom = sp.ext_new(comp, pr, f"{p}_bt", f"{p}_Bottom").bodies.item(0)
     bottom.name = f"{p}_Bottom"
 

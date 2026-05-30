@@ -176,7 +176,11 @@ def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
             corner to anchor to — must not be the sketch-origin projection.
 
     Returns:
-        Number of dimensions retargeted (0 if no anchor point was found).
+        The sketch's smallest profile, RE-RESOLVED after the projection — because
+        projecting the parent face adds construction geometry that invalidates any
+        Profile captured BEFORE this call. Extrude the RETURNED profile, not one
+        captured earlier:  ``prof = sp.reanchor(sk, ...)``. Returns None if no
+        anchor point was found (anchoring did not happen).
 
     Limitation: the anchored vertex itself must not sit on the sketch origin
     (dimensioning it would re-touch the origin). For a part whose own corner is
@@ -192,7 +196,7 @@ def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
     av = [ev(c) if isinstance(c, str) else c for c in anchor_xyz]
     anchor = anchor_pt(sk, av[0], av[1], av[2])
     if anchor is None:
-        return 0
+        return None
 
     op = sk.originPoint
     og = op.geometry
@@ -242,4 +246,11 @@ def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
         rdim(sk, sk.sketchDimensions, anchor, v, orient, axis,
              "abs((%s) - (%s))" % (expr, ax_expr[axis]))
         n += 1
-    return n
+    # Projecting the parent face added construction geometry that invalidates any
+    # Profile captured before this call; re-resolve and return a fresh profile so
+    # the caller extrudes the right one.
+    from .sketch import smallest_profile
+    try:
+        return smallest_profile(sk)
+    except Exception:
+        return None
