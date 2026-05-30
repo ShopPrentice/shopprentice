@@ -1,6 +1,6 @@
 # Moravian Workbench
 
-64"L x 28-1/4"W x 31"H. Parametric model of Barry NM Dima's knock-down workbench
+64"L x 28-1/4"W x 31"H. Parametric model inspired by Barry NM Dima's knock-down workbench
 from *Fine Woodworking* #293 (Tools & Shops 2022) — a heavy, portable trestle
 bench that marries Moravian splayed legs with Roubo proportions and timber-framing
 knockdown joinery.
