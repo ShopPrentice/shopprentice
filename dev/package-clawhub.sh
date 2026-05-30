@@ -2,7 +2,7 @@
 # Package ShopPrentice as a ClawHub-compatible .skill bundle.
 #
 # Usage:
-#   ./scripts/package-clawhub.sh [version]
+#   ./dev/package-clawhub.sh [version]
 #
 # If version is omitted, reads from the latest git tag.
 # Outputs: dist/shopprentice-<version>.skill (a zip file)
