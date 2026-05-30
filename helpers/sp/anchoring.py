@@ -26,6 +26,9 @@ import adsk.fusion
 
 Point3D = adsk.core.Point3D
 
+# Set on the first reanchor() call per add-in process; gates a one-time advisory.
+_REANCHOR_ADVISED = False
+
 
 def project_face(child_sk, parent_body, parent_occ, axis, direction):
     """Project a parent body's outermost ``axis``/``direction`` face into a
@@ -224,6 +227,20 @@ def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
     """
     from .sketch import probe_orientations
     from ._util import _make_ev
+
+    # First-call advisory: surface the load-bearing caveat in the execute_script
+    # output the first time reanchor runs this session, so it is fresh at the
+    # point of use even on a SUCCESSFUL call (the full detail is in this
+    # function's docstring). Module-level flag → prints once per add-in process.
+    global _REANCHOR_ADVISED
+    if not _REANCHOR_ADVISED:
+        _REANCHOR_ADVISED = True
+        print("reanchor note: retargets an origin-mode sketch to a projected "
+              "parent corner. If it prints 'ANCHOR REJECTED — retarget moved the "
+              "part N cm', the anchor is WRONG (clipped/proud corner, "
+              "negative-side sign flip, or non-XY plane) and the sketch is left "
+              "UNANCHORED — fix it, don't ship it. Anchor to a CLEAN body's corner "
+              "(e.g. a CUT-tool panel); see the reanchor docstring for all cases.")
 
     ev = _make_ev()
     project_face(sk, parent_body, parent_occ, face_axis, face_dir)
