@@ -228,7 +228,12 @@ def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
                         dim.parameter.value, ori))
 
     om = sk.sketchToModelSpace(og)
-    n = 0
+    d = sk.sketchDimensions
+    # Original MODEL position of each anchored vertex — a correct anchor must
+    # leave these unchanged (it only re-expresses the SAME position relative to a
+    # projected reference). Used by the geometry-preservation self-check below.
+    pre = [(v, sk.sketchToModelSpace(v.geometry)) for (_, v, _, _, _) in targets]
+    added = []
     for (dim, v, expr, val, ori) in targets:
         vm = sk.sketchToModelSpace(v.geometry)
         orient = probe_orientations(sk, vm.x, vm.y, vm.z)
@@ -243,9 +248,52 @@ def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
         if axis is None:
             continue
         dim.deleteMe()
-        rdim(sk, sk.sketchDimensions, anchor, v, orient, axis,
-             "abs((%s) - (%s))" % (expr, ax_expr[axis]))
-        n += 1
+        g1, g2 = anchor.geometry, v.geometry
+        try:
+            nd = d.addDistanceDimension(
+                anchor, v, orient[axis],
+                Point3D.create((g1.x + g2.x) / 2 + 0.4,
+                               (g1.y + g2.y) / 2 + 0.4, 0))
+            nd.parameter.expression = "abs((%s) - (%s))" % (expr, ax_expr[axis])
+            added.append(nd)
+        except Exception as e:
+            print(f"  reanchor [{getattr(sk, 'name', '?')}]: retarget failed on "
+                  f"axis={axis}: {e}")
+
+    # ── Geometry-preservation self-check ───────────────────────────────────
+    # A correct anchor never moves the part. If any vertex shifted, the anchor
+    # was wrong (almost always anchor_pt resolved to the wrong projected corner —
+    # e.g. a perpendicular/complex parent face on a non-XY plane). Rather than
+    # silently corrupt geometry (the part penetrates its neighbour downstream),
+    # REVERT to the original origin dims and return None with a loud, actionable
+    # message. The sketch then stays in origin mode (builds, fails the deps origin
+    # check) instead of shifting — a safe, debuggable failure.
+    shift = 0.0
+    for (v, m0) in pre:
+        m1 = sk.sketchToModelSpace(v.geometry)
+        shift = max(shift, ((m1.x - m0.x) ** 2 + (m1.y - m0.y) ** 2
+                            + (m1.z - m0.z) ** 2) ** 0.5)
+    if shift > 1e-3:
+        for nd in added:
+            try:
+                nd.deleteMe()
+            except Exception:
+                pass
+        for (dim, v, expr, val, ori) in targets:
+            try:
+                g = v.geometry
+                rd = d.addDistanceDimension(
+                    op, v, ori, Point3D.create(g.x + 0.4, g.y + 0.4, 0))
+                rd.parameter.expression = expr
+            except Exception:
+                pass
+        print(f"  reanchor [{getattr(sk, 'name', '?')}]: ANCHOR REJECTED — "
+              f"retarget moved the part {shift:.3f} cm, so anchor_xyz matched the "
+              f"WRONG projected corner. Reverted to origin mode (not anchored). "
+              f"Fix: pass a corner anchor_pt resolves exactly, or project a "
+              f"different (e.g. parallel) parent face.")
+        return None
+
     # Projecting the parent face added construction geometry that invalidates any
     # Profile captured before this call; re-resolve and return a fresh profile so
     # the caller extrudes the right one.
