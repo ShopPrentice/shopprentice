@@ -239,6 +239,102 @@ def _check_interference(root_comp, exclude_prefixes):
 
 # ── Handler ──────────────────────────────────────────────────────────
 
+def _native_token(b):
+    """Entity token of a body's native object (proxies resolve to their native)."""
+    try:
+        nb = getattr(b, "nativeObject", None) or b
+        return nb.entityToken
+    except Exception:
+        try:
+            return b.entityToken
+        except Exception:
+            return None
+
+
+def _shape_signature(entry):
+    """Reflection/translation-invariant shape signature for congruence grouping:
+    (volume, sorted bbox dims, face count). Mirror twins and pattern repeats share
+    a signature; a leg and a coincidentally-same-volume stretcher almost never do
+    (different bbox dims and/or face count). Returns None if geometry unreadable."""
+    b = entry["body"]
+    mn, mx = entry["min"], entry["max"]
+    dims = tuple(sorted(round(abs(mx[i] - mn[i]), 1) for i in range(3)))
+    try:
+        vol = round(b.volume, 2)
+        nf = b.faces.count
+    except Exception:
+        return None
+    if vol <= 0:
+        return None
+    return (vol, dims, nf)
+
+
+def _replicated_tokens(design):
+    """Native entity tokens of bodies PRODUCED by Mirror/Pattern features — i.e.
+    bodies the agent already replicated. Used to suppress advisories: if any member
+    of a congruence group is such an output, the group is being replicated and is
+    never flagged (keeps false positives low)."""
+    toks = set()
+    try:
+        tl = design.timeline
+        for i in range(tl.count):
+            try:
+                feat = tl.item(i).entity
+                ot = getattr(feat, "objectType", "") or ""
+                if ("MirrorFeature" in ot or "RectangularPatternFeature" in ot
+                        or "CircularPatternFeature" in ot):
+                    fb = getattr(feat, "bodies", None)
+                    if fb:
+                        for k in range(fb.count):
+                            t = _native_token(fb.item(k))
+                            if t:
+                                toks.add(t)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return toks
+
+
+def _check_replication(design, bodies, exclude_prefixes, min_group=2):
+    """ADVISORY (never affects pass/fail): congruent structural bodies built
+    independently instead of via Mirror/Pattern — the token-wasteful, non-parametric
+    anti-pattern. Conservative by design (low false positives):
+      - structural bodies only (exclude_prefixes covers DM_/joinery voids);
+      - strong shape signature (volume + bbox dims + face count);
+      - a group is flagged ONLY if NONE of its members is a Mirror/Pattern output
+        (so a set that's already being replicated is never flagged);
+      - opt-out via a `_norep` substring in a body name (intentional independent
+        construction — e.g. per-corner joinery that can't be mirrored)."""
+    repl = _replicated_tokens(design)
+    groups = {}
+    for e in bodies:
+        nm = e["name"]
+        if any(nm.startswith(p) for p in exclude_prefixes):
+            continue
+        if "_norep" in nm:
+            continue
+        sig = _shape_signature(e)
+        if sig is None:
+            continue
+        groups.setdefault(sig, []).append(e)
+
+    findings = []
+    for sig, members in groups.items():
+        if len(members) < min_group:
+            continue
+        if any(_native_token(m["body"]) in repl for m in members):
+            continue  # already replicated — don't nag
+        findings.append({
+            "names": sorted(m["name"] for m in members),
+            "count": len(members),
+            # crude hint: a pair is usually a mirror, 3+ usually a pattern
+            "suggest": ("Rectangular Pattern" if len(members) >= 3
+                        else "Mirror"),
+        })
+    return {"advisory": True, "groups": findings}
+
+
 def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dict:
     """Run all structural validation checks on the current design."""
 
@@ -283,6 +379,16 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
         except Exception as de:
             deps_result = {"passed": None, "error": str(de)}
 
+        # Replication advisory — congruent bodies built independently instead of
+        # via Mirror/Pattern. ADVISORY ONLY: never changes `passed`. It's an
+        # optimization (parametric + token-cheaper), not a correctness bug, so it
+        # must not force a redo of a working build.
+        replication = None
+        try:
+            replication = _check_replication(design, bodies, prefixes)
+        except Exception as re:
+            replication = {"advisory": True, "error": str(re), "groups": []}
+
         import json
         result = {
             "passed": passed,
@@ -291,6 +397,8 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
         }
         if deps_result is not None:
             result["deps"] = deps_result
+        if replication is not None and replication.get("groups"):
+            result["replication"] = replication
 
         parts = []
         if connectivity["connected"] and not connectivity["weakConnections"]:
@@ -310,6 +418,14 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
                 parts.append("deps OK")
             elif deps_result.get("passed") is False:
                 parts.append("DEPS FAIL")
+
+        if replication is not None and replication.get("groups"):
+            g = replication["groups"]
+            ex = "; ".join(
+                f"{'/'.join(grp['names'])} → {grp['suggest']}" for grp in g[:3])
+            parts.append(
+                f"replication ADVISORY ({len(g)} group(s) built independently — "
+                f"{ex}) [does not affect pass/fail]")
 
         status = "PASSED" if passed else "FAILED"
         msg = f"{status}: {', '.join(parts)}"
@@ -346,9 +462,18 @@ Combines three checks in a single call:
    the judge; only fit-point spline interiors may stay free), bodies in
    components.
    Completeness check is advisory (printed but doesn't affect pass/fail).
+4. **Replication advisory** (ADVISORY — never affects pass/fail): congruent
+   structural bodies built independently instead of via Mirror/Pattern (the
+   token-wasteful, non-parametric anti-pattern). Suppressed when the bodies are
+   already a Mirror/Pattern output, when a body name contains `_norep`, or for
+   excluded prefixes. Surfaced as a note so a working build is never forced into
+   a redo; the recommended response is to refactor the named group to one
+   template + Mirror/Pattern (a sub-agent can do this so the main build's context
+   stays lean).
 
 Returns a single pass/fail result. Fails if disconnected, has weak
-connections, or has interference. Run after EVERY phase."""
+connections, or has interference (NOT for the replication advisory).
+Run after EVERY phase."""
 
 tool = Tool.create_simple(
     name="validate_design",
