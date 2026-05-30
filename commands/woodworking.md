@@ -388,8 +388,10 @@ root body (`ref=origin`) is exempt: its own component's sketches may dimension f
    origin dimension automatically (signs via `abs()`, the origin is auto-excluded, geometry unchanged,
    full constraint preserved):
    ```python
-   sk, prof = sp.sketch_rect_model(comp, plane, (x0,y0,z0), {"x":"w","y":"d"}, "Shelf_Sk", ev=ev)
-   sp.reanchor(sk, side_left, sides_occ, "z", +1, ("table_l", "0 in", "z0"))
+   sk, _ = sp.sketch_rect_model(comp, plane, (x0,y0,z0), {"x":"w","y":"d"}, "Shelf_Sk", ev=ev)
+   prof = sp.reanchor(sk, side_left, sides_occ, "z", +1, ("table_l", "0 in", "z0"))
+   sp.ext_new(comp, prof, "shelf_thick", "Shelf")   # extrude the RETURNED profile —
+   # reanchor projects the parent face, which invalidates a profile captured earlier.
    ```
 
 3. **Hand-anchor with the primitives** (custom geometry): `sp.project_face(sk, parent, occ, axis, dir)`,
