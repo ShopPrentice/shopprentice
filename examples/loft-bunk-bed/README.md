@@ -1,6 +1,6 @@
-# Loft Bunk Bed with Desk and Ladder
+# Loft Bed with Desk and Ladder
 
-A parametric loft bunk bed -- Twin 40"W x 75"L, elevated sleeping platform at 58" with integrated desk underneath and angled ladder with hook-tab sides.
+A parametric loft bed -- Twin 40"W x 75"L, elevated sleeping platform at 58" with integrated desk underneath and angled ladder with hook-tab sides.
 
 ---
 
