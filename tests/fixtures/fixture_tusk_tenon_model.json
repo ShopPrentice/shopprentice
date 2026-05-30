@@ -1,0 +1,45 @@
+{
+  "name": "Tusk Tenon Fixture",
+  "deps": [
+    {
+      "body": "Post_L",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Left post — origin root body"
+    },
+    {
+      "body": "Post_R",
+      "ref": "Post_L",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "contact": false,
+      "note": "Right post — mirror position of Post_L"
+    },
+    {
+      "body": "Rail",
+      "ref": "Post_L",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "contact": true,
+      "note": "Rail spanning between posts, through-tenon + tusk at each end"
+    },
+    {
+      "body": "TK_Key",
+      "refs": ["Post_L", "Rail"],
+      "side": "outside",
+      "direction": [0, 0, -1],
+      "contact": true,
+      "note": "Tusk key — bearing face on Post_L, rides Rail tenon"
+    },
+    {
+      "body": "TK_Key_Mir",
+      "refs": ["Post_R", "Rail"],
+      "side": "outside",
+      "direction": [0, 0, -1],
+      "contact": true,
+      "note": "Mirrored tusk key at Post_R end"
+    }
+  ]
+}

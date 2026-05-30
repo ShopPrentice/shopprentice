@@ -1,0 +1,30 @@
+{
+  "name": "Tabletop Button Fixture",
+  "deps": [
+    {
+      "body": "Apron",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Apron block — origin root body"
+    },
+    {
+      "body": "Top",
+      "ref": "Apron",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Top panel resting on apron"
+    },
+    {
+      "body": "BTN",
+      "ref": "Apron",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Tabletop button — tongue into apron slot, body under top",
+      "replicas": "BTN*"
+    }
+  ]
+}
