@@ -310,20 +310,44 @@ def validate_deps(ctx, metadata_path=None):
         for si in range(comp.sketches.count):
             sk = comp.sketches.item(si)
             origin_pt = sk.originPoint
+            try:
+                otok = origin_pt.entityToken
+            except Exception:
+                otok = None
+            try:
+                ogeo = origin_pt.geometry
+            except Exception:
+                ogeo = None
             for di in range(sk.sketchDimensions.count):
                 dim = sk.sketchDimensions.item(di)
                 try:
-                    e1 = dim.entityOne
-                    e2 = dim.entityTwo
+                    # Match the origin point by IDENTITY, not coordinate
+                    # coincidence. A legitimately-anchored sketch can dimension
+                    # from a PROJECTED parent corner that happens to land on the
+                    # sketch origin (e.g. a parent body at the world origin) —
+                    # that is a real reference, not an origin dim, and a
+                    # proximity test would false-flag it. Only sk.originPoint
+                    # itself counts.
+                    #
+                    # Fallback: if the entityToken is unavailable, drop back to
+                    # the old coordinate-proximity test so the check fails CLOSED
+                    # (a tokenless sketch is still checked) rather than silently
+                    # passing.
                     uses_origin = False
-                    if hasattr(e1, 'geometry') and hasattr(origin_pt, 'geometry'):
-                        if (abs(e1.geometry.x - origin_pt.geometry.x) < 0.001 and
-                            abs(e1.geometry.y - origin_pt.geometry.y) < 0.001):
-                            uses_origin = True
-                    if hasattr(e2, 'geometry') and hasattr(origin_pt, 'geometry'):
-                        if (abs(e2.geometry.x - origin_pt.geometry.x) < 0.001 and
-                            abs(e2.geometry.y - origin_pt.geometry.y) < 0.001):
-                            uses_origin = True
+                    for ent in (dim.entityOne, dim.entityTwo):
+                        try:
+                            if otok is not None:
+                                if ent.entityToken == otok:
+                                    uses_origin = True
+                                    break
+                            elif ogeo is not None:
+                                g = ent.geometry
+                                if (abs(g.x - ogeo.x) < 0.001 and
+                                        abs(g.y - ogeo.y) < 0.001):
+                                    uses_origin = True
+                                    break
+                        except Exception:
+                            pass
                     if uses_origin:
                         expr = dim.parameter.expression if dim.parameter else "?"
                         origin_dim_issues.append(
