@@ -135,3 +135,103 @@ def rdim(sk, d, p1, p2, orient, axis, expr):
         ).parameter.expression = expr
     except Exception:
         pass
+
+
+def reanchor(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz,
+             _eps=1e-3):
+    """Retarget every sketch-origin dimension in ``sk`` to a projected parent
+    corner — the one-call way to make an ORIGIN-mode sketch pass the validator.
+
+    Build the sketch normally (``sketch_rect_model`` / ``sketch_slot_model`` /
+    a joinery template in default/origin mode), then call ``reanchor`` ONCE.
+    It removes the whole "anchor derivation" burden: no choosing a non-origin
+    corner, no positive-offset arithmetic, no axis bookkeeping. It:
+
+      1. projects ``parent_body``'s ``face_axis``/``face_dir`` face as a
+         construction/reference (``project_face``);
+      2. finds the projected anchor nearest ``anchor_xyz`` (the sketch origin is
+         auto-excluded by ``anchor_pt``);
+      3. for every dimension that references the sketch origin, deletes it and
+         re-adds an equivalent dimension from the anchor to the SAME vertex with
+         offset ``abs(<original expr> - <anchor's expr on that axis>)`` — so the
+         sign is handled by Fusion's ``abs()`` and the vertex never moves.
+
+    Because each origin dim is replaced 1-for-1, DOF is preserved: a sketch that
+    was fully constrained in origin mode stays fully constrained, now anchored to
+    real parent geometry (deps rules 1-3).
+
+    Args:
+        sk: The sketch to re-anchor (already built, with origin dims).
+        parent_body, parent_occ, face_axis, face_dir: parent reference face
+            (as in ``project_face``).
+        anchor_xyz: (x, y, z) model expressions (or numbers) of a REAL parent
+            corner to anchor to — must not be the sketch-origin projection.
+
+    Returns:
+        Number of dimensions retargeted (0 if no anchor point was found).
+
+    Limitation: the anchored vertex itself must not sit on the sketch origin
+    (dimensioning it would re-touch the origin). For a part whose own corner is
+    at world (0,0), anchor an adjacent corner instead (``sketch_rect_model``'s
+    ``anchor=`` with ``size_far``).
+    """
+    from .sketch import probe_orientations
+    from ._util import _make_ev
+
+    ev = _make_ev()
+    project_face(sk, parent_body, parent_occ, face_axis, face_dir)
+    ax_expr = {"x": anchor_xyz[0], "y": anchor_xyz[1], "z": anchor_xyz[2]}
+    av = [ev(c) if isinstance(c, str) else c for c in anchor_xyz]
+    anchor = anchor_pt(sk, av[0], av[1], av[2])
+    if anchor is None:
+        return 0
+
+    op = sk.originPoint
+    og = op.geometry
+
+    def _is_origin(e):
+        try:
+            g = e.geometry
+        except Exception:
+            return False
+        return abs(g.x - og.x) < _eps and abs(g.y - og.y) < _eps
+
+    # Snapshot the origin-referencing dims before mutating the collection.
+    targets = []
+    for di in range(sk.sketchDimensions.count):
+        dim = sk.sketchDimensions.item(di)
+        try:
+            e1, e2 = dim.entityOne, dim.entityTwo
+        except Exception:
+            continue
+        o1, o2 = _is_origin(e1), _is_origin(e2)
+        if o1 == o2:
+            continue  # neither, or both (degenerate) — leave alone
+        v = e2 if o1 else e1
+        try:
+            ori = dim.orientation
+        except Exception:
+            ori = None
+        targets.append((dim, v, dim.parameter.expression,
+                        dim.parameter.value, ori))
+
+    om = sk.sketchToModelSpace(og)
+    n = 0
+    for (dim, v, expr, val, ori) in targets:
+        vm = sk.sketchToModelSpace(v.geometry)
+        orient = probe_orientations(sk, vm.x, vm.y, vm.z)
+        axis = None
+        if ori is not None:
+            axis = next((a for a in ("x", "y", "z") if orient[a] == ori), None)
+        if axis is None:  # fallback: match the measured value to an axis delta
+            axis = next(
+                (a for a in ("x", "y", "z")
+                 if abs(abs(getattr(vm, a) - getattr(om, a)) - val) < _eps),
+                None)
+        if axis is None:
+            continue
+        dim.deleteMe()
+        rdim(sk, sk.sketchDimensions, anchor, v, orient, axis,
+             "abs((%s) - (%s))" % (expr, ax_expr[axis]))
+        n += 1
+    return n
