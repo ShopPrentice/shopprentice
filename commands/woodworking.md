@@ -559,6 +559,8 @@ This allows the user (or a new agent session) to resume work by reading the READ
 
 **Loop:** execute_script → on error: fix + retry (max 3 per error) → on success: capture_design + validate_design (MANDATORY) → auto-proceed.
 
+**Multi-agent / parallel sessions.** When agents run concurrently (a fan-out), the **Session Manager keeps a dedicated Fusion document per agent** (keyed by session ID); your `execute_script` / `capture_design` / `validate_design` calls operate on YOUR document and `clean=True` rebuilds only it, so parallel agents never collide. Fusion serializes execution — expect latency, not incorrectness — so run the normal loop with no document coordination. If you lose your binding or `claim_document` reports a conflict, re-bind (`resolution='transfer'` to take a contested doc); after a restore, `clean=True` is rejected until you `sync_script`. See `docs/mcp-advanced.md`.
+
 **model.json:** Before writing the build script, create a `model.json` dependency tree — each entry pairs a `"body"` with its `"ref"`, the parent it was positioned from. `"ref"` may be one name or a list: every body needs ≥1 parent (a part seating against two lists both), and exactly one body references `"origin"` (the root). A two-parent sketch anchors to each parent's projected geometry on the axis that parent controls.
 
 **Phase validation:** `validate_design` runs connectivity, interference, and dependency checks (single origin, sketch origin enforcement, bodies in components). Run it after EVERY phase. Completeness (all bodies tracked) is advisory — it won't fail the build.

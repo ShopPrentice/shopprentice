@@ -263,6 +263,17 @@ Use `execute_script` with `sandbox=true` to run a script in a throwaway document
 
 **Not a substitute for the real execution loop.** Sandbox validates that a script runs without errors and produces expected geometry, but the real design's parameter expressions and timeline context may differ. Always follow sandbox validation with a real `execute_script` run.
 
+### Multi-Agent / Parallel Sessions
+
+Multiple agents can drive Fusion at the same time (e.g. a fan-out where each agent builds or fixes a different piece in parallel). The **Session Manager** makes this safe and transparent:
+
+- **One document per agent, assigned automatically.** The Session Manager finds and maintains a dedicated Fusion document for each agent, keyed by the session ID carried on every request. Your `execute_script` / `capture_design` / `validate_design` / `get_document_status` calls operate on YOUR assigned document by default. You normally do **not** choose, create, activate, or `claim_document` a document (see Re-binding for the exceptions), and you do not read or depend on "which document is visually active" — that is the Session Manager's job, not yours.
+- **No cross-agent collisions.** `execute_script(clean=True)` rebuilds only *your* document. Another agent rebuilding, validating, or wiping its own document never affects yours, so parallel agents don't step on each other and don't need to coordinate or take turns.
+- **Execution is serialized, not parallel.** Fusion is single-threaded, so the Session Manager queues requests across all agents and spaces them out to keep Fusion responsive (and avoid crashes from bursts). Your calls may therefore wait briefly behind other agents' calls — budget for some extra latency, but correctness is unaffected. Keep individual scripts reasonably sized so one agent's long build doesn't starve the queue.
+- **You still run the normal loop.** Author the script, `execute_script`, fix-and-retry on error, then `capture_design` + `validate_design` — exactly as a solo agent would. The only difference is that the document you're acting on was provisioned for you.
+- **Re-binding.** A session can lose its document binding — after an add-in restart, or after an operation that detaches it (e.g. closing the active document via `manage_documents`). The next call then returns a "session restored" message listing available documents with their `doc_key`s; call `claim_document` (preferably by `doc_key`) to re-adopt yours. If the document you target is already bound to another live session, `claim_document` reports a **conflict** with two options — pass `resolution='transfer'` to take it, or `keep_existing` to leave it and bind elsewhere. In normal operation you never call `claim_document`.
+- **After a restore/transfer, `clean=True` is gated.** A restored or transferred session is flagged `needsSync` (visible via `get_document_status`), and `execute_script(clean=True)` is **rejected** even when `pendingChanges=0`. Call `sync_script` to reconcile and retry — or pass `force_clean=True` ONLY when `pendingChanges=0` (nothing to lose). Never `force_clean` past real pending UI work.
+
 ### Important
 
 - Always generate complete, standalone parametric scripts. MCP is the delivery mechanism — the script must also work when pasted into Fusion 360's script editor.
