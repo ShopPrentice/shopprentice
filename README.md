@@ -49,6 +49,9 @@ The agent can also work from images — show it a photo or sketch of a piece and
 
 <table>
 <tr>
+<td align="center" colspan="3"><a href="examples/trestle-table/"><img src="examples/trestle-table/screenshots/iso-top-right.png" width="260" /><br /><b>Trestle Table</b></a><br />Knock-down wedged through-tenons (tusk wedges), drawbore pegs, tabletop buttons, curved stretcher</td>
+</tr>
+<tr>
 <td align="center"><a href="examples/jewelry-chest/"><img src="examples/jewelry-chest/product_iso.png" width="200" /><br /><b>Jewelry Chest</b></a><br />Dovetails, mitered trays, spalted maple veneer, frame-and-panel lid</td>
 <td align="center"><a href="examples/mcm-desk/"><img src="examples/mcm-desk/assets/rendered_model.png" width="200" /><br /><b>MCM Teak Desk</b></a><br />Real wood photography, entasis legs, ear fillet wrapping</td>
 <td align="center"><a href="examples/esherick-stool/"><img src="examples/esherick-stool/iso-top-right.png" width="200" /><br /><b>Esherick Stool</b></a><br />Lofted lens-profile seat, turned legs, wedged through-tenons</td>
