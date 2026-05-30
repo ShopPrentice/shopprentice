@@ -163,19 +163,22 @@ sk, prof = sp.sketch_rect_model(comp, comp.xZConstructionPlane,
 - `model_size`: `{axis: expr, axis: expr}` — 2 model-axis size expressions
 - Returns: `(sketch, profile)`
 
-**Limitation — position dimensions are always positive.** `sketch_rect_model` uses `addDistanceDimension` for the x-offset and y-offset from the sketch origin, which measures absolute distance (always positive). This works correctly when the rectangle is near the origin or in the positive quadrant. For bodies at arbitrary model positions (e.g., splay-adjusted stretchers offset from origin), the position dimensions can reflect coordinates to the wrong side.
+**Non-root sketches must be ANCHORED, not origin-positioned.** In its default form `sketch_rect_model` positions the rectangle with two `addDistanceDimension(sk.originPoint, …)` dims. That is correct ONLY for the root body's own sketch; for any non-root sketch it fails `validate_deps` (origin reference + not anchored to a parent). Make non-root rectangles compliant one of two ways:
 
-**Workaround:** For arbitrarily-positioned rectangles, use a manual sketch with `modelToSketchSpace` for approximate placement and only width/height dimensions (always positive, no position dimensions):
-
+**(a) `anchor=` mode — compliant from the start:**
 ```python
-sk = root.sketches.add(plane)
-m2s = sk.modelToSketchSpace
-s0 = m2s(P(x0_val, y0_val, z_val))
-s1 = m2s(P(x1_val, y1_val, z_val))
-rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
-    P(s0.x, s0.y, 0), P(s1.x, s1.y, 0))
-# H/V constraints + width/height dimensions only — no position dimensions
+sk, prof = sp.sketch_rect_model(comp, plane, (x0,y0,z0), {"x":"w","y":"d"}, "Shelf_Sk", ev=ev,
+    anchor=dict(parent_body=side_left, parent_occ=sides_occ, face_axis="z", face_dir=+1,
+                anchor_xyz=("0 in","board_thick","z0"), off1=("x","w_off"), off2=("y","d_off")))
 ```
+`anchor` projects the parent face, draws the rectangle from explicit model corners with H/V on all four edges, and dimensions a non-origin corner from a projected parent corner (`off1`/`off2` are positive-magnitude offsets). `which=` selects which corner to anchor; `size_far=True` sizes the far edges so a part whose own corner sits at world (0,0) never dimensions the origin vertex. The same `anchor=` dict shape is accepted by `sketch_slot_model` (key `off=((ax,expr),(ax,expr))`) and the joinery templates.
+
+**(b) `sp.reanchor(...)` after the fact — retrofit any origin-mode sketch:**
+```python
+sk, prof = sp.sketch_rect_model(comp, plane, (x0,y0,z0), {"x":"w","y":"d"}, "Shelf_Sk", ev=ev)
+sp.reanchor(sk, side_left, sides_occ, "z", +1, ("table_l", "0 in", "z0"))
+```
+This also resolves the old "position dimensions are always positive" problem — `reanchor` rewrites each offset as `abs(<orig expr> - <anchor expr>)`, so arbitrarily-positioned parts (splay-adjusted stretchers, etc.) get the correct sign automatically, with geometry unchanged. **Do NOT** use a manual `addTwoPointRectangle` with width/height only and no position dims — it leaves the sketch under-constrained and fails the validator.
 
 ### Feature Builder Reference (`sp.*`)
 
@@ -195,13 +198,17 @@ All feature builders take `comp` as first arg. Available via `from helpers impor
 | `feat_pattern` | `(comp, feat, axis, count_expr, spacing_expr, name)` | RectangularPatternFeature | Feature pattern along axis |
 | `body_pattern` | `(comp, body, axis, count_expr, spacing_expr, name)` | RectangularPatternFeature | **WARNING:** replays full feature tree — creates ghost bodies if template has CUT/JOIN history. Use Python `for` loop instead for complex bodies. |
 | `sketch_slot` | `(comp, plane, cx_expr, cy_expr, long_expr, short_expr, vertical, name, ev)` | (sketch, profile) | Stadium shape in sketch-space coords. Use for domino mortises. |
-| `sketch_slot_model` | `(comp, plane, model_center, long_model_axis, long_expr, short_expr, name, ev)` | (sketch, profile) | Stadium shape in model-space coords with auto sign detection. |
+| `sketch_slot_model` | `(comp, plane, model_center, long_model_axis, long_expr, short_expr, name, ev, anchor=None)` | (sketch, profile) | Stadium shape in model-space coords with auto sign detection. Pass `anchor=dict(parent_body, parent_occ, face_axis, face_dir, anchor_xyz, off=((ax,expr),(ax,expr)))` to anchor a NON-root slot to a projected parent (else origin mode → fails the validator). |
 | `probe_sketch_signs` | `(sk)` | (h_axis, v_axis, h_sign, v_sign) | Extends `probe_sketch_axes` with sign detection for non-XY planes. |
 | `mating_bounds` | `(body_a, body_b, normal_axis, tol=0.1)` | dict | Contact area between two bodies at interface. Returns `{ax_min, ax_max, ax_center, ax_size}` for each axis parallel to the interface. **Raises ValueError** if bodies are gapped (not touching), overlapping (penetrating — CUT first), or have no shared mating surface. Provides diagnostic messages with axis ranges so the agent can fix placement during the build. |
 | `check_domino_exposure` | `(void, body_a, body_b, normal_axis, tol=0.05)` | None | Checks that a domino void creates blind pockets in both mating pieces. On axes perpendicular to the interface normal, the void must be fully contained within each body's bounding box. **Raises ValueError** if the void extends beyond either body — the mortise opens to a surface (exposed domino). Call AFTER creating the void body but BEFORE CUTting. Error message includes axis ranges and overshoot distance for diagnosis. |
 | `sketch_on_plane` | `(comp, plane, project=None, intersect=None, identify=None, name="Sk")` | (sketch, found_pts) | **The sanctioned way to anchor a child sketch to a parent body/face.** Creates the sketch, projects each entity in `project` (proxy faces/bodies/edges from `createForAssemblyContext`), optionally intersects bodies, auto-converts all references to construction, and — for each `{name: model_Point3D}` in `identify` — returns the nearest resulting SketchPoint. The identify point is only a *locator* (it selects which projected vertex); the anchor's real position comes from the projected geometry, so nothing is computed. Draw new geometry FROM the returned points. |
 | `drop_to_line` | `(sketch, point, ref_line, approximate_target=None)` | SketchPoint | Drops a perpendicular construction line from a SketchPoint to a reference line and returns the associative projected point (updates when source/reference move). |
-| `refs_to_construction` | `(sk)` | None | Converts all projected/reference lines in a sketch to construction geometry so only drawn curves define profiles. Called automatically by `sketch_on_plane`. |
+| `refs_to_construction` | `(sk)` | None | Converts all projected/reference lines in a sketch to construction geometry so only drawn curves define profiles. Called automatically by `sketch_on_plane`. Note: demotes LINES; projected circles/arcs stay reference curves (still usable by `anchor_pt`). |
+| `project_face` | `(child_sk, parent_body, parent_occ, axis, direction)` | None | Projects the parent body's outermost `axis`/`direction` face (assembly-context proxy when `parent_occ` is given) into the child sketch as a construction/reference, satisfying "project real parent geometry". |
+| `anchor_pt` | `(child_sk, mx, my, mz, include_centers=True, exclude_origin=True)` | SketchPoint or None | Nearest projected-reference point to a model point — for anchoring drawn geometry. Considers line start/end AND circle/arc **centres** (round/turned parts) and reference curves; **auto-skips the sketch origin**. Returns None if nothing eligible was projected. |
+| `rdim` | `(sk, d, p1, p2, orient, axis, expr)` | None | Tolerant relative distance dimension between two sketch points along a model `axis` (`orient` from `probe_orientations`). Silently skips if it would over-constrain. Use POSITIVE magnitude expressions. |
+| `reanchor` | `(sk, parent_body, parent_occ, face_axis, face_dir, anchor_xyz)` | int (dims retargeted) | **One-call fix for a non-root sketch built in origin mode.** Projects the parent face, finds a non-origin anchor, and retargets every `sk.originPoint` dimension to it as `abs(<orig expr> - <anchor axis expr>)`. DOF + geometry preserved. `anchor_xyz` = `(x,y,z)` model exprs of a real parent corner. The anchored vertex must not itself be at world (0,0) — for that use `sketch_rect_model(anchor=…, size_far=True)`. |
 | `validate_deps` | `(ctx, metadata_path=None)` | bool or None | Validates the dependency tree from `model.json`. Hard checks (affect pass/fail): (1) single origin root — only 1 body may reference `"origin"`; (2) sketch origin — non-root sketches must not dimension from `sk.originPoint`; (3) **sketch traceability** — every non-root sketch must project real reference geometry, use no Fix/Ground constraint on drawn geometry, and be fully constrained relative to that reference (Fusion's `sketch.isFullyConstrained` is the judge — a rigid sketch that floats is not fully constrained; only fit-point spline interiors may remain free, and their start/end must anchor); (4) no bodies in the root component. Advisory: completeness (tracked-body coverage). Returns `True`/`False`/`None` (no metadata). Dep entries support optional `"replicas": "glob_pattern"` for pattern copies. A body's `"ref"` may be a single parent name OR a list of names — multi-contact joints reference more than one parent (e.g. a wedge bearing on a post AND riding a stretcher; a shelf tenoned into two sides). Only the `"origin"` root is unique; every other body needs ≥1 parent but is not capped at one. |
 
 ### Cross-Component Proxy Projection
