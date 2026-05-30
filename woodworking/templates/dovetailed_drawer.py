@@ -248,6 +248,20 @@ def build(comp, prefix="dd", ev=None, anchor=None):
 
     print(f"  Bottom panel + grooves done")
 
+    # Always anchor the dovetail corner trapezoids — they reference the drawer's
+    # OWN boards (front/back), so they're valid whether or not the drawer itself
+    # has an external anchor. Without this, dd_HBD_Sk / dd_DT_Sk stay
+    # origin-dimensioned AND under-constrained (only one flank angle). The corner
+    # trapezoids sit on left_pl (x = xo); anchor each to the coplanar -X face of
+    # the board it cuts, giving just a real corner — trapezoid_sketch
+    # auto-derives the offsets.
+    hbd_anchor = dict(parent_body=front, parent_occ=None,
+                      face_axis="x", face_dir=-1,
+                      anchor_xyz=(xo, "0 in", zo))
+    dt_anchor = dict(parent_body=back, parent_occ=None,
+                     face_axis="x", face_dir=-1,
+                     anchor_xyz=(xo, f"{p}_d - {p}_st", zo))
+
     # ── Half-blind dovetails at front (2-corner: FL + FR) ──
     hbd_result = half_blind_dovetail.box(
         comp, front, left,
@@ -258,7 +272,7 @@ def build(comp, prefix="dd", ev=None, anchor=None):
         prefix=f"hbd_{p}", name=f"{p}_HBD", ev=ev,
         fl_plane=left_pl,
         front_expr="0 in",
-        joint_base_expr=zo)
+        joint_base_expr=zo, anchor=hbd_anchor)
 
     print(f"  Half-blind dovetails at front (FL + FR)")
 
@@ -272,7 +286,7 @@ def build(comp, prefix="dd", ev=None, anchor=None):
         fl_plane=left_pl,
         front_expr=f"{p}_d",
         thick_dir=-1,
-        joint_base_expr=zo)
+        joint_base_expr=zo, anchor=dt_anchor)
 
     print(f"  Through dovetails at back (BL + BR)")
 

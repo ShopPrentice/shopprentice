@@ -20,6 +20,38 @@ H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
 V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
 
 
+def _auto_offsets(m1_pt, m4_pt, m3_pt, short_joint_expr, short_base_expr,
+                  anchor_xyz):
+    """Derive ``(off1, off2)`` for the short-face low endpoint automatically.
+
+    Lets a caller anchor a dovetail trapezoid by giving ONLY a real parent
+    corner (``anchor_xyz``) — no fragile hand-computed offsets. The short-face
+    low endpoint's origin-relative position IS ``short_joint_expr`` (joint axis)
+    and ``short_base_expr`` (thickness axis); the offset to the projected anchor
+    corner along each is ``abs(<that expr> - <anchor's expr on the same axis>)``
+    — the sign-safe trick ``sp.reanchor`` uses. The joint/thick MODEL axes are
+    read from the trapezoid's own corner deltas (so no extra caller bookkeeping).
+    """
+    names = ("x", "y", "z")
+    idx = {"x": 0, "y": 1, "z": 2}
+
+    def _axis_of(pa, pb):
+        deltas = (abs(pa.x - pb.x), abs(pa.y - pb.y), abs(pa.z - pb.z))
+        return names[deltas.index(max(deltas))]
+
+    joint_ax = _axis_of(m3_pt, m4_pt)   # short-face direction
+    thick_ax = _axis_of(m1_pt, m4_pt)   # wide ↔ short separation
+
+    def _s(v):
+        return v if isinstance(v, str) else f"{v} cm"
+
+    a_joint = _s(anchor_xyz[idx[joint_ax]])
+    a_thick = _s(anchor_xyz[idx[thick_ax]])
+    off1 = (joint_ax, f"abs(({short_joint_expr}) - ({a_joint}))")
+    off2 = (thick_ax, f"abs(({short_base_expr}) - ({a_thick}))")
+    return off1, off2
+
+
 def trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
                      thick_expr, short_joint_expr, short_base_expr,
                      prefix, name, narrow_w_expr=None, anchor=None):
@@ -59,9 +91,11 @@ def trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
                 reference face (see ``sp.sketch_rect_model``).
               anchor_xyz: (x_expr, y_expr, z_expr) — model point on the parent
                 face whose projected corner anchors the short-face low endpoint.
-              off1, off2: (axis, expr) offset dims from that projected corner to
-                the short-face low endpoint (``l_short.startSketchPoint``).
-                POSITIVE magnitudes.
+              off1, off2: OPTIONAL (axis, expr) offset dims from that projected
+                corner to the short-face low endpoint. When omitted they are
+                auto-derived from the trapezoid's own short/thick exprs and
+                ``anchor_xyz`` (``_auto_offsets``) — so the caller usually only
+                needs ``anchor_xyz`` (a real parent corner). POSITIVE magnitudes.
 
     Returns:
         The smallest profile in the sketch.
@@ -154,7 +188,13 @@ def trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
         axv = [ev(c) if isinstance(c, str) else c for c in ax]
         aP = anchor_pt(sk, axv[0], axv[1], axv[2])
         orient = probe_orientations(sk, m4_pt.x, m4_pt.y, m4_pt.z)
-        o1, o2 = anchor["off1"], anchor["off2"]
+        # off1/off2 are optional: when omitted, auto-derive them from the
+        # trapezoid's own short/thick exprs + the anchor corner (the caller then
+        # only needs to give a real parent face + corner — no manual offsets).
+        o1, o2 = anchor.get("off1"), anchor.get("off2")
+        if o1 is None or o2 is None:
+            o1, o2 = _auto_offsets(m1_pt, m4_pt, m3_pt,
+                                   short_joint_expr, short_base_expr, ax)
         if aP is not None:
             rdim(sk, d, aP, l_short.startSketchPoint, orient, o1[0], o1[1])
             rdim(sk, d, aP, l_short.startSketchPoint, orient, o2[0], o2[1])
