@@ -424,17 +424,12 @@ def run(context):
     # 1. Front rail body (between legs only)
     front_rail_pl = off_plane(rails_c, rails_c.xZConstructionPlane,
         "top_overhang + (leg_size - rail_thick) / 2", "FrontRail_Pl")
-    front_rail_sk, _ = sketch_rect_model(rails_c, front_rail_pl,
+    _, pr = sketch_rect_model(rails_c, front_rail_pl,
         ("top_overhang + leg_size",
          "top_overhang + (leg_size - rail_thick) / 2",
          "leg_h - front_rail_h"),
         {"x": "base_w - 2 * leg_size", "z": "front_rail_h"},
         "FrontRail_Sk")
-    # Anchor to FL leg outer -Y face (clean; taper is on inner +X/+Y faces);
-    # corner = FL top-inner corner.
-    pr = sp.reanchor(front_rail_sk, ref_fl, legs_occ, "y", -1,
-        ("top_overhang + leg_size", "top_overhang", "leg_h")) \
-        or smallest_profile(front_rail_sk)
     front_ext = ext_new(rails_c, pr, "rail_thick", "FrontRail")
     front_body = front_ext.bodies.item(0)
     front_body.name = "Front"
@@ -442,16 +437,12 @@ def run(context):
     # 2. FL bridle tenon -> JOIN to front rail
     br_tenon_pl = off_plane(rails_c, rails_c.xZConstructionPlane,
         "top_overhang + (leg_size - br_slot_w) / 2", "BrTenon_Pl")
-    fl_brtenon_sk, _ = sketch_rect_model(rails_c, br_tenon_pl,
+    _, pr = sketch_rect_model(rails_c, br_tenon_pl,
         ("top_overhang",
          "top_overhang + (leg_size - br_slot_w) / 2",
          "leg_h - front_rail_h"),
         {"x": "leg_size", "z": "front_rail_h"},
         "FL_BrTenon_Sk")
-    # Anchor to FL leg outer -Y face; corner = FL top-outer (-X) corner.
-    pr = sp.reanchor(fl_brtenon_sk, ref_fl, legs_occ, "y", -1,
-        ("top_overhang", "top_overhang", "leg_h")) \
-        or smallest_profile(fl_brtenon_sk)
     fl_tenon_ext = ext_new(rails_c, pr, "br_slot_w", "FL_BrTenon")
     fl_tenon_body = fl_tenon_ext.bodies.item(0)
     fl_tenon_join = combine(rails_c, front_body, fl_tenon_body,
@@ -503,13 +494,7 @@ def run(context):
         H, Point3D.create((fp1.x + fp2.x) / 2, fp1.y - 1, 0)
     ).parameter.expression = "base_w - 2 * leg_size"
 
-    # Anchor: retarget the two origin dims (arch start X + Z) to the front
-    # rail's own -Y face (native parent, same component → parent_occ=None).
-    # Anchor corner = rail top-inner (leg-side) corner of that face.
-    fr_arch_prof = sp.reanchor(fr_arch_sk, front_body, None, "y", -1,
-        ("top_overhang + leg_size", "top_overhang + (leg_size - rail_thick) / 2",
-         "leg_h")) \
-        or smallest_profile(fr_arch_sk)
+    fr_arch_prof = smallest_profile(fr_arch_sk)
     ext_op(rails_c, fr_arch_prof, "rail_thick", CUT, front_body, "FrontArch", flip=True)
 
     # 5. Mirror front rail -> back rail
@@ -527,33 +512,23 @@ def run(context):
     # 1. Left side rail body (between legs only)
     left_side_pl = off_plane(rails_c, rails_c.yZConstructionPlane,
         "top_overhang + (leg_size - rail_thick) / 2", "LeftSide_Pl")
-    left_side_sk, _ = sketch_rect_model(rails_c, left_side_pl,
+    _, pr = sketch_rect_model(rails_c, left_side_pl,
         ("top_overhang + (leg_size - rail_thick) / 2",
          "top_overhang + leg_size",
          "leg_h - front_rail_h - side_rail_h"),
         {"y": "base_d - 2 * leg_size", "z": "side_rail_h"},
         "LeftSide_Sk")
-    # Anchor to FL leg outer -X face (clean); corner = FL top inner-+Y corner.
-    pr = sp.reanchor(left_side_sk, ref_fl, legs_occ, "x", -1,
-        ("top_overhang", "top_overhang + leg_size", "leg_h")) \
-        or smallest_profile(left_side_sk)
     left_ext = ext_new(rails_c, pr, "rail_thick", "LeftSide")
     left_body = left_ext.bodies.item(0)
     left_body.name = "Left"
 
     # 2. FL through-tenon -> JOIN to left side rail
-    fl_tt_sk, _ = sketch_rect_model(rails_c, left_side_pl,
+    _, pr = sketch_rect_model(rails_c, left_side_pl,
         ("top_overhang + (leg_size - rail_thick) / 2",
          "top_overhang - tt_proud",
          "leg_h - front_rail_h - side_rail_h + tt_shoulder"),
         {"y": "leg_size + tt_proud", "z": "tt_tenon_h"},
         "FL_TT_Sk")
-    # Anchor to FL leg outer -X face; corner = FL top-outer (-Y) corner. The
-    # tenon's proud -Y start (top_overhang - tt_proud) is re-expressed as a
-    # positive offset (abs) from this real clean corner by reanchor.
-    pr = sp.reanchor(fl_tt_sk, ref_fl, legs_occ, "x", -1,
-        ("top_overhang", "top_overhang", "leg_h")) \
-        or smallest_profile(fl_tt_sk)
     fl_tt_ext = ext_new(rails_c, pr, "rail_thick", "FL_TT")
     fl_tt_body = fl_tt_ext.bodies.item(0)
     fl_tt_join = combine(rails_c, left_body, fl_tt_body,
@@ -603,12 +578,7 @@ def run(context):
         V, Point3D.create(sp1.x + 1, (sp1.y + sp2.y) / 2, 0)
     ).parameter.expression = "base_d - 2 * leg_size"
 
-    # Anchor: retarget the two origin dims to the left rail's own -X face
-    # (native parent → parent_occ=None). Corner = rail top inner-+Y corner.
-    arch_prof = sp.reanchor(arch_sk, left_body, None, "x", -1,
-        ("top_overhang + (leg_size - rail_thick) / 2",
-         "top_overhang + leg_size", "leg_h - front_rail_h")) \
-        or smallest_profile(arch_sk)
+    arch_prof = smallest_profile(arch_sk)
     ext_op(rails_c, arch_prof, "rail_thick", CUT, left_body, "LeftArch", flip=True)
 
     # 5. Mirror left side rail -> right
@@ -628,16 +598,10 @@ def run(context):
     # Top panel
     top_pl = off_plane(top_c, top_c.xYConstructionPlane,
         "table_h - top_thick", "Top_Pl")
-    top_sk, _ = sketch_rect_model(top_c, top_pl,
+    _, pr = sketch_rect_model(top_c, top_pl,
         ("0 in", "0 in", "table_h - top_thick"),
         {"x": "table_w", "y": "table_d"},
         "Top_Sk")
-    # Anchor to FL leg +Z top face (clean square, normal Z || top plane);
-    # corner = FL outer corner. Panel's own (0,0) corner is retargeted to a
-    # positive offset (top_overhang) from this projected leg corner.
-    pr = sp.reanchor(top_sk, ref_fl, legs_occ, "z", +1,
-        ("top_overhang", "top_overhang", "leg_h")) \
-        or smallest_profile(top_sk)
     top_ext = ext_new(top_c, pr, "top_thick", "TopBoard")
     top_body = top_ext.bodies.item(0)
     top_body.name = "Top"
@@ -645,18 +609,12 @@ def run(context):
     # Left cleat (between rail inside faces)
     cleat_pl = off_plane(top_c, top_c.xYConstructionPlane,
         "table_h - top_thick - cleat_thick", "Cleat_Pl")
-    left_cleat_sk, _ = sketch_rect_model(top_c, cleat_pl,
+    _, pr = sketch_rect_model(top_c, cleat_pl,
         ("table_w / 3 - cleat_w / 2",
          "top_overhang + (leg_size + rail_thick) / 2",
          "table_h - top_thick - cleat_thick"),
         {"x": "cleat_w", "y": "base_d - leg_size - rail_thick"},
         "LeftCleat_Sk")
-    # Anchor to Top panel -Z bottom face (same component → parent_occ=None;
-    # face still clean here — bevel/fillet are added later). Corner = far
-    # (+X,+Y) corner so anchor_pt avoids the panel's (0,0) origin corner.
-    pr = sp.reanchor(left_cleat_sk, top_body, None, "z", -1,
-        ("table_w", "table_d", "table_h - top_thick")) \
-        or smallest_profile(left_cleat_sk)
     left_cleat_ext = ext_new(top_c, pr, "cleat_thick", "LeftCleat")
     left_cleat_body = left_cleat_ext.bodies.item(0)
     left_cleat_body.name = "LeftCleat"
@@ -685,16 +643,8 @@ def run(context):
     sf = ct_sk.modelToSketchSpace(
         Point3D.create(ct_tx + ct_ts, ct_py, ct_tz + ct_ts))
 
-    # Anchor: project the LeftCleat body's -Y face (same component, plane
-    # normal Y || sketch plane; clean box at this point) and tie the cleat
-    # reference corner to the projected parent corner instead of the origin.
-    sp.project_face(ct_sk, left_cleat_body, None, "y", -1)
-    cleat_anchor = sp.anchor_pt(ct_sk, ct_cx, ct_py, ct_cz)
-
     # Reference point at cleat bottom-left corner
     cleat_corner = ct_sk.sketchPoints.add(Point3D.create(sc.x, sc.y, 0))
-    if cleat_anchor is not None:
-        ct_sk.geometricConstraints.addCoincident(cleat_corner, cleat_anchor)
 
     # Tenon rectangle
     ct_rect = ct_sk.sketchCurves.sketchLines.addTwoPointRectangle(
@@ -705,11 +655,21 @@ def run(context):
     ct_sk.geometricConstraints.addVertical(ct_rect[1])
     ct_sk.geometricConstraints.addVertical(ct_rect[3])
 
-    # Parametric dimensions — referenced from cleat corner (anchored to the
-    # projected cleat face), not from the sketch origin.
+    # Parametric dimensions — referenced from cleat corner, not origin
     ct_d = ct_sk.sketchDimensions
+    corner_expr = {"x": "table_w / 3 - cleat_w / 2",
+                   "z": "table_h - top_thick - cleat_thick"}
     dy = -1 if sf.y >= sc.y else 1
     dx = -1 if sf.x >= sc.x else 1
+
+    ct_d.addDistanceDimension(
+        ct_sk.originPoint, cleat_corner, H,
+        Point3D.create(sc.x / 2, sc.y + dy, 0)
+    ).parameter.expression = corner_expr[h_axis]
+    ct_d.addDistanceDimension(
+        ct_sk.originPoint, cleat_corner, V,
+        Point3D.create(sc.x + dx, sc.y / 2, 0)
+    ).parameter.expression = corner_expr[v_axis]
 
     ct_d.addDistanceDimension(
         cleat_corner, ct_rect[0].startSketchPoint, H,
@@ -729,7 +689,7 @@ def run(context):
         Point3D.create(sf.x - dx, (so.y + sf.y) / 2, 0)
     ).parameter.expression = "cleat_w - 2 * tt_shoulder"
 
-    left_tenon_ext = ext_new(top_c, smallest_profile(ct_sk),
+    left_tenon_ext = ext_new(top_c, ct_sk.profiles.item(0),
         "rail_thick + 2 * tt_proud", "LeftCleatTenon")
     left_tenon_body = left_tenon_ext.bodies.item(0)
 
@@ -782,14 +742,7 @@ def run(context):
         V, Point3D.create(cp1.x + 1, (cp1.y + cp2.y) / 2, 0)
     ).parameter.expression = "base_d - 2 * leg_size"
 
-    # Anchor: retarget the two origin dims to the LeftCleat body's own -X
-    # face (same component → parent_occ=None; plane normal X || sketch plane).
-    # Anchor corner = cleat bottom -Y(min) corner of that face.
-    ca_prof = sp.reanchor(ca_sk, left_cleat_body, None, "x", -1,
-        ("table_w / 3 - cleat_w / 2",
-         "top_overhang + (leg_size + rail_thick) / 2",
-         "table_h - top_thick - cleat_thick")) \
-        or smallest_profile(ca_sk)
+    ca_prof = smallest_profile(ca_sk)
     ext_op(top_c, ca_prof, "cleat_w", CUT, left_cleat_body, "LeftCleatArch")
 
     # -- Body-relative reference: cleat positioned relative to top --
