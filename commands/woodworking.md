@@ -57,7 +57,7 @@ Before writing any code, plan the modeling steps the way an experienced designer
    **Wood movement determines attachment method:**
    - Wood expands/contracts across the grain (perpendicular to fiber direction). Narrow parts (legs, rails) are negligible. Wide panels (desk tops, table tops, seats > ~6") move measurably with seasonal humidity changes.
    - **Never rigidly attach a wide panel to a cross-grain apron.** Dominos, dowels, or screws through fixed holes lock the panel — when it shrinks, the cross-grain apron holds it in tension, splitting it.
-   - **Use slotted fasteners** for cross-grain top-to-apron connections: `tabletop_bracket` (L-bracket with slotted screw holes), Z-clips, or figure-8 fasteners. The slot allows the panel to slide across the grain while staying flat.
+   - **Use slotted fasteners** for cross-grain top-to-apron connections: `tabletop_button` (shop-made small L-shaped wooden blocks / clips whose tongue rides in an elongated slot — all-wood, any count per side), `tabletop_bracket` (steel L-bracket with slotted screw holes), Z-clips, or figure-8 fasteners. The slot allows the panel to slide across the grain while staying flat.
    - **Rigid attachment is OK** when the apron runs WITH the grain (both parts move together).
 
 ## Topic Reference
@@ -104,6 +104,8 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | **Bed Rail Fastener** | Bed rail to post — detachable STEP hardware (mortise bedlock, hooks + slots) | Tested (queen + twin beds) | `woodworking/templates/bed_rail_fastener.py` + `docs/hardware-installation.md` |
 | **Tenon Wedge** | Through tenon tightening, fox wedging (blind tenons), Windsor spindle/stretcher locking — rect (2 wedges) or round (1 centred, trimmed to cylinder). Grain detected via principal axes of inertia; pass `grain_dir=` for ambiguous mortise pieces (seats, slabs) | Tested (Windsor chair — splayed legs + angled stretchers) | `docs/joinery/tenon-wedge.md` + `tenon_wedge` template |
 | **Bowtie / Butterfly Key** | Live edge slab crack stabilization, decorative inlay | Tested (twin bed) | `woodworking/templates/bowtie.py` |
+| **Tusk Tenon** | Knock-down through-tenon with tapered key — trestle tables, knock-down furniture, timber frames. Key blade MUST be narrower than tenon width. Multi-parent joint (key bears on receiver AND rides rail) | Tested (trestle table — through + mirror) | `docs/joinery/tusk-tenon.md` + `tusk_tenon` template |
+| **Tabletop Button** | Shop-made wooden top attachment — small L-shaped blocks (also: desktop clips, wood top clips) whose tongue rides in an elongated apron/frame slot, allowing cross-grain wood movement. Use instead of steel `tabletop_bracket` for all-wood builds. Caller decides pattern count (3, 4, or more per side) | Tested (trestle table) | `tabletop_button` template |
 
 **Read the topic/joinery file BEFORE writing code** that uses those techniques. The core skill provides the routing — the reference files provide the implementation details. For Draft files, treat instructions as a starting point and validate aggressively.
 
@@ -515,7 +517,7 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 
 **Core principle:** Build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), JOIN to the owner. Timeline order: CUT first (root, assembly proxies), JOIN second (owning component). Cross-component: use `body.createForAssemblyContext(occ)` for CUT in root.
 
-**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `docs/joinery/README.md`.
+**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `tusk_tenon`, `tabletop_button`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `docs/joinery/README.md`.
 
 **Hardware:** use `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` for hinges, plus the `pull` and `chest_lock` templates for non-hinge hardware. See `docs/hardware-installation.md`.
 
