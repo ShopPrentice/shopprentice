@@ -1,0 +1,31 @@
+{
+  "name": "Wedged Through-Tenon Trestle Table",
+  "source": "Gary Rogowski, 'The Versatile Trestle Table', Fine Woodworking Sep/Oct 2010",
+  "deps": [
+    { "body": "Foot_L", "ref": "origin", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Foot sits on floor at lower-X trestle" },
+    { "body": "Foot_R", "ref": "Foot_L", "side": "outside", "direction": [1, 0, 0], "contact": false, "note": "Mirror of Foot_L across the length midplane (higher-X trestle)" },
+    { "body": "Post_L", "ref": "Foot_L", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Post stands on foot center, blind M&T into foot" },
+    { "body": "Post_R", "ref": "Foot_R", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Post stands on foot center, blind M&T into foot" },
+    { "body": "Cap_L", "ref": "Post_L", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Cap sits on top of post, blind M&T from post tenon" },
+    { "body": "Cap_R", "ref": "Post_R", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Cap sits on top of post, blind M&T from post tenon" },
+    { "body": "Stretcher", "ref": "Post_L", "side": "outside", "direction": [1, 0, 0], "contact": true, "note": "Stretcher spans between posts, through-tenon + tusk wedge at each end" },
+    { "body": "Top", "ref": "Cap_L", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Top rests on the two caps" },
+    { "body": "Batten_L", "ref": "Top", "side": "outside", "direction": [0, 0, -1], "contact": true, "note": "Batten fastened under top near lower-X end" },
+    { "body": "Batten_C", "ref": "Top", "side": "outside", "direction": [0, 0, -1], "contact": true, "note": "Center batten under top" },
+    { "body": "Batten_R", "ref": "Top", "side": "outside", "direction": [0, 0, -1], "contact": true, "note": "Batten fastened under top near higher-X end (mirror)" },
+    { "body": "Wedge_L", "ref": "Stretcher", "side": "outside", "direction": [-1, 0, 0], "contact": true, "note": "Tusk wedge driven through the proud through-tenon at lower-X post" },
+    { "body": "Wedge_R", "ref": "Stretcher", "side": "outside", "direction": [1, 0, 0], "contact": true, "note": "Tusk wedge through the proud through-tenon at higher-X post (mirror)" },
+    { "body": "Peg_Fa_L", "ref": "Foot_L", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Drawbore peg pinning lower tenon a into Foot_L" },
+    { "body": "Peg_Fb_L", "ref": "Foot_L", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Drawbore peg pinning lower tenon b into Foot_L" },
+    { "body": "Peg_C_L", "ref": "Cap_L", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Peg pinning the upper tenon into Cap_L" },
+    { "body": "Peg_Fa_R", "ref": "Foot_R", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Mirror of Peg_Fa_L" },
+    { "body": "Peg_Fb_R", "ref": "Foot_R", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Mirror of Peg_Fb_L" },
+    { "body": "Peg_C_R", "ref": "Cap_R", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Mirror of Peg_C_L" },
+    { "body": "Btn_L0", "ref": "Cap_L", "side": "outside", "direction": [1, 0, 0], "contact": true, "note": "Tabletop button — tongue into Cap_L slot, body under top" },
+    { "body": "Btn_L1", "ref": "Cap_L", "side": "outside", "direction": [1, 0, 0], "contact": true, "note": "Tabletop button on Cap_L" },
+    { "body": "Btn_L2", "ref": "Cap_L", "side": "outside", "direction": [1, 0, 0], "contact": true, "note": "Tabletop button on Cap_L" },
+    { "body": "Btn_R0", "ref": "Cap_R", "side": "outside", "direction": [-1, 0, 0], "contact": true, "note": "Tabletop button — tongue into Cap_R slot" },
+    { "body": "Btn_R1", "ref": "Cap_R", "side": "outside", "direction": [-1, 0, 0], "contact": true, "note": "Tabletop button on Cap_R" },
+    { "body": "Btn_R2", "ref": "Cap_R", "side": "outside", "direction": [-1, 0, 0], "contact": true, "note": "Tabletop button on Cap_R" }
+  ]
+}
