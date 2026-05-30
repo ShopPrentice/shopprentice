@@ -241,7 +241,7 @@ d.addDistanceDimension(pt, line.endSketchPoint, H, placement
 ).parameter.expression = "shelf_inset"
 ```
 
-**For a standard rectangle, slot, or dovetail in a non-root component, prefer the `anchor=` mode** (or `sp.reanchor(...)` after the fact) of the shape helpers instead of wiring this by hand — see the `sketch_rect_model()` section above for both, with examples. `sketch_slot_model`, `trapezoid_sketch`, and the joinery templates accept the same `anchor=`; under the hood they call `project_face` / `anchor_pt` / `rdim`.
+**For a standard rectangle, slot, or dovetail in a non-root component, prefer the `anchor=` mode** (or `sp.reanchor(...)` after the fact) of the shape helpers instead of wiring this by hand — see the `sketch_rect_model()` section above for both, with examples. `sketch_slot_model`, `trapezoid_sketch` (the dovetail template helper in `woodworking/templates/`, not an `sp.*` function), and the joinery templates accept the same `anchor=`; under the hood they call `project_face` / `anchor_pt` / `rdim`.
 
 > **Anti-pattern — do NOT do this.** Computing corner coordinates from parameters
 > (`P(inset, depth, h)`), placing the geometry there, and then deleting the

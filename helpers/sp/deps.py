@@ -314,6 +314,10 @@ def validate_deps(ctx, metadata_path=None):
                 otok = origin_pt.entityToken
             except Exception:
                 otok = None
+            try:
+                ogeo = origin_pt.geometry
+            except Exception:
+                ogeo = None
             for di in range(sk.sketchDimensions.count):
                 dim = sk.sketchDimensions.item(di)
                 try:
@@ -324,15 +328,26 @@ def validate_deps(ctx, metadata_path=None):
                     # that is a real reference, not an origin dim, and a
                     # proximity test would false-flag it. Only sk.originPoint
                     # itself counts.
+                    #
+                    # Fallback: if the entityToken is unavailable, drop back to
+                    # the old coordinate-proximity test so the check fails CLOSED
+                    # (a tokenless sketch is still checked) rather than silently
+                    # passing.
                     uses_origin = False
-                    if otok is not None:
-                        for ent in (dim.entityOne, dim.entityTwo):
-                            try:
+                    for ent in (dim.entityOne, dim.entityTwo):
+                        try:
+                            if otok is not None:
                                 if ent.entityToken == otok:
                                     uses_origin = True
                                     break
-                            except Exception:
-                                pass
+                            elif ogeo is not None:
+                                g = ent.geometry
+                                if (abs(g.x - ogeo.x) < 0.001 and
+                                        abs(g.y - ogeo.y) < 0.001):
+                                    uses_origin = True
+                                    break
+                        except Exception:
+                            pass
                     if uses_origin:
                         expr = dim.parameter.expression if dim.parameter else "?"
                         origin_dim_issues.append(
