@@ -83,6 +83,9 @@ else
 fi
 
 # 2. Copy skill topic files
+#    docs/ holds the guides (joinery, types, styles, etc.) referenced by SKILL.md;
+#    woodworking/ now holds only the joinery templates.
+cp -r "$REPO_ROOT/docs" "$BUILD_DIR/docs"
 cp -r "$REPO_ROOT/woodworking" "$BUILD_DIR/woodworking"
 
 # 3. Copy helper library
