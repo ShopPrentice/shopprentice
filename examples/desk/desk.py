@@ -488,10 +488,16 @@ def run(context):
     # mating dimension), step along X. Standard dm_w/dm_t fit.
     domino.between(apron_c, dm_div_f, div_body, fr_body,
         interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
-        long_expr="dm_w", count=1, name="DM_Div_F", ev=ev)
+        long_expr="dm_w", count=1, name="DM_Div_F", ev=ev,
+        anchor=dict(parent_body=div_body, parent_occ=None,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("desk_l / 2 - divider_thick / 2", "0 in", "0 in")))
     domino.between(apron_c, dm_div_b, div_body, ba_body,
         interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
-        long_expr="dm_w", count=2, name="DM_Div_B", ev=ev)
+        long_expr="dm_w", count=2, name="DM_Div_B", ev=ev,
+        anchor=dict(parent_body=div_body, parent_occ=None,
+                    face_axis="y", face_dir=+1,
+                    anchor_xyz=("desk_l / 2 + divider_thick / 2", "desk_w - leg_size", "0 in")))
 
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
     # Vertical leg against apron inner face, horizontal leg under top
@@ -506,31 +512,38 @@ def run(context):
     # Back apron: 2 brackets (one per drawer opening, centered in each)
     # Skip center — divider is there
     back_y = ev("desk_w") - ev("leg_size") - ev("apron_thick")
+    ba_anchor = dict(parent_body=ba_body, parent_occ=apron_occ,
+                     face_axis="y", face_dir=-1,
+                     anchor_xyz=("leg_size", "desk_w - leg_size - apron_thick", "leg_h"))
     tabletop_bracket.single(bracket_c, face_axis="y", face_dir=-1,
-        pos=(left_center, back_y, top_z), name="TB_BL", ev=ev)
+        pos=(left_center, back_y, top_z), name="TB_BL", ev=ev, anchor=ba_anchor)
     tabletop_bracket.single(bracket_c, face_axis="y", face_dir=-1,
-        pos=(right_center, back_y, top_z), name="TB_BR", ev=ev)
+        pos=(right_center, back_y, top_z), name="TB_BR", ev=ev, anchor=ba_anchor)
 
-    # Left apron: inner face at X = apron_thick
-    # face_dir=+1: horizontal leg extends toward +X (into the desk)
+    la_anchor = dict(parent_body=la_body, parent_occ=apron_occ,
+                     face_axis="x", face_dir=+1,
+                     anchor_xyz=("apron_thick", "leg_size", "leg_h"))
     tabletop_bracket.row(bracket_c, face_axis="x", face_dir=1,
         start=(ev("apron_thick"), ev("leg_size") + ev("short_apron_l") / 3, top_z),
         step_axis="y", step_expr=str(ev("short_apron_l") / 3),
-        count=2, name="TB_L", ev=ev)
+        count=2, name="TB_L", ev=ev, anchor=la_anchor)
 
-    # Right apron: inner face at X = desk_l - apron_thick
-    # face_dir=-1: horizontal leg extends toward -X (into the desk)
+    ra_anchor = dict(parent_body=ra_body, parent_occ=apron_occ,
+                     face_axis="x", face_dir=-1,
+                     anchor_xyz=("desk_l - apron_thick", "leg_size", "leg_h"))
     tabletop_bracket.row(bracket_c, face_axis="x", face_dir=-1,
         start=(ev("desk_l") - ev("apron_thick"), ev("leg_size") + ev("short_apron_l") / 3, top_z),
         step_axis="y", step_expr=str(ev("short_apron_l") / 3),
-        count=2, name="TB_R", ev=ev)
+        count=2, name="TB_R", ev=ev, anchor=ra_anchor)
 
-    # Front rail: 2 brackets (one per drawer opening, centered in each)
+    fr_anchor = dict(parent_body=fr_body, parent_occ=apron_occ,
+                     face_axis="y", face_dir=+1,
+                     anchor_xyz=("leg_size", "apron_thick", "leg_h"))
     front_y = ev("apron_thick")
     tabletop_bracket.single(bracket_c, face_axis="y", face_dir=1,
-        pos=(left_center, front_y, top_z), name="TB_FL", ev=ev)
+        pos=(left_center, front_y, top_z), name="TB_FL", ev=ev, anchor=fr_anchor)
     tabletop_bracket.single(bracket_c, face_axis="y", face_dir=1,
-        pos=(right_center, front_y, top_z), name="TB_FR", ev=ev)
+        pos=(right_center, front_y, top_z), name="TB_FR", ev=ev, anchor=fr_anchor)
 
     print(">>> Brackets: 8 tabletop L-brackets (2 front + 2 back + 2 left + 2 right)")
     print(">>> Dominos: 8 apron-leg + 2 front-rail = 10 joints")
