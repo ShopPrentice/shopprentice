@@ -163,7 +163,7 @@ def corner(pin_body, tail_body, plane,
            x_model, y_wide, y_narrow,
            y_wide_expr, thick_expr, dist_expr,
            name="HT", prefix="dt", ev=None,
-           pattern_axis=None, z_base_expr=None):
+           pattern_axis=None, z_base_expr=None, anchor=None):
     """Create a houndstooth dovetail corner.
 
     Same geometry as through/half-blind at the main tail, plus a
@@ -187,6 +187,11 @@ def corner(pin_body, tail_body, plane,
             to tail_body's parent component's Z axis.
         z_base_expr: Expression for joint-axis offset of the first
             half-pin. Defaults to ``{prefix}_half_pin``.
+        anchor: Optional dict for NON-root tail components — anchors the main
+            tail trapezoid to a projected parent (pin-board) face instead of
+            the origin (same keys as ``_dovetail_common.trapezoid_sketch``).
+            The houndstooth void is then anchored internally to the tail body's
+            wide face. Default None keeps origin mode (backward compatible).
 
     Returns:
         Dict with keys: ``join_feat``, ``void_cut``, ``pattern``, ``cut_combine``.
@@ -226,7 +231,7 @@ def corner(pin_body, tail_body, plane,
         thick_expr=thick_expr,
         short_joint_expr=f"{z_dim_expr} + {thick_expr} * tan({p}_angle)",
         short_base_expr=f"({y_wide_expr}) + ({thick_expr})",
-        prefix=prefix, name=f"{name}_Tail")
+        prefix=prefix, name=f"{name}_Tail", anchor=anchor)
 
     join_feat = sp.ext_op(
         comp_tail, prof_main, dist_expr, JOIN, tail_body,
@@ -252,6 +257,16 @@ def corner(pin_body, tail_body, plane,
     v4_pt = Point3D.create(
         x_model, y_wide, z_base + ht_inset)                  # short-low
 
+    # When anchored (non-root), anchor the void to the freshly-joined tail
+    # body's wide face — the void's short face sits on it. The tail's wide-
+    # face low corner is the real parent vertex at (x_model, y_wide, z_base).
+    void_anchor = None
+    if anchor is not None:
+        void_anchor = dict(
+            parent_body=tail_body, parent_occ=None,
+            face_axis="y", face_dir=(-1 if y_narrow > y_wide else 1),
+            anchor_xyz=(f"{x_model} cm", y_wide_expr, z_dim_expr))
+
     prof_void = trapezoid_sketch(
         comp_tail, plane,
         v1_pt, v2_pt, v3_pt, v4_pt,
@@ -259,7 +274,7 @@ def corner(pin_body, tail_body, plane,
         short_joint_expr=f"{z_dim_expr} + {p}_ht_inset",
         short_base_expr=y_wide_expr,
         prefix=prefix, name=f"{name}_Void",
-        narrow_w_expr=f"{p}_ht_small_w")
+        narrow_w_expr=f"{p}_ht_small_w", anchor=void_anchor)
 
     void_cut = sp.ext_op(
         comp_tail, prof_void, dist_expr, CUT, tail_body,
