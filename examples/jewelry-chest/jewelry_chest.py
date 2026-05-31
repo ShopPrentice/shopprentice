@@ -288,8 +288,25 @@ def run(context):
     pm = m2s(P(x_n, (y_s + y_e) / 2, z_top - ev("notch_h")))
     top_ln = sk.sketchCurves.sketchLines.addByTwoPoints(
         P(pl.x, pl.y, 0), P(pr.x, pr.y, 0))
-    sk.sketchCurves.sketchArcs.addByThreePoints(
+    arc = sk.sketchCurves.sketchArcs.addByThreePoints(
         top_ln.endSketchPoint, P(pm.x, pm.y, 0), top_ln.startSketchPoint)
+    orient = sp.probe_orientations(sk, x_n, y_s, z_top)
+    gc = sk.geometricConstraints
+    V_enum = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    if orient['z'] == V_enum:
+        gc.addHorizontal(top_ln)
+    else:
+        gc.addVertical(top_ln)
+    d = sk.sketchDimensions
+    d.addDistanceDimension(top_ln.startSketchPoint, top_ln.endSketchPoint,
+        orient['y'], P(pl.x, (pl.y + pr.y) / 2, 0)
+    ).parameter.expression = "tray_w_out - 2 * (tray_thick + notch_margin)"
+    notch_w = ev("tray_w_out - 2 * (tray_thick + notch_margin)")
+    r_val = (notch_w**2 / 4 + ev("notch_h")**2) / (2 * ev("notch_h"))
+    d.addRadialDimension(arc, P(pm.x, pm.y + 0.5, 0)
+    ).parameter.expression = f"((tray_w_out - 2 * (tray_thick + notch_margin)) ^ 2 / 4 + notch_h ^ 2) / (2 * notch_h)"
+    sp.reanchor(sk, ut_div, None, "x", -1,
+        ("box_length / 2 - div_thick / 2", "board_thick + tray_cl", "tray_z + tray_height"))
     sp.refs_to_construction(sk)
     prof = sp.smallest_profile(sk)
     sp.ext_op(ut_c, prof, "div_thick", CUT, ut_div, "UTNotch")
@@ -404,7 +421,23 @@ def run(context):
     lpl = m2s(P(lx_n, ly_s, lz_top)); lpr = m2s(P(lx_n, ly_e, lz_top))
     lpm = m2s(P(lx_n, (ly_s + ly_e) / 2, lz_top - ev("notch_h")))
     lt_ln = sk.sketchCurves.sketchLines.addByTwoPoints(P(lpl.x, lpl.y, 0), P(lpr.x, lpr.y, 0))
-    sk.sketchCurves.sketchArcs.addByThreePoints(lt_ln.endSketchPoint, P(lpm.x, lpm.y, 0), lt_ln.startSketchPoint)
+    lt_arc = sk.sketchCurves.sketchArcs.addByThreePoints(lt_ln.endSketchPoint, P(lpm.x, lpm.y, 0), lt_ln.startSketchPoint)
+    lt_orient = sp.probe_orientations(sk, lx_n, ly_s, lz_top)
+    gc = sk.geometricConstraints
+    V_enum = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    if lt_orient['z'] == V_enum:
+        gc.addHorizontal(lt_ln)
+    else:
+        gc.addVertical(lt_ln)
+    d = sk.sketchDimensions
+    d.addDistanceDimension(lt_ln.startSketchPoint, lt_ln.endSketchPoint,
+        lt_orient['y'], P(lpl.x, (lpl.y + lpr.y) / 2, 0)
+    ).parameter.expression = "lower_tray_w_out - 2 * (tray_thick + notch_margin)"
+    d.addRadialDimension(lt_arc, P(lpm.x, lpm.y + 0.5, 0)
+    ).parameter.expression = "((lower_tray_w_out - 2 * (tray_thick + notch_margin)) ^ 2 / 4 + notch_h ^ 2) / (2 * notch_h)"
+    sp.reanchor(sk, lt1_div, None, "x", -1,
+        ("board_thick + tray_cl + lower_tray_l / 2 - div_thick / 2",
+         "board_thick + support_thick + tray_cl", "lower_tray_z + lower_tray_height"))
     sp.refs_to_construction(sk)
     prof = sp.smallest_profile(sk)
     sp.ext_op(lt_c, prof, "div_thick", CUT, lt1_div, "LTNotch")
@@ -634,6 +667,8 @@ def run(context):
     sk, prof = sp.sketch_rect_model(lid_c, pull_y_pl,
         ("box_length / 2 - pull_w / 2", "lid_rab - pull_d", pull_z_expr),
         {"x":"pull_w","z":"pull_h"}, "Pull_Sk", ev=ev)
+    prof = sp.reanchor(sk, lrf, None, "y", -1,
+        ("0 in", "0 in", "open_height + lid_frame_h")) or prof
     pull = sp.ext_new(lid_c, prof, "pull_d", "Pull").bodies.item(0); pull.name = "Pull"
     # Tenon from pull into front rail (0.5" wide)
     pt_pl = sp.off_plane(lid_c, root.xYConstructionPlane,
