@@ -161,25 +161,27 @@ def trapezoid_sketch(comp, plane, m1_pt, m2_pt, m3_pt, m4_pt,
             THICK_DIM, Point3D.create(m4.x / 2, m4.y + 1, 0)
         ).parameter.expression = short_base_expr
 
-    # Dim 5: flank angle — measured at base (narrow/short face).
+    # Dim 5: front flank angle — measured at base (narrow/short face).
     d.addAngularDimension(
         l_front, l_short,
         Point3D.create((m1.x + m4.x) / 2, (m1.y + m4.y) / 2, 0)
+    ).parameter.expression = f"90 deg - {p}_angle"
+    # Dim 6: back flank angle — mirrors the front flank off l_short. Without
+    # this the wide-face length (l_back's slope) is a free DOF → the trapezoid
+    # is under-constrained. An isosceles dovetail's flanks are symmetric, so
+    # both use the same angle. Added in BOTH modes (origin + anchored) so the
+    # trapezoid is fully constrained either way (deps rule 3).
+    d.addAngularDimension(
+        l_back, l_short,
+        Point3D.create((m2.x + m3.x) / 2, (m2.y + m3.y) / 2, 0)
     ).parameter.expression = f"90 deg - {p}_angle"
 
     if anchor is not None:
         # ANCHORED mode (non-root): project the parent face and anchor the
         # short-face low endpoint to its projected corner instead of origin
-        # (deps rules 1 & 2). Add the second flank angle so both flanks are
-        # determined → fully constrained trapezoid (deps rule 3).
+        # (deps rules 1 & 2).
         from helpers.sp.anchoring import project_face, anchor_pt, rdim
         from helpers.sp.sketch import probe_orientations
-
-        # Second flank: l_back (P3→P2) mirrors l_front's angle off l_short.
-        d.addAngularDimension(
-            l_back, l_short,
-            Point3D.create((m2.x + m3.x) / 2, (m2.y + m3.y) / 2, 0)
-        ).parameter.expression = f"90 deg - {p}_angle"
 
         project_face(sk, anchor["parent_body"], anchor.get("parent_occ"),
                      anchor["face_axis"], anchor["face_dir"])

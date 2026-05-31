@@ -132,7 +132,7 @@ def define_params(params, prefix="lk", size="small",
 
 
 def lock_mortise(comp, body, plane, origin, size_map,
-                 prefix="lk", name="Lock", ev=None, flip=False):
+                 prefix="lk", name="Lock", ev=None, flip=False, anchor=None):
     """CUT the lock body pocket and place a visual lock body.
 
     Creates a rectangular block (the lock body), uses it to CUT the
@@ -159,7 +159,7 @@ def lock_mortise(comp, body, plane, origin, size_map,
 
     # Create lock body block
     sk, prof = sp.sketch_rect_model(comp, plane, origin, size_map,
-                                    f"{name}_Sk", ev)
+                                    f"{name}_Sk", ev, anchor=anchor)
     lock_ext = sp.ext_op(comp, prof, f"{p}_d", NEW, None,
                          f"{name}_Body", flip=flip)
     lock_body = lock_ext.bodies.item(0)
@@ -173,7 +173,7 @@ def lock_mortise(comp, body, plane, origin, size_map,
 
 def keyhole(comp, body, plane, center,
             prefix="lk", name="Lock", ev=None, flip=False,
-            board_thick_expr="board_thick"):
+            board_thick_expr="board_thick", anchor=None):
     """CUT a keyhole profile through the board.
 
     The keyhole is a circle (key entry) plus a narrow slot below
@@ -210,9 +210,23 @@ def keyhole(comp, body, plane, center,
 
     circle = sk.sketchCurves.sketchCircles.addByCenterRadius(
         Point3D.create(sc.x, sc.y, 0), r)
-    sk.sketchDimensions.addDiameterDimension(
+    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    dk = sk.sketchDimensions
+    dk.addDiameterDimension(
         circle, Point3D.create(sc.x + r + 0.5, sc.y, 0)
     ).parameter.expression = f"{p}_keyhole_d"
+    cp = circle.centerSketchPoint
+    dk.addDistanceDimension(sk.originPoint, cp, H,
+        Point3D.create(sc.x / 2, sc.y - 0.5, 0)
+        ).parameter.expression = f"abs({sc.x} cm)"
+    dk.addDistanceDimension(sk.originPoint, cp, V,
+        Point3D.create(sc.x - 0.5, sc.y / 2, 0)
+        ).parameter.expression = f"abs({sc.y} cm)"
+    if anchor is not None:
+        sp.reanchor(sk, anchor["parent_body"], anchor.get("parent_occ"),
+                    anchor["face_axis"], anchor["face_dir"],
+                    anchor["anchor_xyz"])
 
     prof = sk.profiles.item(0)
     hole_cut = sp.ext_op(comp, prof, board_thick_expr, CUT, body,
@@ -256,6 +270,28 @@ def keyhole(comp, body, plane, center,
     gc.addHorizontal(rect.item(2))
     gc.addVertical(rect.item(1))
     gc.addVertical(rect.item(3))
+    # Fully constrain the slot: width + height + two origin position dims
+    # (on the far corner, away from the rect's start which may sit at origin).
+    H2 = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V2 = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    d2 = sk2.sketchDimensions
+    r0, r1 = rect.item(0), rect.item(1)
+    d2.addDistanceDimension(r0.startSketchPoint, r0.endSketchPoint, H2,
+        Point3D.create(sc2.x, sc2.y - 0.3, 0)).parameter.expression = f"{p}_slot_w"
+    d2.addDistanceDimension(r1.startSketchPoint, r1.endSketchPoint, V2,
+        Point3D.create(sc2.x + 0.3, sc2.y, 0)).parameter.expression = f"{p}_slot_h"
+    fc = r1.endSketchPoint  # far corner
+    fg = fc.geometry
+    d2.addDistanceDimension(sk2.originPoint, fc, H2,
+        Point3D.create(fg.x / 2, fg.y - 0.5, 0)
+        ).parameter.expression = f"abs({fg.x} cm)"
+    d2.addDistanceDimension(sk2.originPoint, fc, V2,
+        Point3D.create(fg.x - 0.5, fg.y / 2, 0)
+        ).parameter.expression = f"abs({fg.y} cm)"
+    if anchor is not None:
+        sp.reanchor(sk2, anchor["parent_body"], anchor.get("parent_occ"),
+                    anchor["face_axis"], anchor["face_dir"],
+                    anchor["anchor_xyz"])
 
     prof2 = sp.smallest_profile(sk2)
     slot_cut = sp.ext_op(comp, prof2, board_thick_expr, CUT, body,
@@ -265,7 +301,7 @@ def keyhole(comp, body, plane, center,
 
 
 def strike(comp, body, plane, origin, size_map,
-           prefix="lk", name="Strike", ev=None, flip=False):
+           prefix="lk", name="Strike", ev=None, flip=False, anchor=None):
     """CUT the strike plate recess and place a visual strike body.
 
     Same pattern as lock_mortise but using strike plate dimensions.
@@ -289,7 +325,7 @@ def strike(comp, body, plane, origin, size_map,
     p = prefix
 
     sk, prof = sp.sketch_rect_model(comp, plane, origin, size_map,
-                                    f"{name}_Sk", ev)
+                                    f"{name}_Sk", ev, anchor=anchor)
     strike_ext = sp.ext_op(comp, prof, f"{p}_strike_t", NEW, None,
                            f"{name}_Body", flip=flip)
     strike_body = strike_ext.bodies.item(0)

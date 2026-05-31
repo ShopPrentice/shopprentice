@@ -256,7 +256,10 @@ def run(context):
         long_axis="z", short_axis="x",
         length="bt_len", end_w="bt_end_w",
         waist_w="bt_waist_w", depth="bt_depth",
-        slab_body=slab, name="BT", ev=ev)
+        slab_body=slab, name="BT", ev=ev,
+        anchor=dict(parent_body=slab, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "slab_y", "slab_z")))
 
     print(f">>> Headboard: 1 slab + {len(bt_bodies)} bowties")
 
