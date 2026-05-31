@@ -186,7 +186,24 @@ def run(context):
         gc.addHorizontal(l0); gc.addHorizontal(l4)
         gc.addVertical(l2);   gc.addVertical(l5)
 
-    # Extrude profile by leg_size in +X
+    gc.addParallel(l1, l3)
+    orient = sp.probe_orientations(sk, 0, yi, bz)
+    d = sk.sketchDimensions
+    ALI = adsk.fusion.DimensionOrientations.AlignedDimensionOrientation
+    d.addDistanceDimension(l5.startSketchPoint, l5.endSketchPoint,
+        orient['y'], spts[5]).parameter.expression = "leg_size"
+    d.addDistanceDimension(l2.startSketchPoint, l2.endSketchPoint,
+        orient['y'], spts[3]).parameter.expression = "leg_size"
+    d.addDistanceDimension(l0.startSketchPoint, l0.endSketchPoint,
+        orient['z'], spts[0]).parameter.expression = "bend_z"
+    d.addDistanceDimension(sk.originPoint, l0.startSketchPoint,
+        orient['y'], spts[0]).parameter.expression = "seat_d - leg_size"
+    d.addDistanceDimension(sk.originPoint, l0.endSketchPoint,
+        orient['z'], spts[1]).parameter.expression = "bend_z"
+    d.addAngularDimension(l0, l1, spts[1]).parameter.expression = "back_rake"
+    d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
+        ALI, spts[2]).parameter.expression = "back_h - bend_z"
+
     prof = sk.profiles.item(0)
     ext_inp = leg_c.features.extrudeFeatures.createInput(
         prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
@@ -450,7 +467,7 @@ def run(context):
         arc.endSketchPoint,
         P3.create(ps_front.x, ps_front.y, 0))
 
-    # Parametric dimensions on path
+    path_sk.geometricConstraints.addHorizontal(level_line)
     path_dims = path_sk.sketchDimensions
     path_dims.addRadialDimension(
         arc, P3.create(ps_mid.x + 0.5, ps_mid.y + 0.5, 0)
@@ -471,10 +488,6 @@ def run(context):
         origin_pa, level_line.endSketchPoint, orient_pa['y'],
         P3.create(ps_front.x, ps_front.y + 2, 0)
     ).parameter.expression = "scoop_front_y"
-    path_dims.addDistanceDimension(
-        origin_pa, level_line.endSketchPoint, orient_pa['z'],
-        P3.create(ps_front.x - 2, ps_front.y, 0)
-    ).parameter.expression = "seat_h"
 
     # Retarget the 4 origin dims to the projected Seat back-top corner (x=-1 face,
     # parallel to this YZ midplane) — geometry preserved, origin reference removed
@@ -644,6 +657,23 @@ def run(context):
         l1 = lines.addByTwoPoints(l0.endSketchPoint, cpts[2])
         l2 = lines.addByTwoPoints(l1.endSketchPoint, cpts[3])
         l3 = lines.addByTwoPoints(l2.endSketchPoint, l0.startSketchPoint)
+        sk_gc = sk.geometricConstraints
+        sk_gc.addParallel(l0, l2)
+        sk_gc.addParallel(l1, l3)
+        sk_gc.addPerpendicular(l0, l1)
+        ALI_d = adsk.fusion.DimensionOrientations.AlignedDimensionOrientation
+        sk_d = sk.sketchDimensions
+        sk_d.addDistanceDimension(l0.startSketchPoint, l0.endSketchPoint,
+            ALI_d, cpts[0]).parameter.expression = "dm_t"
+        sk_d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
+            ALI_d, cpts[2]).parameter.expression = "dm_w"
+        sk_orient = sp.probe_orientations(sk, center_x, y_rot, z_rot)
+        sk_d.addDistanceDimension(sk.originPoint, l0.startSketchPoint,
+            sk_orient['y'], cpts[0]).parameter.expression = f"{y_rot + dy_l + dy_s} cm"
+        sk_d.addDistanceDimension(sk.originPoint, l0.startSketchPoint,
+            sk_orient['z'], cpts[0]).parameter.expression = f"{z_rot + dz_l + dz_s} cm"
+        sp.reanchor(sk, leg_body, None, "x", -1 if center_x < ev("seat_w") / 2 else +1,
+            (f"{center_x} cm", f"{y_rot} cm", f"{z_rot} cm"))
         prof = sk.profiles.item(0)
         ext_inp = back_c.features.extrudeFeatures.createInput(
             prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)

@@ -119,10 +119,32 @@ def run(context):
     ref_body = find_body("Leg_FL")
     ref_bb = ref_body.boundingBox
     top_pl = sp.off_plane(top_c, top_c.xYConstructionPlane, "leg_h", "Top_Pl")
-    _, pr = sp.sketch_rect_model(top_c, top_pl,
-        ("0 in", "0 in", "leg_h"),
-        {"x": "table_l", "y": "table_w"},
-        "Top_Sk", ev)
+    P3 = adsk.core.Point3D.create
+    H_o = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V_o = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    sk_top = top_c.sketches.add(top_pl)
+    sk_top.name = "Top_Sk"
+    tl = ev("table_l"); tw = ev("table_w")
+    rect = sk_top.sketchCurves.sketchLines.addTwoPointRectangle(
+        P3(0, 0, 0), P3(tl, tw, 0))
+    gc = sk_top.geometricConstraints
+    gc.addHorizontal(rect[0]); gc.addHorizontal(rect[2])
+    gc.addVertical(rect[1]); gc.addVertical(rect[3])
+    d = sk_top.sketchDimensions
+    d.addDistanceDimension(rect[2].startSketchPoint, rect[2].endSketchPoint,
+        H_o, P3(tl / 2, tw + 1, 0)).parameter.expression = "table_l"
+    d.addDistanceDimension(rect[1].startSketchPoint, rect[1].endSketchPoint,
+        V_o, P3(tl + 1, tw / 2, 0)).parameter.expression = "table_w"
+    sp.project_face(sk_top, leg_fl, leg_occ, "y", -1)
+    orient = sp.probe_orientations(sk_top, 0, 0, ev("leg_h"))
+    a = sp.anchor_pt(sk_top, ev("leg_inset - leg_top / 2"),
+                     ev("leg_inset - leg_top / 2"), ev("leg_h"))
+    if a is not None:
+        sp.rdim(sk_top, d, a, rect[1].endSketchPoint, orient,
+                "x", "abs(table_l - (leg_inset - leg_top / 2))")
+        sp.rdim(sk_top, d, a, rect[1].endSketchPoint, orient,
+                "y", "abs(table_w - (leg_inset - leg_top / 2))")
+    pr = sk_top.profiles.item(0)
     top_ext = sp.ext_new(top_c, pr, "top_thick", "TopBoard")
     top_body = top_ext.bodies.item(0)
     top_body.name = "Top"
@@ -170,41 +192,57 @@ def run(context):
     ref_body = find_body("Leg_FL")
     ref_bb = ref_body.boundingBox
 
-    # FL leg domino
+    dm_anchor_fl = dict(parent_body=leg_fl, parent_occ=leg_occ,
+        face_axis="z", face_dir=+1,
+        anchor_xyz=("leg_inset + leg_top / 2", "leg_inset + leg_top / 2", "leg_h"),
+        off=(("x", "leg_top / 2 - (dm_w - dm_t) / 2"),
+             ("y", "leg_top / 2")))
     domino.single(top_c, dm_pl,
         ("leg_inset", "leg_inset", "leg_h"),
         "x", "dm_w", "dm_t", "dm_d",
-        top_body, fl_proxy, "DM_FL", ev)
+        top_body, fl_proxy, "DM_FL", ev, anchor=dm_anchor_fl)
 
     # Body-relative ref: DM_FR depends on Leg_FR
     ref_body = find_body("Leg_FR")
     ref_bb = ref_body.boundingBox
 
-    # FR leg domino
+    dm_anchor_fr = dict(parent_body=leg_fr, parent_occ=leg_occ,
+        face_axis="z", face_dir=+1,
+        anchor_xyz=("table_l - leg_inset + leg_top / 2", "leg_inset + leg_top / 2", "leg_h"),
+        off=(("x", "leg_top / 2 + (dm_w - dm_t) / 2"),
+             ("y", "leg_top / 2")))
     domino.single(top_c, dm_pl,
         ("table_l - leg_inset", "leg_inset", "leg_h"),
         "x", "dm_w", "dm_t", "dm_d",
-        top_body, fr_proxy, "DM_FR", ev)
+        top_body, fr_proxy, "DM_FR", ev, anchor=dm_anchor_fr)
 
     # Body-relative ref: DM_BL depends on Leg_BL
     ref_body = find_body("Leg_BL")
     ref_bb = ref_body.boundingBox
 
-    # BL leg domino
+    dm_anchor_bl = dict(parent_body=leg_bl, parent_occ=leg_occ,
+        face_axis="z", face_dir=+1,
+        anchor_xyz=("leg_inset + leg_top / 2", "table_w - leg_inset + leg_top / 2", "leg_h"),
+        off=(("x", "leg_top / 2 - (dm_w - dm_t) / 2"),
+             ("y", "leg_top / 2")))
     domino.single(top_c, dm_pl,
         ("leg_inset", "table_w - leg_inset", "leg_h"),
         "x", "dm_w", "dm_t", "dm_d",
-        top_body, bl_proxy, "DM_BL", ev)
+        top_body, bl_proxy, "DM_BL", ev, anchor=dm_anchor_bl)
 
     # Body-relative ref: DM_BR depends on Leg_BR
     ref_body = find_body("Leg_BR")
     ref_bb = ref_body.boundingBox
 
-    # BR leg domino
+    dm_anchor_br = dict(parent_body=leg_br, parent_occ=leg_occ,
+        face_axis="z", face_dir=+1,
+        anchor_xyz=("table_l - leg_inset + leg_top / 2", "table_w - leg_inset + leg_top / 2", "leg_h"),
+        off=(("x", "leg_top / 2 + (dm_w - dm_t) / 2"),
+             ("y", "leg_top / 2")))
     domino.single(top_c, dm_pl,
         ("table_l - leg_inset", "table_w - leg_inset", "leg_h"),
         "x", "dm_w", "dm_t", "dm_d",
-        top_body, br_proxy, "DM_BR", ev)
+        top_body, br_proxy, "DM_BR", ev, anchor=dm_anchor_br)
 
     print(">>> Dominos: 4 leg-to-top joints")
 
