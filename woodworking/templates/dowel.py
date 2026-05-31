@@ -52,7 +52,8 @@ METADATA = {
 
 
 def single(comp, plane, center, diameter, depth,
-           body_a=None, body_b=None, name="DW", ev=None, cut=True):
+           body_a=None, body_b=None, name="DW", ev=None, cut=True,
+           anchor=None):
     """Create a single dowel joint between two bodies.
 
     Sketches a circle on the interface plane, extrudes symmetrically,
@@ -69,6 +70,10 @@ def single(comp, plane, center, diameter, depth,
         name: Feature name prefix.
         ev: Evaluator function.
         cut: If True, CUT into both bodies. If False, just create the dowel body.
+        anchor: Optional dict for NON-root components — retargets the circle's
+            two origin center-position dims to a projected parent-face corner
+            via sp.reanchor. Keys: parent_body, parent_occ, face_axis, face_dir,
+            anchor_xyz. Default None keeps origin mode (backward compatible).
 
     Returns:
         The dowel void body (BRepBody).
@@ -91,8 +96,25 @@ def single(comp, plane, center, diameter, depth,
     sk.name = f"{name}_Sk"
     m2s = sk.modelToSketchSpace
     sc = m2s(P3.create(cx, cy, cz))
-    sk.sketchCurves.sketchCircles.addByCenterRadius(
+    circle = sk.sketchCurves.sketchCircles.addByCenterRadius(
         P3.create(sc.x, sc.y, 0), radius)
+
+    # Fully constrain: diameter + two origin center-position dims.
+    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    d = sk.sketchDimensions
+    dia_expr = diameter if isinstance(diameter, str) else f"{diameter} cm"
+    cp = circle.centerSketchPoint
+    d.addDiameterDimension(circle, P3.create(sc.x + radius + 0.5, sc.y, 0)
+        ).parameter.expression = dia_expr
+    d.addDistanceDimension(sk.originPoint, cp, H,
+        P3.create(sc.x / 2, sc.y - 0.5, 0)).parameter.expression = f"abs({sc.x} cm)"
+    d.addDistanceDimension(sk.originPoint, cp, V,
+        P3.create(sc.x - 0.5, sc.y / 2, 0)).parameter.expression = f"abs({sc.y} cm)"
+    if anchor is not None:
+        sp.reanchor(sk, anchor["parent_body"], anchor.get("parent_occ"),
+                    anchor["face_axis"], anchor["face_dir"],
+                    anchor["anchor_xyz"])
 
     prof = sk.profiles.item(0)
 
@@ -131,7 +153,7 @@ def single(comp, plane, center, diameter, depth,
 
 def grid(comp, plane, start, step_axis, step_expr, count_expr,
          diameter, depth, body_a=None, body_b=None,
-         name="DW", ev=None, cut=True):
+         name="DW", ev=None, cut=True, anchor=None):
     """Create a row of dowels along a joint line.
 
     Creates one template dowel, then uses body_pattern to replicate.
@@ -158,7 +180,7 @@ def grid(comp, plane, start, step_axis, step_expr, count_expr,
 
     # Create template dowel (no CUT yet — pattern first)
     template = single(comp, plane, start, diameter, depth,
-                       name=f"{name}_0", ev=ev, cut=False)
+                       name=f"{name}_0", ev=ev, cut=False, anchor=anchor)
 
     # Pattern along step axis
     count = int(ev(count_expr) if isinstance(count_expr, str) else count_expr)
