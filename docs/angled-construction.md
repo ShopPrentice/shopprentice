@@ -36,7 +36,21 @@ Build compound splay in two steps:
 
 2. **Secondary splay (along width)** — Apply a Move feature that rotates the leg body around the X axis by `splay_w`. This avoids compound-angle sketch math and keeps each splay axis independent.
 
-**Why not a single compound-angle sketch?** The sketch would need trigonometric expressions for foreshortened dimensions, and the extrude direction wouldn't align with any principal axis. Two-step splay is simpler, more readable, and each angle is independently adjustable.
+**Why not a single compound-angle sketch?** A *single* compound-angle sketch would need trigonometric expressions for foreshortened dimensions, and the extrude direction wouldn't align with any principal axis.
+
+### Parametric Alternative: Loft Between Two Sections (no Move)
+
+The trapezoid + Move above bakes the second angle as a non-parametric transform. To keep compound splay **fully parametric and Move-free**, use **two sketches + a Loft** instead:
+
+1. Sketch the leg's cross-section (a plain, true-size rectangle) on an XY plane at the **top** (seat) height.
+2. Sketch the same rectangle on an XY plane at the **bottom** (floor), its center offset by `splay_shift` in X **and** `splay_shift_w` in Y.
+3. **Loft** between the two profiles.
+
+Both sections are axis-aligned rectangles at true size — **no foreshortening trig** — and the loft produces the doubly-leaning leg (an oblique prism with planar faces and horizontal top/bottom). The offsets are ordinary `tan()`-based parameter expressions, so the leg recomputes when a splay angle changes.
+
+**Why a Loft and not an Extrude?** Fusion's Extrude only goes *normal to the profile plane* (the taper angle adds draft, it does not redirect the extrusion axis) — there is no off-axis extrude. Two separated profiles can therefore only be bridged by a Loft (profile→profile) or a Sweep along an angled path. A Loft between world-aligned rectangles also gives the geometry you actually want: **horizontal top/bottom faces** (flat on the floor and into the seat) with the sides leaning — whereas tilting a sketch plane for a normal extrude would yield faces *perpendicular to the leg axis* (angled cuts, wrong for floor/seat contact).
+
+Note that **single-axis splay needs neither** — the trapezoid/parallelogram sketch (lean *in* the sketch) extruded normally in the perpendicular direction already captures it. Reach for Loft (or, as the legacy option, the Move below) only for the *second* axis. `validate_design` emits a (non-failing) **move advisory** when a Move is present, to nudge toward this in-place alternative; if a Move is genuinely the right tool (a cosmetic roll about a part's own axis, or aligning to a measured orientation), name the feature with a `_norep` substring to suppress it.
 
 ### Trapezoid Sketch (Primary Splay)
 
@@ -464,7 +478,7 @@ matrix = [
 
 The Move feature's matrix is baked at script time — it doesn't update when parameters change. If `splay_w` changes in Change Parameters, the Move angle stays the same.
 
-**Mitigation:** For furniture models, splay angles are rarely adjusted after the initial design. If parametric splay is required, use a component-level rotation (via occurrence transform) instead of a Move feature, but this adds complexity to cross-component CUT operations.
+**Mitigation:** For furniture models, splay angles are rarely adjusted after the initial design. If parametric splay IS required, prefer building the part in place — for compound splay, the **two-section Loft** above (parametric, no Move); see "Parametric Alternative: Loft Between Two Sections." (A component-level rotation via occurrence transform also stays parametric but complicates cross-component CUTs.) A Move also *hides* sizing bugs until the part lands in position, so after any Move, run `check_interference` and sanity-check the part's dimensions in its final spot.
 
 ### Re-Find Bodies After Move
 

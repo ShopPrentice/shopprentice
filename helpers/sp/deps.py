@@ -218,6 +218,68 @@ def _check_sketch_anchoring(comp, comp_name, is_root_comp, issues):
         # else: only spline interiors are free → legitimate sculpted profile.
 
 
+def _geometry_loop_findings(script_path):
+    """ADVISORY: scan the tracked build script for Python ``for``/``while`` loops
+    that CREATE geometry (sketches, extrudes, combines, cyl_/box_ helpers) — the
+    non-parametric replication anti-pattern. The right way is a Rectangular
+    Pattern or Mirror feature (one parametric feature that recomputes when the
+    count changes), not N independent features from a loop.
+
+    This is the script-source complement to validate_design's body-congruence
+    replication advisory: that one only sees congruent BODIES, so a loop of
+    identical CUTS (dog holes, mortise/hole arrays — which remove voids, not add
+    bodies) is invisible to it. The AST sees both.
+
+    Returns a list of {line, kind, calls}. Best-effort; never raises. A loop that
+    builds a list and then patterns/mirrors it (calls a *pattern*/*mirror* helper)
+    is NOT flagged.
+    """
+    import ast
+    import os
+    try:
+        if not script_path or not os.path.exists(script_path):
+            return []
+        with open(script_path, "r") as f:
+            tree = ast.parse(f.read())
+    except Exception:
+        return []
+
+    # call-name fragments (lower-cased, dotted) that create per-instance geometry
+    GEO = ("sketches.add", "extrudefeatures", "revolvefeatures", "loftfeatures",
+           "sweepfeatures", "ext_new", "ext_op", "ext_new_sym", "combine",
+           "cyl_", "box_", "addbytwopoints", "addbycenterradius", "sketchcircles",
+           "sketchlines", "sketcharcs")
+    # if the loop itself patterns/mirrors, it's already the right approach
+    OK = ("pattern", "mirror")
+
+    def _dotted(fn):
+        if isinstance(fn, ast.Attribute):
+            base = _dotted(fn.value)
+            return (base + "." + fn.attr) if base else fn.attr
+        if isinstance(fn, ast.Name):
+            return fn.id
+        return None
+
+    findings = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.For, ast.While)):
+            continue
+        calls = []
+        for n in ast.walk(node):
+            if isinstance(n, ast.Call):
+                d = _dotted(n.func)
+                if d:
+                    calls.append(d.lower())
+        if any(o in c for c in calls for o in OK):
+            continue
+        hits = sorted({g for c in calls for g in GEO if g in c})
+        if hits:
+            findings.append({"line": node.lineno,
+                             "kind": "for" if isinstance(node, ast.For) else "while",
+                             "calls": hits})
+    return findings
+
+
 def validate_deps(ctx, metadata_path=None):
     """Validate dependency tree from model.json.
 
@@ -235,13 +297,25 @@ def validate_deps(ctx, metadata_path=None):
     import os
     import re
 
+    # Resolve the tracked build script up-front — used both to locate model.json
+    # (when no metadata_path was passed) AND for the geometry-loop advisory below,
+    # which must run even when an explicit metadata_path was given.
+    script_path = None
+    try:
+        from server.document_tracker import DocumentTracker
+        script_path = DocumentTracker._script_path
+    except Exception:
+        pass
+
+    # Geometry-loop advisory (NOTE — never affects pass/fail): a Python loop that
+    # creates geometry should be a Rectangular Pattern or Mirror feature instead.
+    for fnd in _geometry_loop_findings(script_path):
+        print(f"  NOTE  geometry built in a `{fnd['kind']}` loop at line "
+              f"{fnd['line']} ({', '.join(fnd['calls'])}) — use a Rectangular "
+              f"Pattern or Mirror feature so the count stays parametric, not a "
+              f"Python loop. (advisory; does not affect pass/fail)")
+
     if metadata_path is None:
-        script_path = None
-        try:
-            from server.document_tracker import DocumentTracker
-            script_path = DocumentTracker._script_path
-        except Exception:
-            pass
         if script_path:
             script_dir = os.path.dirname(script_path)
             stem = os.path.splitext(os.path.basename(script_path))[0]
