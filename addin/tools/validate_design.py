@@ -335,6 +335,37 @@ def _check_replication(design, bodies, exclude_prefixes, min_group=2):
     return {"advisory": True, "groups": findings}
 
 
+def _check_moves(design):
+    """ADVISORY (never affects pass/fail): Move/rotate features in the timeline.
+
+    A Move that *orients a part to an angled reference* (the common case — splay,
+    tilt) bakes a non-parametric transform and can mask sizing bugs that only show
+    once the part is in place. Prefer building the part in position: sketch its
+    outline against the reference, or — for a compound angle — loft between two
+    offset cross-sections (parametric, no Move). Legit uses remain (a cosmetic
+    roll about a part's own axis, aligning to a measured orientation); suppress
+    those by putting `_norep` in the Move feature's name.
+    """
+    moves = []
+    try:
+        tl = design.timeline
+        for i in range(tl.count):
+            try:
+                feat = tl.item(i).entity
+                ot = getattr(feat, "objectType", "") or ""
+                if "MoveFeature" not in ot:
+                    continue
+                nm = getattr(feat, "name", "") or ""
+                if "_norep" in nm:
+                    continue
+                moves.append(nm or "(unnamed Move)")
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return {"advisory": True, "count": len(moves), "names": moves}
+
+
 def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dict:
     """Run all structural validation checks on the current design."""
 
@@ -389,6 +420,15 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
         except Exception as re:
             replication = {"advisory": True, "error": str(re), "groups": []}
 
+        # Move advisory — Move/rotate features that likely orient a part to an
+        # angled reference. ADVISORY ONLY: never changes `passed`. Prefer building
+        # in place (or loft for compound angles); suppress legit rolls with _norep.
+        moves = None
+        try:
+            moves = _check_moves(design)
+        except Exception as me:
+            moves = {"advisory": True, "error": str(me), "names": []}
+
         import json
         result = {
             "passed": passed,
@@ -399,6 +439,8 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
             result["deps"] = deps_result
         if replication is not None and replication.get("groups"):
             result["replication"] = replication
+        if moves is not None and moves.get("names"):
+            result["moves"] = moves
 
         parts = []
         if connectivity["connected"] and not connectivity["weakConnections"]:
@@ -426,6 +468,13 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
             parts.append(
                 f"replication ADVISORY ({len(g)} group(s) built independently — "
                 f"{ex}) [does not affect pass/fail]")
+
+        if moves is not None and moves.get("names"):
+            parts.append(
+                f"move ADVISORY ({moves['count']} Move feature(s): "
+                f"{', '.join(moves['names'][:4])} — if orienting to an angled "
+                f"reference, prefer build-in-place/loft; name a legit roll "
+                f"`_norep`) [does not affect pass/fail]")
 
         status = "PASSED" if passed else "FAILED"
         msg = f"{status}: {', '.join(parts)}"
@@ -470,9 +519,20 @@ Combines three checks in a single call:
    a redo; the recommended response is to refactor the named group to one
    template + Mirror/Pattern (a sub-agent can do this so the main build's context
    stays lean).
+5. **Move advisory** (ADVISORY — never affects pass/fail): Move/rotate features
+   in the timeline. A Move that orients a part to an angled reference bakes a
+   non-parametric transform and can hide sizing bugs until the part is in place —
+   prefer building the part in position (sketch its outline against the reference;
+   for a compound angle, loft between two offset cross-sections). Legit uses
+   (a cosmetic roll about a part's own axis, aligning to a measured face) are
+   suppressed by putting `_norep` in the Move feature's name.
+
+Note: the geometry-loop advisory (a Python loop that creates geometry instead of
+a Rectangular Pattern/Mirror feature) is emitted by the dependency-tree check and
+appears in the deps output.
 
 Returns a single pass/fail result. Fails if disconnected, has weak
-connections, or has interference (NOT for the replication advisory).
+connections, or has interference (NOT for the replication/move/loop advisories).
 Run after EVERY phase."""
 
 tool = Tool.create_simple(
