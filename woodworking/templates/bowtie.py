@@ -125,7 +125,7 @@ def _bowtie_points_3d(center, long_axis, short_axis,
 
 def single(comp, plane, center, long_axis, short_axis,
            length, end_w, waist_w, depth, slab_body,
-           name="BT", ev=None, cut=True):
+           name="BT", ev=None, cut=True, anchor=None):
     """Create a single bowtie inlay on a slab.
 
     Args:
@@ -149,6 +149,12 @@ def single(comp, plane, center, long_axis, short_axis,
         ev: Parameter evaluator function.
         cut: If True, CUT the bowtie into the slab. If False, just
             create the body.
+        anchor: Optional dict for NON-root slab components — retargets the
+            two origin position dims (which locate the +long/-short wide-end
+            corner) to a projected parent-face corner via ``sp.reanchor``.
+            Keys: parent_body, parent_occ, face_axis, face_dir, anchor_xyz.
+            Default None keeps origin mode (backward compatible). The hourglass
+            is ALWAYS fully constrained (H/V on the wide-end lines + 10 dims).
 
     Returns:
         The bowtie body.
@@ -167,6 +173,14 @@ def single(comp, plane, center, long_axis, short_axis,
     half_ew = ev(end_w) / 2
     half_ww = ev(waist_w) / 2
 
+    Point3D = adsk.core.Point3D
+
+    def _s(v):
+        return v if isinstance(v, str) else f"{v} cm"
+    len_e, ew_e, ww_e = _s(length), _s(end_w), _s(waist_w)
+    idx = {"x": 0, "y": 1, "z": 2}
+    c_long, c_short = _s(center[idx[long_axis]]), _s(center[idx[short_axis]])
+
     # 6 corners in model space, oriented by long_axis + short_axis
     model_pts = _bowtie_points_3d((cx, cy, cz), long_axis, short_axis,
                                    half_l, half_ew, half_ww)
@@ -177,11 +191,58 @@ def single(comp, plane, center, long_axis, short_axis,
     pts = [m2s(p) for p in model_pts]
 
     lines = sk.sketchCurves.sketchLines
-    prev = lines.addByTwoPoints(pts[0], pts[1])
-    for j in range(2, len(pts)):
-        prev = lines.addByTwoPoints(prev.endSketchPoint, pts[j])
-    lines.addByTwoPoints(prev.endSketchPoint,
-                          sk.sketchCurves.sketchLines.item(0).startSketchPoint)
+    # Explicit handles: l0 p0->p1 (wide end A), l1 p1->p2, l2 p2->p3,
+    # l3 p3->p4 (wide end B), l4 p4->p5, l5 p5->p0.
+    l0 = lines.addByTwoPoints(pts[0], pts[1])
+    l1 = lines.addByTwoPoints(l0.endSketchPoint, pts[2])
+    l2 = lines.addByTwoPoints(l1.endSketchPoint, pts[3])
+    l3 = lines.addByTwoPoints(l2.endSketchPoint, pts[4])
+    l4 = lines.addByTwoPoints(l3.endSketchPoint, pts[5])
+    lines.addByTwoPoints(l4.endSketchPoint, l0.startSketchPoint)
+
+    # --- Fully constrain the hourglass (12 DOF) ---
+    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    h_axis, v_axis = sp.probe_sketch_axes(sk)
+    LONG_DIM = H if long_axis == h_axis else V
+    SHORT_DIM = H if short_axis == h_axis else V
+    gc = sk.geometricConstraints
+    # Wide-end lines (l0, l3) are perpendicular to the long axis.
+    if long_axis == h_axis:
+        gc.addVertical(l0); gc.addVertical(l3)
+    else:
+        gc.addHorizontal(l0); gc.addHorizontal(l3)
+    d = sk.sketchDimensions
+    p0, p1 = l0.startSketchPoint, l0.endSketchPoint
+    p3, p4 = l3.startSketchPoint, l3.endSketchPoint
+    p2, p5 = l1.endSketchPoint, l4.endSketchPoint
+    tp = lambda a, b: Point3D.create((a.geometry.x + b.geometry.x) / 2 + 0.3,
+                                     (a.geometry.y + b.geometry.y) / 2 + 0.3, 0)
+    # End widths (both wide faces) + length + symmetry of far end via p1->p4.
+    d.addDistanceDimension(p0, p1, SHORT_DIM, tp(p0, p1)).parameter.expression = ew_e
+    d.addDistanceDimension(p3, p4, SHORT_DIM, tp(p3, p4)).parameter.expression = ew_e
+    d.addDistanceDimension(p1, p4, LONG_DIM, tp(p1, p4)).parameter.expression = len_e
+    d.addDistanceDimension(p1, p4, SHORT_DIM, tp(p1, p4)).parameter.expression = ew_e
+    # Waist points p2 (+short) and p5 (-short), located from p0.
+    d.addDistanceDimension(p0, p2, LONG_DIM, tp(p0, p2)
+        ).parameter.expression = f"({len_e}) / 2"
+    d.addDistanceDimension(p0, p2, SHORT_DIM, tp(p0, p2)
+        ).parameter.expression = f"(({ew_e}) + ({ww_e})) / 2"
+    d.addDistanceDimension(p0, p5, LONG_DIM, tp(p0, p5)
+        ).parameter.expression = f"({len_e}) / 2"
+    d.addDistanceDimension(p0, p5, SHORT_DIM, tp(p0, p5)
+        ).parameter.expression = f"(({ew_e}) - ({ww_e})) / 2"
+    # p0 position: 2 origin dims (retargeted to a parent corner when anchored).
+    d.addDistanceDimension(sk.originPoint, p0, LONG_DIM,
+        Point3D.create(p0.geometry.x / 2, p0.geometry.y - 1, 0)
+        ).parameter.expression = f"abs(({c_long}) + ({len_e}) / 2)"
+    d.addDistanceDimension(sk.originPoint, p0, SHORT_DIM,
+        Point3D.create(p0.geometry.x - 1, p0.geometry.y / 2, 0)
+        ).parameter.expression = f"abs(({c_short}) - ({ew_e}) / 2)"
+    if anchor is not None:
+        sp.reanchor(sk, anchor["parent_body"], anchor.get("parent_occ"),
+                    anchor["face_axis"], anchor["face_dir"],
+                    anchor["anchor_xyz"])
 
     prof = sk.profiles.item(0)
     VI = adsk.core.ValueInput.createByString
@@ -204,7 +265,7 @@ def single(comp, plane, center, long_axis, short_axis,
 
 def row(comp, plane, crack_axis, crack_center, count, spacing,
         long_axis, short_axis, length, end_w, waist_w, depth,
-        slab_body, name="BT", ev=None):
+        slab_body, name="BT", ev=None, anchor=None):
     """Create a row of bowties along a crack / joint line.
 
     Args:
@@ -226,6 +287,9 @@ def row(comp, plane, crack_axis, crack_center, count, spacing,
         slab_body: Slab body to CUT into.
         name: Name prefix.
         ev: Parameter evaluator.
+        anchor: Optional dict forwarded to every ``single()`` — anchors each
+            bowtie's origin position dims to a projected parent-face corner
+            (for non-root slab components). Default None keeps origin mode.
 
     Returns:
         List of bowtie bodies.
@@ -253,7 +317,7 @@ def row(comp, plane, crack_axis, crack_center, count, spacing,
         bt = single(comp, plane, tuple(center),
                      long_axis, short_axis,
                      length, end_w, waist_w, depth,
-                     slab_body, f"{name}_{i+1}", ev)
+                     slab_body, f"{name}_{i+1}", ev, anchor=anchor)
         bodies.append(bt)
 
     return bodies
