@@ -105,7 +105,7 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
             pin_z_ctr, pin_through, stretcher=None, name="DB", ev=None,
             mirror_plane=None,
             pin_dia_expr="db_pin_dia", pin_sp_expr="db_pin_sp",
-            combine=True):
+            combine=True, anchor=None, pin_anchor=None):
     """Create a through drawbore M&T joint.
 
     The tenon construction plane is at the outer end (proud face).
@@ -143,6 +143,11 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
         mirror_plane: If provided, mirrors tenon + pins to opposite end.
         pin_dia_expr: Parameter expression for pin diameter.
         pin_sp_expr: Parameter expression for pin spacing.
+        anchor: Optional dict — anchors the TENON rectangle to a projected
+            parent face (non-root components). Passed to sp.sketch_rect_model.
+        pin_anchor: Optional dict — retargets the PIN sketch's origin dims to
+            a projected parent corner via sp.reanchor. Both default None
+            (origin mode, backward compatible).
 
     Returns:
         Dict with 'tenon_ext', 'pin_bodies', 'mirror' (if mirror_plane),
@@ -157,7 +162,7 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
     # 1. Tenon
     t_pl = sp.off_plane(comp, tenon_plane, tenon_plane_offset, f"{name}_Pl")
     _, pr = sp.sketch_rect_model(comp, t_pl, tenon_origin, tenon_size,
-                                  f"{name}_Sk", ev=ev)
+                                  f"{name}_Sk", ev=ev, anchor=anchor)
     tenon_ext = sp.ext_new(comp, pr, tenon_depth, f"{name}_Tenon")
     tenon_body = tenon_ext.bodies.item(0)
     tenon_body.name = f"{name}_Tenon"
@@ -222,6 +227,17 @@ def through(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
     d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
         orient[spacing_ax], P.create(g0.x - 1, (g0.y + g1.y) / 2, 0)
     ).parameter.expression = pin_sp_expr
+    # c1's tenon-axis position was a free DOF (only spacing-axis was pinned
+    # via the spacing dim). Tie it to c0 along the tenon axis so both pins
+    # share the same tenon-depth position → sketch fully constrained.
+    d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
+        orient[tenon_ax], P.create((g0.x + g1.x) / 2, g0.y - 1, 0)
+    ).parameter.expression = "0 in"
+
+    if pin_anchor is not None:
+        sp.reanchor(pin_sk, pin_anchor["parent_body"],
+                    pin_anchor.get("parent_occ"), pin_anchor["face_axis"],
+                    pin_anchor["face_dir"], pin_anchor["anchor_xyz"])
 
     sp.refs_to_construction(pin_sk)
     pin_bodies = []
