@@ -154,10 +154,17 @@ def run(context):
     ref_bb = ref_body.boundingBox
     glass_pl = sp.off_plane(glass_c, glass_c.xZConstructionPlane,
                              "frame_thick - rabbet_w", "Glass_Pl")
+    # ANCHORED to the Bottom rail's parallel front face (y,-1) at its clean
+    # bottom-right corner (the bottom-left coincides with the sketch origin).
     _, pr = sp.sketch_rect_model(glass_c, glass_pl,
         ("frame_w", "frame_thick - rabbet_w", "frame_w"),
         {"x": "mirror_w", "z": "mirror_h"},
-        "Glass_Sk", ev)
+        "Glass_Sk", ev,
+        anchor=dict(parent_body=ref_body, parent_occ=frame_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("outer_w", "0 in", "0 in"),
+                    off1=("x", "outer_w - frame_w"),
+                    off2=("z", "frame_w"), which=0))
     glass_ext = sp.ext_new(glass_c, pr, "glass_thick", "GlassPanel")
     glass_body = glass_ext.bodies.item(0)
     glass_body.name = "Glass"

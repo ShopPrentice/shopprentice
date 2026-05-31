@@ -116,10 +116,17 @@ def run(context):
     bottom_bb = bottom_ref.boundingBox
     cleat_pl = sp.off_plane(cleat_c, cleat_c.xYConstructionPlane,
                              "board_thick", "Cleat_Pl")
+    # ANCHORED to Bottom's parallel top face (z,+1) at its clean back-left corner
+    # (the front-left corner coincides with the sketch origin, so it's excluded).
     _, pr = sp.sketch_rect_model(cleat_c, cleat_pl,
         ("board_thick", "board_thick", "board_thick"),
         {"x": "cleat_l", "y": "cleat_d"},
-        "Cleat_Sk", ev)
+        "Cleat_Sk", ev,
+        anchor=dict(parent_body=bottom_ref, parent_occ=shelf_occ,
+                    face_axis="z", face_dir=+1,
+                    anchor_xyz=("0 in", "shelf_d", "board_thick"),
+                    off1=("x", "board_thick"),
+                    off2=("y", "shelf_d - board_thick"), which=0))
     cleat_ext = sp.ext_new(cleat_c, pr, "cleat_h", "CleatBoard")
     cleat_body = cleat_ext.bodies.item(0)
     cleat_body.name = "Cleat"
