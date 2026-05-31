@@ -173,7 +173,14 @@ def run(context):
     shelf_body = shelf_ext.bodies.item(0)
     shelf_body.name = "Shelf"
 
-    print(">>> Shelf: 1 body")
+    # Notch the shelf's 4 corners around the legs (the shelf edge sits at the
+    # leg centerline, so each leg's inner half overlaps it). CUT the legs out
+    # of the shelf with keepTool=True — an L-notch wraps each leg, the real
+    # woodworking detail and removes the 4 leg/shelf interferences.
+    sp.combine(shelf_body, [leg_fl, leg_fr, leg_bl, leg_br], CUT, True,
+               "ShelfLegNotch")
+
+    print(">>> Shelf: 1 body (corners notched around legs)")
 
     # ==============================================================
     #  4. DOMINO JOINERY — legs directly to top underside
