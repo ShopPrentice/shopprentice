@@ -500,10 +500,5 @@ def four_corners(comp, plane, center, long_axis, long_expr, short_expr,
 
 
 def _find_body(comp, name):
-    """Find body by name in component (non-recursive, fast)."""
-    for i in range(comp.bRepBodies.count):
-        b = comp.bRepBodies.item(i)
-        if b.name == name:
-            return b
-    # Fall back to recursive search
-    return sp.DesignContext().find_body(name, comp)
+    """Find body by name in component (delegates to sp.find_body)."""
+    return sp.find_body(name, comp)

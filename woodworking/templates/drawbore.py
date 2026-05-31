@@ -281,5 +281,6 @@ def blind(comp, tenon_plane, tenon_plane_offset, tenon_origin, tenon_size,
 
 
 def _all_bodies(comp):
-    """Get all bodies in a component."""
-    return [comp.bRepBodies.item(i) for i in range(comp.bRepBodies.count)]
+    """All bodies in a component (delegates to sp.bodies_in — the single site
+    for raw bRepBodies iteration)."""
+    return sp.bodies_in(comp)
