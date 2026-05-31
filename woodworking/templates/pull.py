@@ -169,9 +169,10 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
             Point3D.create(cg.x + 0.5, cg.y / 2, 0)
         ).parameter.expression = f"{pos[1]} cm"
         if anchor is not None:
-            sp.reanchor(sk, anchor["parent_body"], anchor.get("parent_occ"),
-                        anchor["face_axis"], anchor["face_dir"],
-                        anchor["anchor_xyz"])
+            # Profile not needed — CUT uses sk.profiles.item(0) for circles
+            _ = sp.reanchor(sk, anchor["parent_body"], anchor.get("parent_occ"),
+                            anchor["face_axis"], anchor["face_dir"],
+                            anchor["anchor_xyz"])
 
     # -- Bolt holes --
     offsets = [0.0] if is_knob else [-cc / 2, cc / 2]

@@ -771,6 +771,10 @@ def run(context):
             side_line.startSketchPoint, _front_anchor)
         side_sk.geometricConstraints.addCoincident(
             side_line.endSketchPoint, _back_anchor)
+    else:
+        print(f"WARNING: windsor side_sk anchor_pt returned None "
+              f"(front={_front_anchor}, back={_back_anchor}), "
+              f"sketch left under-constrained")
 
     # Create path from side line, then plane at midpoint (0.5 = 50%)
     side_path = comp.features.createPath(side_line, False)

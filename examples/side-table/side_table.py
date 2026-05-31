@@ -169,7 +169,7 @@ def run(context):
     d_tx.addDistanceDimension(lb.startSketchPoint, lb.endSketchPoint, H,
         P3(ls_v - lt_v / 2, -1, 0)).parameter.expression = "leg_taper"
     d_tx.addDistanceDimension(la.startSketchPoint, la.endSketchPoint, V,
-        P3(ls_v + 1, az_v / 2, 0)).parameter.expression = "apron_z"
+        P3(ls_v + 2, az_v / 2, 0)).parameter.expression = "apron_z"
     sk_tx.name = "TaperX_Sk"
     sp.ext_op(leg_c, sp.smallest_profile(sk_tx), "leg_size",
               CUT, leg_fl, "TaperX_Cut")
@@ -205,7 +205,7 @@ def run(context):
         orient['y'], P3((b2.x + c2.x) / 2, b2.y - 1, 0)
         ).parameter.expression = "leg_taper"
     d_ty.addDistanceDimension(la2.startSketchPoint, la2.endSketchPoint,
-        orient['z'], P3(a2.x + 1, (a2.y + b2.y) / 2, 0)
+        orient['z'], P3(a2.x + 2, (a2.y + b2.y) / 2, 0)
         ).parameter.expression = "apron_z"
     sk_ty.name = "TaperY_Sk"
     sp.ext_op(leg_c, sp.smallest_profile(sk_ty), "leg_size",
