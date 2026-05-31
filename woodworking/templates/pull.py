@@ -105,7 +105,7 @@ def define_params(params, prefix="pl", style="bar_3in",
 
 def install(comp, body, plane, center, pull_axis, depth_axis,
             prefix="pl", name="Pull", ev=None, flip=False,
-            board_thick_expr=None):
+            board_thick_expr=None, anchor=None):
     """Install a pull: CUT bolt holes + create visual handle body.
 
     Bolt holes are cylinders CUT through the board. The visual handle
@@ -154,6 +154,26 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         bt_cm = maxs[di] - mins[di]
         board_thick_expr = f"{bt_cm} cm"
 
+    H_o = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V_o = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+
+    def _anchor_circle_sk(sk, circle, pos):
+        """Add origin position dims to circle, then reanchor if anchor provided."""
+        d = sk.sketchDimensions
+        cp = circle.centerSketchPoint
+        cg = cp.geometry
+        d.addDistanceDimension(sk.originPoint, cp, H_o,
+            Point3D.create(cg.x / 2, cg.y - 0.5, 0)
+        ).parameter.expression = f"{pos[0]} cm"
+        d.addDistanceDimension(sk.originPoint, cp, V_o,
+            Point3D.create(cg.x + 0.5, cg.y / 2, 0)
+        ).parameter.expression = f"{pos[1]} cm"
+        if anchor is not None:
+            # Profile not needed — CUT uses sk.profiles.item(0) for circles
+            _ = sp.reanchor(sk, anchor["parent_body"], anchor.get("parent_occ"),
+                            anchor["face_axis"], anchor["face_dir"],
+                            anchor["anchor_xyz"])
+
     # -- Bolt holes --
     offsets = [0.0] if is_knob else [-cc / 2, cc / 2]
     bolt_cuts = []
@@ -172,6 +192,7 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         sk.sketchDimensions.addDiameterDimension(
             circle, Point3D.create(sc.x + bolt_r + 0.5, sc.y, 0)
         ).parameter.expression = f"{p}_bolt_d"
+        _anchor_circle_sk(sk, circle, (sc.x, sc.y))
 
         prof = sk.profiles.item(0)
         cut = sp.ext_op(comp, prof, board_thick_expr, CUT, body,
@@ -195,6 +216,7 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         sk.sketchDimensions.addDiameterDimension(
             circle, Point3D.create(sc.x + post_r + 0.5, sc.y, 0)
         ).parameter.expression = f"{p}_post_d"
+        _anchor_circle_sk(sk, circle, (sc.x, sc.y))
 
         prof = sk.profiles.item(0)
         # Posts extend opposite to bolt holes (outward from surface)
@@ -242,8 +264,34 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         gc.addHorizontal(rect.item(2))
         gc.addVertical(rect.item(1))
         gc.addVertical(rect.item(3))
-
-        prof = sp.smallest_profile(sk)
+        d = sk.sketchDimensions
+        d.addDistanceDimension(rect.item(0).startSketchPoint,
+            rect.item(0).endSketchPoint, H_o,
+            Point3D.create((s1.x + s2.x) / 2, s1.y - 0.5, 0)
+        ).parameter.expression = f"{p}_cc"
+        d.addDistanceDimension(rect.item(1).startSketchPoint,
+            rect.item(1).endSketchPoint, V_o,
+            Point3D.create(s2.x + 0.5, (s1.y + s2.y) / 2, 0)
+        ).parameter.expression = f"{p}_bar_d"
+        d.addDistanceDimension(sk.originPoint,
+            rect.item(0).startSketchPoint, H_o,
+            Point3D.create(s1.x / 2, s1.y - 1, 0)
+        ).parameter.expression = f"{s1.x} cm"
+        d.addDistanceDimension(sk.originPoint,
+            rect.item(0).startSketchPoint, V_o,
+            Point3D.create(s1.x + 1, s1.y / 2, 0)
+        ).parameter.expression = f"{s1.y} cm"
+        if anchor is not None:
+            new_prof = sp.reanchor(sk, anchor["parent_body"],
+                                   anchor.get("parent_occ"),
+                                   anchor["face_axis"], anchor["face_dir"],
+                                   anchor["anchor_xyz"])
+            if new_prof is not None:
+                prof = new_prof
+            else:
+                prof = sp.smallest_profile(sk)
+        else:
+            prof = sp.smallest_profile(sk)
         bar_ext = sp.ext_op(comp, prof, f"{p}_bar_d", NEW, None,
                             f"{name}_Bar", flip=not flip)
         bar_body = bar_ext.bodies.item(0)

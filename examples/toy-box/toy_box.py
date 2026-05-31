@@ -205,7 +205,12 @@ def run(context):
         ("board_thick - bottom_dado_d", "board_thick - bottom_dado_d", "bottom_z"),
         {"x": "inner_w + 2 * bottom_dado_d",
          "y": "inner_d + 2 * bottom_dado_d"},
-        "Bottom_Sk", ev)
+        "Bottom_Sk", ev,
+        anchor=dict(parent_body=front, parent_occ=case_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("case_w", "board_thick", "foot_h"),
+                    off1=("x", "case_w - (board_thick - bottom_dado_d)"),
+                    off2=("y", "bottom_dado_d")))
     bot_ext = sp.ext_new(bottom_c, pr, "bottom_thick", "BottomBoard")
     bot_body = bot_ext.bodies.item(0)
     bot_body.name = "Bottom"
@@ -361,7 +366,10 @@ def run(context):
     ref_bottom = find_body("Bottom")
     ref_bottom_bb = ref_bottom.boundingBox
 
-    dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev)
+    dd_result = dovetailed_drawer.build(drawer_c, prefix="dd", ev=ev,
+        anchor=dict(parent_body=foot_front, parent_occ=feet_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("case_w", "0 in", "foot_h")))
     print(">>> Drawer: dovetailed drawer done (%d bodies)" % len(dd_result["all_bodies"]))
 
     # Body-relative references for drawer sub-bodies
@@ -383,7 +391,13 @@ def run(context):
         ("-lid_overhang", "-lid_overhang", "case_h - lid_thick"),
         {"x": "case_w + 2 * lid_overhang",
          "y": "case_d + lid_overhang"},
-        "Lid_Sk", ev)
+        "Lid_Sk", ev,
+        anchor=dict(parent_body=bot_body, parent_occ=bottom_occ,
+                    face_axis="z", face_dir=+1,
+                    anchor_xyz=("board_thick - bottom_dado_d",
+                                "board_thick - bottom_dado_d", "bottom_z"),
+                    off1=("x", "board_thick - bottom_dado_d + lid_overhang"),
+                    off2=("y", "board_thick - bottom_dado_d + lid_overhang")))
     lid_ext = sp.ext_new(lid_c, pr, "lid_thick", "LidPanel")
     lid_body = lid_ext.bodies.item(0)
     lid_body.name = "Lid"
@@ -399,7 +413,13 @@ def run(context):
     _, pr = sp.sketch_rect_model(lid_c, bat_z_pl,
         ("batten_inset", "0 in", "case_h - lid_thick - batten_thick"),
         {"x": "batten_w", "y": "case_d - board_thick"},
-        "BattenL_Sk", ev)
+        "BattenL_Sk", ev,
+        anchor=dict(parent_body=lid_body, parent_occ=lid_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("-lid_overhang", "-lid_overhang",
+                                "case_h - lid_thick"),
+                    off1=("x", "batten_inset + lid_overhang"),
+                    off2=("y", "lid_overhang")))
     bat_l_ext = sp.ext_new(lid_c, pr, "batten_thick", "BattenL")
     batten_l = bat_l_ext.bodies.item(0)
     batten_l.name = "Batten_Left"
@@ -428,7 +448,12 @@ def run(context):
     _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
         ("board_thick", "case_d - back_thick", "foot_h"),
         {"x": "inner_w", "z": "case_h - foot_h - lid_thick"},
-        "BackPanel_Sk", ev)
+        "BackPanel_Sk", ev,
+        anchor=dict(parent_body=foot_back, parent_occ=feet_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("case_w", "case_d - foot_thick", "0 in"),
+                    off1=("x", "case_w - board_thick"),
+                    off2=("z", "foot_h")))
     bp_ext = sp.ext_new(back_c, pr, "back_thick", "BackPanelBoard")
     back_panel = bp_ext.bodies.item(0)
     back_panel.name = "BackPanel"

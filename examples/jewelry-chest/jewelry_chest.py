@@ -126,14 +126,23 @@ def run(context):
     bpp = sp.off_plane(bot_c, root.xYConstructionPlane, "groove_up", "BP_Pl")
     sk, prof = sp.sketch_rect_model(bot_c, bpp,
         ("board_thick - groove_depth","board_thick - groove_depth","groove_up"),
-        {"x":"interior_l + 2 * groove_depth","y":"interior_w + 2 * groove_depth"}, "BP_Sk", ev=ev)
+        {"x":"interior_l + 2 * groove_depth","y":"interior_w + 2 * groove_depth"}, "BP_Sk", ev=ev,
+        anchor=dict(parent_body=end_r, parent_occ=case_occ, face_axis="x", face_dir=+1,
+            anchor_xyz=("box_length", "0 in - proud_offset", "groove_up"),
+            off1=("x", "abs((board_thick - groove_depth) - (box_length))"),
+            off2=("y", "abs((board_thick - groove_depth) - (0 in - proud_offset))"), which=0))
     bp = sp.ext_new(bot_c, prof, "bottom_thick", "BP").bodies.item(0); bp.name = "Bottom"
     # Raised center: thicker block below the tongue, inside the case interior
     rpl = sp.off_plane(bot_c, root.xYConstructionPlane,
         "groove_up - bottom_full_thick + bottom_thick", "BP_R_Pl")
     sk, prof = sp.sketch_rect_model(bot_c, rpl,
         ("board_thick", "board_thick", "groove_up - bottom_full_thick + bottom_thick"),
-        {"x": "interior_l", "y": "interior_w"}, "BP_R_Sk", ev=ev)
+        {"x": "interior_l", "y": "interior_w"}, "BP_R_Sk", ev=ev,
+        anchor=dict(parent_body=end_r, parent_occ=case_occ, face_axis="x", face_dir=+1,
+            anchor_xyz=("box_length", "0 in - proud_offset",
+                        "groove_up - bottom_full_thick + bottom_thick"),
+            off1=("x", "abs((board_thick) - (box_length))"),
+            off2=("y", "abs((board_thick) - (0 in - proud_offset))"), which=0))
     bp_r = sp.ext_new(bot_c, prof, "bottom_full_thick - bottom_thick", "BP_R").bodies.item(0)
     sp.combine(bp, bp_r, JOIN, False, "BP_RJ")
     sp.combine(end_l, bp, CUT, True, "BG_EL"); sp.combine(end_r, bp, CUT, True, "BG_ER")
@@ -187,7 +196,12 @@ def run(context):
     tp = sp.off_plane(ut_c, root.xYConstructionPlane, "tray_z", "UT_Pl")
     sk, prof = sp.sketch_rect_model(ut_c, tp,
         ("board_thick + tray_cl", "board_thick + tray_cl", "tray_z"),
-        {"x": "tray_l_out", "y": "tray_thick"}, "UTF_Sk", ev=ev)
+        {"x": "tray_l_out", "y": "tray_thick"}, "UTF_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "tray_cl + groove_depth"),
+            off2=("y", "tray_cl + groove_depth"), which=0))
     ut_f = sp.ext_new(ut_c, prof, "tray_height", "UTF").bodies.item(0); ut_f.name = "UT_Front"
     left_end = sp.find_face(ut_f, "x", -1); right_end = sp.find_face(ut_f, "x", +1)
     inner_y = sp.find_face(ut_f, "y", +1)
@@ -205,7 +219,12 @@ def run(context):
 
     sk, prof = sp.sketch_rect_model(ut_c, tp,
         ("board_thick + tray_cl", "board_thick + tray_cl", "tray_z"),
-        {"x": "tray_thick", "y": "tray_w_out"}, "UTEL_Sk", ev=ev)
+        {"x": "tray_thick", "y": "tray_w_out"}, "UTEL_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "tray_cl + groove_depth"),
+            off2=("y", "tray_cl + groove_depth"), which=0))
     ut_el = sp.ext_new(ut_c, prof, "tray_height", "UTEL").bodies.item(0); ut_el.name = "UT_End_L"
     fend = sp.find_face(ut_el, "y", -1); bend = sp.find_face(ut_el, "y", +1)
     inner_x = sp.find_face(ut_el, "x", +1)
@@ -224,7 +243,12 @@ def run(context):
          "tray_z + tray_groove_up"),
         {"x": "tray_l_out - 2 * tray_thick + 2 * tray_groove_depth",
          "y": "tray_w_out - 2 * tray_thick + 2 * tray_groove_depth"},
-        "UTBot_Sk", ev=ev)
+        "UTBot_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "tray_cl + tray_thick - tray_groove_depth + groove_depth"),
+            off2=("y", "tray_cl + tray_thick - tray_groove_depth + groove_depth"), which=0))
     ut_bot = sp.ext_new(ut_c, prof, "tray_bottom_thick", "UTBot").bodies.item(0)
     ut_bot.name = "UT_Bottom"
 
@@ -242,7 +266,12 @@ def run(context):
          "board_thick + tray_cl + tray_thick - tray_dado_depth", utdz),
         {"x": "div_thick",
          "y": "tray_w_out - 2 * tray_thick + 2 * tray_dado_depth"},
-        "UTDiv_Sk", ev=ev)
+        "UTDiv_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "box_length / 2 - div_thick / 2 - board_thick + groove_depth"),
+            off2=("y", "tray_cl + tray_thick - tray_dado_depth + groove_depth"), which=0))
     ut_div = sp.ext_new(ut_c, prof, utdh, "UTDiv").bodies.item(0); ut_div.name = "UT_Div"
     sp.combine(ut_f, ut_div, CUT, True, "UTD_F"); sp.combine(ut_b, ut_div, CUT, True, "UTD_B")
 
@@ -259,8 +288,25 @@ def run(context):
     pm = m2s(P(x_n, (y_s + y_e) / 2, z_top - ev("notch_h")))
     top_ln = sk.sketchCurves.sketchLines.addByTwoPoints(
         P(pl.x, pl.y, 0), P(pr.x, pr.y, 0))
-    sk.sketchCurves.sketchArcs.addByThreePoints(
+    arc = sk.sketchCurves.sketchArcs.addByThreePoints(
         top_ln.endSketchPoint, P(pm.x, pm.y, 0), top_ln.startSketchPoint)
+    orient = sp.probe_orientations(sk, x_n, y_s, z_top)
+    gc = sk.geometricConstraints
+    V_enum = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    if orient['z'] == V_enum:
+        gc.addHorizontal(top_ln)
+    else:
+        gc.addVertical(top_ln)
+    d = sk.sketchDimensions
+    d.addDistanceDimension(top_ln.startSketchPoint, top_ln.endSketchPoint,
+        orient['y'], P(pl.x, (pl.y + pr.y) / 2, 0)
+    ).parameter.expression = "tray_w_out - 2 * (tray_thick + notch_margin)"
+    notch_w = ev("tray_w_out - 2 * (tray_thick + notch_margin)")
+    r_val = (notch_w**2 / 4 + ev("notch_h")**2) / (2 * ev("notch_h"))
+    d.addRadialDimension(arc, P(pm.x, pm.y + 0.5, 0)
+    ).parameter.expression = f"((tray_w_out - 2 * (tray_thick + notch_margin)) ^ 2 / 4 + notch_h ^ 2) / (2 * notch_h)"
+    sp.reanchor(sk, ut_div, None, "x", -1,
+        ("box_length / 2 - div_thick / 2", "board_thick + tray_cl", "tray_z + tray_height"))
     sp.refs_to_construction(sk)
     prof = sp.smallest_profile(sk)
     sp.ext_op(ut_c, prof, "div_thick", CUT, ut_div, "UTNotch")
@@ -277,7 +323,12 @@ def run(context):
 
     sk, prof = sp.sketch_rect_model(lt_c, ltp,
         ("board_thick + tray_cl", "board_thick + support_thick + tray_cl", "lower_tray_z"),
-        {"x": "lower_tray_l", "y": "tray_thick"}, "LTL_F_Sk", ev=ev)
+        {"x": "lower_tray_l", "y": "tray_thick"}, "LTL_F_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "tray_cl + groove_depth"),
+            off2=("y", "support_thick + tray_cl + groove_depth"), which=0))
     lt1_f = sp.ext_new(lt_c, prof, "lower_tray_height", "LTL_F").bodies.item(0)
     lt1_f.name = "LTL_Front"
     left_end = sp.find_face(lt1_f, "x", -1); right_end = sp.find_face(lt1_f, "x", +1)
@@ -297,7 +348,12 @@ def run(context):
 
     sk, prof = sp.sketch_rect_model(lt_c, ltp,
         ("board_thick + tray_cl", "board_thick + support_thick + tray_cl", "lower_tray_z"),
-        {"x": "tray_thick", "y": "lower_tray_w_out"}, "LTL_EL_Sk", ev=ev)
+        {"x": "tray_thick", "y": "lower_tray_w_out"}, "LTL_EL_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "tray_cl + groove_depth"),
+            off2=("y", "support_thick + tray_cl + groove_depth"), which=0))
     lt1_el = sp.ext_new(lt_c, prof, "lower_tray_height", "LTL_EL").bodies.item(0)
     lt1_el.name = "LTL_End_L"
     fend = sp.find_face(lt1_el, "y", -1); bend = sp.find_face(lt1_el, "y", +1)
@@ -319,7 +375,13 @@ def run(context):
          "lower_tray_z + tray_groove_up"),
         {"x": "lower_tray_l - 2 * tray_thick + 2 * tray_groove_depth",
          "y": "lower_tray_w_out - 2 * tray_thick + 2 * tray_groove_depth"},
-        "LTL_Bot_Sk", ev=ev)
+        "LTL_Bot_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "tray_cl + tray_thick - tray_groove_depth + groove_depth"),
+            off2=("y", "support_thick + tray_cl + tray_thick - tray_groove_depth + groove_depth"),
+            which=0))
     lt1_bot = sp.ext_new(lt_c, prof, "tray_bottom_thick", "LTL_Bot").bodies.item(0)
     lt1_bot.name = "LTL_Bottom"
 
@@ -337,7 +399,13 @@ def run(context):
          "board_thick + support_thick + tray_cl + tray_thick - tray_dado_depth", ltdz),
         {"x": "div_thick",
          "y": "lower_tray_w_out - 2 * tray_thick + 2 * tray_dado_depth"},
-        "LTL_Div_Sk", ev=ev)
+        "LTL_Div_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "tray_cl + lower_tray_l / 2 - div_thick / 2 + groove_depth"),
+            off2=("y", "support_thick + tray_cl + tray_thick - tray_dado_depth + groove_depth"),
+            which=0))
     lt1_div = sp.ext_new(lt_c, prof, ltdh, "LTL_Div").bodies.item(0); lt1_div.name = "LTL_Div"
     sp.combine(lt1_f, lt1_div, CUT, True, "LTD_F"); sp.combine(lt1_b, lt1_div, CUT, True, "LTD_B")
 
@@ -353,7 +421,23 @@ def run(context):
     lpl = m2s(P(lx_n, ly_s, lz_top)); lpr = m2s(P(lx_n, ly_e, lz_top))
     lpm = m2s(P(lx_n, (ly_s + ly_e) / 2, lz_top - ev("notch_h")))
     lt_ln = sk.sketchCurves.sketchLines.addByTwoPoints(P(lpl.x, lpl.y, 0), P(lpr.x, lpr.y, 0))
-    sk.sketchCurves.sketchArcs.addByThreePoints(lt_ln.endSketchPoint, P(lpm.x, lpm.y, 0), lt_ln.startSketchPoint)
+    lt_arc = sk.sketchCurves.sketchArcs.addByThreePoints(lt_ln.endSketchPoint, P(lpm.x, lpm.y, 0), lt_ln.startSketchPoint)
+    lt_orient = sp.probe_orientations(sk, lx_n, ly_s, lz_top)
+    gc = sk.geometricConstraints
+    V_enum = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    if lt_orient['z'] == V_enum:
+        gc.addHorizontal(lt_ln)
+    else:
+        gc.addVertical(lt_ln)
+    d = sk.sketchDimensions
+    d.addDistanceDimension(lt_ln.startSketchPoint, lt_ln.endSketchPoint,
+        lt_orient['y'], P(lpl.x, (lpl.y + lpr.y) / 2, 0)
+    ).parameter.expression = "lower_tray_w_out - 2 * (tray_thick + notch_margin)"
+    d.addRadialDimension(lt_arc, P(lpm.x, lpm.y + 0.5, 0)
+    ).parameter.expression = "((lower_tray_w_out - 2 * (tray_thick + notch_margin)) ^ 2 / 4 + notch_h ^ 2) / (2 * notch_h)"
+    sp.reanchor(sk, lt1_div, None, "x", -1,
+        ("board_thick + tray_cl + lower_tray_l / 2 - div_thick / 2",
+         "board_thick + support_thick + tray_cl", "lower_tray_z + lower_tray_height"))
     sp.refs_to_construction(sk)
     prof = sp.smallest_profile(sk)
     sp.ext_op(lt_c, prof, "div_thick", CUT, lt1_div, "LTNotch")
@@ -387,21 +471,44 @@ def run(context):
 
     # Rail_F (recessed lid_rab from front face — flat bottom, no rabbet)
     sk, prof = sp.sketch_rect_model(lid_c, lbp,
-        ("board_thick","lid_rab","open_height"), {"x":"interior_l","y":"lid_frame_w"}, "LRF_Sk", ev=ev)
+        ("board_thick","lid_rab","open_height"), {"x":"interior_l","y":"lid_frame_w"}, "LRF_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((board_thick) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab) - (board_thick - groove_depth))"), which=0))
     lrf = sp.ext_new(lid_c, prof, "lid_frame_h", "LRF").bodies.item(0); lrf.name = "Lid_Rail_F"
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
         ("board_thick","lid_rab + lid_frame_w - lid_tenon_l","lid_groove_z"),
-        {"x":"interior_l","y":"lid_tenon_l"}, "LRF_G_Sk", ev=ev)
+        {"x":"interior_l","y":"lid_tenon_l"}, "LRF_G_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((board_thick) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w - lid_tenon_l) - (board_thick - groove_depth))"),
+            which=0))
     gf = sp.ext_new(lid_c, prof, "lid_groove_t", "LRF_GT").bodies.item(0)
     sp.combine(lrf, gf, CUT, False, "LRF_G")
 
     # Rail_B (at back edge, flat bottom)
     sk, prof = sp.sketch_rect_model(lid_c, lbp,
-        ("board_thick","box_width - lid_frame_w","open_height"), {"x":"interior_l","y":"lid_frame_w"}, "LRB_Sk", ev=ev)
+        ("board_thick","box_width - lid_frame_w","open_height"), {"x":"interior_l","y":"lid_frame_w"}, "LRB_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((board_thick) - (board_thick - groove_depth))"),
+            off2=("y", "abs((box_width - lid_frame_w) - (board_thick - groove_depth))"),
+            which=0))
     lrb = sp.ext_new(lid_c, prof, "lid_frame_h", "LRB").bodies.item(0); lrb.name = "Lid_Rail_B"
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
         ("board_thick","box_width - lid_frame_w","lid_groove_z"),
-        {"x":"interior_l","y":"lid_tenon_l"}, "LRB_G_Sk", ev=ev)
+        {"x":"interior_l","y":"lid_tenon_l"}, "LRB_G_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((board_thick) - (board_thick - groove_depth))"),
+            off2=("y", "abs((box_width - lid_frame_w) - (board_thick - groove_depth))"),
+            which=0))
     gb = sp.ext_new(lid_c, prof, "lid_groove_t", "LRB_GT").bodies.item(0)
     sp.combine(lrb, gb, CUT, False, "LRB_G")
 
@@ -412,22 +519,46 @@ def run(context):
     # Stile_L (between rails, inside end board extension)
     sk, prof = sp.sketch_rect_model(lid_c, lbp,
         ("board_thick","lid_rab + lid_frame_w","open_height"),
-        {"x":"lid_frame_w","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LSL_Sk", ev=ev)
+        {"x":"lid_frame_w","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LSL_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((board_thick) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w) - (board_thick - groove_depth))"),
+            which=0))
     lsl = sp.ext_new(lid_c, prof, "lid_frame_h", "LSL").bodies.item(0); lsl.name = "Lid_Stile_L"
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
         ("board_thick + lid_frame_w - lid_tongue_l","lid_rab + lid_frame_w","lid_groove_z"),
-        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LSL_G_Sk", ev=ev)
+        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LSL_G_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((board_thick + lid_frame_w - lid_tongue_l) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w) - (board_thick - groove_depth))"),
+            which=0))
     gs = sp.ext_new(lid_c, prof, "lid_groove_t", "LSL_GT").bodies.item(0)
     sp.combine(lsl, gs, CUT, False, "LSL_G")
     # Stile tenons into rails (recessed from inner edge)
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
         ("board_thick","lid_rab + lid_frame_w - lid_tenon_l","lid_groove_z"),
-        {"x":"lid_frame_w - lid_tongue_l","y":"lid_tenon_l"}, "LSL_TF_Sk", ev=ev)
+        {"x":"lid_frame_w - lid_tongue_l","y":"lid_tenon_l"}, "LSL_TF_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((board_thick) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w - lid_tenon_l) - (board_thick - groove_depth))"),
+            which=0))
     t = sp.ext_new(lid_c, prof, "lid_groove_t", "LSL_TF").bodies.item(0)
     sp.combine(lsl, t, JOIN, False, "LSL_TFJ")
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
         ("board_thick","box_width - lid_frame_w","lid_groove_z"),
-        {"x":"lid_frame_w - lid_tongue_l","y":"lid_tenon_l"}, "LSL_TB_Sk", ev=ev)
+        {"x":"lid_frame_w - lid_tongue_l","y":"lid_tenon_l"}, "LSL_TB_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((board_thick) - (board_thick - groove_depth))"),
+            off2=("y", "abs((box_width - lid_frame_w) - (board_thick - groove_depth))"),
+            which=0))
     t = sp.ext_new(lid_c, prof, "lid_groove_t", "LSL_TB").bodies.item(0)
     sp.combine(lsl, t, JOIN, False, "LSL_TBJ")
     lsr = sp.mirror_body(lid_c, lsl, xmid_pl, "LSR_M").bodies.item(0); lsr.name = "Lid_Stile_R"
@@ -435,23 +566,53 @@ def run(context):
     # Div (runs in Y between rails, centered in X — parallel to sides)
     sk, prof = sp.sketch_rect_model(lid_c, lbp,
         ("box_length / 2 - lid_frame_w / 2","lid_rab + lid_frame_w","open_height"),
-        {"x":"lid_frame_w","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LDV_Sk", ev=ev)
+        {"x":"lid_frame_w","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LDV_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((box_length / 2 - lid_frame_w / 2) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w) - (board_thick - groove_depth))"),
+            which=0))
     ldv = sp.ext_new(lid_c, prof, "lid_frame_h", "LDV").bodies.item(0); ldv.name = "Lid_Div"
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
         ("box_length / 2 - lid_frame_w / 2","lid_rab + lid_frame_w","lid_groove_z"),
-        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LDV_GL_Sk", ev=ev)
+        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LDV_GL_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((box_length / 2 - lid_frame_w / 2) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w) - (board_thick - groove_depth))"),
+            which=0))
     gl = sp.ext_new(lid_c, prof, "lid_groove_t", "LDV_GLT").bodies.item(0); sp.combine(ldv, gl, CUT, False, "LDV_GL")
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
         ("box_length / 2 + lid_frame_w / 2 - lid_tongue_l","lid_rab + lid_frame_w","lid_groove_z"),
-        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LDV_GR_Sk", ev=ev)
+        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LDV_GR_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((box_length / 2 + lid_frame_w / 2 - lid_tongue_l) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w) - (board_thick - groove_depth))"),
+            which=0))
     gr = sp.ext_new(lid_c, prof, "lid_groove_t", "LDV_GRT").bodies.item(0); sp.combine(ldv, gr, CUT, False, "LDV_GR")
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
         ("box_length / 2 - lid_frame_w / 2","lid_rab + lid_frame_w - lid_tenon_l","lid_groove_z"),
-        {"x":"lid_frame_w","y":"lid_tenon_l"}, "LDV_TF_Sk", ev=ev)
+        {"x":"lid_frame_w","y":"lid_tenon_l"}, "LDV_TF_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((box_length / 2 - lid_frame_w / 2) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w - lid_tenon_l) - (board_thick - groove_depth))"),
+            which=0))
     t = sp.ext_new(lid_c, prof, "lid_groove_t", "LDV_TF").bodies.item(0); sp.combine(ldv, t, JOIN, False, "LDV_TFJ")
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
         ("box_length / 2 - lid_frame_w / 2","box_width - lid_frame_w","lid_groove_z"),
-        {"x":"lid_frame_w","y":"lid_tenon_l"}, "LDV_TB_Sk", ev=ev)
+        {"x":"lid_frame_w","y":"lid_tenon_l"}, "LDV_TB_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((box_length / 2 - lid_frame_w / 2) - (board_thick - groove_depth))"),
+            off2=("y", "abs((box_width - lid_frame_w) - (board_thick - groove_depth))"),
+            which=0))
     t = sp.ext_new(lid_c, prof, "lid_groove_t", "LDV_TB").bodies.item(0); sp.combine(ldv, t, JOIN, False, "LDV_TBJ")
 
     # Body-relative reference: Lid_Panel_L depends on Lid_Stile_L, Lid_Panel_R depends on Lid_Stile_R
@@ -465,17 +626,31 @@ def run(context):
     sk, prof = sp.sketch_rect_model(lid_c, lpp,
         ("board_thick + lid_frame_w - lid_tongue_l","lid_rab + lid_frame_w - lid_tongue_l","lid_panel_z"),
         {"x":"box_length / 2 - board_thick - 3 * lid_frame_w / 2 + 2 * lid_tongue_l",
-         "y":"box_width - 2 * lid_frame_w - lid_rab + 2 * lid_tongue_l"}, "LPL_Sk", ev=ev)
+         "y":"box_width - 2 * lid_frame_w - lid_rab + 2 * lid_tongue_l"}, "LPL_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((board_thick + lid_frame_w - lid_tongue_l) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w - lid_tongue_l) - (board_thick - groove_depth))"),
+            which=0))
     lpl = sp.ext_new(lid_c, prof, "lid_panel_t", "LPL").bodies.item(0); lpl.name = "Lid_Panel_L"
     lrp = sp.off_plane(lid_c, root.xYConstructionPlane, "lid_panel_z + lid_groove_t", "LRab_Pl")
     px = "board_thick + lid_frame_w - lid_tongue_l"; py = "lid_rab + lid_frame_w - lid_tongue_l"
     rz = "lid_panel_z + lid_groove_t"
     pwx = "box_length / 2 - board_thick - 3 * lid_frame_w / 2 + 2 * lid_tongue_l"
     pwy = "box_width - 2 * lid_frame_w - lid_rab + 2 * lid_tongue_l"; rd = "lid_panel_t - lid_groove_t"
-    sk, prof = sp.sketch_rect_model(lid_c, lrp, (px,py,rz), {"x":pwx,"y":"lid_tongue_l"}, "LPL_RbF_Sk", ev=ev); sp.ext_op(lid_c, prof, rd, CUT, lpl, "LPL_RbF")
-    sk, prof = sp.sketch_rect_model(lid_c, lrp, (px,"box_width - lid_frame_w",rz), {"x":pwx,"y":"lid_tongue_l"}, "LPL_RbB_Sk", ev=ev); sp.ext_op(lid_c, prof, rd, CUT, lpl, "LPL_RbB")
-    sk, prof = sp.sketch_rect_model(lid_c, lrp, (px,py,rz), {"x":"lid_tongue_l","y":pwy}, "LPL_RbL_Sk", ev=ev); sp.ext_op(lid_c, prof, rd, CUT, lpl, "LPL_RbL")
-    sk, prof = sp.sketch_rect_model(lid_c, lrp, ("box_length / 2 - lid_frame_w / 2",py,rz), {"x":"lid_tongue_l","y":pwy}, "LPL_RbR_Sk", ev=ev); sp.ext_op(lid_c, prof, rd, CUT, lpl, "LPL_RbR")
+    _rb_anchor = dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+        anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                    "groove_up + bottom_thick"), which=0)
+    _ax = "board_thick - groove_depth"
+    sk, prof = sp.sketch_rect_model(lid_c, lrp, (px,py,rz), {"x":pwx,"y":"lid_tongue_l"}, "LPL_RbF_Sk", ev=ev,
+        anchor=dict(_rb_anchor, off1=("x", f"abs(({px}) - ({_ax}))"), off2=("y", f"abs(({py}) - ({_ax}))"))); sp.ext_op(lid_c, prof, rd, CUT, lpl, "LPL_RbF")
+    sk, prof = sp.sketch_rect_model(lid_c, lrp, (px,"box_width - lid_frame_w",rz), {"x":pwx,"y":"lid_tongue_l"}, "LPL_RbB_Sk", ev=ev,
+        anchor=dict(_rb_anchor, off1=("x", f"abs(({px}) - ({_ax}))"), off2=("y", f"abs((box_width - lid_frame_w) - ({_ax}))"))); sp.ext_op(lid_c, prof, rd, CUT, lpl, "LPL_RbB")
+    sk, prof = sp.sketch_rect_model(lid_c, lrp, (px,py,rz), {"x":"lid_tongue_l","y":pwy}, "LPL_RbL_Sk", ev=ev,
+        anchor=dict(_rb_anchor, off1=("x", f"abs(({px}) - ({_ax}))"), off2=("y", f"abs(({py}) - ({_ax}))"))); sp.ext_op(lid_c, prof, rd, CUT, lpl, "LPL_RbL")
+    sk, prof = sp.sketch_rect_model(lid_c, lrp, ("box_length / 2 - lid_frame_w / 2",py,rz), {"x":"lid_tongue_l","y":pwy}, "LPL_RbR_Sk", ev=ev,
+        anchor=dict(_rb_anchor, off1=("x", f"abs((box_length / 2 - lid_frame_w / 2) - ({_ax}))"), off2=("y", f"abs(({py}) - ({_ax}))"))); sp.ext_op(lid_c, prof, rd, CUT, lpl, "LPL_RbR")
     lpr = sp.mirror_body(lid_c, lpl, xmid_pl, "LPR_M").bodies.item(0); lpr.name = "Lid_Panel_R"
 
     sp.combine(lsl, [lpl, lpr], CUT, True, "LPG_SL"); sp.combine(lsr, [lpl, lpr], CUT, True, "LPG_SR")
@@ -492,6 +667,8 @@ def run(context):
     sk, prof = sp.sketch_rect_model(lid_c, pull_y_pl,
         ("box_length / 2 - pull_w / 2", "lid_rab - pull_d", pull_z_expr),
         {"x":"pull_w","z":"pull_h"}, "Pull_Sk", ev=ev)
+    prof = sp.reanchor(sk, lrf, None, "y", -1,
+        ("0 in", "0 in", "open_height + lid_frame_h")) or prof
     pull = sp.ext_new(lid_c, prof, "pull_d", "Pull").bodies.item(0); pull.name = "Pull"
     # Tenon from pull into front rail (0.5" wide)
     pt_pl = sp.off_plane(lid_c, root.xYConstructionPlane,
@@ -499,7 +676,12 @@ def run(context):
     sk, prof = sp.sketch_rect_model(lid_c, pt_pl,
         ("box_length / 2 - 0.1875 in","lid_rab",
          "open_height + lid_frame_h / 2 - pull_h / 2"),
-        {"x":"0.375 in","y":"lid_tongue_l"}, "PT_Sk", ev=ev)
+        {"x":"0.375 in","y":"lid_tongue_l"}, "PT_Sk", ev=ev,
+        anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
+            anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
+                        "groove_up + bottom_thick"),
+            off1=("x", "abs((box_length / 2 - 0.1875 in) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab) - (board_thick - groove_depth))"), which=0))
     pt = sp.ext_new(lid_c, prof, "pull_h", "PT").bodies.item(0)
     sp.combine(lrf, pt, CUT, True, "PullMortise")
     sp.combine(pull, pt, JOIN, False, "PullTenonJ")

@@ -272,7 +272,8 @@ def _check_domino_containment(void_body, body_a, body_b, name):
 def between(comp, plane, body_a, body_b, interface_axis,
             short_expr, depth_expr,
             long_expr=None, long_axis=None,
-            count=2, name="DM", ev=None, cut=True):
+            count=2, name="DM", ev=None, cut=True,
+            anchor=None):
     """Create dominos at the mating area between two bodies.
 
     Auto-computes where body_a and body_b overlap, determines the best
@@ -399,6 +400,13 @@ def between(comp, plane, body_a, body_b, interface_axis,
             comp, plane, (f"{pos[0]} cm", f"{pos[1]} cm", f"{pos[2]} cm"),
             long_axis, long_expr, short_expr,
             name=f"{name}_{i}_Sk", ev=ev)
+        if anchor is not None:
+            new_prof = sp.reanchor(sk, anchor["parent_body"],
+                                   anchor.get("parent_occ"),
+                                   anchor["face_axis"], anchor["face_dir"],
+                                   anchor["anchor_xyz"])
+            if new_prof is not None:
+                prof = new_prof
         ext = sp.ext_new_sym(comp, prof, depth_expr, f"{name}_{i}")
         void = ext.bodies.item(0)
         void.name = f"{name}_{i}"

@@ -129,15 +129,21 @@ def run(context):
                           "kick_height", "Shelf_Pl")
 
     # Shelf body (depth = shelf_depth, recessed for backboard)
-    _, pr = sp.sketch_rect(shelves_c, sh_pl, "board_thick", "0 in",
+    sk_shelf, pr = sp.sketch_rect(shelves_c, sh_pl, "board_thick", "0 in",
                             "inner_width", "shelf_depth", "Shelf_Sk", ctx.ev)
+    # Anchor to Side_Left's bottom face (z=0); back-outer-bottom corner.
+    pr = sp.reanchor(sk_shelf, left_side, sides_occ, "z", -1,
+                     ("0 in", "total_depth", "0 in")) or pr
     ext_sh = sp.ext_new(shelves_c, pr, "board_thick", "ShelfBody")
     sh_body = ext_sh.bodies.item(0)
     sh_body.name = "Shelf"
 
     # One tenon (left-front)
-    _, pr = sp.sketch_rect(shelves_c, sh_pl, "0 in", "mt_tenon_y1",
+    sk_tenon, pr = sp.sketch_rect(shelves_c, sh_pl, "0 in", "mt_tenon_y1",
                             "board_thick", "mt_tenon_w", "Sh_Tenon_Sk", ctx.ev)
+    # Anchor to Side_Left's bottom face (z=0); inner-back-bottom corner.
+    pr = sp.reanchor(sk_tenon, left_side, sides_occ, "z", -1,
+                     ("board_thick", "total_depth", "0 in")) or pr
     ext_t = sp.ext_new(shelves_c, pr, "board_thick", "Sh_Tenon")
 
     # Mirror tenon across YMid → left-back, then across XMid → right pair
@@ -165,7 +171,12 @@ def run(context):
         long_axis="x", long_expr="dm_back_h",
         short_expr="dm_back_w", depth_expr="dm_back_d",
         body_a=sh_body, body_b=sh_body,
-        name="ShDm", ev=ctx.ev)
+        name="ShDm", ev=ctx.ev,
+        anchor=dict(parent_body=left_side, parent_occ=sides_occ,
+                    face_axis="y", face_dir=+1,
+                    anchor_xyz=("board_thick", "total_depth", "0 in"),
+                    off=(("x", "abs(dm_back_xsp - (dm_back_h - dm_back_w) / 2)"),
+                         ("z", "kick_height + board_thick / 2"))))
 
     # Body pattern shelf along Z (ghost void bodies are harmless)
     shelf_pat = sp.body_pattern(shelves_c, sh_body, shelves_c.zConstructionAxis,
@@ -208,8 +219,11 @@ def run(context):
     # ==============================================================
     #  4. KICK BOARD + DOMINO VOIDS  (Kick component)
     # ==============================================================
-    _, pr = sp.sketch_rect(kick_c, kick_c.xYConstructionPlane,
+    sk_kick, pr = sp.sketch_rect(kick_c, kick_c.xYConstructionPlane,
         "board_thick", "0 in", "inner_width", "board_thick", "Kick_Sk", ctx.ev)
+    # Anchor to Side_Left's bottom face (z=0); back-outer-bottom corner.
+    pr = sp.reanchor(sk_kick, left_side, sides_occ, "z", -1,
+                     ("0 in", "total_depth", "0 in")) or pr
     kick_body = sp.ext_new(kick_c, pr, "kick_height", "KickBoard").bodies.item(0)
     kick_body.name = "KickBoard"
 
@@ -230,7 +244,12 @@ def run(context):
         long_axis="z", long_expr="dm_kick_h",
         short_expr="dm_kick_w", depth_expr="dm_kick_d",
         body_a=kick_body,
-        name="KDm_L", ev=ctx.ev)
+        name="KDm_L", ev=ctx.ev,
+        anchor=dict(parent_body=left_side, parent_occ=sides_occ,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=("board_thick", "total_depth", "0 in"),
+                    off=(("y", "abs(board_thick / 2 - total_depth)"),
+                         ("z", "abs(dm_kick_zsp - (dm_kick_h - dm_kick_w) / 2)"))))
 
     # Right-side: mirror left voids across XMid + CUT into kick
     mir_k = sp.mirror_bodies(kick_c, dm_kick_left, k_XMid, "KDm_MirX")
@@ -259,9 +278,12 @@ def run(context):
     ref_shelf_bb = ref_shelf.boundingBox
     bk_pl = sp.off_plane(back_c, back_c.xYConstructionPlane,
                           "kick_height", "Back_Pl")
-    _, pr = sp.sketch_rect(back_c, bk_pl, "board_thick",
+    sk_back, pr = sp.sketch_rect(back_c, bk_pl, "board_thick",
                             "total_depth - back_thick",
                             "inner_width", "back_thick", "Back_Sk", ctx.ev)
+    # Anchor to Side_Left's bottom face (z=0); back-outer-bottom corner.
+    pr = sp.reanchor(sk_back, left_side, sides_occ, "z", -1,
+                     ("0 in", "total_depth", "0 in")) or pr
     back_body = sp.ext_new(back_c, pr, "back_height", "BackPanel").bodies.item(0)
     back_body.name = "BackPanel"
 
@@ -281,8 +303,11 @@ def run(context):
 
     tp = sp.off_plane(top_c, top_c.xYConstructionPlane,
                        "total_height - board_thick", "Top_Pl")
-    _, pr = sp.sketch_rect(top_c, tp, "board_thick", "0 in",
+    sk_top, pr = sp.sketch_rect(top_c, tp, "board_thick", "0 in",
                             "inner_width", "total_depth", "Top_Sk", ctx.ev)
+    # Anchor to Side_Left's top face (z=total_height); back-outer corner.
+    pr = sp.reanchor(sk_top, left_side, sides_occ, "z", +1,
+                     ("0 in", "total_depth", "total_height")) or pr
     top_body = sp.ext_new(top_c, pr, "board_thick", "TopBoard").bodies.item(0)
     top_body.name = "TopBoard"
 
@@ -330,16 +355,27 @@ def run(context):
         V, Point3D.create(bt + 1, hp + tw / 2, 0)).parameter.expression = "dt_narrow_w"
     d.addDistanceDimension(l_short.startSketchPoint, l_wide.endSketchPoint,
         H, Point3D.create(bt / 2, hp - 1, 0)).parameter.expression = "board_thick"
-    d.addDistanceDimension(sk_dt.originPoint, l_short.startSketchPoint,
-        V, Point3D.create(bt + 2, (hp + delta) / 2, 0)
-    ).parameter.expression = "dt_half_pin + board_thick * tan(dt_angle)"
-    d.addDistanceDimension(sk_dt.originPoint, l_short.startSketchPoint,
-        H, Point3D.create(0, hp - 2, 0)).parameter.expression = "board_thick"
     d.addAngularDimension(
         l_front, l_short, Point3D.create(bt / 2, hp + tw / 2, 0)
     ).parameter.expression = "90 deg - dt_angle"
+    d.addDistanceDimension(l_wide.startSketchPoint, l_wide.endSketchPoint,
+        V, Point3D.create(-1, hp + tw / 2, 0)).parameter.expression = "dt_tail_w"
 
-    ext_dt_l = sp.ext_new(top_c, sk_dt.profiles.item(0), "board_thick", "DT_Left")
+    # Anchor: replace the two origin-position dims on p4 (l_short.start) with
+    # dims from a projected Side_Left top-face corner (z=+1). Non-root sketch
+    # → must reference real parent geometry, never the sketch origin.
+    sp.project_face(sk_dt, left_side, sides_occ, "z", +1)
+    orient_dt = sp.probe_orientations(sk_dt, bt, hp + delta,
+                                      ctx.ev("total_height"))
+    a_dt = sp.anchor_pt(sk_dt, 0, ctx.ev("total_depth"),
+                        ctx.ev("total_height"))
+    if a_dt is not None:
+        sp.rdim(sk_dt, d, a_dt, l_short.startSketchPoint, orient_dt, "x",
+                "board_thick")
+        sp.rdim(sk_dt, d, a_dt, l_short.startSketchPoint, orient_dt, "y",
+                "abs((dt_half_pin + board_thick * tan(dt_angle)) - total_depth)")
+
+    ext_dt_l = sp.ext_new(top_c, sp.smallest_profile(sk_dt), "board_thick", "DT_Left")
     left_tail = ext_dt_l.bodies.item(0)
     left_tail.name = "DT_Left"
 

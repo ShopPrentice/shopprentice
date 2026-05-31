@@ -147,7 +147,11 @@ def run(context):
                            "post_size / 2 - rail_thick / 2", "FBR_Pl")
     _, pr = sp.sketch_rect_model(rail_c, fbr_pl,
         ("post_size", "post_size / 2 - rail_thick / 2", "0 in"),
-        {"x": "interior_w", "z": "rail_w"}, "FrontBotRail_Sk", ev)
+        {"x": "interior_w", "z": "rail_w"}, "FrontBotRail_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("x", "interior_w"), off2=("z", "rail_w"), which=2))
     fbr_ext = sp.ext_new(rail_c, pr, "rail_thick", "FrontBotRail")
     fbr = fbr_ext.bodies.item(0); fbr.name = "Rail_FrontBot"
 
@@ -158,7 +162,11 @@ def run(context):
     # Front top rail
     _, pr = sp.sketch_rect_model(rail_c, fbr_pl,
         ("post_size", "post_size / 2 - rail_thick / 2", "rail_h - rail_w"),
-        {"x": "interior_w", "z": "rail_w"}, "FrontTopRail_Sk", ev)
+        {"x": "interior_w", "z": "rail_w"}, "FrontTopRail_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("x", "interior_w"), off2=("z", "rail_h"), which=2))
     ftr_ext = sp.ext_new(rail_c, pr, "rail_thick", "FrontTopRail")
     ftr = ftr_ext.bodies.item(0); ftr.name = "Rail_FrontTop"
 
@@ -181,7 +189,11 @@ def run(context):
                            "post_size / 2 - rail_thick / 2", "LBR_Pl")
     _, pr = sp.sketch_rect_model(rail_c, lbr_pl,
         ("post_size / 2 - rail_thick / 2", "post_size", "0 in"),
-        {"y": "interior_l", "z": "rail_w"}, "LeftBotRail_Sk", ev)
+        {"y": "interior_l", "z": "rail_w"}, "LeftBotRail_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "post_size", "0 in"),
+                    off1=("y", "interior_l"), off2=("z", "rail_w"), which=2))
     lbr_ext = sp.ext_new(rail_c, pr, "rail_thick", "LeftBotRail")
     lbr_ext.bodies.item(0).name = "Rail_LeftBot"
 
@@ -191,7 +203,11 @@ def run(context):
 
     _, pr = sp.sketch_rect_model(rail_c, lbr_pl,
         ("post_size / 2 - rail_thick / 2", "post_size", "rail_h - rail_w"),
-        {"y": "interior_l", "z": "rail_w"}, "LeftTopRail_Sk", ev)
+        {"y": "interior_l", "z": "rail_w"}, "LeftTopRail_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "post_size", "0 in"),
+                    off1=("y", "interior_l"), off2=("z", "rail_h"), which=2))
     ltr_ext = sp.ext_new(rail_c, pr, "rail_thick", "LeftTopRail")
     ltr_ext.bodies.item(0).name = "Rail_LeftTop"
 
@@ -227,9 +243,21 @@ def run(context):
     sk_fs2.name = "FSpindle_Sk"
     first_x_cm = ev("post_size") + ev("short_sp_act")
     center_y_cm = ev("post_size") / 2
-    sk_fs2.sketchCurves.sketchCircles.addByCenterRadius(
+    fs_circ = sk_fs2.sketchCurves.sketchCircles.addByCenterRadius(
         P3.create(first_x_cm, center_y_cm, 0), ev("spindle_dia") / 2)
-    fs_prof2 = sk_fs2.profiles.item(0)
+    sk_fs2.sketchDimensions.addRadialDimension(
+        fs_circ, P3.create(first_x_cm + 1, center_y_cm + 1, 0)
+    ).parameter.expression = "spindle_dia / 2"
+    # Anchor circle center to a projected post corner (deps rules 1-3).
+    sp.project_face(sk_fs2, post_fl, post_occ, "z", -1)
+    fs_aP = sp.anchor_pt(sk_fs2, ev("post_size"), 0, 0)
+    fs_orient = sp.probe_orientations(sk_fs2, first_x_cm, center_y_cm, ev("spindle_z"))
+    if fs_aP is not None:
+        sp.rdim(sk_fs2, sk_fs2.sketchDimensions, fs_aP,
+                fs_circ.centerSketchPoint, fs_orient, "x", "short_sp_act")
+        sp.rdim(sk_fs2, sk_fs2.sketchDimensions, fs_aP,
+                fs_circ.centerSketchPoint, fs_orient, "y", "post_size / 2")
+    fs_prof2 = sp.smallest_profile(sk_fs2)
     fs_ext2 = sp.ext_new(spindle_c, fs_prof2, "spindle_h", "FSpindle_1")
     fs_body2 = fs_ext2.bodies.item(0); fs_body2.name = "Spindle_F1"
 
@@ -244,9 +272,21 @@ def run(context):
     sk_ls.name = "LSpindle_Sk"
     center_x_cm = ev("post_size") / 2
     first_y_cm = ev("post_size") + ev("long_sp_act")
-    sk_ls.sketchCurves.sketchCircles.addByCenterRadius(
+    ls_circ = sk_ls.sketchCurves.sketchCircles.addByCenterRadius(
         P3.create(center_x_cm, first_y_cm, 0), ev("spindle_dia") / 2)
-    ls_prof = sk_ls.profiles.item(0)
+    sk_ls.sketchDimensions.addRadialDimension(
+        ls_circ, P3.create(center_x_cm + 1, first_y_cm + 1, 0)
+    ).parameter.expression = "spindle_dia / 2"
+    # Anchor circle center to a projected post corner (deps rules 1-3).
+    sp.project_face(sk_ls, post_fl, post_occ, "z", -1)
+    ls_aP = sp.anchor_pt(sk_ls, 0, ev("post_size"), 0)
+    ls_orient = sp.probe_orientations(sk_ls, center_x_cm, first_y_cm, ev("spindle_z"))
+    if ls_aP is not None:
+        sp.rdim(sk_ls, sk_ls.sketchDimensions, ls_aP,
+                ls_circ.centerSketchPoint, ls_orient, "x", "post_size / 2")
+        sp.rdim(sk_ls, sk_ls.sketchDimensions, ls_aP,
+                ls_circ.centerSketchPoint, ls_orient, "y", "long_sp_act")
+    ls_prof = sp.smallest_profile(sk_ls)
     ls_ext = sp.ext_new(spindle_c, ls_prof, "spindle_h", "LSpindle_1")
     ls_body = ls_ext.bodies.item(0); ls_body.name = "Spindle_L1"
 
@@ -286,7 +326,13 @@ def run(context):
                             "sup_rail_inset", "SupL_Pl")
     _, pr = sp.sketch_rect_model(support_c, sup_lpl,
         ("sup_rail_inset", "post_size / 2", "mattress_h - support_thick - sup_rail_h"),
-        {"y": "outer_l - post_size", "z": "sup_rail_h"}, "SupRailL_Sk", ev)
+        {"y": "outer_l - post_size", "z": "sup_rail_h"}, "SupRailL_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "post_size", "0 in"),
+                    off1=("y", "post_size / 2"),
+                    off2=("z", "mattress_h - support_thick - sup_rail_h"),
+                    which=0))
     srl_ext = sp.ext_new(support_c, pr, "sup_rail_w", "SupRailLeft")
     sup_rail_l = srl_ext.bodies.item(0); sup_rail_l.name = "SupRail_Left"
 
@@ -307,7 +353,12 @@ def run(context):
                               "slat_z", "SlatZ_Pl")
     _, pr = sp.sketch_rect_model(support_c, slat_z_pl,
         ("sup_rail_inset + sup_rail_w", "post_size", "slat_z"),
-        {"x": "slat_l", "y": "slat_w"}, "Slat_Sk", ev)
+        {"x": "slat_l", "y": "slat_w"}, "Slat_Sk", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off1=("x", "sup_rail_w / 2"), off2=("y", "post_size"),
+                    which=0))
     slat_ext = sp.ext_new(support_c, pr, "support_thick", "Slat_1")
     slat_body = slat_ext.bodies.item(0); slat_body.name = "Slat_1"
 
@@ -380,75 +431,155 @@ def run(context):
     domino.grid(rail_c, dm_xl,
         ("post_size", "post_size / 2", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        fbr_b, fl_p, "DM_FBR_L", ev)
+        fbr_b, fl_p, "DM_FBR_L", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "post_size", "0 in"),
+                    off=(("y", "post_size / 2"),
+                         ("z", "dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_xr,
         ("outer_w - post_size", "post_size / 2", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        fbr_b, fr_p, "DM_FBR_R", ev)
+        fbr_b, fr_p, "DM_FBR_R", ev,
+        anchor=dict(parent_body=post_fr, parent_occ=post_occ,
+                    face_axis="x", face_dir=1,
+                    anchor_xyz=("outer_w", "post_size", "0 in"),
+                    off=(("y", "post_size / 2"),
+                         ("z", "dm_z1 - (dm_w - dm_t) / 2"))))
 
     # --- Front top rail → FL, FR ---
     domino.grid(rail_c, dm_xl,
         ("post_size", "post_size / 2", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ftr_b, fl_p, "DM_FTR_L", ev)
+        ftr_b, fl_p, "DM_FTR_L", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "post_size", "0 in"),
+                    off=(("y", "post_size / 2"),
+                         ("z", "rail_h - rail_w + dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_xr,
         ("outer_w - post_size", "post_size / 2", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ftr_b, fr_p, "DM_FTR_R", ev)
+        ftr_b, fr_p, "DM_FTR_R", ev,
+        anchor=dict(parent_body=post_fr, parent_occ=post_occ,
+                    face_axis="x", face_dir=1,
+                    anchor_xyz=("outer_w", "post_size", "0 in"),
+                    off=(("y", "post_size / 2"),
+                         ("z", "rail_h - rail_w + dm_z1 - (dm_w - dm_t) / 2"))))
 
     # --- Back rails (mirror positions) ---
     domino.grid(rail_c, dm_xl,
         ("post_size", "outer_l - post_size / 2", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        bbr_b, bl_p, "DM_BBR_L", ev)
+        bbr_b, bl_p, "DM_BBR_L", ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "outer_l", "0 in"),
+                    off=(("y", "post_size / 2"),
+                         ("z", "dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_xr,
         ("outer_w - post_size", "outer_l - post_size / 2", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        bbr_b, br_p, "DM_BBR_R", ev)
+        bbr_b, br_p, "DM_BBR_R", ev,
+        anchor=dict(parent_body=post_br, parent_occ=post_occ,
+                    face_axis="x", face_dir=1,
+                    anchor_xyz=("outer_w", "outer_l", "0 in"),
+                    off=(("y", "post_size / 2"),
+                         ("z", "dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_xl,
         ("post_size", "outer_l - post_size / 2", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        btr_b, bl_p, "DM_BTR_L", ev)
+        btr_b, bl_p, "DM_BTR_L", ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "outer_l", "0 in"),
+                    off=(("y", "post_size / 2"),
+                         ("z", "rail_h - rail_w + dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_xr,
         ("outer_w - post_size", "outer_l - post_size / 2", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        btr_b, br_p, "DM_BTR_R", ev)
+        btr_b, br_p, "DM_BTR_R", ev,
+        anchor=dict(parent_body=post_br, parent_occ=post_occ,
+                    face_axis="x", face_dir=1,
+                    anchor_xyz=("outer_w", "outer_l", "0 in"),
+                    off=(("y", "post_size / 2"),
+                         ("z", "rail_h - rail_w + dm_z1 - (dm_w - dm_t) / 2"))))
 
     # --- Left side rails → FL, BL ---
     domino.grid(rail_c, dm_yf,
         ("post_size / 2", "post_size", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        lbr_b, fl_p, "DM_LBR_F", ev)
+        lbr_b, fl_p, "DM_LBR_F", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off=(("x", "post_size / 2"),
+                         ("z", "dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_yb,
         ("post_size / 2", "outer_l - post_size", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        lbr_b, bl_p, "DM_LBR_B", ev)
+        lbr_b, bl_p, "DM_LBR_B", ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="y", face_dir=1,
+                    anchor_xyz=("post_size", "outer_l", "0 in"),
+                    off=(("x", "post_size / 2"),
+                         ("z", "dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_yf,
         ("post_size / 2", "post_size", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ltr_b, fl_p, "DM_LTR_F", ev)
+        ltr_b, fl_p, "DM_LTR_F", ev,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("post_size", "0 in", "0 in"),
+                    off=(("x", "post_size / 2"),
+                         ("z", "rail_h - rail_w + dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_yb,
         ("post_size / 2", "outer_l - post_size", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        ltr_b, bl_p, "DM_LTR_B", ev)
+        ltr_b, bl_p, "DM_LTR_B", ev,
+        anchor=dict(parent_body=post_bl, parent_occ=post_occ,
+                    face_axis="y", face_dir=1,
+                    anchor_xyz=("post_size", "outer_l", "0 in"),
+                    off=(("x", "post_size / 2"),
+                         ("z", "rail_h - rail_w + dm_z1 - (dm_w - dm_t) / 2"))))
 
     # --- Right side rails → FR, BR ---
     domino.grid(rail_c, dm_yf,
         ("outer_w - post_size / 2", "post_size", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rbr_b, fr_p, "DM_RBR_F", ev)
+        rbr_b, fr_p, "DM_RBR_F", ev,
+        anchor=dict(parent_body=post_fr, parent_occ=post_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("outer_w", "0 in", "0 in"),
+                    off=(("x", "post_size / 2"),
+                         ("z", "dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_yb,
         ("outer_w - post_size / 2", "outer_l - post_size", "dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rbr_b, br_p, "DM_RBR_B", ev)
+        rbr_b, br_p, "DM_RBR_B", ev,
+        anchor=dict(parent_body=post_br, parent_occ=post_occ,
+                    face_axis="y", face_dir=1,
+                    anchor_xyz=("outer_w", "outer_l", "0 in"),
+                    off=(("x", "post_size / 2"),
+                         ("z", "dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_yf,
         ("outer_w - post_size / 2", "post_size", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rtr_b, fr_p, "DM_RTR_F", ev)
+        rtr_b, fr_p, "DM_RTR_F", ev,
+        anchor=dict(parent_body=post_fr, parent_occ=post_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("outer_w", "0 in", "0 in"),
+                    off=(("x", "post_size / 2"),
+                         ("z", "rail_h - rail_w + dm_z1 - (dm_w - dm_t) / 2"))))
     domino.grid(rail_c, dm_yb,
         ("outer_w - post_size / 2", "outer_l - post_size", "rail_h - rail_w + dm_z1"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
-        rtr_b, br_p, "DM_RTR_B", ev)
+        rtr_b, br_p, "DM_RTR_B", ev,
+        anchor=dict(parent_body=post_br, parent_occ=post_occ,
+                    face_axis="y", face_dir=1,
+                    anchor_xyz=("outer_w", "outer_l", "0 in"),
+                    off=(("x", "post_size / 2"),
+                         ("z", "rail_h - rail_w + dm_z1 - (dm_w - dm_t) / 2"))))
 
     print(">>> Dominos: 16 rail-to-post joints (32 voids)")
 
@@ -539,11 +670,21 @@ def run(context):
     left_voids = domino.grid(support_c, dm_slat_xl,
         ("sup_rail_inset + sup_rail_w", "slat_dm_y0", "slat_dm_z"),
         "y", "slat_sp", "n_slats", "y", "dm_w", "dm_t", "dm_d",
-        body_a=None, body_b=None, name="DM_SlatL", ev=ev, cut=False)
+        body_a=None, body_b=None, name="DM_SlatL", ev=ev, cut=False,
+        anchor=dict(parent_body=post_fl, parent_occ=post_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "post_size", "0 in"),
+                    off=(("y", "slat_w / 2 - (dm_w - dm_t) / 2"),
+                         ("z", "slat_dm_z"))))
     right_voids = domino.grid(support_c, dm_slat_xr,
         ("outer_w - sup_rail_inset - sup_rail_w", "slat_dm_y0", "slat_dm_z"),
         "y", "slat_sp", "n_slats", "y", "dm_w", "dm_t", "dm_d",
-        body_a=None, body_b=None, name="DM_SlatR", ev=ev, cut=False)
+        body_a=None, body_b=None, name="DM_SlatR", ev=ev, cut=False,
+        anchor=dict(parent_body=post_fr, parent_occ=post_occ,
+                    face_axis="x", face_dir=1,
+                    anchor_xyz=("outer_w", "post_size", "0 in"),
+                    off=(("y", "slat_w / 2 - (dm_w - dm_t) / 2"),
+                         ("z", "slat_dm_z"))))
 
     # Bulk CUT all domino voids into support rails (all overlap the long rail)
     sp.combine(srl_p, left_voids, CUT, True, "DM_SlatL_CutRail")

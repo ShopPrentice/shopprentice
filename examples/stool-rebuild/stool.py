@@ -129,6 +129,7 @@ def run(context):
     gc = Seat_Sk.geometricConstraints
     gc.addHorizontal(rect[0]); gc.addHorizontal(rect[2])
     gc.addVertical(rect[1]); gc.addVertical(rect[3])
+    gc.addCoincident(rect[0].startSketchPoint, Seat_Sk.originPoint)
     d = Seat_Sk.sketchDimensions
     d.addDistanceDimension(rect[0].startSketchPoint, rect[0].endSketchPoint,
         H, P(x0 + w/2, y0 - 1, 0)).parameter.expression = "seat_l"
@@ -180,7 +181,16 @@ def run(context):
     gc = Leg_NL_Sk.geometricConstraints
     gc.addHorizontal(ln0)
     gc.addHorizontal(ln2)
-    Leg_NL_Sk_prof = Leg_NL_Sk.profiles.item(0)  # 1 profile(s)
+    # ── ANCHOR (non-root sketch): retarget the two origin dims (the V/H
+    # positioning of ln0.startSketchPoint) to a projected Seat corner. The
+    # Seat front face (y, -1 at Y=0) is PARALLEL to this xZ sketch plane and
+    # its bottom corners (Z = leg_h = seat_z) are un-beveled/clean. reanchor
+    # rewrites each origin dim as abs(orig - anchor_axis), geometry unchanged
+    # (self-check reverts if the part moves), and RETURNS a fresh profile
+    # (the projection invalidates any profile captured before this call).
+    Leg_NL_Sk_prof = sp.reanchor(
+        Leg_NL_Sk, Seat, seat_occ, "y", -1,
+        ("0 in", "0 in", "leg_h")) or Leg_NL_Sk.profiles.item(0)
 
     # [7] Extrude: Leg_NL (in legs_c)
     inp = legs_c.features.extrudeFeatures.createInput(Leg_NL_Sk_prof, NEWBODY)
@@ -336,6 +346,10 @@ def run(context):
     d.addDistanceDimension(_nearest_proj(*_xf(6.4181, -4.9068)), ln7.endSketchPoint,
         adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, P(0, 0, 0)).parameter.expression = "tenon_shoulder_w"
     gc = Sketch3.geometricConstraints
+    gc.addCoincident(ln4.endSketchPoint, _pcurve_4)
+    gc.addCoincident(ln5.endSketchPoint, _pcurve_6)
+    gc.addCoincident(ln6.endSketchPoint, _pcurve_4)
+    gc.addCoincident(ln7.endSketchPoint, _pcurve_6)
     _best_pi, _best_a = 0, float('inf')
     for _pi in range(Sketch3.profiles.count):
         _bb = Sketch3.profiles.item(_pi).boundingBox

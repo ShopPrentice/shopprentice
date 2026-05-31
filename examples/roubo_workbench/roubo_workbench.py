@@ -382,7 +382,11 @@ def run(context):
          "0 in",
          "ls_z"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w", "z": "ls_w"},
-        "LSBody_Sk", ev=ev)
+        "LSBody_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_setback + leg_w", "0 in", "0 in"),
+                    off1=("x", "0 in"), off2=("z", "ls_z")))
     ls_body_ext = sp.ext_new(ls_c, pr, "ls_t", "LSBody")
     ls_front = ls_body_ext.bodies.item(0)
     ls_front.name = "LS_Front"
@@ -396,7 +400,12 @@ def run(context):
          "(ls_t - st_tt) / 2",
          "ls_z"),
         {"y": "st_tt", "z": "ls_w"},
-        "LSTenon_L_Sk", ev=ev)
+        "LSTenon_L_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("leg_setback", "leg_d", "0 in"),
+                    off1=("y", "leg_d - (ls_t - st_tt) / 2"),
+                    off2=("z", "ls_z")))
     ls_tenon_l = sp.ext_new(ls_c, pr, "leg_w + ls_proud", "LSTenon_L")
     ls_tenon_l_body = ls_tenon_l.bodies.item(0)
     ls_tenon_l_body.name = "LS_Tenon_L"
@@ -422,10 +431,13 @@ def run(context):
     ).parameter.expression = "pin_dia / 2"
     d.addRadialDimension(c1, P.create(g1.x + 0.5, g1.y, 0)
     ).parameter.expression = "pin_dia / 2"
-    d.addDistanceDimension(ls_pin_sk.originPoint, c0.centerSketchPoint,
+    # Anchor circle centers to the FL leg front face (normal Y, parallel to xZ)
+    sp.project_face(ls_pin_sk, ref_leg_fl, leg_occ, "y", -1)
+    ls_pin_anchor = sp.anchor_pt(ls_pin_sk, ev("leg_setback"), 0, 0)
+    d.addDistanceDimension(ls_pin_anchor, c0.centerSketchPoint,
         H, P.create(g0.x / 2, g0.y - 1, 0)
-    ).parameter.expression = "leg_setback + 2 * leg_w / 3"
-    d.addDistanceDimension(ls_pin_sk.originPoint, c0.centerSketchPoint,
+    ).parameter.expression = "2 * leg_w / 3"
+    d.addDistanceDimension(ls_pin_anchor, c0.centerSketchPoint,
         V, P.create(g0.x - 1, g0.y / 2, 0)
     ).parameter.expression = "ls_z + ls_w / 2 - pin_sp / 2"
     d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
@@ -482,7 +494,11 @@ def run(context):
          "leg_d",
          "ls_z"),
         {"y": "bench_w - 2 * leg_d", "z": "ss_w"},
-        "SSBody_Sk", ev=ev)
+        "SSBody_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("leg_setback", "leg_d", "0 in"),
+                    off1=("y", "0 in"), off2=("z", "ls_z")))
     ss_body_ext = sp.ext_new_sym(ss_c, pr, "ss_t / 2", "SSBody")
     ss_left = ss_body_ext.bodies.item(0)
     ss_left.name = "SS_Left"
@@ -496,7 +512,11 @@ def run(context):
          "st_blind",
          "ls_z"),
         {"x": "st_tt", "z": "ss_w"},
-        "SSTenon_F_Sk", ev=ev)
+        "SSTenon_F_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_setback", "0 in", "0 in"),
+                    off1=("x", "(ss_t - st_tt) / 2"), off2=("z", "ls_z")))
     ss_tenon_f = sp.ext_new(ss_c, pr, "leg_d - st_blind", "SSTenon_F")
     ss_tenon_f_body = ss_tenon_f.bodies.item(0)
     ss_tenon_f_body.name = "SS_Tenon_F"
@@ -531,10 +551,13 @@ def run(context):
     ).parameter.expression = "pin_dia / 2"
     d.addRadialDimension(c1, P.create(g1.x + 0.5, g1.y, 0)
     ).parameter.expression = "pin_dia / 2"
-    d.addDistanceDimension(ss_pin_sk.originPoint, c0.centerSketchPoint,
+    # Anchor circle centers to the FL leg outer (left) face (normal X, parallel to yZ)
+    sp.project_face(ss_pin_sk, ref_leg_fl, leg_occ, "x", -1)
+    ss_pin_anchor = sp.anchor_pt(ss_pin_sk, ev("leg_setback"), ev("leg_d"), 0)
+    d.addDistanceDimension(ss_pin_anchor, c0.centerSketchPoint,
         y_orient, P.create(g0.x / 2, g0.y - 1, 0)
-    ).parameter.expression = "leg_d - (leg_d - st_blind) / 3"
-    d.addDistanceDimension(ss_pin_sk.originPoint, c0.centerSketchPoint,
+    ).parameter.expression = "(leg_d - st_blind) / 3"
+    d.addDistanceDimension(ss_pin_anchor, c0.centerSketchPoint,
         z_orient, P.create(g0.x - 1, g0.y / 2, 0)
     ).parameter.expression = "ls_z + ss_w / 2 - pin_sp / 2"
     d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
@@ -597,7 +620,12 @@ def run(context):
     _, pr = sp.sketch_rect_model(dm_c, dm_pl,
         ("0 in", "0 in", "ls_z + ls_w + dm_gap"),
         {"y": "dm_thick", "z": "dm_h"},
-        "DM_Sk", ev=ev)
+        "DM_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("leg_setback", "leg_d", "0 in"),
+                    off1=("y", "leg_d"),
+                    off2=("z", "ls_z + ls_w + dm_gap")))
     dm_ext = sp.ext_new_sym(dm_c, pr, "dm_w / 2", "DMPanel")
     dm_body = dm_ext.bodies.item(0)
     dm_body.name = "Deadman"
@@ -608,7 +636,12 @@ def run(context):
          "(dm_thick - dm_tongue_t) / 2",
          "ls_z + ls_w + dm_gap - dm_tongue_h"),
         {"y": "dm_tongue_t", "z": "dm_tongue_h"},
-        "DMTongueBot_Sk", ev=ev)
+        "DMTongueBot_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("leg_setback", "leg_d", "0 in"),
+                    off1=("y", "leg_d - (dm_thick - dm_tongue_t) / 2"),
+                    off2=("z", "ls_z + ls_w + dm_gap - dm_tongue_h")))
     dm_tbot_ext = sp.ext_new_sym(dm_c, pr, "dm_w / 2", "DMTongueBot")
     dm_tbot = dm_tbot_ext.bodies.item(0)
     dm_tbot.name = "DM_Tongue_Bot"
@@ -620,7 +653,12 @@ def run(context):
          "(dm_thick - dm_tongue_t) / 2",
          "leg_h - dm_gap"),
         {"y": "dm_tongue_t", "z": "dm_tongue_h"},
-        "DMTongueTop_Sk", ev=ev)
+        "DMTongueTop_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("leg_setback", "leg_d", "0 in"),
+                    off1=("y", "leg_d - (dm_thick - dm_tongue_t) / 2"),
+                    off2=("z", "leg_h - dm_gap")))
     dm_ttop_ext = sp.ext_new_sym(dm_c, pr, "dm_w / 2", "DMTongueTop")
     dm_ttop = dm_ttop_ext.bodies.item(0)
     dm_ttop.name = "DM_Tongue_Top"
@@ -658,16 +696,21 @@ def run(context):
     dm_d.addRadialDimension(
         dm_circle, P.create(dm_ctr.x + dm_r + 1, dm_ctr.y, 0)
     ).parameter.expression = "dog_dia / 2"
-    # X center from sketch origin (centered on deadman = mid_x)
+    # Anchor circle center to the deadman's own front face (native parent),
+    # bottom-left corner — no origin reference.
+    sp.project_face(dm_sk, dm_body, None, "y", -1)
+    dm_anchor = sp.anchor_pt(dm_sk, ev("mid_x - dm_w / 2"), 0,
+                             ev("ls_z + ls_w + dm_gap"))
+    # X center from face left edge (centered → half the panel width)
     dm_d.addDistanceDimension(
-        dm_sk.originPoint, dm_circle.centerSketchPoint,
+        dm_anchor, dm_circle.centerSketchPoint,
         _dm_x_orient, P.create(dm_ctr.x + 1, dm_ctr.y + 1, 0)
-    ).parameter.expression = "mid_x"
-    # Z offset from origin: bottom of deadman + 2 in
+    ).parameter.expression = "dm_w / 2"
+    # Z offset from face bottom edge: 2 in
     dm_d.addDistanceDimension(
-        dm_sk.originPoint, dm_circle.centerSketchPoint,
+        dm_anchor, dm_circle.centerSketchPoint,
         _dm_z_orient, P.create(dm_ctr.x - 1, dm_ctr.y - 1, 0)
-    ).parameter.expression = "ls_z + ls_w + dm_gap + 2 in"
+    ).parameter.expression = "2 in"
 
     _refs_to_construction(dm_sk)
     dm_dog_prof = sp.smallest_profile(dm_sk)
@@ -743,14 +786,18 @@ def run(context):
         c_bot.startSketchPoint, c_top.endSketchPoint,
         V, P.create(chop_bl.x - 1, (chop_bl.y + chop_tl.y) / 2, 0)
     ).parameter.expression = "bench_h - vise_bottom_gap"
+    # Anchor X + Z to the FL leg front face (normal Y, parallel to xZ),
+    # bottom-left corner — no origin reference.
+    sp.project_face(chop_sk, ref_leg_fl, leg_occ, "y", -1)
+    chop_anchor = sp.anchor_pt(chop_sk, ev("leg_setback"), 0, 0)
     # X from leg left face (centered, so offset by half the width difference)
     dc.addDistanceDimension(
-        chop_ref, c_bot.startSketchPoint,
+        chop_anchor, c_bot.startSketchPoint,
         H, P.create(chop_bl.x - 0.5, chop_bl.y - 2, 0)
     ).parameter.expression = "(vise_chop_w - leg_w) / 2"
     # Z from floor
     dc.addDistanceDimension(
-        chop_sk.originPoint, c_bot.startSketchPoint,
+        chop_anchor, c_bot.startSketchPoint,
         V, P.create(chop_bl.x - 2, chop_bl.y / 2, 0)
     ).parameter.expression = "vise_bottom_gap"
 
@@ -812,14 +859,18 @@ def run(context):
     ds.addRadialDimension(
         screw_circle, P.create(screw_ctr.x + screw_r + 1, screw_ctr.y, 0)
     ).parameter.expression = "vise_screw_dia / 2"
+    # Anchor X + Z to the FL leg front face (normal Y, parallel to xZ),
+    # bottom-left corner — no origin reference.
+    sp.project_face(screw_sk, ref_leg_fl, leg_occ, "y", -1)
+    screw_anchor = sp.anchor_pt(screw_sk, ev("leg_setback"), 0, 0)
     # X center from leg left face
     ds.addDistanceDimension(
-        screw_circle.centerSketchPoint, screw_ref,
+        screw_anchor, screw_circle.centerSketchPoint,
         H, P.create(screw_ctr.x - 1, screw_ctr.y - 2, 0)
     ).parameter.expression = "leg_w / 2"
     # Z position
     ds.addDistanceDimension(
-        screw_sk.originPoint, screw_circle.centerSketchPoint,
+        screw_anchor, screw_circle.centerSketchPoint,
         V, P.create(screw_ctr.x - 2, screw_ctr.y / 2, 0)
     ).parameter.expression = "vise_screw_z"
 
@@ -856,14 +907,19 @@ def run(context):
     dh.addRadialDimension(
         handle_circle, P.create(handle_ctr.x + handle_r + 1, handle_ctr.y, 0)
     ).parameter.expression = "vise_handle_dia / 2"
-    # Y position (vise offset from leg front face)
+    # Anchor Y + Z to the FL leg outer (left) face (normal X, parallel to yZ),
+    # back-bottom corner — no origin reference (front-bottom corner projects
+    # onto the sketch origin on this normal-X plane and would be auto-excluded).
+    sp.project_face(handle_sk, ref_leg_fl, leg_occ, "x", -1)
+    handle_anchor = sp.anchor_pt(handle_sk, ev("leg_setback"), ev("leg_d"), 0)
+    # Y position (vise offset from leg back face)
     dh.addDistanceDimension(
-        handle_sk.originPoint, handle_circle.centerSketchPoint,
+        handle_anchor, handle_circle.centerSketchPoint,
         _h_y_orient, P.create(handle_ctr.x / 2, handle_ctr.y - 2, 0)
-    ).parameter.expression = "vise_distance + vise_chop_t + vise_handle_gap"
+    ).parameter.expression = "leg_d + vise_distance + vise_chop_t + vise_handle_gap"
     # Z position
     dh.addDistanceDimension(
-        handle_sk.originPoint, handle_circle.centerSketchPoint,
+        handle_anchor, handle_circle.centerSketchPoint,
         _h_z_orient, P.create(handle_ctr.x - 2, handle_ctr.y / 2, 0)
     ).parameter.expression = "vise_screw_z"
 
@@ -924,14 +980,18 @@ def run(context):
         g_bot.startSketchPoint, g_top.endSketchPoint,
         V, P.create(guide_bl.x - 1, (guide_bl.y + guide_tl.y) / 2, 0)
     ).parameter.expression = "vise_guide_h"
+    # Anchor X + Z to the FL leg front face (normal Y, parallel to xZ),
+    # bottom-left corner — no origin reference.
+    sp.project_face(guide_sk, ref_leg_fl, leg_occ, "y", -1)
+    guide_anchor = sp.anchor_pt(guide_sk, ev("leg_setback"), 0, 0)
     # X from leg left face
     dg.addDistanceDimension(
-        g_bot.startSketchPoint, guide_ref,
+        guide_anchor, g_bot.startSketchPoint,
         H, P.create(guide_bl.x - 0.5, guide_bl.y - 2, 0)
     ).parameter.expression = "(leg_w - vise_guide_w) / 2"
     # Z position
     dg.addDistanceDimension(
-        guide_sk.originPoint, g_bot.startSketchPoint,
+        guide_anchor, g_bot.startSketchPoint,
         V, P.create(guide_bl.x - 2, guide_bl.y / 2, 0)
     ).parameter.expression = "vise_guide_z - vise_guide_h / 2"
 
@@ -962,6 +1022,28 @@ def run(context):
         circle, P.create(center_sk.x + dog_r + 1, center_sk.y, 0)
     ).parameter.expression = "dog_dia / 2"
 
+    # Anchor circle center to the top's own top face (native parent),
+    # front-right corner — no origin reference.
+    H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+    V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    _dog_o = m2s(P.create(0, 0, ev("bench_h")))
+    _dog_xt = m2s(P.create(1, 0, ev("bench_h")))
+    _dog_x_is_H = abs(_dog_xt.x - _dog_o.x) > abs(_dog_xt.y - _dog_o.y)
+    _dog_x_orient = H if _dog_x_is_H else V
+    _dog_y_orient = V if _dog_x_is_H else H
+    sp.project_face(sk, top_c.bRepBodies.item(0), None, "z", +1)
+    dog_anchor = sp.anchor_pt(sk, ev("bench_l"), 0, ev("bench_h"))
+    dd = sk.sketchDimensions
+    dd.addDistanceDimension(
+        dog_anchor, circle.centerSketchPoint,
+        _dog_x_orient, P.create(center_sk.x, center_sk.y - 1, 0)
+    ).parameter.expression = "bench_l - (leg_setback + leg_w + dog_sp)"
+    dd.addDistanceDimension(
+        dog_anchor, circle.centerSketchPoint,
+        _dog_y_orient, P.create(center_sk.x - 1, center_sk.y, 0)
+    ).parameter.expression = "dog_inset"
+
+    _refs_to_construction(sk)
     dog_prof = sp.smallest_profile(sk)
     dog_ext = sp.ext_op(top_c, dog_prof, "top_thick", CUT,
                         top_c.bRepBodies.item(0), "DogHole", flip=True)
@@ -1030,7 +1112,12 @@ def run(context):
          "ls_z + ls_w - (dm_tongue_h - dm_gap)"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w",
          "z": "dm_tongue_h - dm_gap"},
-        "GrooveBot_Sk", ev=ev)
+        "GrooveBot_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_setback + leg_w", "0 in", "0 in"),
+                    off1=("x", "0 in"),
+                    off2=("z", "ls_z + ls_w - (dm_tongue_h - dm_gap)")))
     groove_bot_ext = sp.ext_op(ls_c, pr, "dm_tongue_t", CUT,
         ls_c.bRepBodies.itemByName("LS_Front"), "DMGroove_LS")
 
@@ -1043,7 +1130,11 @@ def run(context):
          "leg_h"),
         {"x": "bench_l - 2 * leg_setback - 2 * leg_w",
          "z": "dm_tongue_h - dm_gap"},
-        "GrooveTop_Sk", ev=ev)
+        "GrooveTop_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_setback + leg_w", "0 in", "0 in"),
+                    off1=("x", "0 in"), off2=("z", "leg_h")))
     groove_top_ext = sp.ext_op(top_c, pr, "dm_tongue_t", CUT,
         top_c.bRepBodies.item(0), "DMGroove_Top")
 

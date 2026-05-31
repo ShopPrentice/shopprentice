@@ -146,7 +146,14 @@ def run(context):
     door_z_offset = "board_thick + door_gap"
     _, pr = sp.sketch_rect_model(door_c, door_c.xZConstructionPlane,
         ("board_thick + door_gap", "0 in", door_z_offset),
-        {"x": "door_w", "z": "door_h"}, "LeftDoor_Sk", ev)
+        {"x": "door_w", "z": "door_h"}, "LeftDoor_Sk", ev,
+        anchor=dict(parent_body=top_body, parent_occ=case_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("board_thick - dado_d", "0 in",
+                                "case_h - board_thick"),
+                    off1=("x", "door_gap + dado_d"),
+                    off2=("z", "case_h - 2 * board_thick - door_gap"),
+                    which=0))
     ld_ext = sp.ext_new(door_c, pr, "door_thick", "LeftDoor")
     ld_ext.bodies.item(0).name = "Door_Left"
 
@@ -169,7 +176,13 @@ def run(context):
     shelf_z_pl = sp.off_plane(shelf_c, shelf_c.xYConstructionPlane, "mid_z", "ShelfZ_Pl")
     _, pr = sp.sketch_rect_model(shelf_c, shelf_z_pl,
         ("board_thick", "0 in", "mid_z"),
-        {"x": "shelf_w", "y": "shelf_d"}, "Shelf_Sk", ev)
+        {"x": "shelf_w", "y": "shelf_d"}, "Shelf_Sk", ev,
+        anchor=dict(parent_body=bot_body, parent_occ=case_occ,
+                    face_axis="z", face_dir=+1,
+                    anchor_xyz=("board_thick - dado_d", "case_d", "board_thick"),
+                    off1=("x", "dado_d"),
+                    off2=("y", "case_d"),
+                    which=0))
     sp.ext_new(shelf_c, pr, "shelf_thick", "ShelfBoard").bodies.item(0).name = "Shelf"
 
     print(">>> Shelf: 1 body")
@@ -179,7 +192,13 @@ def run(context):
     # ==============================================================
     _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
         ("board_thick", "case_d - back_thick", "board_thick"),
-        {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev)
+        {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev,
+        anchor=dict(parent_body=bot_body, parent_occ=case_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("board_thick - dado_d", "0 in", "0 in"),
+                    off1=("x", "dado_d"),
+                    off2=("z", "board_thick"),
+                    which=0))
     sp.ext_new(back_c, pr, "back_thick", "BackPanel").bodies.item(0).name = "BackPanel"
 
     # Rabbet for back panel in sides

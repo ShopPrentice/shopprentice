@@ -457,8 +457,11 @@ def run(context):
     _ce_10 = _xf(-334.01, 168.91)
     ln10 = lns.addByTwoPoints(ln9.endSketchPoint, ln6.endSketchPoint)
     d = Sketch1_posts.sketchDimensions
+    # ANCHOR: dimension from the projected 'ground' parent corner (at _xf(0,0)),
+    # not the sketch origin — satisfies validate_deps (projected parent geometry, no origin ref).
+    _anchor_posts = _nearest_proj(*_xf(0.0, 0.0))
     try:
-        d.addDistanceDimension(Sketch1_posts.originPoint, ln0.endSketchPoint,
+        d.addDistanceDimension(_anchor_posts, ln0.endSketchPoint,
             adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, P(0, 0, 0)).parameter.expression = "perg_x"
     except: pass  # skip if already constrained
     try:
@@ -1937,8 +1940,11 @@ def run(context):
     _ce_14 = _xf(114.3, 411.226)
     ln14 = lns.addByTwoPoints(ln13.endSketchPoint, ln10.endSketchPoint)
     d = Sketch1_beam.sketchDimensions
+    # ANCHOR: dimension from the projected 'wall' parent corner (at _xf(0,0)),
+    # not the sketch origin — satisfies validate_deps (projected parent geometry, no origin ref).
+    _anchor_beam = _nearest_proj(*_xf(0.0, 0.0))
     try:
-        d.addDistanceDimension(Sketch1_beam.originPoint, ln0.endSketchPoint,
+        d.addDistanceDimension(_anchor_beam, ln0.endSketchPoint,
             adsk.fusion.DimensionOrientations.AlignedDimensionOrientation, P(0, 0, 0)).parameter.expression = "perg_x"
     except: pass  # skip if already constrained
     try:

@@ -109,7 +109,11 @@ def run(context):
     # ==== KICK ====
     _, pr = sp.sketch_rect_model(kick_c, kick_c.xZConstructionPlane,
         ("kick_inset", "kick_inset", "0 in"),
-        {"x": "case_w - 2 * kick_inset", "z": "kick_h"}, "KickF_Sk", ev)
+        {"x": "case_w - 2 * kick_inset", "z": "kick_h"}, "KickF_Sk", ev,
+        anchor=dict(parent_body=find_body("Bottom"), parent_occ=case_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("board_thick", "0 in", "kick_h"),
+                    off1=("x", "kick_inset - board_thick"), off2=("z", "kick_h")))
     kf_ext = sp.ext_new(kick_c, pr, "board_thick", "KickFront")
     kf_ext.bodies.item(0).name = "Kick_Front"
 
@@ -122,7 +126,11 @@ def run(context):
 
     _, pr = sp.sketch_rect_model(kick_c, kick_c.yZConstructionPlane,
         ("kick_inset", "kick_inset + board_thick", "0 in"),
-        {"y": "case_d - 2 * kick_inset - 2 * board_thick", "z": "kick_h"}, "KickL_Sk", ev)
+        {"y": "case_d - 2 * kick_inset - 2 * board_thick", "z": "kick_h"}, "KickL_Sk", ev,
+        anchor=dict(parent_body=find_body("Side_Left"), parent_occ=case_occ,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=("board_thick", "0 in", "kick_h"),
+                    off1=("y", "kick_inset + board_thick"), off2=("z", "kick_h")))
     kl_ext = sp.ext_new(kick_c, pr, "board_thick", "KickLeft")
     kl_ext.bodies.item(0).name = "Kick_Left"
 
@@ -137,7 +145,11 @@ def run(context):
     # ==== DOORS ====
     _, pr = sp.sketch_rect_model(door_c, door_c.xZConstructionPlane,
         ("board_thick + door_gap", "0 in", "kick_h + board_thick + door_gap"),
-        {"x": "door_w", "z": "door_h"}, "DoorL_Sk", ev)
+        {"x": "door_w", "z": "door_h"}, "DoorL_Sk", ev,
+        anchor=dict(parent_body=find_body("Side_Left"), parent_occ=case_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("board_thick", "0 in", "kick_h"),
+                    off1=("x", "door_gap"), off2=("z", "board_thick + door_gap")))
     dl_ext = sp.ext_new(door_c, pr, "door_thick", "DoorLeft")
     dl_ext.bodies.item(0).name = "Door_Left"
 
@@ -157,7 +169,12 @@ def run(context):
     shelf_pl = sp.off_plane(int_c, int_c.xYConstructionPlane, "shelf_z", "ShelfPl")
     _, pr = sp.sketch_rect_model(int_c, shelf_pl,
         ("board_thick", "0 in", "shelf_z"),
-        {"x": "inner_w", "y": "case_d - back_thick - board_thick"}, "Shelf_Sk", ev)
+        {"x": "inner_w", "y": "case_d - back_thick - board_thick"}, "Shelf_Sk", ev,
+        anchor=dict(parent_body=find_body("Bottom"), parent_occ=case_occ,
+                    face_axis="z", face_dir=+1,
+                    anchor_xyz=("board_thick", "0 in", "kick_h + board_thick"),
+                    off1=("x", "inner_w"),
+                    off2=("y", "case_d - back_thick - board_thick"), which=2))
     sp.ext_new(int_c, pr, "shelf_thick", "ShelfBoard").bodies.item(0).name = "Shelf"
 
     # Body-relative ref: Rod hangs below Shelf
@@ -168,7 +185,12 @@ def run(context):
     rod_pl = sp.off_plane(int_c, int_c.xYConstructionPlane, "rod_z", "RodPl")
     _, pr = sp.sketch_rect_model(int_c, rod_pl,
         ("board_thick", "case_d / 2 - rod_dia / 2", "rod_z"),
-        {"x": "inner_w", "y": "rod_dia"}, "Rod_Sk", ev)
+        {"x": "inner_w", "y": "rod_dia"}, "Rod_Sk", ev,
+        anchor=dict(parent_body=find_body("Bottom"), parent_occ=case_occ,
+                    face_axis="z", face_dir=+1,
+                    anchor_xyz=("board_thick", "0 in", "kick_h + board_thick"),
+                    off1=("x", "inner_w"),
+                    off2=("y", "case_d / 2 - rod_dia / 2"), which=1))
     sp.ext_new(int_c, pr, "rod_dia", "HangingRod").bodies.item(0).name = "Rod"
     print(">>> Interior: shelf + rod")
 
@@ -179,7 +201,11 @@ def run(context):
 
     _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
         ("board_thick", "case_d - back_thick", "kick_h + board_thick"),
-        {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev)
+        {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev,
+        anchor=dict(parent_body=find_body("Side_Left"), parent_occ=case_occ,
+                    face_axis="y", face_dir=+1,
+                    anchor_xyz=("board_thick", "case_d", "kick_h"),
+                    off1=("x", "inner_w"), off2=("z", "board_thick"), which=1))
     sp.ext_new(back_c, pr, "back_thick", "BackPanel").bodies.item(0).name = "BackPanel"
     print(">>> Back: 1")
 

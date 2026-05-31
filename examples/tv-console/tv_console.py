@@ -155,7 +155,13 @@ def run(context):
     _, top_pr = sp.sketch_rect_model(case_c, top_pl,
         ("0 in", "0 in", "case_z + board_thick + case_h"),
         {"x": "console_w", "y": "console_d"},
-        "Top_Sk", ev=ev)
+        "Top_Sk", ev=ev,
+        anchor=dict(parent_body=bot_body, parent_occ=None,
+                    face_axis="z", face_dir=+1,
+                    anchor_xyz=("console_w", "0 in",
+                                "case_z + board_thick"),
+                    off1=("x", "0 in"), off2=("y", "console_d"),
+                    which=2, size_far=True))
     top_ext = sp.ext_new(case_c, top_pr, "board_thick", "TopBoard")
     top_body = top_ext.bodies.item(0)
     top_body.name = "Top"
@@ -168,10 +174,14 @@ def run(context):
     # Inset along Z: starts at leg_h + board_thick, spans case_h
     # Tails will JOIN into this board, extending it into Top/Bottom zones
     left_pl = sp.off_plane(case_c, case_c.yZConstructionPlane, "0 in", "Left_Pl")
-    _, left_pr = sp.sketch_rect_model(case_c, left_pl,
+    left_sk, left_pr = sp.sketch_rect_model(case_c, left_pl,
         ("0 in", "0 in", "case_z + board_thick"),
         {"y": "console_d", "z": "case_h"},
         "Left_Sk", ev=ev)
+    # Anchor Left to Bottom's coplanar (x,-1) face at X=0 (deps: Left → Bottom)
+    left_pr = (sp.reanchor(left_sk, bot_body, None, "x", -1,
+                           ("0 in", "console_d", "case_z + board_thick"))
+               or sp.smallest_profile(left_sk))
     left_ext = sp.ext_new(case_c, left_pr, "board_thick", "LeftBoard")
     left_body = left_ext.bodies.item(0)
     left_body.name = "Left"
@@ -209,6 +219,11 @@ def run(context):
         front_expr="case_z",
         joint_axis="y",
         thick_axis="z",
+        # Anchor the FL trapezoid to the Bottom pin board's coplanar (x,-1)
+        # face at X=0 (deps: dovetail sockets reference the case boards).
+        anchor=dict(parent_body=bot_body, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "0 in", "case_z")),
     )
 
     # Body-relative reference: Back depends on Left
@@ -219,10 +234,16 @@ def run(context):
     # Thin panel sits in rabbet at back of case
     back_pl = sp.off_plane(case_c, case_c.xZConstructionPlane,
         "console_d - back_thick", "Back_Pl")
-    _, back_pr = sp.sketch_rect_model(case_c, back_pl,
+    back_sk, back_pr = sp.sketch_rect_model(case_c, back_pl,
         ("board_thick", "console_d - back_thick", "case_z + board_thick"),
         {"x": "console_w - 2 * board_thick", "z": "case_h"},
         "Back_Sk", ev=ev)
+    # Anchor Back to Left's coplanar (y,+1) face at Y=console_d (deps: Back → Left)
+    # Anchor to Left's diagonal corner (X=0, top) so both offset dims are non-zero.
+    back_pr = (sp.reanchor(back_sk, left_body, None, "y", +1,
+                           ("0 in", "console_d",
+                            "case_z + board_thick + case_h"))
+               or sp.smallest_profile(back_sk))
     back_ext = sp.ext_new(case_c, back_pr, "back_thick", "BackPanel")
     back_body = back_ext.bodies.item(0)
     back_body.name = "Back"
@@ -244,10 +265,14 @@ def run(context):
     # Divider 1 at section boundary
     div1_pl = sp.off_plane(case_c, case_c.yZConstructionPlane,
         "div1_x", "Div1_Pl")
-    _, div1_pr = sp.sketch_rect_model(case_c, div1_pl,
+    div1_sk, div1_pr = sp.sketch_rect_model(case_c, div1_pl,
         ("div1_x", "0 in", "case_z + board_thick"),
         {"y": "console_d - back_thick", "z": "case_h"},
         "Div1_Sk", ev=ev)
+    # Anchor Divider1 to Bottom's (x,-1) face (deps: Divider1 → Bottom)
+    div1_pr = (sp.reanchor(div1_sk, bot_body, None, "x", -1,
+                           ("0 in", "console_d", "case_z + board_thick"))
+               or sp.smallest_profile(div1_sk))
     div1_ext = sp.ext_new(case_c, div1_pr, "divider_thick", "Div1Board")
     div1_body = div1_ext.bodies.item(0)
     div1_body.name = "Divider1"
@@ -259,10 +284,15 @@ def run(context):
     # Divider 2 at second section boundary
     div2_pl = sp.off_plane(case_c, case_c.yZConstructionPlane,
         "div2_x", "Div2_Pl")
-    _, div2_pr = sp.sketch_rect_model(case_c, div2_pl,
+    div2_sk, div2_pr = sp.sketch_rect_model(case_c, div2_pl,
         ("div2_x", "0 in", "case_z + board_thick"),
         {"y": "console_d - back_thick", "z": "case_h"},
         "Div2_Sk", ev=ev)
+    # Anchor Divider2 to Divider1's (x,+1) face (deps: Divider2 → Divider1)
+    div2_pr = (sp.reanchor(div2_sk, div1_body, None, "x", +1,
+                           ("div1_x + divider_thick / 2", "console_d - back_thick",
+                            "case_z + board_thick"))
+               or sp.smallest_profile(div2_sk))
     div2_ext = sp.ext_new(case_c, div2_pr, "divider_thick", "Div2Board")
     div2_body = div2_ext.bodies.item(0)
     div2_body.name = "Divider2"
@@ -294,7 +324,14 @@ def run(context):
             long_expr="dm_dv_long", short_expr="dm_dv_short",
             depth_expr="dm_dv_depth",
             body_a=div_body, body_b=bot_body,
-            name=f"{div_name}_Bot", ev=ev)
+            name=f"{div_name}_Bot", ev=ev,
+            anchor=dict(parent_body=div_body, parent_occ=None,
+                        face_axis="z", face_dir=-1,
+                        anchor_xyz=(div_cx, "console_d - back_thick",
+                                    "case_z + board_thick"),
+                        off=(("x", "0 in"),
+                             ("y", "abs(dm_dv_sp - (dm_dv_long - dm_dv_short) / 2"
+                                   " - (console_d - back_thick))"))))
 
         # Top interface (Z = case_z + board_thick + case_h)
         dm_top_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
@@ -307,7 +344,14 @@ def run(context):
             long_expr="dm_dv_long", short_expr="dm_dv_short",
             depth_expr="dm_dv_depth",
             body_a=div_body, body_b=top_body,
-            name=f"{div_name}_Top", ev=ev)
+            name=f"{div_name}_Top", ev=ev,
+            anchor=dict(parent_body=div_body, parent_occ=None,
+                        face_axis="z", face_dir=+1,
+                        anchor_xyz=(div_cx, "console_d - back_thick",
+                                    "case_z + board_thick + case_h"),
+                        off=(("x", "0 in"),
+                             ("y", "abs(dm_dv_sp - (dm_dv_long - dm_dv_short) / 2"
+                                   " - (console_d - back_thick))"))))
 
     # Body-relative references: Domino voids depend on Divider1, Divider2
     ref_div1_2 = ctx.find_body("Divider1")
@@ -677,8 +721,13 @@ def run(context):
         x_offset="div1_x + divider_thick + drawer_gap",
         z_offset="case_z + board_thick + drawer_gap")
 
-    # Build one drawer
-    dd_result = dovetailed_drawer.build(drawers_c, prefix="dd", ev=ev)
+    # Build one drawer — anchor the drawer FRONT to the case Bottom's coplanar
+    # (y,-1) face at Y=0 (deps: dd_Front → Bottom). The template then anchors
+    # the back/left/bottom boards + dovetails to the front internally.
+    dd_result = dovetailed_drawer.build(drawers_c, prefix="dd", ev=ev,
+        anchor=dict(parent_body=bot_body, parent_occ=case_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("console_w", "0 in", "case_z + board_thick")))
 
     # Body-relative references for drawer sub-bodies
     ref_dd_front = ctx.find_body("dd_Front")
@@ -707,11 +756,15 @@ def run(context):
 
     # Left door — inset in left section opening
     # Left section: X from board_thick to div1_x
-    _, ldoor_pr = sp.sketch_rect_model(doors_c, doors_c.xZConstructionPlane,
+    ldoor_sk, ldoor_pr = sp.sketch_rect_model(doors_c, doors_c.xZConstructionPlane,
         ("board_thick + door_gap", "0 in",
          "case_z + board_thick + door_gap"),
         {"x": "door_w", "z": "door_h"},
         "LDoor_Sk", ev=ev)
+    # Anchor LeftDoor to case Left's coplanar (y,-1) face at Y=0 (deps: LeftDoor → Left)
+    ldoor_pr = (sp.reanchor(ldoor_sk, left_body, case_occ, "y", -1,
+                            ("board_thick", "0 in", "case_z + board_thick"))
+                or sp.smallest_profile(ldoor_sk))
     ldoor_ext = sp.ext_new(doors_c, ldoor_pr, "door_thick", "LeftDoor")
     ldoor_body = ldoor_ext.bodies.item(0)
     ldoor_body.name = "LeftDoor"
@@ -753,13 +806,17 @@ def run(context):
         # Cleat body
         cpl = sp.off_plane(cleats_c, cleats_c.xYConstructionPlane,
             cleat_z_expr, f"{cname}_Pl")
-        _, cpr = sp.sketch_rect_model(cleats_c, cpl,
+        c_sk, cpr = sp.sketch_rect_model(cleats_c, cpl,
             (cx_expr,
              "(leg_size + rail_thick) / 2",
              cleat_z_expr),
             {"x": "cleat_w",
              "y": "console_d - leg_size - rail_thick"},
             f"{cname}_Sk", ev=ev)
+        # Anchor cleat body to case Bottom's (z,-1) face (deps: Cleat → Bottom)
+        cpr = (sp.reanchor(c_sk, bot_body, case_occ, "z", -1,
+                           ("console_w", "console_d", "case_z"))
+               or sp.smallest_profile(c_sk))
         c_ext = sp.ext_new(cleats_c, cpr, "cleat_thick", cname)
         c_body = c_ext.bodies.item(0)
         c_body.name = cname
@@ -769,13 +826,17 @@ def run(context):
         # of rail + tt_shoulder into cleat body
         tn_f_pl = sp.off_plane(cleats_c, cleats_c.xZConstructionPlane,
             "leg_size / 2", f"{cname}_TnF_Pl")
-        _, tn_f_pr = sp.sketch_rect_model(cleats_c, tn_f_pl,
+        tn_f_sk, tn_f_pr = sp.sketch_rect_model(cleats_c, tn_f_pl,
             (f"{cx_expr} + tt_shoulder",
              "leg_size / 2",
              "leg_h - rail_w + tt_shoulder"),
             {"x": "cleat_w - 2 * tt_shoulder",
              "z": "rail_w - 2 * tt_shoulder"},
             f"{cname}_TnF_Sk", ev=ev)
+        # Anchor front tenon to the cleat body's (y,-1) face (same component)
+        tn_f_pr = (sp.reanchor(tn_f_sk, c_body, None, "y", -1,
+                               (cx_expr, "(leg_size + rail_thick) / 2", "case_z"))
+                   or sp.smallest_profile(tn_f_sk))
         tn_f_ext = sp.ext_new(cleats_c, tn_f_pr,
             "rail_thick / 2 + tt_shoulder", f"{cname}_TnF")
         tn_f_body = tn_f_ext.bodies.item(0)
@@ -785,13 +846,18 @@ def run(context):
         tn_b_pl = sp.off_plane(cleats_c, cleats_c.xZConstructionPlane,
             "console_d - (leg_size + rail_thick) / 2 - tt_shoulder",
             f"{cname}_TnB_Pl")
-        _, tn_b_pr = sp.sketch_rect_model(cleats_c, tn_b_pl,
+        tn_b_sk, tn_b_pr = sp.sketch_rect_model(cleats_c, tn_b_pl,
             (f"{cx_expr} + tt_shoulder",
              "console_d - (leg_size + rail_thick) / 2 - tt_shoulder",
              "leg_h - rail_w + tt_shoulder"),
             {"x": "cleat_w - 2 * tt_shoulder",
              "z": "rail_w - 2 * tt_shoulder"},
             f"{cname}_TnB_Sk", ev=ev)
+        # Anchor back tenon to the cleat body's (y,+1) face (same component)
+        tn_b_pr = (sp.reanchor(tn_b_sk, c_body, None, "y", +1,
+                               (cx_expr, "console_d - (leg_size + rail_thick) / 2",
+                                "case_z"))
+                   or sp.smallest_profile(tn_b_sk))
         tn_b_ext = sp.ext_new(cleats_c, tn_b_pr,
             "rail_thick / 2 + tt_shoulder", f"{cname}_TnB")
         tn_b_body = tn_b_ext.bodies.item(0)
@@ -878,7 +944,13 @@ def run(context):
             long_expr="dm_cl_long", short_expr="dm_cl_short",
             depth_expr="dm_cl_depth",
             body_a=cleat_bodies[i], body_b=bot_px,
-            name=dm_name, ev=ev)
+            name=dm_name, ev=ev,
+            anchor=dict(parent_body=cleat_bodies[i], parent_occ=None,
+                        face_axis="z", face_dir=+1,
+                        anchor_xyz=(f"{cx_expr} - cleat_w / 2",
+                                    "(leg_size + rail_thick) / 2", "case_z"),
+                        off=(("x", "cleat_w / 2"),
+                             ("y", "abs(dm_cl_sp - (dm_cl_long - dm_cl_short) / 2)"))))
 
     # ── Details: Leg Bottom Chamfers ───────────────────────────────
     # Small chamfer on bottom edges of each leg
