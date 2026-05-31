@@ -145,7 +145,24 @@ def run(context):
     else:
         gc.addHorizontal(l0); gc.addHorizontal(l4)
         gc.addVertical(l5)
-    # l2 (top cap) is NOT horizontal — it's perpendicular to the rake
+    gc.addPerpendicular(l2, l1)
+    gc.addParallel(l3, l1)
+    orient = sp.probe_orientations(sk, 0, yi, bz)
+    d = sk.sketchDimensions
+    d.addDistanceDimension(l5.startSketchPoint, l5.endSketchPoint,
+        orient['y'], spts[5]).parameter.expression = "leg_size"
+    d.addDistanceDimension(l0.startSketchPoint, l0.endSketchPoint,
+        orient['z'], spts[0]).parameter.expression = "bend_z"
+    d.addDistanceDimension(sk.originPoint, l0.startSketchPoint,
+        orient['y'], spts[0]).parameter.expression = "bench_d - leg_size"
+    d.addDistanceDimension(sk.originPoint, l0.endSketchPoint,
+        orient['z'], spts[1]).parameter.expression = "bend_z"
+    d.addAngularDimension(l0, l1, spts[1]).parameter.expression = "back_rake * 1 deg"
+    ALI = adsk.fusion.DimensionOrientations.AlignedDimensionOrientation
+    d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
+        ALI, spts[2]).parameter.expression = "upper_post_len"
+    d.addDistanceDimension(l2.startSketchPoint, l2.endSketchPoint,
+        ALI, spts[3]).parameter.expression = "leg_size"
 
     prof = sk.profiles.item(0)
     ext_inp = leg_c.features.extrudeFeatures.createInput(
@@ -427,12 +444,22 @@ def run(context):
         center=(f"{ls_cm} cm", f"{bb_y} cm", f"{bb_z} cm"),
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
         depth_expr="dm_d", body_a=back_board, body_b=bl_p,
-        name="DM_BB_L", ev=ev)
+        name="DM_BB_L", ev=ev,
+        anchor=dict(parent_body=back_board, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=(f"{ls_cm} cm", f"{bb_y} cm", f"{bb_z} cm"),
+                    off=(("y", f"{abs(bb_y - ev('bench_d'))} cm"),
+                         ("z", f"{abs(bb_z - ev('bend_z'))} cm"))))
     domino.single(back_c, dm_bb_yz_r,
         center=(f"{ev('bench_l') - ls_cm} cm", f"{bb_y} cm", f"{bb_z} cm"),
         long_axis="z", long_expr="dm_w", short_expr="dm_t",
         depth_expr="dm_d", body_a=back_board, body_b=br_p,
-        name="DM_BB_R", ev=ev)
+        name="DM_BB_R", ev=ev,
+        anchor=dict(parent_body=back_board, parent_occ=None,
+                    face_axis="x", face_dir=+1,
+                    anchor_xyz=(f"{ev('bench_l') - ls_cm} cm", f"{bb_y} cm", f"{bb_z} cm"),
+                    off=(("y", f"{abs(bb_y - ev('bench_d'))} cm"),
+                         ("z", f"{abs(bb_z - ev('bend_z'))} cm"))))
 
     print(f">>> Dominos done")
 
