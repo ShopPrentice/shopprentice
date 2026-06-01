@@ -312,6 +312,8 @@ def run(context):
     d.addDistanceDimension(sk.originPoint, top_ln.startSketchPoint,
         orient['z'], P(pl.x / 2, pl.y - 1, 0)
     ).parameter.expression = "tray_z + tray_height"
+    # anchor_xyz = UT_Div's real front-bottom-left corner (min X, min Y from the
+    # dado-inset front edge, min Z from the divider's groove base) — see UTDiv_Sk.
     sp.reanchor(sk, ut_div, None, "x", -1,
         ("box_length / 2 - div_thick / 2",
          "board_thick + tray_cl + tray_thick - tray_dado_depth",
@@ -450,6 +452,8 @@ def run(context):
     d.addDistanceDimension(sk.originPoint, lt_ln.startSketchPoint,
         lt_orient['z'], P(lpl.x / 2, lpl.y - 1, 0)
     ).parameter.expression = "lower_tray_z + lower_tray_height"
+    # anchor_xyz = LTL_Div's real front-bottom-left corner (min X, min Y from the
+    # dado-inset front edge, min Z from the divider's groove base) — see LTL_Div_Sk.
     sp.reanchor(sk, lt1_div, None, "x", -1,
         ("board_thick + tray_cl + lower_tray_l / 2 - div_thick / 2",
          "board_thick + support_thick + tray_cl + tray_thick - tray_dado_depth",
