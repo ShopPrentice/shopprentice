@@ -2,6 +2,8 @@
 
 Seating with a back — dining chairs, side chairs, arm chairs. Distinguished from stools by having a backrest, and from benches by being single-seat.
 
+**Origin root: the Seat.** A chair is "a seat on legs" — anchor the **Seat** to the origin; legs/posts and the backrest reference it (`Seat → origin`, `legs → Seat`, `back → Seat/legs`). Don't root on a leg just because it touches the floor.
+
 ## Components
 
 | Component | Required | Role |
