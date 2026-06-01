@@ -305,8 +305,19 @@ def run(context):
     r_val = (notch_w**2 / 4 + ev("notch_h")**2) / (2 * ev("notch_h"))
     d.addRadialDimension(arc, P(pm.x, pm.y + 0.5, 0)
     ).parameter.expression = f"((tray_w_out - 2 * (tray_thick + notch_margin)) ^ 2 / 4 + notch_h ^ 2) / (2 * notch_h)"
+    # Position the top line's start (origin dims, retargeted by reanchor below).
+    d.addDistanceDimension(sk.originPoint, top_ln.startSketchPoint,
+        orient['y'], P(pl.x - 1, pl.y / 2, 0)
+    ).parameter.expression = "board_thick + tray_cl + tray_thick + notch_margin"
+    d.addDistanceDimension(sk.originPoint, top_ln.startSketchPoint,
+        orient['z'], P(pl.x / 2, pl.y - 1, 0)
+    ).parameter.expression = "tray_z + tray_height"
+    # anchor_xyz = UT_Div's real front-bottom-left corner (min X, min Y from the
+    # dado-inset front edge, min Z from the divider's groove base) — see UTDiv_Sk.
     sp.reanchor(sk, ut_div, None, "x", -1,
-        ("box_length / 2 - div_thick / 2", "board_thick + tray_cl", "tray_z + tray_height"))
+        ("box_length / 2 - div_thick / 2",
+         "board_thick + tray_cl + tray_thick - tray_dado_depth",
+         "tray_z + tray_groove_up + tray_bottom_thick"))
     sp.refs_to_construction(sk)
     prof = sp.smallest_profile(sk)
     sp.ext_op(ut_c, prof, "div_thick", CUT, ut_div, "UTNotch")
@@ -435,9 +446,18 @@ def run(context):
     ).parameter.expression = "lower_tray_w_out - 2 * (tray_thick + notch_margin)"
     d.addRadialDimension(lt_arc, P(lpm.x, lpm.y + 0.5, 0)
     ).parameter.expression = "((lower_tray_w_out - 2 * (tray_thick + notch_margin)) ^ 2 / 4 + notch_h ^ 2) / (2 * notch_h)"
+    d.addDistanceDimension(sk.originPoint, lt_ln.startSketchPoint,
+        lt_orient['y'], P(lpl.x - 1, lpl.y / 2, 0)
+    ).parameter.expression = "board_thick + support_thick + tray_cl + tray_thick + notch_margin"
+    d.addDistanceDimension(sk.originPoint, lt_ln.startSketchPoint,
+        lt_orient['z'], P(lpl.x / 2, lpl.y - 1, 0)
+    ).parameter.expression = "lower_tray_z + lower_tray_height"
+    # anchor_xyz = LTL_Div's real front-bottom-left corner (min X, min Y from the
+    # dado-inset front edge, min Z from the divider's groove base) — see LTL_Div_Sk.
     sp.reanchor(sk, lt1_div, None, "x", -1,
         ("board_thick + tray_cl + lower_tray_l / 2 - div_thick / 2",
-         "board_thick + support_thick + tray_cl", "lower_tray_z + lower_tray_height"))
+         "board_thick + support_thick + tray_cl + tray_thick - tray_dado_depth",
+         "lower_tray_z + tray_groove_up + tray_bottom_thick"))
     sp.refs_to_construction(sk)
     prof = sp.smallest_profile(sk)
     sp.ext_op(lt_c, prof, "div_thick", CUT, lt1_div, "LTNotch")
@@ -667,8 +687,10 @@ def run(context):
     sk, prof = sp.sketch_rect_model(lid_c, pull_y_pl,
         ("box_length / 2 - pull_w / 2", "lid_rab - pull_d", pull_z_expr),
         {"x":"pull_w","z":"pull_h"}, "Pull_Sk", ev=ev)
+    # Anchor to Lid_Rail_F's front (-Y) face — its bottom-left corner is the
+    # real parent vertex at (board_thick, <front y>, open_height).
     prof = sp.reanchor(sk, lrf, None, "y", -1,
-        ("0 in", "0 in", "open_height + lid_frame_h")) or prof
+        ("board_thick", "lid_rab", "open_height")) or sp.smallest_profile(sk)
     pull = sp.ext_new(lid_c, prof, "pull_d", "Pull").bodies.item(0); pull.name = "Pull"
     # Tenon from pull into front rail (0.5" wide)
     pt_pl = sp.off_plane(lid_c, root.xYConstructionPlane,
