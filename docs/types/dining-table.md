@@ -20,6 +20,8 @@ Top sits on aprons, attached with buttons or dominos
 Stretchers (if present) connect legs at a lower height
 ```
 
+**Origin root: the Top.** A table is "a top on legs" — anchor the **Top** to the origin and hang the frame off it: `Top → origin`, `aprons → Top`, `legs → aprons`. (Do NOT root on a leg just because it's closest to the floor.) You can still *build* legs-first if convenient, but the `model.json` dependency tree and the absolutely-positioned reference are the Top.
+
 ## Openings & Cavities
 
 | Opening | In which board | Created by |
