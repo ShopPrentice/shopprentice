@@ -158,6 +158,19 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
         corner[a] += ev(expr)
 
     sk_o = sk.modelToSketchSpace(Point3D.create(ox, oy, oz))
+    # Guard: model_origin must LIE ON the sketch plane. modelToSketchSpace
+    # flattens the point onto the plane, dropping the out-of-plane component
+    # (sk_o.z) below — so an off-plane origin would silently create the body
+    # IN the plane, not at model_origin (the back-panel-at-front bug class:
+    # PR #56). Catch it here as an immediate, self-explaining error instead of
+    # a late interference. A correct call (plane at the right offset) has
+    # sk_o.z ≈ 0; only a wrong plane trips this.
+    if abs(sk_o.z) > 1e-4:
+        raise ValueError(
+            f"sketch_rect_model('{name}'): model_origin lies {sk_o.z:.4f} cm off "
+            f"the sketch plane — the body would be created IN the plane, not at "
+            f"model_origin. Sketch on an off_plane at that offset, or set the "
+            f"out-of-plane component of model_origin to match the plane.")
     sk_f = sk.modelToSketchSpace(
         Point3D.create(corner["x"], corner["y"], corner["z"]))
 
