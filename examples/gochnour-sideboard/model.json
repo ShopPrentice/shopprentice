@@ -1,0 +1,59 @@
+{
+  "name": "Gochnour Sideboard",
+  "deps": [
+    {"body": "Leg_FL", "ref": "origin", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Front-left leg sits on the floor"},
+    {"body": "Leg_FR", "ref": "Leg_FL", "side": "outside", "direction": [1, 0, 0], "contact": false, "note": "Mirror of FL across X mid"},
+    {"body": "Leg_BL", "ref": "Leg_FL", "side": "outside", "direction": [0, 1, 0], "contact": false, "note": "Mirror of FL across Y mid"},
+    {"body": "Leg_BR", "ref": "Leg_FL", "side": "outside", "direction": [1, 1, 0], "contact": false, "note": "Back-right leg"},
+
+    {"body": "Rail_F", "ref": "Leg_FL", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Front rail at leg tops"},
+    {"body": "Rail_B", "ref": "Leg_BL", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Back rail at leg tops"},
+    {"body": "Rail_SL", "ref": "Leg_FL", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Left side rail"},
+    {"body": "Rail_SR", "ref": "Leg_FR", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Right side rail"},
+
+    {"body": "Case_Bot", "ref": "Rail_F", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Case bottom rests on rails"},
+    {"body": "Case_Top", "ref": "Case_Bot", "side": "outside", "direction": [0, 0, 1], "contact": false, "note": "Top, connected via sides"},
+    {"body": "Case_SideL", "ref": "Case_Bot", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Left side, mitered-dovetailed to bottom"},
+    {"body": "Case_SideR", "ref": "Case_Bot", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Right side"},
+    {"body": "Partition_L", "ref": "Case_Bot", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Left partition"},
+    {"body": "Partition_R", "ref": "Case_Bot", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Right partition"},
+    {"body": "BackPanel_L", "ref": "Case_Bot", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Left back panel"},
+    {"body": "BackPanel_C", "ref": "Case_Bot", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Center back panel"},
+    {"body": "BackPanel_R", "ref": "Case_Bot", "side": "outside", "direction": [0, 0, 1], "contact": true, "note": "Right back panel"},
+
+    {"body": "DoorL_StileL", "ref": "Case_SideL", "side": "outside", "direction": [0, -1, 0], "contact": false, "note": "Left door outer stile (sliding, gap)"},
+    {"body": "DoorL_StileR", "ref": "DoorL_StileL", "side": "outside", "direction": [1, 0, 0], "contact": false, "note": "Left door inner stile"},
+    {"body": "DoorL_RailB", "ref": "DoorL_StileL", "side": "outside", "direction": [1, 0, 0], "contact": true, "note": "Left door bottom rail"},
+    {"body": "DoorL_RailT", "ref": "DoorL_StileL", "side": "outside", "direction": [1, 0, 0], "contact": true, "note": "Left door top rail"},
+    {"body": "DoorL_Panel", "ref": "DoorL_StileL", "side": "outside", "direction": [1, 0, 0], "contact": true, "note": "Left door spalted-maple panel"},
+    {"body": "Knob_DoorL", "ref": "DoorL_StileL", "side": "outside", "direction": [0, -1, 0], "contact": true, "note": "Left door knob — flat base contacts outer stile face, held by a dowel (Knob_DoorL_Dwl)"},
+
+    {"body": "DoorR_StileR", "ref": "Case_SideR", "side": "outside", "direction": [0, -1, 0], "contact": false, "note": "Right door outer stile"},
+    {"body": "DoorR_StileL", "ref": "DoorR_StileR", "side": "outside", "direction": [-1, 0, 0], "contact": false, "note": "Right door inner stile"},
+    {"body": "DoorR_RailB", "ref": "DoorR_StileR", "side": "outside", "direction": [-1, 0, 0], "contact": true, "note": "Right door bottom rail"},
+    {"body": "DoorR_RailT", "ref": "DoorR_StileR", "side": "outside", "direction": [-1, 0, 0], "contact": true, "note": "Right door top rail"},
+    {"body": "DoorR_Panel", "ref": "DoorR_StileR", "side": "outside", "direction": [-1, 0, 0], "contact": true, "note": "Right door spalted-maple panel"},
+    {"body": "Knob_DoorR", "ref": "DoorR_StileR", "side": "outside", "direction": [0, -1, 0], "contact": true, "note": "Right door knob — flat base contacts outer stile face, held by a dowel (Knob_DoorR_Dwl)"},
+
+    {"body": "dd_Front", "ref": "Case_Bot", "side": "outside", "direction": [0, 0, 1], "contact": false, "note": "Drawer 1 front (slides in center compartment)"},
+    {"body": "dd_Back", "ref": "dd_Front", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 1 back (through dovetails)"},
+    {"body": "dd_Left", "ref": "dd_Front", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 1 left side (half-blind dovetails)"},
+    {"body": "dd_Right", "ref": "dd_Front", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 1 right side"},
+    {"body": "dd_Bottom", "ref": "dd_Front", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 1 bottom panel (grooved)"},
+    {"body": "Knob_Drw", "ref": "dd_Front", "side": "outside", "direction": [0, -1, 0], "contact": true, "note": "Drawer 1 knob — base ring-contacts the cove dish, held by a dowel (Knob_Drw_Dwl)"},
+
+    {"body": "dd_Front (1)", "ref": "dd_Front", "side": "outside", "direction": [0, 0, 1], "contact": false, "note": "Drawer 2 front (pattern)"},
+    {"body": "dd_Back (1)", "ref": "dd_Front (1)", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 2 back"},
+    {"body": "dd_Left (1)", "ref": "dd_Front (1)", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 2 left"},
+    {"body": "dd_Right (1)", "ref": "dd_Front (1)", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 2 right"},
+    {"body": "dd_Bottom (1)", "ref": "dd_Front (1)", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 2 bottom"},
+    {"body": "Knob_Drw (1)", "ref": "dd_Front (1)", "side": "outside", "direction": [0, -1, 0], "contact": true, "note": "Drawer 2 knob — base ring-contacts the cove dish, held by a dowel"},
+
+    {"body": "dd_Front (2)", "ref": "dd_Front", "side": "outside", "direction": [0, 0, 1], "contact": false, "note": "Drawer 3 front (pattern)"},
+    {"body": "dd_Back (2)", "ref": "dd_Front (2)", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 3 back"},
+    {"body": "dd_Left (2)", "ref": "dd_Front (2)", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 3 left"},
+    {"body": "dd_Right (2)", "ref": "dd_Front (2)", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 3 right"},
+    {"body": "dd_Bottom (2)", "ref": "dd_Front (2)", "side": "outside", "direction": [0, 1, 0], "contact": true, "note": "Drawer 3 bottom"},
+    {"body": "Knob_Drw (2)", "ref": "dd_Front (2)", "side": "outside", "direction": [0, -1, 0], "contact": true, "note": "Drawer 3 knob — base ring-contacts the cove dish, held by a dowel"}
+  ]
+}
