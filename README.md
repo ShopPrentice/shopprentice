@@ -86,6 +86,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 <tr>
 <td align="center"><a href="examples/moravian-workbench/"><img src="examples/moravian-workbench/screenshots/iso-top-left.png" width="200" /><br /><b>Moravian Workbench</b></a></td>
 <td align="center"><a href="examples/gochnour-sideboard/"><img src="examples/gochnour-sideboard/screenshots/iso-top-right.png" width="200" /><br /><b>Gochnour Sideboard</b></a></td>
+<td align="center"><a href="examples/modular-wall-shelf/"><img src="examples/modular-wall-shelf/product_iso.png" width="200" /><br /><b>Modular Wall Shelf</b></a></td>
 </tr>
 </table>
 

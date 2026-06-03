@@ -1,0 +1,30 @@
+{
+  "name": "Modular Wall Shelf System",
+  "source": "Fine Woodworking Jan/Feb 2025 — Charlie Peterson",
+  "deps": [
+    {
+      "body": "Post_0",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Posts stand on the floor (Z=0), built from origin. Patterned ×4 along X."
+    },
+    {
+      "body": "Shelf_1",
+      "ref": "Post_0",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Shelf board; through-mortises slide over posts. Snug mortise = post cross-section so mortise walls contact post faces."
+    },
+    {
+      "body": "Peg1",
+      "ref": ["Post_0", "Shelf_1"],
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Peg is a dowel through a post peg-hole; shelf rests on it. References post (hole) and shelf (support). Slightly undersize so it seats without interference."
+    }
+  ]
+}
