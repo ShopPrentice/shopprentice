@@ -85,6 +85,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 </tr>
 <tr>
 <td align="center"><a href="examples/moravian-workbench/"><img src="examples/moravian-workbench/screenshots/iso-top-left.png" width="200" /><br /><b>Moravian Workbench</b></a><br />Splayed-leg knock-down trestle, tusk + fox-wedged tenons, leg vise, 16 dog holes</td>
+<td align="center"><a href="examples/modular-wall-shelf/"><img src="examples/modular-wall-shelf/product_iso.png" width="200" /><br /><b>Modular Wall Shelf</b></a><br />Staggered shelves on pegged posts, 21 peg holes/post, snug through-mortises (single prompt)</td>
 </tr>
 </table>
 
