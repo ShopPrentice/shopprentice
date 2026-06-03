@@ -141,6 +141,7 @@ Before planning, identify the **furniture type** and **design style** from the u
 | Pergola | pergola, arbor, trellis, gazebo | `docs/types/pergola.md` |
 | Mirror frame | mirror, mirror frame, looking glass | `docs/types/mirror-frame.md` |
 | Shelf | shelf, floating shelf, wall shelf, ledge | `docs/types/shelf.md` |
+| Modular shelving | modular shelf, shelving system, post-and-peg shelving, standards-and-brackets, ladder shelf, wall shelf system | `docs/types/modular-shelving.md` |
 
 **Identify style** from visual cues, user description, or reference photos:
 
