@@ -306,7 +306,7 @@ def _sketch_rect_model_anchored(comp, plane, model_origin, model_size,
 
 
 def refs_to_construction(sk):
-    """Convert all projected/reference lines to construction geometry.
+    """Convert all projected/reference curves to construction geometry.
 
     Call this after dimensioning but before profile selection.  Projected
     references (from sketch.project() or auto-projected face edges) form
@@ -314,12 +314,19 @@ def refs_to_construction(sk):
     to construction removes them from profile computation so only the
     drawn geometry defines profiles.
 
-    The sketch points from these lines remain valid for dimensions.
+    Covers EVERY curve type, not just lines: a projected round face yields a
+    reference circle/arc, a projected spline yields a reference spline. If
+    those stay live they keep splitting the drawn profile into slivers (a
+    projected leg-circle quartered a slot rect, so smallest_profile() then
+    extruded a sliver and the cut removed almost nothing). Iterating
+    sketchCurves catches lines, arcs, circles, ellipses, and splines alike.
+
+    The sketch points from these curves remain valid for dimensions.
     """
-    for i in range(sk.sketchCurves.sketchLines.count):
-        ln = sk.sketchCurves.sketchLines.item(i)
-        if ln.isReference:
-            ln.isConstruction = True
+    for i in range(sk.sketchCurves.count):
+        cv = sk.sketchCurves.item(i)
+        if getattr(cv, "isReference", False):
+            cv.isConstruction = True
 
 
 def probe_orientations(sk, x=0, y=0, z=0):
