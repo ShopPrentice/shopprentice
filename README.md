@@ -49,9 +49,6 @@ The agent can also work from images — show it a photo or sketch of a piece and
 
 <table>
 <tr>
-<td align="center" colspan="3"><a href="examples/gochnour-sideboard/"><img src="examples/gochnour-sideboard/screenshots/iso-top-right.png" width="260" /><br /><b>Gochnour Sideboard</b></a></td>
-</tr>
-<tr>
 <td align="center"><a href="examples/jewelry-chest/"><img src="examples/jewelry-chest/product_iso.png" width="200" /><br /><b>Jewelry Chest</b></a></td>
 <td align="center"><a href="examples/mcm-desk/"><img src="examples/mcm-desk/assets/rendered_model.png" width="200" /><br /><b>MCM Teak Desk</b></a></td>
 <td align="center"><a href="examples/esherick-stool/"><img src="examples/esherick-stool/iso-top-right.png" width="200" /><br /><b>Esherick Stool</b></a></td>
@@ -88,6 +85,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 </tr>
 <tr>
 <td align="center"><a href="examples/moravian-workbench/"><img src="examples/moravian-workbench/screenshots/iso-top-left.png" width="200" /><br /><b>Moravian Workbench</b></a></td>
+<td align="center"><a href="examples/gochnour-sideboard/"><img src="examples/gochnour-sideboard/screenshots/iso-top-right.png" width="200" /><br /><b>Gochnour Sideboard</b></a></td>
 </tr>
 </table>
 
