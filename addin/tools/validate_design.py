@@ -335,6 +335,88 @@ def _check_replication(design, bodies, exclude_prefixes, min_group=2):
     return {"advisory": True, "groups": findings}
 
 
+def _sketch_detail_sig(sk):
+    """(shape-signature, world-centroid) of a sketch's drawn profiles, or None.
+
+    Signature = (rounded total profile area, total curve count) — a cheap
+    congruence proxy. Centroid is in WORLD space so positions of sketches on
+    different planes are comparable.
+    """
+    try:
+        if sk.profiles.count == 0:
+            return None
+        area = 0.0; ncurves = 0; cx = cy = cz = 0.0; n = 0
+        for pi in range(sk.profiles.count):
+            pr = sk.profiles.item(pi)
+            ap = pr.areaProperties()
+            area += ap.area
+            c = sk.sketchToModelSpace(ap.centroid)
+            cx += c.x; cy += c.y; cz += c.z; n += 1
+            for lp in range(pr.profileLoops.count):
+                ncurves += pr.profileLoops.item(lp).profileCurves.count
+        if n == 0 or area <= 0:
+            return None
+        return (round(area, 2), ncurves), (cx / n, cy / n, cz / n)
+    except Exception:
+        return None
+
+
+def _check_detail_after_replicate(root_comp, tol=0.05):
+    """ADVISORY (never affects pass/fail): the SAME detail sketched separately for
+    each copy instead of detailed on the template before the Mirror/Pattern — e.g.
+    tapering every leg after mirroring (8 taper sketches) instead of tapering one
+    leg first (2). Catches what the body-level replication check can't: the copy
+    BODIES are proper mirror outputs, but the per-copy detail FEATURES are redundant.
+
+    Roll-free (reads persistent sketches, not the fragile timeline-feature APIs):
+    group drawn sketches by congruence (area + curve count); within a group, flag
+    members whose world centroids differ on EXACTLY ONE axis — i.e. mirror/pattern
+    copies of each other. Congruent-but-not-1-axis-aligned sketches (e.g. the two
+    perpendicular taper faces of ONE leg) are NOT flagged. Opt out with `_norep` in
+    the sketch name.
+    """
+    import collections
+    seen = set(); items = []
+    comps = [root_comp]
+    try:
+        for i in range(root_comp.allOccurrences.count):
+            comps.append(root_comp.allOccurrences.item(i).component)
+    except Exception:
+        pass
+    for comp in comps:
+        key = getattr(comp, "name", None)
+        if key in seen:
+            continue
+        seen.add(key)
+        for si in range(comp.sketches.count):
+            sk = comp.sketches.item(si)
+            if "_norep" in sk.name:
+                continue
+            r = _sketch_detail_sig(sk)
+            if r is None:
+                continue
+            items.append((sk.name, r[0], r[1]))
+
+    groups = collections.defaultdict(list)
+    for nm, sig, ctr in items:
+        groups[sig].append((nm, ctr))
+
+    findings = []
+    for sig, members in groups.items():
+        if len(members) < 2:
+            continue
+        flagged = set()
+        for a in range(len(members)):
+            for b in range(a + 1, len(members)):
+                ca, cb = members[a][1], members[b][1]
+                axes_differ = sum(1 for k in range(3) if abs(ca[k] - cb[k]) > tol)
+                if axes_differ == 1:           # mirror/translation copies
+                    flagged.add(members[a][0]); flagged.add(members[b][0])
+        if len(flagged) >= 2:
+            findings.append({"sketches": sorted(flagged), "count": len(flagged)})
+    return {"advisory": True, "groups": findings}
+
+
 def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dict:
     """Run all structural validation checks on the current design."""
 
@@ -389,6 +471,16 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
         except Exception as re:
             replication = {"advisory": True, "error": str(re), "groups": []}
 
+        # Detail-after-replicate advisory — the same detail sketched per copy
+        # instead of detailed on the template before the Mirror/Pattern. ADVISORY
+        # ONLY (the body-level replication check can't see it; this catches it via
+        # repeated congruent sketches).
+        detail_repl = None
+        try:
+            detail_repl = _check_detail_after_replicate(root)
+        except Exception as dre:
+            detail_repl = {"advisory": True, "error": str(dre), "groups": []}
+
         import json
         result = {
             "passed": passed,
@@ -399,6 +491,8 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
             result["deps"] = deps_result
         if replication is not None and replication.get("groups"):
             result["replication"] = replication
+        if detail_repl is not None and detail_repl.get("groups"):
+            result["detail_replication"] = detail_repl
 
         parts = []
         if connectivity["connected"] and not connectivity["weakConnections"]:
@@ -426,6 +520,14 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
             parts.append(
                 f"replication ADVISORY ({len(g)} group(s) built independently — "
                 f"{ex}) [does not affect pass/fail]")
+
+        if detail_repl is not None and detail_repl.get("groups"):
+            dg = detail_repl["groups"]
+            dex = "; ".join("/".join(grp["sketches"]) for grp in dg[:3])
+            parts.append(
+                f"detail-after-replicate ADVISORY ({len(dg)} group(s) — same detail "
+                f"sketched per copy; detail the template before mirroring: {dex}) "
+                f"[does not affect pass/fail]")
 
         status = "PASSED" if passed else "FAILED"
         msg = f"{status}: {', '.join(parts)}"
@@ -470,9 +572,16 @@ Combines three checks in a single call:
    a redo; the recommended response is to refactor the named group to one
    template + Mirror/Pattern (a sub-agent can do this so the main build's context
    stays lean).
+5. **Detail-after-replicate advisory** (ADVISORY — never affects pass/fail): the
+   SAME detail sketched separately for each copy (e.g. tapering every leg AFTER
+   mirroring) instead of detailing the template BEFORE the Mirror/Pattern. The
+   copy bodies are proper mirror outputs (so check 4 stays quiet), but the
+   per-copy detail SKETCHES are redundant. Detected roll-free via congruent
+   sketches at mirror/pattern-symmetric positions; opt out with `_norep` in the
+   sketch name.
 
 Returns a single pass/fail result. Fails if disconnected, has weak
-connections, or has interference (NOT for the replication advisory).
+connections, or has interference (NOT for the two advisories).
 Run after EVERY phase."""
 
 tool = Tool.create_simple(

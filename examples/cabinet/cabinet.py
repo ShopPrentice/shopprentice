@@ -174,14 +174,17 @@ def run(context):
     ref_bottom = find_body("Bottom")
     ref_bottom_bb = ref_bottom.boundingBox
     shelf_z_pl = sp.off_plane(shelf_c, shelf_c.xYConstructionPlane, "mid_z", "ShelfZ_Pl")
+    # Shelf is set BACK behind the closed inset doors (front at
+    # door_thick + door_gap), so the doors can close without hitting it.
     _, pr = sp.sketch_rect_model(shelf_c, shelf_z_pl,
-        ("board_thick", "0 in", "mid_z"),
-        {"x": "shelf_w", "y": "shelf_d"}, "Shelf_Sk", ev,
+        ("board_thick", "door_thick + door_gap", "mid_z"),
+        {"x": "shelf_w", "y": "case_d - back_thick - door_thick - door_gap"},
+        "Shelf_Sk", ev,
         anchor=dict(parent_body=bot_body, parent_occ=case_occ,
                     face_axis="z", face_dir=+1,
                     anchor_xyz=("board_thick - dado_d", "case_d", "board_thick"),
                     off1=("x", "dado_d"),
-                    off2=("y", "case_d"),
+                    off2=("y", "case_d - door_thick - door_gap"),
                     which=0))
     sp.ext_new(shelf_c, pr, "shelf_thick", "ShelfBoard").bodies.item(0).name = "Shelf"
 
@@ -190,7 +193,12 @@ def run(context):
     # ==============================================================
     #  4. BACK PANEL
     # ==============================================================
-    _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
+    # Back panel sketch on a plane at the REAR of the case (Y = case_d -
+    # back_thick), not the xZ plane at Y=0 — otherwise the model_origin's Y
+    # is dropped and the panel lands at the front, overlapping the doors.
+    back_pl = sp.off_plane(back_c, back_c.xZConstructionPlane,
+                           "case_d - back_thick", "Back_Pl")
+    _, pr = sp.sketch_rect_model(back_c, back_pl,
         ("board_thick", "case_d - back_thick", "board_thick"),
         {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev,
         anchor=dict(parent_body=bot_body, parent_occ=case_occ,

@@ -167,9 +167,13 @@ def run(context):
     ref_top_bb = ref_top.boundingBox
 
     shelf_pl = sp.off_plane(int_c, int_c.xYConstructionPlane, "shelf_z", "ShelfPl")
+    # Shelf set back behind the closed doors (front at door_thick + door_gap),
+    # rear edge unchanged so the anchor's far corner (which=2) still matches.
     _, pr = sp.sketch_rect_model(int_c, shelf_pl,
-        ("board_thick", "0 in", "shelf_z"),
-        {"x": "inner_w", "y": "case_d - back_thick - board_thick"}, "Shelf_Sk", ev,
+        ("board_thick", "door_thick + door_gap", "shelf_z"),
+        {"x": "inner_w",
+         "y": "case_d - back_thick - board_thick - door_thick - door_gap"},
+        "Shelf_Sk", ev,
         anchor=dict(parent_body=find_body("Bottom"), parent_occ=case_occ,
                     face_axis="z", face_dir=+1,
                     anchor_xyz=("board_thick", "0 in", "kick_h + board_thick"),
@@ -199,7 +203,11 @@ def run(context):
     ref_bottom = find_body("Bottom")
     ref_bottom_bb = ref_bottom.boundingBox
 
-    _, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
+    # Sketch on a plane at the REAR (Y = case_d - back_thick) — the xZ plane
+    # at Y=0 drops the model_origin's Y and lands the panel at the front.
+    back_pl = sp.off_plane(back_c, back_c.xZConstructionPlane,
+                           "case_d - back_thick", "Back_Pl")
+    _, pr = sp.sketch_rect_model(back_c, back_pl,
         ("board_thick", "case_d - back_thick", "kick_h + board_thick"),
         {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev,
         anchor=dict(parent_body=find_body("Side_Left"), parent_occ=case_occ,
