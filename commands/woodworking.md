@@ -95,6 +95,7 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | **Drawbore M&T** | Stretcher-to-leg with offset pins for permanent tightness — workbenches, trestle tables, timber frames | Tested (Roubo workbench — through & blind variants) | `docs/joinery/drawbore.md` + `drawbore` template |
 | **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `docs/joinery/domino-joint.md` |
 | **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `docs/joinery/dovetail.md` |
+| **Full-Blind (Secret-Mitred) Dovetail** | Hidden corners that must read as a plain 45° miter from both outer faces — jewelry boxes, humidors, fine casework. Through dovetail buried behind a mitered lip; `corner()` is a generator (builds both boards). | Tested (corner generator — through + parameter-change validated) | `docs/joinery/full-blind-dovetail.md` + `full_blind_dovetail` template |
 | **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `docs/joinery/box-joint.md` |
 | **Dado & Rabbet** | Shelves into sides, case backs, drawer bottoms, any panel-into-groove connection | Tested (bookshelf, template fixtures — through/stopped dado, rabbet, panel groove) | `docs/joinery/dado-rabbet.md` |
 | **Bridle Joint** | Frame corners, T-connections, open mortise-and-tenon at end of a rail | Draft | `docs/joinery/bridle-joint.md` |
@@ -522,7 +523,7 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 
 **Core principle:** Build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), JOIN to the owner. Timeline order: CUT first (root, assembly proxies), JOIN second (owning component). Cross-component: use `body.createForAssemblyContext(occ)` for CUT in root.
 
-**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `tusk_tenon`, `tabletop_button`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `docs/joinery/README.md`.
+**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `full_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `tusk_tenon`, `tabletop_button`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `docs/joinery/README.md`.
 
 **Hardware:** use `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` for hinges, plus the `pull` and `chest_lock` templates for non-hinge hardware. See `docs/hardware-installation.md`.
 

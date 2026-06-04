@@ -14,6 +14,7 @@ Reusable Python templates in `addin/helpers/templates/` encapsulate complex join
 | `finger_joint` | `from helpers.templates import finger_joint` | `define_params()`, `box()` | Boxes, drawers, decorative corners |
 | `dovetail` | `from helpers.templates import dovetail` | `define_params()`, `corner()`, `box()` | Box corners, drawer fronts |
 | `half_blind_dovetail` | `from helpers.templates import half_blind_dovetail` | `define_params()`, `corner()`, `box()` | Drawer fronts (hides end grain) |
+| `full_blind_dovetail` | `from woodworking.templates import full_blind_dovetail` | `define_params()`, `corner()` | Secret-mitred corners — dovetail hidden behind a 45° miter on both faces |
 | `splayed_legs` | `from helpers.templates import splayed_legs` | `define_params()`, `build()`, `splay_offset()` | 4 compound-splayed legs with floor trim |
 | `dovetailed_drawer` | `from helpers.templates import dovetailed_drawer` | `define_params()`, `build()`, `pattern()` | Complete drawer box |
 | `tusk_tenon` | `from woodworking.templates import tusk_tenon` | `define_params()`, `through()` | Knock-down through-tenon + tapered key |
@@ -37,6 +38,7 @@ Dado/rabbet joints (2-3 features) and tongue & groove (inline in skill) are simp
 | Spline Joint | [spline-joint.md](spline-joint.md) | — | Medium | Reinforced miters, decorative accents |
 | Miter Joint | [miter-joint.md](miter-joint.md) | — | Low-Medium | Picture frames, trim, hidden end grain |
 | Dovetail | [dovetail.md](dovetail.md) | `dovetail` | Very High | Drawer fronts, premium boxes, visible joints |
+| Full-Blind (Secret-Mitred) Dovetail | [full-blind-dovetail.md](full-blind-dovetail.md) | `full_blind_dovetail` | Very High | Hidden corners that read as a plain miter — jewelry boxes, fine casework |
 | Pocket Hole | [pocket-hole.md](pocket-hole.md) | — | Medium | Face frames, quick assemblies, tabletops |
 | Domino Joint | [domino-joint.md](domino-joint.md) | `domino` | High | Hidden structural connections, kick boards, shelf-to-back |
 | Mortise & Tenon | Inline in skill | `mortise_tenon` | Very High | Shelves, rails, stretchers |
