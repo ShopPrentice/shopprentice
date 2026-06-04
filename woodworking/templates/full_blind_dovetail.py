@@ -253,30 +253,34 @@ def corner(comp, thick_expr, joint_h_expr, len_a_expr, len_b_expr,
     P2 = mk_box(f"{name}_B_lip", xo, yo, f"{p}_lip", len_b_expr)
 
     # ── Inner through dovetail: tails on S1 → sockets in S2 ──
-    # Sketch the tail trapezoid on a plane at x = x_out + thick; flare across Y
-    # (wide at the recessed outer face y_out+lip, narrow at the inner face
-    # y_out+thick); JOIN it onto S1 and extrude -X (penetration = socket).
-    tail_pl = sp.off_plane(comp, comp.yZConstructionPlane,
-                           f"({xo}) + {thick_expr}", f"{name}_Tail_Pl")
-    xm = ev(f"({xo}) + {thick_expr}")
-    ylip = ev(f"({yo}) + {p}_lip")
-    yt = ev(f"({yo}) + {thick_expr}")
+    # The dovetail FLARE runs along X — the penetration into board_b / socket
+    # depth — so the fan shows on the board faces (a real dovetail), not on the
+    # end grain. Sketch the trapezoid on the X-Z plane at y = y_out + lip: WIDE
+    # at the socket bottom (board_b recessed outer face, x = x_out + lip), NARROW
+    # at the socket opening (board_b inner face, x = x_out + thick). Extrude +Y
+    # across board_a's inner slab (y_out+lip .. y_out+thick) and JOIN onto S1.
+    tail_pl = sp.off_plane(comp, comp.xZConstructionPlane,
+                           f"({yo}) + {p}_lip", f"{name}_Tail_Pl")
+    xlip = ev(f"({xo}) + {p}_lip")
+    xt = ev(f"({xo}) + {thick_expr}")
+    yl = ev(f"({yo}) + {p}_lip")
     z0t = ev(f"({z0_expr}) + {p}_pad + {p}_half_pin")
     tw = ev(f"{p}_tail_w")
     delta = ev(f"{p}_socket") * math.tan(ev(f"{p}_angle"))
 
-    m1 = Point3D.create(xm, ylip, z0t)              # wide-low  (recessed outer)
-    m2 = Point3D.create(xm, ylip, z0t + tw)         # wide-high
-    m3 = Point3D.create(xm, yt, z0t + tw - delta)   # narrow-high (inner face)
-    m4 = Point3D.create(xm, yt, z0t + delta)        # narrow-low
+    m1 = Point3D.create(xlip, yl, z0t)             # wide-low   (socket bottom, x=lip)
+    m2 = Point3D.create(xlip, yl, z0t + tw)        # wide-high
+    m3 = Point3D.create(xt, yl, z0t + tw - delta)  # narrow-high (socket opening, x=t)
+    m4 = Point3D.create(xt, yl, z0t + delta)       # narrow-low
     prof = _trapezoid_sketch(
         comp, tail_pl, m1, m2, m3, m4,
         thick_expr=f"{p}_socket",
         short_joint_expr=f"({z0_expr}) + {p}_pad + {p}_half_pin + {p}_socket * tan({p}_angle)",
-        short_base_expr=f"({yo}) + {thick_expr}",
+        short_base_expr=f"({xo}) + {thick_expr}",
         prefix=prefix, name=f"{name}_Tail")
+    ny = tail_pl.geometry.normal.y
     join = sp.ext_op(comp, prof, f"{p}_socket", JOIN, S1,
-                     f"{name}_TailJoin", flip=True)
+                     f"{name}_TailJoin", flip=(ny < 0))
     sp.feat_pattern(comp, join, comp.zConstructionAxis,
                     f"{p}_tail_count", f"{p}_pitch", f"{name}_TailPat")
     sp.combine(S2, S1, CUT, True, f"{name}_Sockets")
