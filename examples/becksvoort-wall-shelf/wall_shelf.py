@@ -471,9 +471,9 @@ def run(context):
         names = [c.bRepBodies.item(i).name for i in range(c.bRepBodies.count)]
         print(f"{cname}: {len(names)} bodies -> {names}")
 
-    # Appearance: cherry primary, pine secondary (drawer boxes), rosewood pulls.
-    # apply_appearance(species, bodies=<list of body NAME strings>)
-    sp.apply_appearance("cherry")
+    # Appearance: oak primary (light warm tan, not red), pine secondary (drawer
+    # boxes), rosewood pulls. apply_appearance(species, bodies=<NAME strings>)
+    sp.apply_appearance("oak")
     sp.apply_appearance("pine",
         ["td_Left", "td_Right", "td_Back", "td_Bottom",
          "bd_Left", "bd_Right", "bd_Back", "bd_Bottom",
