@@ -297,3 +297,51 @@ def run(context):
           "pegs:", pegs.bRepBodies.count)
     print("post vert edges filleted:", len(pedges),
           "shelf top edges:", len(top_edges), "shelf bottom edges:", n_bot)
+
+    # ============================================================
+    # PRESENTATION BACKDROP — wall behind the unit (product photos).
+    # Wall side is min-Y (shelf back edges at Y=0; posts mount to it).
+    # Centered on the unit in X; spans the post height in Z. The body is
+    # named WALL_back and excluded from validation via the WALL_ prefix.
+    # ============================================================
+    P3 = adsk.core.Point3D
+    INF = 1e12
+    _mn = [INF, INF, INF]
+    _mx = [-INF, -INF, -INF]
+    for _occ in root.allOccurrences:
+        for _i in range(_occ.component.bRepBodies.count):
+            _bb = _occ.component.bRepBodies.item(_i).boundingBox
+            for _k, _ax in enumerate("xyz"):
+                _mn[_k] = min(_mn[_k], getattr(_bb.minPoint, _ax))
+                _mx[_k] = max(_mx[_k], getattr(_bb.maxPoint, _ax))
+    _M = 2.54 * 10        # 10 in margin (X and Z)
+    _yb = _mn[1]          # back / wall side = min Y
+    wall_occ = sp.make_comp(root, "Backdrop")
+    wall_c = wall_occ.component
+    _wpl = sp.off_plane(wall_c, wall_c.xZConstructionPlane, f"{_yb} cm", "Wall_Pl")
+    _wsk = wall_c.sketches.add(_wpl)
+    _m2s = _wsk.modelToSketchSpace
+    _pts = [P3.create(_mn[0] - _M, _yb, _mn[2] - _M),
+            P3.create(_mx[0] + _M, _yb, _mn[2] - _M),
+            P3.create(_mx[0] + _M, _yb, _mx[2] + _M),
+            P3.create(_mn[0] - _M, _yb, _mx[2] + _M)]
+    _sps = [_m2s(p) for p in _pts]
+    _L = _wsk.sketchCurves.sketchLines
+    for _i in range(4):
+        _L.addByTwoPoints(_sps[_i], _sps[(_i + 1) % 4])
+    _ei = wall_c.features.extrudeFeatures.createInput(_wsk.profiles.item(0), NEW)
+    _ei.setDistanceExtent(False, VI("-3 in"))      # extrude behind (toward -Y)
+    wall_c.features.extrudeFeatures.add(_ei).bodies.item(0).name = "WALL_back"
+
+    # appearance + tidy up for product shots
+    sp.apply_appearance("white oak")
+    sp.apply_appearance("Concrete", ["WALL_back"])
+    for _c2 in (posts, shelves, pegs, wall_c):
+        for _s in _c2.sketches:
+            _s.isVisible = False
+        for _cp in _c2.constructionPlanes:
+            _cp.isLightBulbOn = False
+    cam = app.activeViewport.camera
+    cam.isFitView = True
+    app.activeViewport.camera = cam
+    print(">>> Backdrop wall added (centered on the unit)")

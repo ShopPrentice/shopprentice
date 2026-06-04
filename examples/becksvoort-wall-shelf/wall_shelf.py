@@ -423,17 +423,39 @@ def run(context):
     print(">>> Drawer pulls: 2 stones")
 
     # ==============================================================
-    #  PRESENTATION BACKDROP — a wall behind the piece, for product photos.
+    #  PRESENTATION BACKDROP — wall CENTERED behind the piece (product photos).
     #  Not part of the shelf; excluded from validation via the WALL_ prefix.
+    #  Built from the furniture bounding box so it stays centered on the piece.
     # ==============================================================
+    INF = 1e12
+    _mn = [INF, INF, INF]
+    _mx = [-INF, -INF, -INF]
+    for _occ in root.allOccurrences:
+        for _i in range(_occ.component.bRepBodies.count):
+            _bb = _occ.component.bRepBodies.item(_i).boundingBox
+            for _k, _ax in enumerate("xyz"):
+                _mn[_k] = min(_mn[_k], getattr(_bb.minPoint, _ax))
+                _mx[_k] = max(_mx[_k], getattr(_bb.maxPoint, _ax))
+    _M = 2.54 * 9          # 9 in margin all around the piece
+    _t = 2.54 * 3          # 3 in wall thickness
+    _yb = _mx[1]           # back / wall side (front faces are at Y=0)
     wall_occ = sp.make_comp(root, "Backdrop")
     wall_c = wall_occ.component
-    wall_pl = sp.off_plane(wall_c, wall_c.xZConstructionPlane, "part_d", "Wall_Pl")
-    _, wprof = sp.sketch_rect_model(wall_c, wall_pl,
-        ("-1 ft", "part_d", "-2 in"),
-        {"x": "shelf_l + 30 in", "z": "mount_h + upright_h + 8 in"}, "Wall_Sk", ev)
-    sp.ext_new(wall_c, wprof, "3 in", "WALL_back").bodies.item(0).name = "WALL_back"
-    print(">>> Backdrop wall added")
+    wall_pl = sp.off_plane(wall_c, wall_c.xZConstructionPlane, f"{_yb} cm", "Wall_Pl")
+    _wsk = wall_c.sketches.add(wall_pl)
+    _m2s = _wsk.modelToSketchSpace
+    _pts = [P3.create(_mn[0] - _M, _yb, _mn[2] - _M),
+            P3.create(_mx[0] + _M, _yb, _mn[2] - _M),
+            P3.create(_mx[0] + _M, _yb, _mx[2] + _M),
+            P3.create(_mn[0] - _M, _yb, _mx[2] + _M)]
+    _sps = [_m2s(p) for p in _pts]
+    _L = _wsk.sketchCurves.sketchLines
+    for _i in range(4):
+        _L.addByTwoPoints(_sps[_i], _sps[(_i + 1) % 4])
+    _ei = wall_c.features.extrudeFeatures.createInput(_wsk.profiles.item(0), NEW)
+    _ei.setDistanceExtent(False, VI(f"{_t} cm"))
+    wall_c.features.extrudeFeatures.add(_ei).bodies.item(0).name = "WALL_back"
+    print(">>> Backdrop wall added (centered on the piece)")
 
     # ==============================================================
     #  EPILOGUE

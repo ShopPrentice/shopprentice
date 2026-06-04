@@ -1,7 +1,8 @@
 # Modular Wall Shelf System
 
-Parametric model of the **Modular Shelf System** by Charlie Peterson (Fine Woodworking,
-Jan/Feb 2025) — an adjustable, knock-down wall unit. Hardwood posts carry the load to
+Inspired by the **Modular Shelf System** by Charlie Peterson (*Fine Woodworking*,
+Jan/Feb 2025) — an interpretation, not an exact reproduction. An adjustable, knock-down
+wall unit. Hardwood posts carry the load to
 the floor, staggered shelves slide over the posts through square through-mortises, and
 thick dowel pegs set in trios of holes hold each shelf at its height.
 
@@ -79,7 +80,13 @@ width/length presets.
 - Hidden steel wall angle-brackets (out of sight in the original).
 - Hand-planed peg facets (a cosmetic hand-tool detail).
 
+## Presentation backdrop
+The build script adds a **concrete backdrop wall** (`WALL_back`) sized off the
+furniture bounding box and centered behind the unit, so the product shots read as a
+wall-hung installation. It's a separate `Backdrop` component, excluded from validation
+by its `WALL_` prefix.
+
 ## Files
 - `modular_wall_shelf.py` — parametric build script (run via `execute_script`, clean rebuild).
 - `model.json` — dependency tree.
-- `product_*.png` — rendered product shots.
+- `product_*.png` — rendered product shots (with the centered backdrop wall).
