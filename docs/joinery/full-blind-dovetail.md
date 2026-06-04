@@ -69,16 +69,17 @@ Tails repeat along **Z** (the joint height); penetration is along **X**.
 | `fbd_tail_w` | `"0.5 in"` | in | Tail width at the wide (recessed-outer) face |
 | `fbd_tail_count` | `"3"` | "" | Number of tails |
 | `fbd_lip` | `"board_thick / 3"` | in | **Mitered outer-lip thickness = the recess depth** |
+| `fbd_pad` | `"0 in"` | in | **End-miter width at each joint end** (see below) |
 
 ### Derived
 
 | Parameter | Expression | Description |
 |-----------|------------|-------------|
 | `fbd_socket` | `board_thick - fbd_lip` | inner-slab depth = tail penetration |
-| `fbd_pitch` | `joint_h / fbd_tail_count` | tail center-to-center |
+| `fbd_pitch` | `(joint_h - 2 * fbd_pad) / fbd_tail_count` | tail center-to-center over the dovetail field |
 | `fbd_pin_w` | `fbd_pitch - fbd_tail_w` | inner pin width |
 | `fbd_narrow_w` | `fbd_tail_w - 2 * fbd_socket * tan(fbd_angle)` | tail width at the narrow (inner) end |
-| `fbd_half_pin` | `fbd_pin_w / 2` | half-pin at the edges |
+| `fbd_half_pin` | `fbd_pin_w / 2` | half-pin between the end miter and the first tail |
 
 ## Proportions & defaults
 
@@ -96,6 +97,23 @@ parameter is the **lip**:
 Validate `fbd_pin_w > 0` (tails fit) and `fbd_narrow_w > 0` (tails don't over-taper) — the
 template raises a clear `ValueError` if either fails.
 
+**`fbd_pad`** — end-miter width at each end of the joint along the height (Z):
+- With `pad = 0` (default) the dovetail field runs the full height with half-pins at the
+  top and bottom edges — so the joint, while hidden from the two outer faces, **shows the
+  dovetail on the top/bottom edges**.
+- With `pad > 0` the dovetail field shrinks to `joint_h − 2·pad` and the two end zones
+  (`z ∈ [0, pad]` and `[joint_h − pad, joint_h]`) become a **full-thickness 45° miter**.
+  The dovetail is then enclosed by miters on **all four edges** (two faces + two ends) —
+  a *truly* fully-blind joint, invisible from every direction. Use this when the
+  top/bottom edges of the corner are exposed (e.g. an open-top tray, a plinth, a case with
+  no separate top/bottom panel hiding the edge).
+- Typical: a pad roughly equal to one pin width, or whatever leaves a tidy half-pin
+  (`fbd_half_pin`) between the end miter and the first tail. Keep `joint_h − 2·pad` large
+  enough for the requested `fbd_tail_count` (the `fbd_pin_w > 0` check still guards this).
+
+A half-pin of pin-board material sits between each end miter and the nearest tail, so the
+layout reads: `miter | half-pin | tail | pin | … | tail | half-pin | miter`.
+
 ## Template
 
 ```python
@@ -104,7 +122,8 @@ from woodworking.templates import full_blind_dovetail as fbd
 fbd.define_params(params, prefix="fbd",
     angle="10 deg", tail_w="0.5 in", tail_count="3",
     joint_h_expr="board_h", thick_expr="board_thick",
-    lip="board_thick / 3")
+    lip="board_thick / 3",
+    pad="0.4 in")          # > 0 → end zones become full-thickness miters
 
 res = fbd.corner(comp,
     thick_expr="board_thick", joint_h_expr="board_h",
@@ -122,10 +141,12 @@ joint** at one corner and returns them. Place the corner with `x_out_expr` / `y_
 ### What the template does
 
 1. Four boxes — each board's inner slab + outer lip.
-2. Through dovetail between the inner slabs: trapezoid → JOIN tails onto slab A →
-   feature-pattern along Z → CUT sockets into slab B.
-3. 45° miter both outer lips at the corner (parametric triangular CUT tools).
-4. JOIN each lip back onto its slab → two finished boards.
+2. Through dovetail between the inner slabs over `z ∈ [pad, joint_h − pad]`: trapezoid →
+   JOIN tails onto slab A → feature-pattern along Z → CUT sockets into slab B.
+3. **Pad zones** (when `pad > 0`): full-thickness 45° miter at each end — give board_a the
+   `{x ≥ y}` inner half (JOIN) and take it from board_b (CUT).
+4. 45° miter both outer lips over the full height (parametric triangular CUT tools).
+5. JOIN each lip back onto its slab → two finished boards.
 
 ## Validation
 
@@ -134,10 +155,12 @@ A correct full-blind dovetail should show:
 - **1 connected cluster** (the boards meet over the dovetail + miter faces — a large
   planar contact area).
 - From the outside (either face): only a 45° miter line, no dovetail.
-- Exploded or in section: the tails/sockets behind the lips.
+- With `pad > 0`: the top/bottom edges also show only a miter (no dovetail).
+- Exploded or in section: the tails/sockets in the middle, bounded by solid mitered end
+  zones, all behind the lips.
 
-Verified end-to-end and across parameter changes (thickness, height, tail count) at 0
-interference / 1 cluster.
+Verified end-to-end and across parameter changes (thickness, height, tail count, **pad**)
+at 0 interference / 1 cluster.
 
 ## Pitfalls
 
