@@ -49,47 +49,47 @@ The agent can also work from images — show it a photo or sketch of a piece and
 
 <table>
 <tr>
-<td align="center"><a href="examples/jewelry-chest/"><img src="examples/jewelry-chest/product_iso.png" width="200" /><br /><b>Jewelry Chest</b></a></td>
-<td align="center"><a href="examples/mcm-desk/"><img src="examples/mcm-desk/assets/rendered_model.png" width="200" /><br /><b>MCM Teak Desk</b></a></td>
-<td align="center"><a href="examples/esherick-stool/"><img src="examples/esherick-stool/iso-top-right.png" width="200" /><br /><b>Esherick Stool</b></a></td>
+<td align="center"><a href="examples/jewelry-chest/"><img src="examples/jewelry-chest/product_iso.png" width="220" /><br /><b>Jewelry Chest</b></a></td>
+<td align="center"><a href="examples/mcm-desk/"><img src="examples/mcm-desk/assets/rendered_model.png" width="220" /><br /><b>MCM Teak Desk</b></a></td>
+<td align="center"><a href="examples/esherick-stool/"><img src="examples/esherick-stool/iso-top-right.png" width="220" /><br /><b>Esherick Stool</b></a></td>
 </tr>
 <tr>
-<td align="center"><a href="examples/roubo_workbench/"><img src="examples/roubo_workbench/screenshots/front.png" width="200" /><br /><b>Roubo Workbench</b></a></td>
-<td align="center"><a href="examples/tv-console/"><img src="examples/tv-console/screenshots/iso-top-left.png" width="200" /><br /><b>TV Console</b></a></td>
-<td align="center"><a href="examples/stool-rebuild/"><img src="examples/stool-rebuild/screenshots/iso-top-right.png" width="200" /><br /><b>Step Stool</b></a></td>
+<td align="center"><a href="examples/roubo_workbench/"><img src="examples/roubo_workbench/screenshots/front.png" width="220" /><br /><b>Roubo Workbench</b></a></td>
+<td align="center"><a href="examples/tv-console/"><img src="examples/tv-console/screenshots/iso-top-left.png" width="220" /><br /><b>TV Console</b></a></td>
+<td align="center"><a href="examples/stool-rebuild/"><img src="examples/stool-rebuild/screenshots/iso-top-right.png" width="220" /><br /><b>Step Stool</b></a></td>
 </tr>
 <tr>
-<td align="center"><a href="examples/windsor-chair/"><img src="examples/windsor-chair/iso.png" width="200" /><br /><b>Windsor Chair</b></a></td>
-<td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/twin-live-edge-slab.png" width="200" /><br /><b>Twin Bed (Live Edge)</b></a></td>
-<td align="center"><a href="examples/loft-bunk-bed/"><img src="examples/loft-bunk-bed/screenshots/iso-top-right.png" width="200" /><br /><b>Loft Bunk Bed</b></a></td>
+<td align="center"><a href="examples/windsor-chair/"><img src="examples/windsor-chair/iso.png" width="220" /><br /><b>Windsor Chair</b></a></td>
+<td align="center"><a href="examples/bed-frame/"><img src="examples/bed-frame/screenshots/twin-live-edge-slab.png" width="220" /><br /><b>Twin Bed (Live Edge)</b></a></td>
+<td align="center"><a href="examples/loft-bunk-bed/"><img src="examples/loft-bunk-bed/screenshots/iso-top-right.png" width="220" /><br /><b>Loft Bunk Bed</b></a></td>
 </tr>
 <tr>
-<td align="center"><a href="examples/crib/"><img src="examples/crib/screenshots/iso-top-right.png" width="200" /><br /><b>Crib</b></a></td>
-<td align="center"><a href="examples/rachels-table/"><img src="examples/rachels-table/screenshots/iso-top-right.png" width="200" /><br /><b>Rachel's Table</b></a></td>
-<td align="center"><a href="examples/bookshelf/"><img src="examples/bookshelf/screenshots/iso-top-right.png" width="200" /><br /><b>Bookshelf</b></a></td>
+<td align="center"><a href="examples/crib/"><img src="examples/crib/screenshots/iso-top-right.png" width="220" /><br /><b>Crib</b></a></td>
+<td align="center"><a href="examples/rachels-table/"><img src="examples/rachels-table/screenshots/iso-top-right.png" width="220" /><br /><b>Rachel's Table</b></a></td>
+<td align="center"><a href="examples/bookshelf/"><img src="examples/bookshelf/screenshots/iso-top-right.png" width="220" /><br /><b>Bookshelf</b></a></td>
 </tr>
 <tr>
-<td align="center"><a href="examples/shaker-nightstand/"><img src="examples/shaker-nightstand/screenshots/iso-top-right.png" width="200" /><br /><b>Shaker Nightstand</b></a></td>
-<td align="center"><a href="examples/wrap-box/"><img src="examples/wrap-box/screenshots/iso-top-right.png" width="200" /><br /><b>Wrap Box</b></a></td>
-<td align="center"><a href="examples/pencil-box/"><img src="examples/pencil-box/screenshots/iso-top-right.png" width="200" /><br /><b>Pencil Box</b></a></td>
+<td align="center"><a href="examples/shaker-nightstand/"><img src="examples/shaker-nightstand/screenshots/iso-top-right.png" width="220" /><br /><b>Shaker Nightstand</b></a></td>
+<td align="center"><a href="examples/wrap-box/"><img src="examples/wrap-box/screenshots/iso-top-right.png" width="220" /><br /><b>Wrap Box</b></a></td>
+<td align="center"><a href="examples/pencil-box/"><img src="examples/pencil-box/screenshots/iso-top-right.png" width="220" /><br /><b>Pencil Box</b></a></td>
 </tr>
 <tr>
-<td align="center"><a href="examples/wood-planter/"><img src="examples/wood-planter/screenshots/iso-top-right.png" width="200" /><br /><b>Wood Planter</b></a></td>
-<td align="center"><a href="examples/pergola-rebuild/"><img src="examples/pergola-rebuild/screenshots/overview.png" width="200" /><br /><b>Pergola + Deck</b></a></td>
-<td align="center"><a href="examples/dresser/"><img src="examples/dresser/screenshots/iso-top-right.png" width="200" /><br /><b>Dresser</b></a></td>
+<td align="center"><a href="examples/wood-planter/"><img src="examples/wood-planter/screenshots/iso-top-right.png" width="220" /><br /><b>Wood Planter</b></a></td>
+<td align="center"><a href="examples/pergola-rebuild/"><img src="examples/pergola-rebuild/screenshots/overview.png" width="220" /><br /><b>Pergola + Deck</b></a></td>
+<td align="center"><a href="examples/dresser/"><img src="examples/dresser/screenshots/iso-top-right.png" width="220" /><br /><b>Dresser</b></a></td>
 </tr>
 <tr>
-<td align="center"><a href="examples/chair/"><img src="examples/chair/screenshots/iso-top-right.png" width="200" /><br /><b>Dining Chair</b></a></td>
-<td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="200" /><br /><b>Desk</b></a></td>
-<td align="center"><a href="examples/trestle-table/"><img src="examples/trestle-table/screenshots/iso-top-right.png" width="200" /><br /><b>Trestle Table</b></a></td>
+<td align="center"><a href="examples/chair/"><img src="examples/chair/screenshots/iso-top-right.png" width="220" /><br /><b>Dining Chair</b></a></td>
+<td align="center"><a href="examples/desk/"><img src="examples/desk/screenshots/iso-top-right.png" width="220" /><br /><b>Desk</b></a></td>
+<td align="center"><a href="examples/trestle-table/"><img src="examples/trestle-table/screenshots/iso-top-right.png" width="220" /><br /><b>Trestle Table</b></a></td>
 </tr>
 <tr>
-<td align="center"><a href="examples/moravian-workbench/"><img src="examples/moravian-workbench/screenshots/iso-top-left.png" width="200" /><br /><b>Moravian Workbench</b></a></td>
-<td align="center"><a href="examples/gochnour-sideboard/"><img src="examples/gochnour-sideboard/screenshots/iso-top-right.png" width="200" /><br /><b>Gochnour Sideboard</b></a></td>
-<td align="center"><a href="examples/modular-wall-shelf/"><img src="examples/modular-wall-shelf/product_iso.png" width="200" /><br /><b>Modular Wall Shelf</b></a></td>
+<td align="center"><a href="examples/moravian-workbench/"><img src="examples/moravian-workbench/screenshots/iso-top-left.png" width="220" /><br /><b>Moravian Workbench</b></a></td>
+<td align="center"><a href="examples/gochnour-sideboard/"><img src="examples/gochnour-sideboard/screenshots/iso-top-right.png" width="220" /><br /><b>Gochnour Sideboard</b></a></td>
+<td align="center"><a href="examples/modular-wall-shelf/"><img src="examples/modular-wall-shelf/product_iso.png" width="220" /><br /><b>Modular Wall Shelf</b></a></td>
 </tr>
 <tr>
-<td align="center"><a href="examples/becksvoort-wall-shelf/"><img src="examples/becksvoort-wall-shelf/screenshots/iso-top-right.png" width="200" /><br /><b>Becksvoort Wall Shelf</b></a></td>
+<td align="center"><a href="examples/becksvoort-wall-shelf/"><img src="examples/becksvoort-wall-shelf/screenshots/iso-top-right.png" width="220" /><br /><b>Becksvoort Wall Shelf</b></a></td>
 </tr>
 </table>
 
