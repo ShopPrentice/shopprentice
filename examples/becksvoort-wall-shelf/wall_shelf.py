@@ -8,7 +8,7 @@ shelves joined with dadoed cross-laps, plus two suspended drawers.
 Coordinate system:
   X = length   (wall runs left->right)
   Y = depth    (Y=0 FRONT / viewer side, Y=part_d back / wall side)
-  Z = height   (Z=0 bottom of uprights)
+  Z = height   (Z=0 floor; the piece is wall-mounted, uprights start at mount_h)
 
 Layout (drawing p.32):
   Uprights : 3/4" x 8.5" x 15", centers at X = 6" and 39" (33" on center)
@@ -63,6 +63,7 @@ def run(context):
         ("side_t", "0.4375 in", "in"), ("bottom_t", "0.125 in", "in"),
         ("topdr_h", "2.4375 in", "in"), ("botdr_h", "3.4375 in", "in"),
         ("slot_w", "0.5 in", "in"),          # shelf front slot width (rides tongue)
+        ("mount_h", "24 in", "in"),          # floor -> bottom of uprights (wall-mounted)
     ]
     for n, e, u in USER:
         if not params.itemByName(n):
@@ -72,7 +73,8 @@ def run(context):
         ("clr", "0.0625 in", "in"),                   # running clearance (drawer gaps)
         ("half_d", "part_d / 2", "in"), ("lup_cx", "bot_inset", "in"),
         ("rup_cx", "lup_cx + up_spacing", "in"), ("xmid", "(lup_cx + rup_cx) / 2", "in"),
-        ("bot_z", "up_below", "in"), ("top_z", "up_below + board_t + shelf_gap", "in"),
+        ("bot_z", "mount_h + up_below", "in"),
+        ("top_z", "mount_h + up_below + board_t + shelf_gap", "in"),
         ("top_x0", "lup_cx - top_inset", "in"), ("bot_x0", "lup_cx - bot_inset", "in"),
         ("dado_d", "(board_t - slot_w) / 2", "in"),   # upright dado depth = 1/8
         ("ch_rise", "board_t * 3 / 4", "in"),         # end chamfer: 3/4 of board width
@@ -173,7 +175,7 @@ def run(context):
     upl_pl = sp.off_plane(up_c, up_c.yZConstructionPlane,
                           "lup_cx - board_t / 2", "UpL_Pl")
     _, pr = sp.sketch_rect_model(up_c, upl_pl,
-        ("lup_cx - board_t / 2", "0 in", "0 in"),
+        ("lup_cx - board_t / 2", "0 in", "mount_h"),
         {"y": "part_d", "z": "upright_h"}, "UpL_Sk", ev)
     upl = sp.ext_new(up_c, pr, "board_t", "UprightL").bodies.item(0)
     upl.name = "upright_L"
@@ -357,16 +359,17 @@ def run(context):
     # upright ends — chamfer the INNER edge (top & bottom), full depth (axis Y).
     # rise (0.5) across the thin top face in X; run (1.5) down the inner face in Z.
     bt = ev("board_t")
-    uh = ev("upright_h")
+    uz0 = ev("mount_h")                    # upright bottom (off the floor)
+    uz1 = ev("mount_h + upright_h")        # upright top
     for upb, cxp, side in [(upl, "lup_cx", +1), (upr, "rup_cx", -1)]:
         x_in = ev(cxp) + side * bt / 2     # inner face X (+1 inner=+X, -1 inner=-X)
         s = -side                          # rake across the top toward the OUTER side
         wedge_cut(up_c, upb, "ChUp" + cxp + "Top", "y", "0 in",
-                  [P3.create(x_in, 0, uh), P3.create(x_in + s * rise, 0, uh),
-                   P3.create(x_in, 0, uh - run)])
+                  [P3.create(x_in, 0, uz1), P3.create(x_in + s * rise, 0, uz1),
+                   P3.create(x_in, 0, uz1 - run)])
         wedge_cut(up_c, upb, "ChUp" + cxp + "Bot", "y", "0 in",
-                  [P3.create(x_in, 0, 0), P3.create(x_in + s * rise, 0, 0),
-                   P3.create(x_in, 0, run)])
+                  [P3.create(x_in, 0, uz0), P3.create(x_in + s * rise, 0, uz0),
+                   P3.create(x_in, 0, uz0 + run)])
     print(">>> End chamfers: 4 shelf + 4 upright wedge cuts")
 
     # ==============================================================
@@ -428,7 +431,7 @@ def run(context):
     wall_pl = sp.off_plane(wall_c, wall_c.xZConstructionPlane, "part_d", "Wall_Pl")
     _, wprof = sp.sketch_rect_model(wall_c, wall_pl,
         ("-1 ft", "part_d", "-2 in"),
-        {"x": "shelf_l + 30 in", "z": "upright_h + 22 in"}, "Wall_Sk", ev)
+        {"x": "shelf_l + 30 in", "z": "mount_h + upright_h + 8 in"}, "Wall_Sk", ev)
     sp.ext_new(wall_c, wprof, "3 in", "WALL_back").bodies.item(0).name = "WALL_back"
     print(">>> Backdrop wall added")
 
