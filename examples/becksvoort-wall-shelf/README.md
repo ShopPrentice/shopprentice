@@ -26,8 +26,9 @@ pulls.
 **Script:** [`wall_shelf.py`](wall_shelf.py) — 20 furniture bodies (2 uprights, 2 shelves, 2
 dovetailed drawers of 5 boards each + 2 runners, 2 cleats, 2 pulls), plus a presentation
 **backdrop wall** (`WALL_back`, excluded from validation) so the product photos show the piece
-mounted. Uses the `dovetailed_drawer` template; everything else is dimension-driven boxes,
-mirrors, and combine cuts.
+wall-mounted. The whole assembly is lifted off the floor by `mount_h` (default 24") since it's
+a wall-hung shelf. Uses the `dovetailed_drawer` template; everything else is dimension-driven
+boxes, mirrors, and combine cuts.
 
 Coordinate system: X = length, **Y = depth (Y=0 front / viewer side)**, Z = height.
 
