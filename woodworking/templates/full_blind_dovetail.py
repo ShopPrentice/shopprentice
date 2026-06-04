@@ -107,7 +107,8 @@ METADATA = {
 
 def define_params(params, prefix="fbd", angle="10 deg", tail_w="0.5 in",
                   tail_count="3", joint_h_expr="board_h",
-                  thick_expr="board_thick", lip="board_thick / 3"):
+                  thick_expr="board_thick", lip="board_thick / 3",
+                  pad="0 in"):
     """Define all full-blind dovetail parameters with derivations.
 
     Args:
@@ -119,6 +120,13 @@ def define_params(params, prefix="fbd", angle="10 deg", tail_w="0.5 in",
         joint_h_expr: Joint height (tail distribution axis = Z).
         thick_expr: Board thickness.
         lip: Mitered outer-lip thickness (recess depth). Default thick/3.
+        pad: End-miter width at each end of the joint along Z. With pad > 0
+            the dovetail field shrinks to ``joint_h - 2*pad`` and the two end
+            zones (``z in [0, pad]`` and ``[joint_h - pad, joint_h]``) become
+            a FULL-thickness 45° miter — so the dovetail is hidden from the
+            top/bottom edges too (fully blind on all four sides). Default
+            "0 in" leaves the dovetail running to the ends (half-pin edges,
+            visible from the top/bottom edge).
 
     Returns:
         Dict of parameter name strings.
@@ -130,22 +138,25 @@ def define_params(params, prefix="fbd", angle="10 deg", tail_w="0.5 in",
     params.add(f"{p}_tail_w", VI(tail_w), "in", "Tail width at wide face")
     params.add(f"{p}_tail_count", VI(tail_count), "", "Number of tails")
     params.add(f"{p}_lip", VI(lip), "in", "Mitered outer-lip thickness (recess)")
+    params.add(f"{p}_pad", VI(pad), "in",
+               "End-miter width at each joint end (full-thickness miter zone)")
 
     params.add(f"{p}_socket", VI(f"{thick_expr} - {p}_lip"),
                "in", "Inner-slab depth / tail penetration (derived)")
-    params.add(f"{p}_pitch", VI(f"({joint_h_expr}) / {p}_tail_count"),
-               "in", "Tail pitch (derived)")
+    params.add(f"{p}_pitch",
+               VI(f"(({joint_h_expr}) - 2 * {p}_pad) / {p}_tail_count"),
+               "in", "Tail pitch over the dovetail field (derived)")
     params.add(f"{p}_pin_w", VI(f"{p}_pitch - {p}_tail_w"),
                "in", "Inner pin width (derived)")
     params.add(f"{p}_narrow_w",
                VI(f"{p}_tail_w - 2 * {p}_socket * tan({p}_angle)"),
                "in", "Narrow face width (derived)")
     params.add(f"{p}_half_pin", VI(f"{p}_pin_w / 2"),
-               "in", "Half-pin at edges (derived)")
+               "in", "Half-pin between the end miter and the first tail (derived)")
 
     return {
         "angle": f"{p}_angle", "tail_w": f"{p}_tail_w",
-        "tail_count": f"{p}_tail_count", "lip": f"{p}_lip",
+        "tail_count": f"{p}_tail_count", "lip": f"{p}_lip", "pad": f"{p}_pad",
         "socket": f"{p}_socket", "pitch": f"{p}_pitch",
         "pin_w": f"{p}_pin_w", "narrow_w": f"{p}_narrow_w",
         "half_pin": f"{p}_half_pin",
@@ -165,10 +176,18 @@ def corner(comp, thick_expr, joint_h_expr, len_a_expr, len_b_expr,
 
     Topology:
       1. Four boxes: each board's inner slab + outer lip.
-      2. Through dovetail between the inner slabs (trapezoid → JOIN tails
-         onto slab A → feature-pattern along Z → CUT sockets into slab B).
-      3. 45° miter both outer lips at the corner (triangular CUT tools).
-      4. JOIN each lip back onto its slab → two finished boards.
+      2. Through dovetail between the inner slabs over the field z in
+         [pad, joint_h - pad] (trapezoid → JOIN tails onto slab A →
+         feature-pattern along Z → CUT sockets into slab B).
+      3. Pad zones (when ``{prefix}_pad`` > 0): full-thickness 45° miter at
+         each joint end so the dovetail is hidden from the top/bottom edges
+         too — give board_a the {x>=y} inner half, take it from board_b.
+      4. 45° miter both outer lips over the full height (triangular CUT tools).
+      5. JOIN each lip back onto its slab → two finished boards.
+
+    With ``pad`` > 0 the dovetail field is fully enclosed by miters on all four
+    edges (two faces + two ends) — a true fully-blind joint. ``pad`` = 0 leaves
+    half-pin edges at the ends (dovetail visible from the top/bottom edge).
 
     Args:
         comp: Component to build in.
@@ -242,7 +261,7 @@ def corner(comp, thick_expr, joint_h_expr, len_a_expr, len_b_expr,
     xm = ev(f"({xo}) + {thick_expr}")
     ylip = ev(f"({yo}) + {p}_lip")
     yt = ev(f"({yo}) + {thick_expr}")
-    z0t = ev(f"({z0_expr}) + {p}_half_pin")
+    z0t = ev(f"({z0_expr}) + {p}_pad + {p}_half_pin")
     tw = ev(f"{p}_tail_w")
     delta = ev(f"{p}_socket") * math.tan(ev(f"{p}_angle"))
 
@@ -253,7 +272,7 @@ def corner(comp, thick_expr, joint_h_expr, len_a_expr, len_b_expr,
     prof = _trapezoid_sketch(
         comp, tail_pl, m1, m2, m3, m4,
         thick_expr=f"{p}_socket",
-        short_joint_expr=f"({z0_expr}) + {p}_half_pin + {p}_socket * tan({p}_angle)",
+        short_joint_expr=f"({z0_expr}) + {p}_pad + {p}_half_pin + {p}_socket * tan({p}_angle)",
         short_base_expr=f"({yo}) + {thick_expr}",
         prefix=prefix, name=f"{name}_Tail")
     join = sp.ext_op(comp, prof, f"{p}_socket", JOIN, S1,
@@ -262,50 +281,71 @@ def corner(comp, thick_expr, joint_h_expr, len_a_expr, len_b_expr,
                     f"{p}_tail_count", f"{p}_pitch", f"{name}_TailPat")
     sp.combine(S2, S1, CUT, True, f"{name}_Sockets")
 
-    # ── Miter the two outer lips at 45° in the corner [x_out, x_out+lip]^2 ──
-    # Parametric right-isoceles triangle: right-angle vertex at (vx,vy), legs of
-    # length `lip` along d1/d2. Fully dimensioned so it recomputes on param change.
-    zc = ev(z0_expr)
-
-    def tri_tool(nm, vx_expr, vy_expr, d1, d2):
-        sk = comp.sketches.add(base_pl)
+    # ── Miter tooling ──
+    # Parametric right-isoceles triangular prism: right-angle vertex at (vx,vy),
+    # legs of length `leg_expr` along d1/d2, extruded over z in [z0+z_off, +h].
+    # Fully dimensioned so it recomputes on parameter change.
+    def tri_tool(nm, vx_expr, vy_expr, d1, d2, leg_expr,
+                 z_off_expr="0 in", h_expr=None):
+        if h_expr is None:
+            h_expr = joint_h_expr
+        plane = (base_pl if z_off_expr == "0 in"
+                 else sp.off_plane(comp, base_pl, z_off_expr, f"{nm}_Pl"))
+        zloc = ev(f"({z0_expr}) + ({z_off_expr})")
+        leg = ev(leg_expr)
+        sk = comp.sketches.add(plane)
         gc = sk.geometricConstraints
         d = sk.sketchDimensions
         vx, vy = ev(vx_expr), ev(vy_expr)
-        Vs = sk.modelToSketchSpace(Point3D.create(vx, vy, zc))
-        As = sk.modelToSketchSpace(Point3D.create(vx + d1[0] * lip, vy + d1[1] * lip, zc))
-        Bs = sk.modelToSketchSpace(Point3D.create(vx + d2[0] * lip, vy + d2[1] * lip, zc))
+        Vs = sk.modelToSketchSpace(Point3D.create(vx, vy, zloc))
+        As = sk.modelToSketchSpace(Point3D.create(vx + d1[0] * leg, vy + d1[1] * leg, zloc))
+        Bs = sk.modelToSketchSpace(Point3D.create(vx + d2[0] * leg, vy + d2[1] * leg, zloc))
         ls = sk.sketchCurves.sketchLines
         la = ls.addByTwoPoints(Point3D.create(Vs.x, Vs.y, 0), Point3D.create(As.x, As.y, 0))
         lb = ls.addByTwoPoints(la.startSketchPoint, Point3D.create(Bs.x, Bs.y, 0))
         ls.addByTwoPoints(la.endSketchPoint, lb.endSketchPoint)  # hypotenuse
-        orient = sp.probe_orientations(sk, vx, vy, zc)
-        # legs are axis-aligned: horizontal if along model X, vertical if along Y
+        orient = sp.probe_orientations(sk, vx, vy, zloc)
         (gc.addHorizontal if d1[0] != 0 else gc.addVertical)(la)
         (gc.addHorizontal if d2[0] != 0 else gc.addVertical)(lb)
         d.addDistanceDimension(la.startSketchPoint, la.endSketchPoint,
                                orient['x'] if d1[0] != 0 else orient['y'],
-                               Point3D.create(As.x, As.y, 0)).parameter.expression = f"{p}_lip"
+                               Point3D.create(As.x, As.y, 0)).parameter.expression = leg_expr
         d.addDistanceDimension(lb.startSketchPoint, lb.endSketchPoint,
                                orient['x'] if d2[0] != 0 else orient['y'],
-                               Point3D.create(Bs.x, Bs.y, 0)).parameter.expression = f"{p}_lip"
-        # position the vertex from the origin (generator/root geometry)
+                               Point3D.create(Bs.x, Bs.y, 0)).parameter.expression = leg_expr
         d.addDistanceDimension(sk.originPoint, la.startSketchPoint, orient['x'],
                                Point3D.create(Vs.x, Vs.y - 1, 0)).parameter.expression = vx_expr
         d.addDistanceDimension(sk.originPoint, la.startSketchPoint, orient['y'],
                                Point3D.create(Vs.x - 1, Vs.y, 0)).parameter.expression = vy_expr
         prof2 = sp.smallest_profile(sk)
-        body = sp.ext_new(comp, prof2, joint_h_expr, nm).bodies.item(0)
+        body = sp.ext_new(comp, prof2, h_expr, nm).bodies.item(0)
         body.name = nm
         return body
 
+    # ── Pad zones: full-thickness 45° miter at each joint end (fully blind from
+    # the top/bottom edges too). Extend the x=y miter into the inner region over
+    # z in [0, pad] and [joint_h - pad, joint_h]: give board_a the {x>=y} half
+    # (JOIN) and take it from board_b (CUT). Skipped when pad == 0. ──
+    if ev(f"{p}_pad") > 1e-7:
+        # I ∩ {x>=y}: right-angle vertex at (x_out+thick, y_out+lip),
+        # legs +Y and -X of length `socket`.
+        for tag, zoff in (("Bot", "0 in"),
+                          ("Top", f"({joint_h_expr}) - {p}_pad")):
+            pm = tri_tool(f"{name}_PadMiter{tag}",
+                          f"({xo}) + {thick_expr}", f"({yo}) + {p}_lip",
+                          (0, 1), (-1, 0), f"{p}_socket",
+                          z_off_expr=zoff, h_expr=f"{p}_pad")
+            sp.combine(S2, pm, CUT, True, f"{name}_PadCut{tag}")   # take board_b's half
+            sp.combine(S1, pm, JOIN, False, f"{name}_PadJoin{tag}")  # give to board_a
+
+    # ── Miter the two outer lips at 45° over the FULL height ──
     # P1 lip (board_a, outer face y_out): remove the x<y triangle → keeps x>=y.
-    # Right-angle vertex at (x_out, y_out+lip); legs down (-Y) and right (+X).
-    t1 = tri_tool(f"{name}_MiterToolA", xo, f"({yo}) + {p}_lip", (0, -1), (1, 0))
+    t1 = tri_tool(f"{name}_MiterToolA", xo, f"({yo}) + {p}_lip", (0, -1), (1, 0),
+                  f"{p}_lip")
     sp.combine(P1, t1, CUT, False, f"{name}_MiterA")
     # P2 lip (board_b, outer face x_out): remove the x>y triangle → keeps y>=x.
-    # Right-angle vertex at (x_out+lip, y_out); legs left (-X) and up (+Y).
-    t2 = tri_tool(f"{name}_MiterToolB", f"({xo}) + {p}_lip", yo, (-1, 0), (0, 1))
+    t2 = tri_tool(f"{name}_MiterToolB", f"({xo}) + {p}_lip", yo, (-1, 0), (0, 1),
+                  f"{p}_lip")
     sp.combine(P2, t2, CUT, False, f"{name}_MiterB")
 
     # ── JOIN each lip back onto its slab ──
