@@ -4,8 +4,8 @@ Inspired by Christian Becksvoort's "Modern Wall Shelf" (*Fine Woodworking* #284)
 interpretation, not an exact reproduction. An asymmetric
 Shaker wall shelf, **~45"W × 8.5"D × 15"H**. Two vertical uprights and two long, unaligned
 shelves interlock with **dadoed cross-laps**, and two **suspended dovetailed drawers** hang
-on hidden cleats below the top shelf. Built in cherry with pine drawer boxes and rosewood
-pulls.
+on hidden cleats below the top shelf. Built in oak with pine drawer boxes and rosewood
+pulls. The product shots show the drawers slid open to reveal the dovetails.
 
 ![Becksvoort Wall Shelf — iso top-right](screenshots/iso-top-right.png)
 
@@ -51,12 +51,12 @@ Coordinate system: X = length, **Y = depth (Y=0 front / viewer side)**, Z = heig
     matching bevels hook under it (a sliding-dovetail guide). A **central notch** in the
     back's bottom clears the cleat as the drawer slides.
 - **Dovetailed drawers** via the `dovetailed_drawer` template — half-blind dovetails at the
-  cherry front (hidden), through dovetails at the pine back. Bottom panels are trimmed to
+  oak front (hidden), through dovetails at the pine back. Bottom panels are trimmed to
   notch cleanly around the tails.
 - **Chamfered ends** cut with explicit wedge tools (deterministic 45° angle, sized to 3/4
   of the board): shelf ends raked on the bottom, upright top/bottom ends raked on the
   **inner** edge so they taper toward the centre.
-- **Materials** — cherry primary (case + drawer fronts), pine secondary (drawer
+- **Materials** — oak primary (case + drawer fronts), pine secondary (drawer
   boxes/runners), rosewood pulls (resolves to the closest library appearance).
 
 ### Notes
