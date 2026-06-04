@@ -420,9 +420,22 @@ def run(context):
     print(">>> Drawer pulls: 2 stones")
 
     # ==============================================================
+    #  PRESENTATION BACKDROP — a wall behind the piece, for product photos.
+    #  Not part of the shelf; excluded from validation via the WALL_ prefix.
+    # ==============================================================
+    wall_occ = sp.make_comp(root, "Backdrop")
+    wall_c = wall_occ.component
+    wall_pl = sp.off_plane(wall_c, wall_c.xZConstructionPlane, "part_d", "Wall_Pl")
+    _, wprof = sp.sketch_rect_model(wall_c, wall_pl,
+        ("-1 ft", "part_d", "-2 in"),
+        {"x": "shelf_l + 30 in", "z": "upright_h + 22 in"}, "Wall_Sk", ev)
+    sp.ext_new(wall_c, wprof, "3 in", "WALL_back").bodies.item(0).name = "WALL_back"
+    print(">>> Backdrop wall added")
+
+    # ==============================================================
     #  EPILOGUE
     # ==============================================================
-    for comp in [up_c, sh_c, dt_c, db_c, cl_c]:
+    for comp in [up_c, sh_c, dt_c, db_c, cl_c, wall_c]:
         for sk in comp.sketches:
             sk.isVisible = False
         for cp in comp.constructionPlanes:
@@ -441,6 +454,7 @@ def run(context):
          "bd_Left", "bd_Right", "bd_Back", "bd_Bottom",
          "botdr_runnerL", "botdr_runnerR"])
     sp.apply_appearance("rosewood", ["PULL_top", "PULL_bot"])
+    sp.apply_appearance("Concrete", ["WALL_back"])
 
     app = adsk.core.Application.get()
     cam = app.activeViewport.camera
