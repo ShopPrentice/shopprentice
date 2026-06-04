@@ -87,6 +87,37 @@ apply_appearance(species="cherry")                                    # case
 apply_appearance(species="walnut", bodies=["Drw_Front", "Drw_Back"]) # drawer accent
 ```
 
+## Lightening / recoloring a species (and what `get_product_shots` honors)
+
+Library woods get their color from a **bitmap on `opaque_albedo`**, not a flat
+color — blending the appearance's `ColorProperty` toward white is a no-op. The
+texture node has two relevant knobs:
+
+```python
+# the cherry bodies already carry the "Cherry" appearance (apply_appearance ran)
+ch  = next(a for i in range(design.appearances.count)
+           if "cherry" in (a := design.appearances.item(i)).name.lower())
+tex = ch.appearanceProperties.itemById("opaque_albedo").connectedTexture
+tex.properties.itemById("unifiedbitmap_RGBAmount").value = 1.7          # lighten
+tex.properties.itemById("common_Tint_toggle").value = True
+tex.properties.itemById("common_Tint_color").value = \
+    adsk.core.Color.create(212, 184, 146, 0)                            # hue tint
+```
+
+**Critical, verified on the wall shelf (oak/cherry build):** the **shaded**
+`get_product_shots` render honors `unifiedbitmap_RGBAmount` (>1 lightens, <1
+darkens — a uniform brightness scale, so it keeps the hue) but **ignores the
+`common_Tint_*` hue tint entirely.** Proof: setting `common_Tint_color` to pure
+blue left the wood orange in the shaded shot, while a gain of 5.0 visibly
+lightened it. The tint is a ray-trace-only modifier, and product shots are
+shaded (styles are shaded / transparent / wireframe — no ray trace).
+
+**Consequence:** to change *lightness* of a species in deliverable shots, use the
+gain. To change *hue* (e.g. "make cherry less red"), **switch to a different
+species** — the tint won't show. On the wall shelf, "lighter and not as red"
+was solved by changing the primary from cherry to oak, not by tinting cherry.
+(Tested: wall shelf, April/June 2026.)
+
 ## Technical Details
 
 - Uses `ProjectedTextureMapControl` with `BoxTextureMapProjection` for reliable grain orientation
