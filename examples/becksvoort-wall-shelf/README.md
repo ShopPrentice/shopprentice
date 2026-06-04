@@ -1,6 +1,7 @@
-# Becksvoort Modern Wall Shelf (FWW #284)
+# Wall Shelf — inspired by Becksvoort (FWW #284)
 
-Christian Becksvoort's "Modern Wall Shelf" from *Fine Woodworking* #284 — an asymmetric
+Inspired by Christian Becksvoort's "Modern Wall Shelf" (*Fine Woodworking* #284) — an
+interpretation, not an exact reproduction. An asymmetric
 Shaker wall shelf, **~45"W × 8.5"D × 15"H**. Two vertical uprights and two long, unaligned
 shelves interlock with **dadoed cross-laps**, and two **suspended dovetailed drawers** hang
 on hidden cleats below the top shelf. Built in cherry with pine drawer boxes and rosewood
@@ -22,9 +23,11 @@ pulls.
 
 ---
 
-**Script:** [`wall_shelf.py`](wall_shelf.py) — 20 bodies (2 uprights, 2 shelves, 2 dovetailed
-drawers of 5 boards each + 2 runners, 2 cleats, 2 pulls). Uses the `dovetailed_drawer`
-template; everything else is dimension-driven boxes, mirrors, and combine cuts.
+**Script:** [`wall_shelf.py`](wall_shelf.py) — 20 furniture bodies (2 uprights, 2 shelves, 2
+dovetailed drawers of 5 boards each + 2 runners, 2 cleats, 2 pulls), plus a presentation
+**backdrop wall** (`WALL_back`, excluded from validation) so the product photos show the piece
+mounted. Uses the `dovetailed_drawer` template; everything else is dimension-driven boxes,
+mirrors, and combine cuts.
 
 Coordinate system: X = length, **Y = depth (Y=0 front / viewer side)**, Z = height.
 
