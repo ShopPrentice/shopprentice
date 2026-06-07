@@ -39,7 +39,7 @@ def run(context):
     add("table_h", "30.875 in", "in", "Overall table height, floor to top surface")
     add("splay", "1.5 deg", "deg", "Leg splay/rake angle from vertical, per axis")
     # --- Top frame & panel ---
-    add("tf_t", "0.6875 in", "in", "Top-frame stock thickness (vertical)")
+    add("tf_t", "1 1/16 in", "in", "Top-frame stock thickness (vertical)")
     add("tf_w", "2 in", "in", "Top-frame member width")
     add("tf_bot", "table_h - tf_t", "in", "Z of the frame underside (derived)")
     add("panel_t", "0.3125 in", "in", "Top-panel thickness")
@@ -48,6 +48,9 @@ def run(context):
     add("tongue_w", "panel_t / 2", "in", "Panel tongue thickness")
     add("tf_cham_d", "0.104 in", "in", "Top-frame edge profile depth (inward from outer face)")
     add("tf_cham_h", "tf_t", "in", "Top-frame edge profile height (up from bottom face)")
+    add("tf_tn_d", "tf_w * 1.5 / 3.5", "in", "格角榫 tenon depth into the stile (template tenon_depth 1.5/3.5 of width)")
+    add("tf_tn_st", "tf_w * 1.2 / 3.5", "in", "格角榫 tenon shoulder at the INNER edge (template tenon_shoulder_top 1.2/3.5)")
+    add("tf_tn_sb", "tf_w * 0.6 / 3.5", "in", "格角榫 tenon shoulder at the OUTER edge (template tenon_shoulder_bot 0.6/3.5)")
     add("sf_cham", "0.3125 in", "in", "Shelf-frame edge profile depth/width")
     # --- Legs ---  (legs sit at X=+/-ltx, Y=+/-lty; set ltx/lty via the setbacks)
     add("leg_dia", "1.375 in", "in", "Leg diameter (round leg)")
@@ -65,7 +68,7 @@ def run(context):
     add("fbd_pad", "0.1 in", "in", "Hidden dovetail end padding")
     add("fbd_angle", "10 deg", "deg", "Hidden dovetail angle")
     add("fbd_tail_w", "0.225 in", "in", "Dovetail tail width at wide face")
-    add("fbd_tail_count", "3", "", "Number of dovetail tails")
+    add("fbd_tail_count", "2", "", "Number of dovetail tails")
     add("fbd_socket", "apron_t - fbd_lip", "in", "Tail penetration depth (derived)")
     add("fbd_narrow_w", "fbd_tail_w - 2 * fbd_socket * tan(fbd_angle)", "in", "Tail narrow width (derived)")
     add("fbd_pitch", "(apron_w - 2 * fbd_pad) / fbd_tail_count", "in", "Tail pitch (derived)")
@@ -272,29 +275,59 @@ def run(context):
     occ_top = sp.make_comp(root, "Top")
     topc = occ_top.component
 
-    def member(corners_in, name):
-        pl = sp.off_plane(topc, topc.xYConstructionPlane, "tf_bot", name + "_Pl")
-        sk = topc.sketches.add(pl); sk.name = name + "_Sk"
-        lns = sk.sketchCurves.sketchLines
-        pts = [P(x*IN, y*IN, 0) for (x, y) in corners_in]
-        first = lns.addByTwoPoints(pts[0], pts[1]); prev = first
-        for k in range(2, len(pts)):
-            prev = lns.addByTwoPoints(prev.endSketchPoint, pts[k])
-        lns.addByTwoPoints(prev.endSketchPoint, first.startSketchPoint)
-        b = sp.ext_new(topc, sk.profiles.item(0), "tf_t", name).bodies.item(0)
-        b.name = name
-        return b
+    # ---- 格角榫 frame (faithful port of the chinese-table-top template) ----
+    # The LONG rails (TF_Front/Back, 大边) carry a concealed, mitered TENON into the SHORT
+    # stiles (TF_Left/Right, 抹头). Each rail is a full box overlapping the corner; at each
+    # end the TOP and BOTTOM thirds get a 45 deg MITER triangle removed and the MIDDLE third
+    # gets the TENON PENTAGON (waste) cut, leaving the shouldered, mitered tenon. The stiles
+    # are then CUT by the rails, inheriting the mating miter + mortise.
+    _tl2 = ev("table_l") / 2.0; _td2 = ev("table_d") / 2.0
+    _tfw = ev("tf_w"); _td_ = ev("tf_tn_d"); _tst = ev("tf_tn_st"); _tsb = ev("tf_tn_sb")
 
-    frt = member([(-14,-6.875),(14,-6.875),(12,-4.875),(-12,-4.875)], "TF_Front")
-    sp.mirror_body(topc, frt, topc.xZConstructionPlane, "TF_Back_Mir")
-    lft = member([(-14,-6.875),(-14,6.875),(-12,4.875),(-12,-4.875)], "TF_Left")
+    def _poly_cut(target_name, pts, z0e, he, name):
+        pl = sp.off_plane(topc, topc.xYConstructionPlane, z0e, name + "_Pl")
+        sk = topc.sketches.add(pl); sk.name = name + "_Sk"
+        L = sk.sketchCurves.sketchLines
+        wp = [P(x, y, 0) for (x, y) in pts]
+        f = L.addByTwoPoints(wp[0], wp[1]); pv = f
+        for k in range(2, len(wp)):
+            pv = L.addByTwoPoints(pv.endSketchPoint, wp[k])
+        L.addByTwoPoints(pv.endSketchPoint, f.startSketchPoint)
+        tool = sp.ext_new(topc, sk.profiles.item(0), he, name).bodies.item(0)
+        sp.combine(ctx.find_body(target_name), [tool], CUT, False, name + "_C")
+
+    def shape_rail_end(rail_name, sx):
+        # sx = -1 left end / +1 right end of a FRONT rail (outer Y face at -td2, inner at iy).
+        ox = sx * _tl2; oy = -_td2; iy = -_td2 + _tfw
+        tag = "R" if sx > 0 else "L"
+        # miter triangle (remove the stile-side corner) on the TOP and BOTTOM thirds
+        tri = [(ox, oy), (ox, iy), (sx * (_tl2 - _tfw), iy)]
+        _poly_cut(rail_name, tri, "tf_bot + 2 * tf_t / 3", "tf_t / 3", "Mit_T" + tag)
+        _poly_cut(rail_name, tri, "tf_bot",               "tf_t / 3", "Mit_B" + tag)
+        # tenon PENTAGON (waste) on the MIDDLE third: u along rail length from the outer end,
+        # v across width from the outer edge; small shoulder _tsb at the outer edge, larger
+        # shoulder _tst at the inner edge, depth _td_, with the 45 deg miter corner (td,td).
+        pent = [(ox, oy + _tsb), (ox, iy - _tst),
+                (sx * (_tl2 - _td_), iy - _tst), (sx * (_tl2 - _td_), oy + _td_),
+                (sx * (_tl2 - _tsb), oy + _tsb)]
+        _poly_cut(rail_name, pent, "tf_bot + tf_t / 3", "tf_t / 3", "Tn" + tag)
+
+    pbox(topc, "TF_Front", "-table_l / 2", "table_l / 2",
+         "-table_d / 2", "-table_d / 2 + tf_w", "tf_bot", "tf_t")
+    shape_rail_end("TF_Front", -1); shape_rail_end("TF_Front", 1)
+    sp.mirror_body(topc, ctx.find_body("TF_Front"), topc.xZConstructionPlane, "TF_Back_Mir")
+    lft = pbox(topc, "TF_Left", "-table_l / 2", "-table_l / 2 + tf_w",
+               "-table_d / 2", "table_d / 2", "tf_bot", "tf_t")
     sp.mirror_body(topc, lft, topc.yZConstructionPlane, "TF_Right_Mir")
     for i in range(topc.bRepBodies.count):
         b = topc.bRepBodies.item(i)
-        if b.name in ("TF_Front (1)", "TF_Left (1)"):
-            bb = b.boundingBox
-            cx = (bb.minPoint.x+bb.maxPoint.x)/2; cy = (bb.minPoint.y+bb.maxPoint.y)/2
-            b.name = ("TF_Right" if cx > 0 else "TF_Left") if abs(cx) > abs(cy) else ("TF_Back" if cy > 0 else "TF_Front")
+        if b.name == "TF_Front (1)": b.name = "TF_Back"
+        elif b.name == "TF_Left (1)": b.name = "TF_Right"
+    # cut the stiles with the rails -> stiles inherit the mating miter + mortise
+    sp.combine(ctx.find_body("TF_Left"),
+               [ctx.find_body("TF_Front"), ctx.find_body("TF_Back")], CUT, True, "TF_Left_Joint")
+    sp.combine(ctx.find_body("TF_Right"),
+               [ctx.find_body("TF_Front"), ctx.find_body("TF_Back")], CUT, True, "TF_Right_Joint")
 
     # Flush panel with one-shoulder tongues (top flush, tongue below).
     # Field stops at frame inner edge; tongues extend tongue_ov into the frame.
@@ -609,9 +642,10 @@ def run(context):
     # two bottom edges meet level.
     def _band_bottom_outer_z(b):
         best = None
+        _bz = ev("tf_bot") - ev("apron_w")       # nominal band-bottom Z (cm); parametric window
         for i in range(b.faces.count):
             f = b.faces.item(i); gg = f.geometry
-            if isinstance(gg, adsk.core.Plane) and gg.normal.z < -0.9 and 73 < f.pointOnFace.z < 74.6:
+            if isinstance(gg, adsk.core.Plane) and gg.normal.z < -0.9 and _bz - 0.8 < f.pointOnFace.z < _bz + 0.8:
                 if best is None or f.area > best.area: best = f
         gg = best.geometry; nn = gg.normal; oo = gg.origin
         ymin = b.boundingBox.minPoint.y          # outer (front) side of the leaning band
@@ -960,7 +994,9 @@ def run(context):
     # at the top). Parametric, so the shelf tracks the legs when leg_setback_x changes.
     add("leg_x_shelf", "ltx + (leg_tip_z - (shelf_z - sf_t / 2)) * tan(splay)", "in", "Leg X at shelf mid-height (derived)")
     add("leg_y_shelf", "lty + (leg_tip_z - (shelf_z - sf_t / 2)) * tan(splay)", "in", "Leg Y at shelf mid-height (derived)")
-    add("tenon_w", "0.875 in", "in", "Shelf-rail tenon width")
+    add("tenon_w", "0.5 in", "in", "Shelf-rail tenon width")
+    add("sf_tn_h", "sf_t", "in", "Shelf-rail tenon height = FULL thickness (reaches top + bottom, no shoulder)")
+    add("sf_tn_z", "shelf_z - sf_t", "in", "Shelf-rail tenon bottom Z = rail bottom (derived)")
     Lx = ev("leg_x_shelf"); Ly = ev("leg_y_shelf"); r = ev("leg_r"); tw = ev("tenon_w")
     ze = "shelf_z - sf_t"; he = "sf_t"
 
@@ -982,30 +1018,58 @@ def run(context):
         sp.combine(proxy(rn, occ_sh), [proxy(legs[0], occ_legs), proxy(legs[1], occ_legs)],
                    CUT, True, rn + "_Cope")
 
-    # 3. tenons into legs: build tenon body -> cut leg by tenon (mortise, tenon
-    #    survives) -> join tenon to rail. Long tenons upper-Z, short lower-Z so
-    #    the two tenons entering each leg don't collide.
-    def tenon(name, rail, leg, x0_e, x1_e, y0_e, y1_e, zexpr, hexpr):
-        t = pbox(shc, name, x0_e, x1_e, y0_e, y1_e, zexpr, hexpr)
-        sp.combine(proxy(leg, occ_legs), [t.createForAssemblyContext(occ_sh)],
-                   CUT, True, name + "_Mort")
-        sp.combine(ctx.find_body(rail), [t], JOIN, False, name + "_J")
-    zu = "shelf_z - 0.45 in"; zl = "shelf_z - sf_t + 0.075 in"; th = "0.375 in"
-    HW = "tenon_w / 2"
-    tenon("Tn_FL_L", "ShelfLong_F", "Leg_FL", "-leg_x_shelf - 0.2 cm", "-leg_x_shelf + leg_r + 0.3 cm", "-leg_y_shelf - "+HW, "-leg_y_shelf + "+HW, zu, th)
-    tenon("Tn_FR_L", "ShelfLong_F", "Leg_FR", "leg_x_shelf - leg_r - 0.3 cm", "leg_x_shelf + 0.2 cm", "-leg_y_shelf - "+HW, "-leg_y_shelf + "+HW, zu, th)
-    tenon("Tn_BL_L", "ShelfLong_B", "Leg_BL", "-leg_x_shelf - 0.2 cm", "-leg_x_shelf + leg_r + 0.3 cm", "leg_y_shelf - "+HW, "leg_y_shelf + "+HW, zu, th)
-    tenon("Tn_BR_L", "ShelfLong_B", "Leg_BR", "leg_x_shelf - leg_r - 0.3 cm", "leg_x_shelf + 0.2 cm", "leg_y_shelf - "+HW, "leg_y_shelf + "+HW, zu, th)
-    tenon("Tn_FL_S", "ShelfShort_L", "Leg_FL", "-leg_x_shelf - "+HW, "-leg_x_shelf + "+HW, "-leg_y_shelf - 0.2 cm", "-leg_y_shelf + leg_r + 0.3 cm", zl, th)
-    tenon("Tn_BL_S", "ShelfShort_L", "Leg_BL", "-leg_x_shelf - "+HW, "-leg_x_shelf + "+HW, "leg_y_shelf - leg_r - 0.3 cm", "leg_y_shelf + 0.2 cm", zl, th)
-    tenon("Tn_FR_S", "ShelfShort_R", "Leg_FR", "leg_x_shelf - "+HW, "leg_x_shelf + "+HW, "-leg_y_shelf - 0.2 cm", "-leg_y_shelf + leg_r + 0.3 cm", zl, th)
-    tenon("Tn_BR_S", "ShelfShort_R", "Leg_BR", "leg_x_shelf - "+HW, "leg_x_shelf + "+HW, "leg_y_shelf - leg_r - 0.3 cm", "leg_y_shelf + 0.2 cm", zl, th)
-
-    # 4b. trim short rails where they still overlap the long rails at corners
+    # 2b. Cope each short rail to the long rails — done BEFORE the tenons exist, so this cut
+    #     trims only the BARE short rail (not its tenon). The long rail's rounded leg-cope
+    #     therefore cannot bite the short tenon; instead the short tenon cuts its own mortise
+    #     into the long rail (step 3).
     sp.combine(ctx.find_body("ShelfShort_L"),
-               [ctx.find_body("ShelfLong_F"), ctx.find_body("ShelfLong_B")], CUT, True, "ShS_L_trim")
+               [ctx.find_body("ShelfLong_F"), ctx.find_body("ShelfLong_B")], CUT, True, "ShS_L_cope")
     sp.combine(ctx.find_body("ShelfShort_R"),
-               [ctx.find_body("ShelfLong_F"), ctx.find_body("ShelfLong_B")], CUT, True, "ShS_R_trim")
+               [ctx.find_body("ShelfLong_F"), ctx.find_body("ShelfLong_B")], CUT, True, "ShS_R_cope")
+
+    # 3. Tenons — FULL height (reach the top + bottom shelf surfaces, no Z shoulder), each
+    #    mitered 45 deg on the leg-centre diagonal so they MEET face-to-face inside the leg.
+    #    Each tenon is a plan-view quad (rail-end edge + two side edges + the diagonal miter
+    #    edge) extruded the full rail thickness; the long and short tenons share the diagonal.
+    _HWv = tw / 2.0            # half tenon width (cm)
+    _depv = r + 0.3            # interior reach past the leg centre, into the rail (cm)
+    def _tquad(name, lcx, lcy, locpts):
+        pl = sp.off_plane(shc, shc.xYConstructionPlane, "sf_tn_z", name + "_Pl")
+        sk = shc.sketches.add(pl); sk.name = name + "_Sk"
+        lns = sk.sketchCurves.sketchLines
+        wp = [P(lcx + a, lcy + b, 0) for (a, b) in locpts]
+        first = lns.addByTwoPoints(wp[0], wp[1]); prev = first
+        for k in range(2, len(wp)):
+            prev = lns.addByTwoPoints(prev.endSketchPoint, wp[k])
+        lns.addByTwoPoints(prev.endSketchPoint, first.startSketchPoint)
+        b = sp.ext_new(shc, sk.profiles.item(0), "sf_tn_h", name).bodies.item(0)
+        b.name = name
+        return b
+    def mtenon(label, sx, sy, leg, long_rail, short_rail):
+        # leg centre (cm); ix/iy = interior direction (toward table centre) in local coords
+        lcx = sx * Lx; lcy = sy * Ly
+        ix = -sx; iy = -sy
+        HW = _HWv; dep = _depv
+        # long tenon (along X): rail-end edge at x'=ix*dep, miter edge on the centre diagonal
+        long_q  = [(ix * dep, -HW), (ix * dep, HW), (ix * iy * HW, HW), (-ix * iy * HW, -HW)]
+        # short tenon (along Y): x'<->y' swap; shares the same diagonal edge
+        short_q = [(-HW, iy * dep), (HW, iy * dep), (HW, iy * ix * HW), (-HW, -iy * ix * HW)]
+        lt = _tquad(label + "_TnL", lcx, lcy, long_q)
+        st = _tquad(label + "_TnS", lcx, lcy, short_q)
+        # cut the shared mortise in the leg
+        sp.combine(proxy(leg, occ_legs),
+                   [lt.createForAssemblyContext(occ_sh), st.createForAssemblyContext(occ_sh)],
+                   CUT, True, label + "_Mort")
+        # cut a mortise in the LONG rail with the SHORT tenon, so the long rail YIELDS to the
+        # tenon (the short tenon stays intact instead of being trimmed by the long rail's cope)
+        sp.combine(ctx.find_body(long_rail), [st], CUT, True, label + "_LongMort")
+        # join each tenon to its rail
+        sp.combine(ctx.find_body(long_rail), [lt], JOIN, False, label + "_TnL_J")
+        sp.combine(ctx.find_body(short_rail), [st], JOIN, False, label + "_TnS_J")
+    mtenon("FL", -1, -1, "Leg_FL", "ShelfLong_F", "ShelfShort_L")
+    mtenon("FR",  1, -1, "Leg_FR", "ShelfLong_F", "ShelfShort_R")
+    mtenon("BL", -1,  1, "Leg_BL", "ShelfLong_B", "ShelfShort_L")
+    mtenon("BR",  1,  1, "Leg_BR", "ShelfLong_B", "ShelfShort_R")
 
     # 5. flush shelf panel with one-shoulder tongues, grooved into rails
     siw = "leg_x_shelf - leg_r"; sih = "leg_y_shelf - leg_r"
@@ -1092,10 +1156,15 @@ def run(context):
                           0, "TF_ChamL", "table_d / 2 + 1 cm", axis='x', sign=1)
     tf_chR = tf_cham_body(topc.xZConstructionPlane, _tfl, zbot_ch, _chd, _chh,
                           0, "TF_ChamR", "table_d / 2 + 1 cm", axis='x', sign=-1)
-    sp.combine(ctx.find_body("TF_Front"), [tf_chF], CUT, False, "TF_Front_Cham")
-    sp.combine(ctx.find_body("TF_Back"), [tf_chB], CUT, False, "TF_Back_Cham")
-    sp.combine(ctx.find_body("TF_Left"), [tf_chL], CUT, False, "TF_Left_Cham")
-    sp.combine(ctx.find_body("TF_Right"), [tf_chR], CUT, False, "TF_Right_Cham")
+    # Cut EVERY frame member by ALL FOUR chamfer tools (keep the tools), so the molding is
+    # continuous around the corners AND trims the through-tenons where they exit each corner's
+    # outer face (a tenon belongs to its long member but exits through the short member's edge,
+    # so it must see the adjacent edge's chamfer). Non-adjacent tools are harmless no-ops.
+    _chams = [tf_chF, tf_chB, tf_chL, tf_chR]
+    for _nm in ("TF_Front", "TF_Back", "TF_Left", "TF_Right"):
+        sp.combine(ctx.find_body(_nm), _chams, CUT, True, _nm + "_Cham")
+    for _ch in _chams:                      # drop the (kept) chamfer tool bodies
+        topc.features.removeFeatures.add(_ch)
 
     allb = []
     for occ in (occ_legs, occ_top, occ_ap, occ_sh):
