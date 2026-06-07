@@ -1,6 +1,6 @@
 # Classic Ming-Style Side Table
 
-A parametric side table inspired by classical Chinese Ming-dynasty furniture, modeled in Fusion 360 via Python script. 28"L x 13.75"D x 30.875"H. Round splayed legs, a floating frame-and-panel top, a mid shelf, carved spandrel brackets under the apron, and **hidden (full-blind) dovetails at all four apron corners** — the joinery is completely concealed, reading as clean miters from the outside.
+A parametric side table inspired by classical Chinese Ming-dynasty furniture, modeled in Fusion 360 via Python script. 28"L x 13.75"D x 30.875"H. Round splayed legs and a traditional joinery vocabulary throughout: a **格角榫 mitered mortise-and-tenon** top frame (concealed tenon, clean mitered corners), **hidden full-blind dovetails** at the apron corners, **mitered mortise-and-tenons** that meet inside the round legs at the shelf, floating frame-and-panel surfaces with sliding-dovetail battens, and carved spandrel brackets — almost every joint is concealed, reading as clean miters from the outside.
 
 ![Ming Table — iso top-right](screenshots/iso-top-right.png)
 
@@ -16,10 +16,12 @@ A parametric side table inspired by classical Chinese Ming-dynasty furniture, mo
 ```
 /woodworking
 Build a classic Ming-style side table, 28"L x 13.75"D x 30.875"H, with round 1-3/8"
-legs splayed 1.5 degrees, a floating frame-and-panel top with sliding-dovetail battens,
-an apron band with carved spandrel brackets, a floating frame-and-panel mid shelf coped
-into the legs, and a hollow spline edge profile on the top frame. Join the short aprons
-to the long aprons with hidden full-blind dovetails at all four corners. Fully parametric.
+legs splayed 1.5 degrees. Top: a floating frame-and-panel with sliding-dovetail battens
+and 格角榫 mitered mortise-and-tenon corners (concealed tenon, mitered outside) plus a
+hollow spline edge molding. Aprons: a band with carved spandrel brackets, joined corner
+to corner with hidden full-blind dovetails. Shelf: a floating frame-and-panel whose rails
+are coped to the round legs with full-height mitered tenons that meet inside each leg.
+Fully parametric.
 ```
 
 ### Appearance
@@ -50,12 +52,15 @@ All exposed as User Parameters (Modify > Change Parameters):
 | `table_d` | 13.75 in | Overall table depth (Y) |
 | `table_h` | 30.875 in | Overall height, floor to top surface |
 | `splay` | 1.5 deg | Leg splay/rake angle from vertical, per axis |
-| `tf_t` | 0.6875 in | Top-frame stock thickness (vertical) |
+| `tf_t` | 1 1/16 in | Top-frame stock thickness (vertical) |
 | `tf_w` | 2 in | Top-frame member width |
 | `panel_t` | 0.3125 in | Top-panel thickness |
 | `tongue_ov` | 0.25 in | Panel tongue protrusion into the frame groove |
 | `tf_cham_d` | 0.104 in | Top-frame edge-profile depth (inward from outer face) |
 | `tf_cham_h` | tf_t | Top-frame edge-profile height (up from bottom face) |
+| `tf_tn_d` | tf_w·1.5/3.5 | 格角榫 tenon depth into the stile (template ratio) |
+| `tf_tn_st` | tf_w·1.2/3.5 | 格角榫 tenon shoulder at the inner edge |
+| `tf_tn_sb` | tf_w·0.6/3.5 | 格角榫 tenon shoulder at the outer edge |
 | `leg_dia` | 1.375 in | Leg diameter (round leg) |
 | `leg_setback_x` | 5.375 in | Distance each leg is set in from the table END (X) |
 | `leg_setback_y` | 1.125 in | Distance each leg is set in from the table SIDE (Y) |
@@ -66,12 +71,14 @@ All exposed as User Parameters (Modify > Change Parameters):
 | `fbd_pad` | 0.1 in | Hidden-dovetail end padding |
 | `fbd_angle` | 10 deg | Hidden-dovetail flank angle |
 | `fbd_tail_w` | 0.225 in | Dovetail tail width at the wide face |
-| `fbd_tail_count` | 3 | Number of dovetail tails per corner |
+| `fbd_tail_count` | 2 | Number of dovetail tails per corner |
 | `spandrel_depth` | 3 9/16 in | Spandrel vertical extent below the apron |
 | `shelf_z` | 20 in | Shelf top height above the floor |
 | `sf_t` | 0.875 in | Shelf-frame stock thickness |
 | `sf_w` | 1.375 in | Shelf-frame member width |
 | `sp_panel_t` | 0.3125 in | Shelf-panel thickness |
+| `tenon_w` | 0.5 in | Shelf-rail tenon width |
+| `sf_tn_h` | sf_t | Shelf-rail tenon height (full thickness, reaches top + bottom) |
 | `bt_w` | 0.875 in | Top-batten width |
 | `bt_off` | 7 in | Top-batten offset from center (+/-) |
 | `bt_dt_base` | 0.5 in | Batten dovetail base width (narrow side) |
@@ -97,18 +104,20 @@ All exposed as User Parameters (Modify > Change Parameters):
 
 | Component | Features |
 |-----------|----------|
-| **Legs** | FL round leg swept with 1.5° splay, top embedded into the frame; mirror to all 4 |
-| **Top** | Frame-and-panel: 4 mitered frame members grooved for a floating panel, panel with one-shoulder tongues, two sliding-dovetail battens underneath; hollow spline edge profile cut on all 4 outer bottom edges |
-| **Aprons** | Long-apron band + carved spandrel brackets joined via internal 1/8" tongues; short aprons lofted between the long-apron miter faces; hidden full-blind dovetails at all 4 corners |
-| **Shelf** | Frame-and-panel mid shelf, rails coped (rounded shoulder) and M&T into the round legs, floating panel with a sliding-dovetail batten |
+| **Legs** | FL round leg swept with 1.5° splay, top let into the frame; mirror to all 4 |
+| **Top** | Frame-and-panel: long rails + short stiles joined with **格角榫 mitered mortise-and-tenons** (concealed tenon, 45° miter outside), grooved for a floating panel with one-shoulder tongues, two sliding-dovetail battens underneath; hollow spline edge molding on all 4 outer bottom edges |
+| **Aprons** | Long-apron band + carved spandrel brackets joined via internal 1/8" tongues; short aprons lofted between the long-apron miter faces; **hidden full-blind dovetails** at all 4 corners |
+| **Shelf** | Frame-and-panel mid shelf; rails coped (rounded shoulder) to the round legs with **full-height mitered tenons that meet inside each leg** and tenon into the long rail; floating panel with a sliding-dovetail batten |
 
 ### Key Techniques
 
-- **Hidden (full-blind) dovetail** — the marquee joint. Tails on the short aprons drop into sockets in the long aprons behind a concealing end lip, so nothing shows from outside. Built once on the front-left corner and **mirrored to all four**: lip mirrored to every corner and JOINed to the long aprons, tails built on one end + mirrored to the other, then the short apron mirrored left→right; the long aprons are finally CUT by the short aprons to carve the sockets.
-- **Splayed round legs** — each leg is swept along a raked centerline (1.5° per axis), so it leans out toward the floor; positions are derived so the apron and shelf track the lean parametrically.
-- **Floating frame-and-panel** (top and shelf) — grooved frames with one-shoulder panel tongues; sliding-dovetail battens keep the panels flat while allowing wood movement.
+- **格角榫 (mitered mortise-and-tenon)** — the top-frame corners (ported from the `chinese_frame_and_panel` template). Each long rail is a full box; the **top and bottom thirds** of its thickness get a 45° miter, while the **middle third** keeps a shouldered tenon. The stiles are then CUT by the shaped rails, inheriting the mating miter + mortise. Outside reads as a clean miter; the tenon is concealed.
+- **Hidden (full-blind) dovetail** — the apron corners. Tails on the short aprons drop into sockets in the long aprons behind a concealing end lip, so nothing shows from outside. Built once on the front-left corner and **mirrored to all four**.
+- **Mitered tenons into a round leg** — at the shelf, the long- and short-rail tenons are coped to the round leg and **mitered on the leg-center diagonal so they meet face-to-face inside the leg** (instead of colliding). The short rail is coped to the long rail *before* its tenon is built, then the tenon cuts its own mortise into the long rail — so the long rail's cope never trims the tenon.
+- **Splayed round legs** — each leg is swept along a raked centerline (1.5° per axis); apron and shelf positions are derived so they track the lean parametrically.
+- **Floating frame-and-panel** (top and shelf) — grooved frames with one-shoulder panel tongues; sliding-dovetail battens (穿带) keep the panels flat while allowing wood movement.
 - **Spandrel brackets** — carved brackets under the apron, joined to the band with internal tongues so the apron + spandrels act as one member at each corner.
-- **Spline edge profile** — a custom fitted-spline cutter sweeps a hollow molding along the top-frame outer bottom edge (cut on one edge, mirrored to all four).
+- **Spline edge molding** — a custom fitted-spline cutter sweeps a hollow molding along the top-frame outer bottom edge; cut on every member so it wraps the corners and trims the through-tenons flush.
 - **Mirror-based replication** — symmetric parts (legs, frame members, aprons, shelf rails, battens, dovetails) are built once and mirrored, so the whole piece rebuilds from a single corner's geometry.
 
 ---
