@@ -61,8 +61,6 @@ def run(context):
     _p("dt_angle", "12 deg", "deg", "Dovetail angle")
     _p("slot_depth", "panel_t * 0.4", "in", "Dovetail slot depth")
     _p("batten_tenon_l", "1 in", "in", "Batten tenon into rail")
-    _p("batten_narrow", "batten_w - 2 * slot_depth * tan(dt_angle)", "in",
-       "Batten narrow width")
 
     comp = sp.make_comp(root, "ChineseTableTop").component
     fw = ev("frame_w")
@@ -302,10 +300,14 @@ def run(context):
     # Tenons on batten ends (parameter expressions, not ev() values)
     bt_cx = "frame_w + (rail_len - 2 * frame_w) / (batten_count + 1)"
 
+    # Tenon spans the FULL batten width (no side shoulders) — it reaches the
+    # batten's sides. Only the under-side is shouldered (it starts at z =
+    # recess + third). The X-width matches batten_w, not the dovetail-narrowed
+    # width, so the tenon cheeks are flush with the batten sides.
     front_face = sp.find_face(bt, "y", -1)
     sk_tn, _ = sp.sketch_rect_model(comp, front_face,
-        (f"({bt_cx}) - batten_narrow / 2", "frame_w", "recess + third"),
-        {"x": "batten_narrow", "z": "third"},
+        (f"({bt_cx}) - batten_w / 2", "frame_w", "recess + third"),
+        {"x": "batten_w", "z": "third"},
         "BT0_TnF_Sk", ev=ev)
     sp.refs_to_construction(sk_tn)
     tn_f = sp.ext_new(
@@ -314,9 +316,9 @@ def run(context):
 
     back_face = sp.find_face(bt, "y", +1)
     sk_tn2, _ = sp.sketch_rect_model(comp, back_face,
-        (f"({bt_cx}) - batten_narrow / 2", "stile_len - frame_w",
+        (f"({bt_cx}) - batten_w / 2", "stile_len - frame_w",
          "recess + third"),
-        {"x": "batten_narrow", "z": "third"},
+        {"x": "batten_w", "z": "third"},
         "BT0_TnB_Sk", ev=ev)
     sp.refs_to_construction(sk_tn2)
     tn_b = sp.ext_new(
