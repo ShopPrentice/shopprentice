@@ -299,6 +299,30 @@ swallowing failed dimensions — harmless under the old origin-only check, but u
 a skipped dim is *silent under-constraint*. Prefer dims that fail loudly, or assert
 `sketch.isFullyConstrained` per sketch as you build rather than discovering gaps at the end.
 
+**7. Filleted corners CONSUME their vertices — you can't dimension a continuous coved profile
+point-by-point.** A single continuous outline with rounded corners (the Ming-table apron+spandrel:
+one elevation profile with quarter-circle coves and rounded bottoms) can't be fully constrained by
+pinning each corner, because filleting deletes the corner vertices you'd dimension from. Two ways
+out — **prefer the skeleton:**
+- **Parametric construction skeleton (keeps the single continuous profile).** Lay down construction
+  points/lines pinned with parameter-expression dimensions (apron length, band height, spandrel
+  width/depth/position, lean `angle = splay`), constrain the real profile lines to the skeleton
+  (`collinear` / `parallel` / coincident / angle), THEN fillet the corners with radial dims tied to
+  the radius parameters (`cove_r`, `bot_r`). The dimensions that locate the spandrel runs are
+  **parallel-line OFFSET dims** — they reference the *lines*, not the consumed corner vertices, so
+  they survive the fillet. This is what took the apron to `isFullyConstrained = True` (17 dims, 31
+  constraints, zero Python-computed coordinates).
+- **Decompose into auto-dimensioning primitives** (band as a parametric rectangle, spandrels as
+  separate features) — trivially constrained, but no longer one continuous sketch. Use only when the
+  seamless coved transition isn't required.
+
+**8. A fit-point spline cannot be FULLY dimensioned — locking every point throws
+`VCS_SKETCH_OVER_CONSTRAINTS`.** The traceability check deliberately exempts spline *interiors* for
+exactly this reason (anchor only the start/end). If you need a truly parametric, fully-constrained
+bracket curve, **rebuild it from constrained arcs + lines**, not a fit spline. (Repeated attempts to
+dimension every fit point of the spandrel spline failed with this error before the arc/line +
+skeleton rebuild.)
+
 ## Extrude Operations
 
 | Operation | Use For |
@@ -314,6 +338,44 @@ When doing Cut or Join near other bodies, you MUST specify which body to target:
 ext_input.participantBodies = [target_body]  # Python list, NOT ObjectCollection!
 ```
 Using `ObjectCollection` causes `TypeError`. Using no participant bodies causes accidental merging or cutting of adjacent bodies.
+
+## SplitBody — ONE tool per call (CRITICAL: freezes Fusion)
+
+`splitBodyFeatures.createInput(splitBodies, splittingTool, isExtended)` accepts a
+**single entity** as the splitting tool — a construction plane, face, profile, or
+one BRepBody. Per the API reference: *"The splitting tool is a single entity."*
+(Only the `splitBodies` argument and `SplitFace`'s tool accept an `ObjectCollection` —
+`SplitBody`'s tool does not.)
+
+**Passing an `ObjectCollection` of multiple planes/tools to one SplitBody call does
+NOT raise — it sends Fusion into an unbounded compute that hard-freezes the whole
+app** (requires force-quit). This was reproduced with a plain box and 4 parallel
+planes; it is not specific to leaning/complex geometry. Autodesk's own notes flag
+Split Body as fragile around multiple/intersecting tool data ("unhandled
+intersecting tool data", "Compute Failed") — via the API that failure mode becomes
+a freeze.
+
+```python
+# WRONG — collection of planes as the tool: FREEZES FUSION
+coll = adsk.core.ObjectCollection.create()
+for p in planes: coll.add(p)
+si = sbf.createInput(body, coll, True)   # ← hard hang
+sbf.add(si)
+
+# RIGHT — one plane per call; re-find the fragment to split each iteration
+for plane in planes:
+    target = pick_fragment_to_split(comp, plane)   # e.g. body whose bbox straddles the plane
+    si = sbf.createInput(target, plane, True)       # single tool
+    sbf.add(si)
+```
+
+Better still: if the goal is to make room for a peak/notch while keeping a rail as
+ONE continuous body, **don't SplitBody at all** — CUT a finite (bounded) tool body
+out of the rail and JOIN that same tool body into the mating part. A SplitBody by an
+infinite plane through the full height severs the rail into disconnected lumps;
+rejoining disconnected lumps then compounds the instability. The bounded
+CUT-then-JOIN ("notch") keeps the rail intact and avoids both failure modes. See the
+Ming table apron/spandrel gable for a worked example.
 
 ## Fillet and Chamfer Features
 
@@ -412,6 +474,7 @@ Result: one parametric pattern feature replaces an entire Python `for` loop.
 | Count doesn't update parametrically | Used Python `int()` at script time | Use `floor()` in Fusion parameter expressions |
 | Body pattern creates extra bodies | `keepTool=True` CUTs in template history create ghost duplicates at each pattern instance | Ghost bodies are harmless — keep patterns for parametric counts. Filter ghost overlaps from `check_interference` by excluding void-on-void pairs. |
 | Mortise CUT destroys the receiving board | CUT body diameter >= board thickness (e.g., 0.75" spindle in 0.75" rail) | Mortise diameter must be < board thickness. Leave >= 1/4 wall on each side. Use blind mortises (stub tenon), not through. |
+| Fusion hard-freezes on a SplitBody call (force-quit needed) | Passed an `ObjectCollection` of multiple planes/tools as the SplitBody **splitting tool** — the API takes a SINGLE entity there and doesn't validate, so it enters an unbounded compute | **Split one tool per `createInput` call** (loop the planes, re-finding the fragment each time), or avoid SplitBody entirely and use a bounded CUT-then-JOIN notch. See "SplitBody — ONE tool per call". |
 | Fusion crashes / hangs on complex scripts | Too many individual features created in a loop (e.g., 140 dowels = 700+ timeline features). Each `dowel.single()` or `domino.single()` creates sketch + extrude + fillet + CUT. | **Use bulk CUT instead of per-element joints.** For repeated elements (spindles, slats) that insert into rails, build all bodies first (body_pattern), then CUT them ALL into the target in ONE `sp.combine(rail, [all_spindles], CUT, True)` call. 8 bulk CUTs replaced 140 individual dowels in the crib build. |
 | Sketch geometry at mirrored/wrong position on non-XY plane | `probe_sketch_axes` gives axis name but not sign; model +Z -> sketch -Y on XZ planes | Use `probe_sketch_signs` or `modelToSketchSpace` for approximate positions, flip offset operator based on sign |
 | Loose tenon (domino) bodies disappear | Second CUT used `keepTool=False`, consuming the body | Use `keepTool=True` on ALL CUTs for visible loose tenon joints |

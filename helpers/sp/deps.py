@@ -218,6 +218,39 @@ def _check_sketch_anchoring(comp, comp_name, is_root_comp, issues):
         # else: only spline interiors are free → legitimate sculpted profile.
 
 
+def resolve_model_json(metadata_path=None):
+    """Resolve the model.json path for the current script.
+
+    Returns ``(path, found)``: ``path`` is the resolved metadata path (the
+    per-script ``<stem>_model.json`` if it exists, else ``<dir>/model.json``),
+    or ``None`` when no tracked script path is known; ``found`` is whether that
+    file exists on disk. Pure os/path logic — safe to call outside Fusion (used
+    by both ``validate_deps`` and ``validate_design`` to report a missing
+    model.json, and exercised by the offline tests).
+    """
+    import os
+
+    if metadata_path is not None:
+        return metadata_path, os.path.exists(metadata_path)
+
+    script_path = None
+    try:
+        from server.document_tracker import DocumentTracker
+        script_path = DocumentTracker._script_path
+    except Exception:
+        pass
+
+    if not script_path:
+        return None, False
+
+    script_dir = os.path.dirname(script_path)
+    stem = os.path.splitext(os.path.basename(script_path))[0]
+    per_script = os.path.join(script_dir, f"{stem}_model.json")
+    if os.path.exists(per_script):
+        return per_script, True
+    return os.path.join(script_dir, "model.json"), False
+
+
 def validate_deps(ctx, metadata_path=None):
     """Validate dependency tree from model.json.
 
@@ -236,27 +269,17 @@ def validate_deps(ctx, metadata_path=None):
     import re
 
     if metadata_path is None:
-        script_path = None
-        try:
-            from server.document_tracker import DocumentTracker
-            script_path = DocumentTracker._script_path
-        except Exception:
-            pass
-        if script_path:
-            script_dir = os.path.dirname(script_path)
-            stem = os.path.splitext(os.path.basename(script_path))[0]
-            per_script = os.path.join(script_dir, f"{stem}_model.json")
-            if os.path.exists(per_script):
-                metadata_path = per_script
-            else:
-                metadata_path = os.path.join(script_dir, "model.json")
-        else:
+        metadata_path, found = resolve_model_json(None)
+        if metadata_path is None:
             print("validate_deps: no metadata path and no script path found")
             return None
+    else:
+        found = os.path.exists(metadata_path)
 
-    if not os.path.exists(metadata_path):
-        print(f"validate_deps: {metadata_path} not found — skipping "
-              f"(create model.json to enable dependency validation)")
+    if not found:
+        print(f"validate_deps: no model.json at {metadata_path} — skipping "
+              f"sketch origin / traceability / fully-constrained checks. "
+              f"Create model.json to enable dependency validation.")
         return None
 
     with open(metadata_path, "r") as f:

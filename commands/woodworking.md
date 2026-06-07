@@ -569,9 +569,23 @@ This allows the user (or a new agent session) to resume work by reading the READ
 
 **Multi-agent / parallel sessions.** When agents run concurrently (a fan-out), the **Session Manager keeps a dedicated Fusion document per agent** (keyed by session ID); your `execute_script` / `capture_design` / `validate_design` calls operate on YOUR document and `clean=True` rebuilds only it, so parallel agents never collide. Fusion serializes execution — expect latency, not incorrectness — so run the normal loop with no document coordination. If you lose your binding or `claim_document` reports a conflict, re-bind (`resolution='transfer'` to take a contested doc); after a restore, `clean=True` is rejected until you `sync_script`. See `docs/mcp-advanced.md`.
 
-**model.json:** Before writing the build script, create a `model.json` dependency tree — each entry pairs a `"body"` with its `"ref"`, the parent it was positioned from. `"ref"` may be one name or a list: every body needs ≥1 parent (a part seating against two lists both), and exactly one body references `"origin"` (the root). A two-parent sketch anchors to each parent's projected geometry on the axis that parent controls.
+**model.json (MANDATORY — create it FIRST, before the build script):** The dependency
+tree is what turns on `validate_design`'s sketch-quality checks (sketch origin enforcement,
+traceability, fully-constrained). **Without a `model.json` next to the script those checks do
+not run at all** — `validate_design` then reports `DEPS SKIPPED — no model.json` and its
+"PASS" only covers connectivity + interference. A model can pass that way with every sketch
+floating on Python-computed coordinates (the Ming-table trap: a multi-hour build reported
+green the whole time because the gate was never armed). So create `model.json` at project
+start, not as a retrofit. Each entry pairs a `"body"` with its `"ref"`, the parent it was
+positioned from. `"ref"` may be one name or a list: every body needs ≥1 parent (a part
+seating against two lists both), and exactly one body references `"origin"` (the root). A
+two-parent sketch anchors to each parent's projected geometry on the axis that parent controls.
 
-**Phase validation:** `validate_design` runs connectivity, interference, and dependency checks (single origin, sketch origin enforcement, bodies in components). Run it after EVERY phase. Completeness (all bodies tracked) is advisory — it won't fail the build.
+**Phase validation:** `validate_design` runs connectivity, interference, and dependency checks
+(single origin, sketch origin enforcement, bodies in components). Run it after EVERY phase.
+Completeness (all bodies tracked) is advisory — it won't fail the build. **If you see
+`DEPS SKIPPED`, the dependency checks never ran — add `model.json` and re-validate; do not
+treat that result as a clean pass.**
 
 **Final step:** apply_appearance → get_product_shots → present to user.
 
