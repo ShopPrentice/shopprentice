@@ -135,13 +135,13 @@ All exposed as User Parameters (Modify > Change Parameters):
 
 ### See-through views
 
-Because nearly every joint is concealed, here are transparent renders (the obscuring member made see-through, edge lines kept) that reveal the hidden joinery — two angles per joint.
+Because nearly every joint is concealed, here are transparent renders (edge lines kept) that reveal the hidden joinery. For each joint the two images are a **complementary pair**: each side of the joint is made see-through in turn, shot from the opposite face.
 
 ![Transparent overview](screenshots/joinery-overview-transparent.png)
 
 #### 格角榫 — top-frame mitered mortise-and-tenon
 
-The rail's concealed tenon and the 45° miter, seen through the transparent stile.
+The rail's tenon revealed through the transparent stile; then the stile's mortise through the transparent rail (opposite face).
 
 <p float="left">
   <img src="screenshots/joinery-gejiaosun-1.png" width="49%" />
@@ -168,7 +168,7 @@ The long apron passing through the transparent leg; then the apron + mitered spa
 
 #### 圆包圆内榫格 — shelf rails mitered inside the round leg
 
-The two full-height rail tenons mitering together inside the transparent leg.
+The two full-height rail tenons mitering together inside the transparent leg; then the short rail's tenon seated in the transparent long rail (opposite face).
 
 <p float="left">
   <img src="screenshots/joinery-shelf-1.png" width="49%" />
