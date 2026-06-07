@@ -1,4 +1,4 @@
-# Classic Ming-Style Side Table
+# Classic Ming-Style Side Table (平头案)
 
 A parametric side table inspired by classical Chinese Ming-dynasty furniture, modeled in Fusion 360 via Python script. 28"L x 13.75"D x 30.875"H. Round splayed legs and a traditional joinery vocabulary throughout: a **格角榫 mitered mortise-and-tenon** top frame (concealed tenon, clean mitered corners), **hidden full-blind dovetails** at the apron corners, **mitered mortise-and-tenons** that meet inside the round legs at the shelf, floating frame-and-panel surfaces with sliding-dovetail battens, and carved spandrel brackets — almost every joint is concealed, reading as clean miters from the outside.
 
