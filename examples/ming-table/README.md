@@ -133,6 +133,20 @@ All exposed as User Parameters (Modify > Change Parameters):
 | Top & shelf fields | Frame-and-floating-panel | 攒边打槽装板 | Grooved frame captures a panel that floats for wood movement. |
 | Spandrel brackets | Carved bracket (part) | 牙子 / 角牙 | Carved brackets joined to the apron band by internal 1/8" tongues. |
 
+### See-through views
+
+Because nearly every joint is concealed, here are transparent renders that reveal the hidden joinery. A see-through overview, then each corner joint (the obscuring member made transparent):
+
+![Transparent overview](screenshots/joinery-overview-transparent.png)
+
+<p float="left">
+  <img src="screenshots/joinery-apron-dovetail.png" width="32%" title="Apron full-blind dovetail" />
+  <img src="screenshots/joinery-top-mitered-tenon.png" width="32%" title="Top-frame 格角榫" />
+  <img src="screenshots/joinery-shelf-tenon.png" width="32%" title="Shelf mitered tenons in the leg" />
+</p>
+
+Left → right: **闷齿斗角榫** (apron full-blind dovetail — tails seen through the transparent long apron), **格角榫** (top-frame mitered tenon — rail tenon seen through the transparent stile), **圆包圆内榫格** (shelf rails' full-height tenons mitering together inside a transparent leg).
+
 ---
 
 ## Customization
