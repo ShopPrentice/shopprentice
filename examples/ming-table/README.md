@@ -120,6 +120,19 @@ All exposed as User Parameters (Modify > Change Parameters):
 - **Spline edge molding** — a custom fitted-spline cutter sweeps a hollow molding along the top-frame outer bottom edge; cut on every member so it wraps the corners and trims the through-tenons flush.
 - **Mirror-based replication** — symmetric parts (legs, frame members, aprons, shelf rails, battens, dovetails) are built once and mirrored, so the whole piece rebuilds from a single corner's geometry.
 
+### Joinery names (傳統榫卯)
+
+| Location | Joint | 中文 |
+|----------|-------|------|
+| Top-frame corners | Mitered mortise-and-tenon (concealed tenon) | 格角榫 |
+| Apron corners | Full-blind (secret mitered) dovetail | 闷齿斗角榫 |
+| Apron → leg | Forked/slotted leg clamping the apron, mitered spandrel | 格角牙夹头榫 |
+| Shelf rails → round legs | Round-wraps-round, coped with internal mitered tenons | 圆包圆内榫格 |
+| Panel → frame | Groove-and-tongue | 舌榫（簧） |
+| Battens under panels | Sliding-dovetail batten | 穿带 |
+| Top & shelf fields | Frame-and-floating-panel | 攒边打槽装板 |
+| Spandrel brackets | Carved bracket (joined by loose tongues) | 牙子 / 角牙 |
+
 ---
 
 ## Customization
