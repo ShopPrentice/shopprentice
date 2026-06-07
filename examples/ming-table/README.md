@@ -122,16 +122,16 @@ All exposed as User Parameters (Modify > Change Parameters):
 
 ### Joinery names (傳統榫卯)
 
-| Location | Joint | 中文 |
-|----------|-------|------|
-| Top-frame corners | Mitered mortise-and-tenon (concealed tenon) | 格角榫 |
-| Apron corners | Full-blind (secret mitered) dovetail | 闷齿斗角榫 |
-| Apron → leg | Forked/slotted leg clamping the apron, mitered spandrel | 格角牙夹头榫 |
-| Shelf rails → round legs | Round-wraps-round, coped with internal mitered tenons | 圆包圆内榫格 |
-| Panel → frame | Groove-and-tongue | 舌榫（簧） |
-| Battens under panels | Sliding-dovetail batten | 穿带 |
-| Top & shelf fields | Frame-and-floating-panel | 攒边打槽装板 |
-| Spandrel brackets | Carved bracket (joined by loose tongues) | 牙子 / 角牙 |
+| Location | Joint | Chinese term | What it is |
+|----------|-------|--------------|------------|
+| Top-frame corners | Mitered mortise-and-tenon | 格角榫 | 45° miter shows outside; the tenon is concealed in the middle third of the thickness. |
+| Apron corners | Full-blind (secret mitered) dovetail | 闷齿斗角榫 | Tails on the short apron hide in sockets in the long apron behind a lip — invisible outside. |
+| Apron → leg | Forked/slotted leg clamping the apron | 格角牙夹头榫 | The leg is slotted to "clamp" the apron; a mitered spandrel fills the corner. |
+| Shelf rails → round legs | Round-wraps-round, coped + mitered tenons | 圆包圆内榫格 | Rails coped to wrap the round leg; full-height tenons miter together inside the leg. |
+| Panel → frame | Groove-and-tongue | 舌榫（簧） | One-shoulder tongue riding in the frame groove. |
+| Battens under panels | Sliding-dovetail batten | 穿带 | Tapered dovetail batten slid into a groove across the panel underside; keeps it flat. |
+| Top & shelf fields | Frame-and-floating-panel | 攒边打槽装板 | Grooved frame captures a panel that floats for wood movement. |
+| Spandrel brackets | Carved bracket (part) | 牙子 / 角牙 | Carved brackets joined to the apron band by internal 1/8" tongues. |
 
 ---
 
