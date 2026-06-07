@@ -90,6 +90,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 </tr>
 <tr>
 <td align="center"><a href="examples/becksvoort-wall-shelf/"><img src="examples/becksvoort-wall-shelf/screenshots/iso-top-right.png" width="220" /><br /><b>Becksvoort Wall Shelf</b></a></td>
+<td align="center"><a href="examples/ming-table/"><img src="examples/ming-table/screenshots/iso-top-right.png" width="220" /><br /><b>Ming Table</b></a></td>
 </tr>
 </table>
 

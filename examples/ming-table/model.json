@@ -1,0 +1,33 @@
+{
+  "name": "Classic Ming Table",
+  "deps": [
+    {"body": "Leg_FL", "ref": "origin", "note": "front-left leg, sits on floor — root"},
+    {"body": "Leg_FR", "ref": "Leg_FL", "note": "mirror of FL across YZ"},
+    {"body": "Leg_BL", "ref": "Leg_FL", "note": "mirror of FL across XZ"},
+    {"body": "Leg_BR", "ref": "Leg_FL", "note": "mirror of FL"},
+
+    {"body": "TF_Front", "ref": "Leg_FL", "note": "top frame front, pierced by front legs"},
+    {"body": "TF_Back", "ref": "Leg_FL", "note": "mirror of TF_Front"},
+    {"body": "TF_Left", "ref": "Leg_FL", "note": "top frame left, pierced by left legs"},
+    {"body": "TF_Right", "ref": "Leg_FL", "note": "mirror of TF_Left"},
+    {"body": "TopPanel", "ref": "TF_Front", "note": "floating panel in frame groove"},
+    {"body": "Batten_R", "ref": "TopPanel", "note": "sliding-dovetail batten under panel"},
+    {"body": "Batten_L", "ref": "TopPanel", "note": "mirror of Batten_R"},
+
+    {"body": "LongApron_F", "ref": "Leg_FL", "note": "apron band + connecting tongues, joined to spandrels via internal 1/8\" tongues"},
+    {"body": "LongApron_B", "ref": "Leg_FL", "note": "mirror of LongApron_F"},
+    {"body": "Spandrel_FL", "ref": "Leg_FL", "note": "front-left spandrel bracket, connected to band via tongue"},
+    {"body": "Spandrel_FR", "ref": "Leg_FL", "note": "front-right spandrel"},
+    {"body": "Spandrel_BL", "ref": "Leg_FL", "note": "back-left spandrel"},
+    {"body": "Spandrel_BR", "ref": "Leg_FL", "note": "back-right spandrel"},
+    {"body": "ShortApron_L", "ref": "Leg_FL", "note": "short apron, mitered to long aprons at the corners"},
+    {"body": "ShortApron_R", "ref": "Leg_FL", "note": "mirror of ShortApron_L"},
+
+    {"body": "ShelfLong_F", "ref": "Leg_FL", "note": "shelf long rail, coped M&T to legs"},
+    {"body": "ShelfLong_B", "ref": "Leg_FL", "note": "mirror of ShelfLong_F"},
+    {"body": "ShelfShort_L", "ref": "Leg_FL", "note": "shelf short rail, coped M&T to legs"},
+    {"body": "ShelfShort_R", "ref": "Leg_FL", "note": "mirror of ShelfShort_L"},
+    {"body": "ShelfPanel", "ref": "ShelfLong_F", "note": "floating shelf panel in rail groove"},
+    {"body": "ShelfBatten", "ref": "ShelfPanel", "note": "sliding-dovetail batten under shelf panel"}
+  ]
+}
