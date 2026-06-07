@@ -135,17 +135,45 @@ All exposed as User Parameters (Modify > Change Parameters):
 
 ### See-through views
 
-Because nearly every joint is concealed, here are transparent renders that reveal the hidden joinery. A see-through overview, then each corner joint (the obscuring member made transparent):
+Because nearly every joint is concealed, here are transparent renders (the obscuring member made see-through, edge lines kept) that reveal the hidden joinery — two angles per joint.
 
 ![Transparent overview](screenshots/joinery-overview-transparent.png)
 
+#### 格角榫 — top-frame mitered mortise-and-tenon
+
+The rail's concealed tenon and the 45° miter, seen through the transparent stile.
+
 <p float="left">
-  <img src="screenshots/joinery-apron-dovetail.png" width="32%" title="Apron full-blind dovetail" />
-  <img src="screenshots/joinery-top-mitered-tenon.png" width="32%" title="Top-frame 格角榫" />
-  <img src="screenshots/joinery-shelf-tenon.png" width="32%" title="Shelf mitered tenons in the leg" />
+  <img src="screenshots/joinery-gejiaosun-1.png" width="49%" />
+  <img src="screenshots/joinery-gejiaosun-2.png" width="49%" />
 </p>
 
-Left → right: **闷齿斗角榫** (apron full-blind dovetail — tails seen through the transparent long apron), **格角榫** (top-frame mitered tenon — rail tenon seen through the transparent stile), **圆包圆内榫格** (shelf rails' full-height tenons mitering together inside a transparent leg).
+#### 闷齿斗角榫 — apron full-blind dovetail
+
+The short apron's tails through the transparent long apron; then the long apron's sockets through the transparent short apron.
+
+<p float="left">
+  <img src="screenshots/joinery-dovetail-1.png" width="49%" />
+  <img src="screenshots/joinery-dovetail-2.png" width="49%" />
+</p>
+
+#### 格角牙夹头榫 — apron clamped by the leg
+
+The long apron passing through the transparent leg; then the apron + mitered spandrel ghosted against the solid leg.
+
+<p float="left">
+  <img src="screenshots/joinery-jiatousun-1.png" width="49%" />
+  <img src="screenshots/joinery-jiatousun-2.png" width="49%" />
+</p>
+
+#### 圆包圆内榫格 — shelf rails mitered inside the round leg
+
+The two full-height rail tenons mitering together inside the transparent leg.
+
+<p float="left">
+  <img src="screenshots/joinery-shelf-1.png" width="49%" />
+  <img src="screenshots/joinery-shelf-2.png" width="49%" />
+</p>
 
 ---
 
