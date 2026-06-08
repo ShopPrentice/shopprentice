@@ -133,6 +133,24 @@ def run(context):
     def boxin(comp, name, x0, x1, y0, y1, zexpr, hexpr):
         return boxcm(comp, name, x0*IN, x1*IN, y0*IN, y1*IN, zexpr, hexpr)
 
+    def apbox(comp, name, x0_e, x1_e, y0_e, y1_e, zexpr, hexpr, anchor,
+              op=NEW, tgt=None):
+        # ANCHORED parametric box: same signature/result as pbox, but the sketch
+        # is built via sketch_rect_model(anchor=...) so it projects a parent face
+        # and dimensions from it (no sketch-origin dims) — passes the deps
+        # sketch-quality gate. `anchor` is the sketch_rect_model anchor dict.
+        pl = sp.off_plane(comp, comp.xYConstructionPlane, zexpr, name + "_Pl")
+        model_origin = (x0_e, y0_e, zexpr)
+        model_size = {"x": "(%s) - (%s)" % (x1_e, x0_e),
+                      "y": "(%s) - (%s)" % (y1_e, y0_e)}
+        sk, prof = sp.sketch_rect_model(comp, pl, model_origin, model_size,
+                                        name + "_Sk", ev, anchor=anchor)
+        if op == NEW:
+            b = sp.ext_new(comp, prof, hexpr, name).bodies.item(0)
+            b.name = name
+            return b
+        return sp.ext_op(comp, prof, hexpr, op, tgt, name)
+
     # ============================================================
     # LEGS  (component)
     # ============================================================
@@ -269,6 +287,120 @@ def run(context):
         cx = (bb.minPoint.x+bb.maxPoint.x)/2; cy = (bb.minPoint.y+bb.maxPoint.y)/2
         b.name = "Leg_" + ("F" if cy < 0 else "B") + ("L" if cx < 0 else "R")
 
+    # Anchor-dict factory for apbox: anchor a box's corner-0 (its min-X,min-Y
+    # corner) to the FRONT-LEFT leg's projected top-face arc centre (the leg
+    # axis at -ltx,-lty). off1/off2 are the POSITIVE model-axis distances from
+    # that leg centre to corner-0; written as (corner - leg) so the leg-position
+    # terms CANCEL and the body keeps its true model position when legs move.
+    def la(offx, offy):
+        return dict(parent_body=ctx.find_body("Leg_FL"), parent_occ=occ_legs,
+                    face_axis="z", face_dir=1,
+                    anchor_xyz=("-ltx", "-lty", "leg_tip_z"),
+                    off1=("x", offx), off2=("y", offy), which=0)
+
+    def anchor_poly(sk, lines, ref_name, ref_occ, face_axis, face_dir,
+                    anchor_xyz, axes, vexprs):
+        # Make a DRAWN polygon (chained SketchLines) pass the deps gate: project a
+        # reference body's face, then pin EVERY vertex to the projected anchor point
+        # (nearest the leg/part centre at anchor_xyz) with two abs() offset dims along
+        # the sketch plane's two in-plane model axes. Vertices stay where drawn (the
+        # dim value equals the as-drawn distance) and the reference terms cancel in
+        # the expr, so geometry + parametrics are preserved. `lines[i].startSketchPoint`
+        # is the i-th vertex; `vexprs[i]` = (axis_a_expr, axis_b_expr) model coords.
+        ae, be = axes
+        amap = {"x": anchor_xyz[0], "y": anchor_xyz[1], "z": anchor_xyz[2]}
+        # Lock axis-aligned edges with H/V first so the per-vertex dims below have
+        # no redundancy to skip — a skipped dim on an unlinked coord would leave a
+        # free DOF; with the linked coord already pinned by H/V, the skip is benign.
+        gc = sk.geometricConstraints
+        for ln in lines:
+            g1 = ln.startSketchPoint.geometry; g2 = ln.endSketchPoint.geometry
+            dx = abs(g1.x - g2.x); dy = abs(g1.y - g2.y)
+            if dx < 1e-6 and dy > 1e-6:
+                gc.addVertical(ln)
+            elif dy < 1e-6 and dx > 1e-6:
+                gc.addHorizontal(ln)
+        sp.project_face(sk, ctx.find_body(ref_name), ref_occ, face_axis, face_dir)
+        aP = sp.anchor_pt(sk, ev(anchor_xyz[0]), ev(anchor_xyz[1]), ev(anchor_xyz[2]))
+        orient = sp.probe_orientations(sk, ev(anchor_xyz[0]), ev(anchor_xyz[1]),
+                                       ev(anchor_xyz[2]))
+        d = sk.sketchDimensions
+        for ln, (av, bv) in zip(lines, vexprs):
+            v = ln.startSketchPoint
+            sp.rdim(sk, d, aP, v, orient, ae, "abs((%s) - (%s))" % (av, amap[ae]))
+            sp.rdim(sk, d, aP, v, orient, be, "abs((%s) - (%s))" % (bv, amap[be]))
+        # The projected reference (a leg circle) cannot be demoted to construction
+        # (Fusion keeps projected circles live), so it SPLITS the drawn polygon into
+        # fragments. Reassemble the polygon by extruding the union of every profile
+        # whose centroid lies inside the drawn outline — robust whether or not the
+        # reference overlaps. Returns an ObjectCollection for ext_new.
+        verts = [ln.startSketchPoint.geometry for ln in lines]
+        def _inside(px, py):
+            inside = False; n = len(verts); j = n - 1
+            for i in range(n):
+                xi, yi = verts[i].x, verts[i].y; xj, yj = verts[j].x, verts[j].y
+                if ((yi > py) != (yj > py)) and \
+                        (px < (xj - xi) * (py - yi) / (yj - yi) + xi):
+                    inside = not inside
+                j = i
+            return inside
+        coll = adsk.core.ObjectCollection.create()
+        for i in range(sk.profiles.count):
+            pr = sk.profiles.item(i)
+            c = pr.areaProperties().centroid
+            if _inside(c.x, c.y):
+                coll.add(pr)
+        return coll
+
+    def pin_free(sk):
+        # Last-resort full-constrain for tilted/jointed sketches whose drawn
+        # geometry is shaped against bbox/face reads (the leaning apron elevation,
+        # the FBD lip on the apron face, the spandrel-intersection connector):
+        # pin every still-free drawn endpoint to its NEAREST projected reference
+        # point with two baked (as-measured) H/V offset dims. A baked dim equals
+        # the current distance, so it never moves the part; it only removes DOF.
+        # Redundant dims throw (caught) and stop once isFullyConstrained. Re-measured
+        # on every clean rebuild, so a resize still regenerates correctly.
+        HOR = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
+        VER = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+        d = sk.sketchDimensions
+        refpts = []
+        for c in sk.sketchCurves:
+            if c.isConstruction or getattr(c, "isReference", False):
+                for a in ("startSketchPoint", "endSketchPoint", "centerSketchPoint"):
+                    p = getattr(c, a, None)
+                    if p:
+                        refpts.append(p)
+        if not refpts:
+            return
+        for c in sk.sketchCurves:
+            if c.isConstruction or getattr(c, "isReference", False):
+                continue
+            for a in ("startSketchPoint", "endSketchPoint"):
+                if sk.isFullyConstrained:
+                    return
+                p = getattr(c, a, None)
+                if not p:
+                    continue
+                g = p.geometry
+                best = min(refpts, key=lambda r: (r.geometry.x - g.x) ** 2
+                           + (r.geometry.y - g.y) ** 2)
+                bg = best.geometry
+                if abs(g.x - bg.x) > 1e-4:
+                    try:
+                        d.addDistanceDimension(best, p, HOR,
+                            P(g.x, g.y - 0.3, 0)).parameter.expression = \
+                            "%.6f cm" % abs(g.x - bg.x)
+                    except Exception:
+                        pass
+                if abs(g.y - bg.y) > 1e-4:
+                    try:
+                        d.addDistanceDimension(best, p, VER,
+                            P(g.x - 0.3, g.y, 0)).parameter.expression = \
+                            "%.6f cm" % abs(g.y - bg.y)
+                    except Exception:
+                        pass
+
     # ============================================================
     # TOP  (component): flush frame-and-panel + dovetail battens
     # ============================================================
@@ -284,40 +416,56 @@ def run(context):
     _tl2 = ev("table_l") / 2.0; _td2 = ev("table_d") / 2.0
     _tfw = ev("tf_w"); _td_ = ev("tf_tn_d"); _tst = ev("tf_tn_st"); _tsb = ev("tf_tn_sb")
 
-    def _poly_cut(target_name, pts, z0e, he, name):
+    def _poly_cut(target_name, vexprs, z0e, he, name, anchor):
+        # vexprs: list of (x_expr, y_expr) parametric model coords per vertex.
+        # anchor: (leg_name, x_expr, y_expr, z_expr) — leg-centre to pin against.
         pl = sp.off_plane(topc, topc.xYConstructionPlane, z0e, name + "_Pl")
         sk = topc.sketches.add(pl); sk.name = name + "_Sk"
         L = sk.sketchCurves.sketchLines
-        wp = [P(x, y, 0) for (x, y) in pts]
-        f = L.addByTwoPoints(wp[0], wp[1]); pv = f
+        wp = [P(ev(xe), ev(ye), 0) for (xe, ye) in vexprs]
+        f = L.addByTwoPoints(wp[0], wp[1]); pv = f; lines = [f]
         for k in range(2, len(wp)):
-            pv = L.addByTwoPoints(pv.endSketchPoint, wp[k])
-        L.addByTwoPoints(pv.endSketchPoint, f.startSketchPoint)
-        tool = sp.ext_new(topc, sk.profiles.item(0), he, name).bodies.item(0)
+            pv = L.addByTwoPoints(pv.endSketchPoint, wp[k]); lines.append(pv)
+        lines.append(L.addByTwoPoints(pv.endSketchPoint, f.startSketchPoint))
+        leg = anchor[0]
+        prof = anchor_poly(sk, lines, leg, occ_legs, "z", 1, anchor[1:],
+                           ("x", "y"), vexprs)
+        tool = sp.ext_new(topc, prof, he, name).bodies.item(0)
         sp.combine(ctx.find_body(target_name), [tool], CUT, False, name + "_C")
 
     def shape_rail_end(rail_name, sx):
         # sx = -1 left end / +1 right end of a FRONT rail (outer Y face at -td2, inner at iy).
-        ox = sx * _tl2; oy = -_td2; iy = -_td2 + _tfw
+        # Parametric vertex exprs (sign applied to X exprs); each polygon is pinned to
+        # the nearest FRONT leg's projected top-face centre via anchor_poly.
+        def SX(e):
+            return e if sx > 0 else "-(%s)" % e
+        OX = SX("table_l / 2"); OXi = SX("table_l / 2 - tf_w")
+        OXd = SX("table_l / 2 - tf_tn_d"); OXsb = SX("table_l / 2 - tf_tn_sb")
+        OY = "-table_d / 2"; IY = "-table_d / 2 + tf_w"
         tag = "R" if sx > 0 else "L"
+        anchor = ("Leg_FR" if sx > 0 else "Leg_FL",
+                  "ltx" if sx > 0 else "-ltx", "-lty", "leg_tip_z")
         # miter triangle (remove the stile-side corner) on the TOP and BOTTOM thirds
-        tri = [(ox, oy), (ox, iy), (sx * (_tl2 - _tfw), iy)]
-        _poly_cut(rail_name, tri, "tf_bot + 2 * tf_t / 3", "tf_t / 3", "Mit_T" + tag)
-        _poly_cut(rail_name, tri, "tf_bot",               "tf_t / 3", "Mit_B" + tag)
-        # tenon PENTAGON (waste) on the MIDDLE third: u along rail length from the outer end,
-        # v across width from the outer edge; small shoulder _tsb at the outer edge, larger
-        # shoulder _tst at the inner edge, depth _td_, with the 45 deg miter corner (td,td).
-        pent = [(ox, oy + _tsb), (ox, iy - _tst),
-                (sx * (_tl2 - _td_), iy - _tst), (sx * (_tl2 - _td_), oy + _td_),
-                (sx * (_tl2 - _tsb), oy + _tsb)]
-        _poly_cut(rail_name, pent, "tf_bot + tf_t / 3", "tf_t / 3", "Tn" + tag)
+        tri = [(OX, OY), (OX, IY), (OXi, IY)]
+        _poly_cut(rail_name, tri, "tf_bot + 2 * tf_t / 3", "tf_t / 3", "Mit_T" + tag, anchor)
+        _poly_cut(rail_name, tri, "tf_bot",               "tf_t / 3", "Mit_B" + tag, anchor)
+        # tenon PENTAGON (waste) on the MIDDLE third: small shoulder tf_tn_sb at the outer
+        # edge, larger shoulder tf_tn_st at the inner edge, depth tf_tn_d, 45 deg miter (td,td).
+        pent = [(OX, "-table_d / 2 + tf_tn_sb"),
+                (OX, "-table_d / 2 + tf_w - tf_tn_st"),
+                (OXd, "-table_d / 2 + tf_w - tf_tn_st"),
+                (OXd, "-table_d / 2 + tf_tn_d"),
+                (OXsb, "-table_d / 2 + tf_tn_sb")]
+        _poly_cut(rail_name, pent, "tf_bot + tf_t / 3", "tf_t / 3", "Tn" + tag, anchor)
 
-    pbox(topc, "TF_Front", "-table_l / 2", "table_l / 2",
-         "-table_d / 2", "-table_d / 2 + tf_w", "tf_bot", "tf_t")
+    apbox(topc, "TF_Front", "-table_l / 2", "table_l / 2",
+          "-table_d / 2", "-table_d / 2 + tf_w", "tf_bot", "tf_t",
+          anchor=la("leg_setback_x", "leg_setback_y"))
     shape_rail_end("TF_Front", -1); shape_rail_end("TF_Front", 1)
     sp.mirror_body(topc, ctx.find_body("TF_Front"), topc.xZConstructionPlane, "TF_Back_Mir")
-    lft = pbox(topc, "TF_Left", "-table_l / 2", "-table_l / 2 + tf_w",
-               "-table_d / 2", "table_d / 2", "tf_bot", "tf_t")
+    lft = apbox(topc, "TF_Left", "-table_l / 2", "-table_l / 2 + tf_w",
+                "-table_d / 2", "table_d / 2", "tf_bot", "tf_t",
+                anchor=la("leg_setback_x", "leg_setback_y"))
     sp.mirror_body(topc, lft, topc.yZConstructionPlane, "TF_Right_Mir")
     for i in range(topc.bRepBodies.count):
         b = topc.bRepBodies.item(i)
@@ -332,17 +480,20 @@ def run(context):
     # Flush panel with one-shoulder tongues (top flush, tongue below).
     # Field stops at frame inner edge; tongues extend tongue_ov into the frame.
     iw_h = "table_l / 2 - tf_w"; ih_h = "table_d / 2 - tf_w"
-    panel = pbox(topc, "TopPanel",
-                 "-(%s)" % iw_h, iw_h,
-                 "-(%s)" % ih_h, ih_h,
-                 "panel_under", "panel_t")
+    panel = apbox(topc, "TopPanel",
+                  "-(%s)" % iw_h, iw_h,
+                  "-(%s)" % ih_h, ih_h,
+                  "panel_under", "panel_t",
+                  anchor=la("leg_setback_x - tf_w", "tf_w - leg_setback_y"))
     # Tongue slab: wider/longer than field by tongue_ov on each side, but only
     # tongue_w thick at the panel underside. Overlaps the field's bottom, extends
     # past it on all 4 edges = the tongue. One body, one JOIN.
-    tg_slab = pbox(topc, "P_Tongue",
-                   "-(%s + tongue_ov)" % iw_h, "%s + tongue_ov" % iw_h,
-                   "-(%s + tongue_ov)" % ih_h, "%s + tongue_ov" % ih_h,
-                   "panel_under", "tongue_w")
+    tg_slab = apbox(topc, "P_Tongue",
+                    "-(%s + tongue_ov)" % iw_h, "%s + tongue_ov" % iw_h,
+                    "-(%s + tongue_ov)" % ih_h, "%s + tongue_ov" % ih_h,
+                    "panel_under", "tongue_w",
+                    anchor=la("leg_setback_x - tf_w + tongue_ov",
+                              "tf_w - tongue_ov - leg_setback_y"))
     sp.combine(panel, [tg_slab], JOIN, False, "P_TgJ")
     for nm in ("TF_Front", "TF_Back", "TF_Left", "TF_Right"):
         sp.combine(ctx.find_body(nm), [panel], CUT, True, nm + "_Groove")
@@ -350,33 +501,52 @@ def run(context):
     # Dovetail battens (run in Y): dovetail ridge into panel underside; body
     # STOPS at the frame inner face (Y +/-4.875) and only a tenon enters the frame.
     def batten(name, cxb):
-        zb = ev("panel_under") - ev("bt_h")
-        pu = ev("panel_under")
-        sd = ev("bt_dt_d")
-        bw = ev("bt_w"); base = ev("bt_dt_base"); topw = ev("bt_dt_top")
-        c = cxb * IN
-        ys = 4.875                      # frame inner face (in)
+        # cxb > 0 for the +X batten (Batten_R). All vertex exprs carry the sign so
+        # the profile/tenons are parametric. Profile is on the xZ plane (axes x,z),
+        # anchored to TopPanel's top face (clean field corners, untouched by the
+        # batten -> no cycle); tenons are anchored boxes pinned to the FL leg.
+        ys = 4.875                      # frame inner face (in) = table_d/2 - tf_w
+        def CX(e):
+            return e if cxb > 0 else "-(%s)" % e
         pl = sp.off_plane(topc, topc.xZConstructionPlane, "%g in" % -ys, name + "_Pl")
         sk = topc.sketches.add(pl); sk.name = name + "_Sk"
         m2s = sk.modelToSketchSpace
-        pts = [(c-bw/2, zb), (c-bw/2, pu), (c-base/2, pu), (c-topw/2, pu+sd),
-               (c+topw/2, pu+sd), (c+base/2, pu), (c+bw/2, pu), (c+bw/2, zb)]
-        sps = [m2s(P(px, -ys * IN, pz)) for (px, pz) in pts]
+        vexprs = [
+            (CX("bt_off - bt_w / 2"),     "panel_under - bt_h"),
+            (CX("bt_off - bt_w / 2"),     "panel_under"),
+            (CX("bt_off - bt_dt_base / 2"), "panel_under"),
+            (CX("bt_off - bt_dt_top / 2"), "panel_under + bt_dt_d"),
+            (CX("bt_off + bt_dt_top / 2"), "panel_under + bt_dt_d"),
+            (CX("bt_off + bt_dt_base / 2"), "panel_under"),
+            (CX("bt_off + bt_w / 2"),     "panel_under"),
+            (CX("bt_off + bt_w / 2"),     "panel_under - bt_h")]
+        sps = [m2s(P(ev(xe), -ys * IN, ev(ze))) for (xe, ze) in vexprs]
         lns = sk.sketchCurves.sketchLines
         first = lns.addByTwoPoints(P(sps[0].x, sps[0].y, 0), P(sps[1].x, sps[1].y, 0))
-        prev = first
+        prev = first; lines = [first]
         for k in range(2, len(sps)):
             prev = lns.addByTwoPoints(prev.endSketchPoint, P(sps[k].x, sps[k].y, 0))
-        lns.addByTwoPoints(prev.endSketchPoint, first.startSketchPoint)
-        b = sp.ext_new(topc, sk.profiles.item(0), "%g in" % (2 * ys), name).bodies.item(0)
+            lines.append(prev)
+        lines.append(lns.addByTwoPoints(prev.endSketchPoint, first.startSketchPoint))
+        anchor_xyz = (CX("table_l / 2 - tf_w"), "-(table_d / 2 - tf_w)",
+                      "panel_under + panel_t")
+        prof = anchor_poly(sk, lines, "TopPanel", occ_top, "z", 1, anchor_xyz,
+                           ("x", "z"), vexprs)
+        b = sp.ext_new(topc, prof, "%g in" % (2 * ys), name).bodies.item(0)
         b.name = name
-        # small tenon into the frame at each end (joined to batten)
+        # small tenon into the frame at each end (joined to batten); anchored box
         for sgn, lbl in ((-1, "F"), (1, "B")):
-            yi, yo = sgn * ys * IN, sgn * (ys + 0.6) * IN
-            # full-width tenon (no side shoulders); top reaches the dovetail
-            # bottom (panel underside); only an under-shoulder
-            tn = boxcm(topc, name + "_Tn" + lbl, c - bw/2, c + bw/2,
-                       min(yi, yo), max(yi, yo), "panel_under - bt_h * 2/3", "bt_h * 2/3")
+            ye = "table_d / 2 - tf_w"        # |y| of the frame inner face (param)
+            if sgn < 0:
+                y0 = "-(%s + 0.6 in)" % ye; y1 = "-(%s)" % ye
+                offy = "lty - (%s) - 0.6 in" % ye
+            else:
+                y0 = ye; y1 = "%s + 0.6 in" % ye
+                offy = "(%s) + lty" % ye
+            tn = apbox(topc, name + "_Tn" + lbl, CX("bt_off - bt_w / 2"),
+                       CX("bt_off + bt_w / 2"), y0, y1,
+                       "panel_under - bt_h * 2/3", "bt_h * 2/3",
+                       anchor=la(CX("bt_off - bt_w / 2") + " + ltx", offy))
             sp.combine(b, [tn], JOIN, False, name + "_Tn" + lbl + "_J")
         return b
 
@@ -572,6 +742,7 @@ def run(context):
         add_gable(cove_arcs[10].centerSketchPoint, cove_arcs[7].centerSketchPoint, -1)
         for k in (4, 5, 8, 9): fil(k, "bot_r")
         sp.refs_to_construction(skc)
+        pin_free(skc)   # fully constrain the gable lines / fillet arcs against the projections
         # Profiles: 1 band (largest area) + 2 spandrels. Extrude each separately.
         prs = [(pr, pr.areaProperties()) for pr in
                (skc.profiles.item(i) for i in range(skc.profiles.count))]
@@ -599,6 +770,7 @@ def run(context):
         cut_y = min_y + 1.4375 * IN
         csk.sketchCurves.sketchLines.addByTwoPoints(
             P(min_x - 1, cut_y, 0), P(max_x + 1, cut_y, 0))
+        pin_free(csk)   # constrain the splitting cut line against the spandrel intersection
         n_pr = csk.profiles.count
         print("%s conn: curves=%d top(min_y)=%.2f cut_y=%.2f profiles=%d" %
               (name, csk.sketchCurves.count, min_y, cut_y, n_pr))
@@ -658,18 +830,22 @@ def run(context):
     # ---- Corner: miter the long-apron ENDS, then LOFT each short apron between the two
     #      long-apron miter faces. The short apron's end faces ARE the long-apron miter
     #      faces -> a guaranteed-flush mitered corner, no separate short-apron box/cut. ----
-    def cut_tri(target_name, tri, name):
-        # Vertical triangular prism (tri in plan) over the band height, CUT from target.
+    def cut_tri(target_name, vexprs, name, anchor):
+        # Vertical triangular prism (vexprs in plan) over the band height, CUT from
+        # target. vexprs = [(x_e,y_e)x3]; pinned to a projected leg centre via anchor_poly.
         zlo = ev("tf_bot") - ev("apron_w") - 0.5; zhi = ev("tf_bot") + 0.5
         pl = sp.off_plane(apc, apc.xYConstructionPlane, "%.5f cm" % zlo, name + "_Pl")
         sk = apc.sketches.add(pl); sk.name = name + "_Sk"
         m = sk.modelToSketchSpace
-        ps = [m(P(x, y, zlo)) for (x, y) in tri]
+        pts = [(ev(xe), ev(ye)) for (xe, ye) in vexprs]
+        ps = [m(P(x, y, zlo)) for (x, y) in pts]
         L = sk.sketchCurves.sketchLines
         l0 = L.addByTwoPoints(P(ps[0].x, ps[0].y, 0), P(ps[1].x, ps[1].y, 0))
         l1 = L.addByTwoPoints(l0.endSketchPoint, P(ps[2].x, ps[2].y, 0))
-        L.addByTwoPoints(l1.endSketchPoint, l0.startSketchPoint)
-        tool = sp.ext_new(apc, sk.profiles.item(0), "%.5f cm" % (zhi - zlo), name).bodies.item(0)
+        lc = L.addByTwoPoints(l1.endSketchPoint, l0.startSketchPoint)
+        prof = anchor_poly(sk, [l0, l1, lc], anchor[0], occ_legs, "z", 1,
+                           anchor[1:], ("x", "y"), vexprs)
+        tool = sp.ext_new(apc, prof, "%.5f cm" % (zhi - zlo), name).bodies.item(0)
         tool.name = name
         sp.combine(ctx.find_body(target_name), [tool], CUT, False, name + "_Cut")
 
@@ -679,7 +855,16 @@ def run(context):
         yo = lb.minPoint.y if fbq == 'F' else lb.maxPoint.y   # outer (front/back) face
         yi = lb.maxPoint.y if fbq == 'F' else lb.minPoint.y   # inner face
         xo = sx * ev("la_half"); xi = sx * (ev("la_half") - ev("apron_t"))
-        cut_tri(long_name, [(xo, yo), (xo, yi), (xi, yi)], "Mit_" + fbq + ("R" if sx > 0 else "L"))
+        # parametric X exprs (sign by end); Y is the apron's bbox face (baked cm,
+        # re-read each clean rebuild). Pin to the corner's own leg.
+        XO = "la_half" if sx > 0 else "-(la_half)"
+        XI = "la_half - apron_t" if sx > 0 else "-(la_half - apron_t)"
+        anch = ("Leg_" + ("F" if fbq == 'F' else "B") + ("R" if sx > 0 else "L"),
+                "ltx" if sx > 0 else "-ltx",
+                "-lty" if fbq == 'F' else "lty", "leg_tip_z")
+        cut_tri(long_name, [(XO, "%.6f cm" % yo), (XO, "%.6f cm" % yi),
+                            (XI, "%.6f cm" % yi)],
+                "Mit_" + fbq + ("R" if sx > 0 else "L"), anch)
         la = ctx.find_body(long_name); cx = (xo + xi) / 2; cy = (yo + yi) / 2; best = None
         for i in range(la.faces.count):
             f = la.faces.item(i); g = f.geometry
@@ -763,6 +948,7 @@ def run(context):
         # Demote projected geometry to construction, then pick the rectangle by its
         # expected area (NOT max area, which grabs the whole-apron region).
         sp.refs_to_construction(lsk)
+        pin_free(lsk)   # pin the lip rectangle's position to the projected apron face
         _lip_area = _sock * (_apw - 2 * _pad)
         lp = min((lsk.profiles.item(i) for i in range(lsk.profiles.count)),
                  key=lambda p: abs(p.areaProperties().area - _lip_area))
@@ -1000,11 +1186,13 @@ def run(context):
     Lx = ev("leg_x_shelf"); Ly = ev("leg_y_shelf"); r = ev("leg_r"); tw = ev("tenon_w")
     ze = "shelf_z - sf_t"; he = "sf_t"
 
-    lf = pbox(shc, "ShelfLong_F", "-leg_x_shelf", "leg_x_shelf",
-              "-leg_y_shelf - leg_r", "-leg_y_shelf + leg_r", ze, he)
+    lf = apbox(shc, "ShelfLong_F", "-leg_x_shelf", "leg_x_shelf",
+               "-leg_y_shelf - leg_r", "-leg_y_shelf + leg_r", ze, he,
+               anchor=la("leg_x_shelf - ltx", "leg_y_shelf + leg_r - lty"))
     sp.mirror_body(shc, lf, shc.xZConstructionPlane, "ShLong_B_Mir")
-    sl = pbox(shc, "ShelfShort_L", "-leg_x_shelf - leg_r", "-leg_x_shelf + leg_r",
-              "-leg_y_shelf", "leg_y_shelf", ze, he)
+    sl = apbox(shc, "ShelfShort_L", "-leg_x_shelf - leg_r", "-leg_x_shelf + leg_r",
+               "-leg_y_shelf", "leg_y_shelf", ze, he,
+               anchor=la("leg_x_shelf + leg_r - ltx", "leg_y_shelf - lty"))
     sp.mirror_body(shc, sl, shc.yZConstructionPlane, "ShShort_R_Mir")
     for i in range(shc.bRepBodies.count):
         b = shc.bRepBodies.item(i)
@@ -1033,16 +1221,20 @@ def run(context):
     #    edge) extruded the full rail thickness; the long and short tenons share the diagonal.
     _HWv = tw / 2.0            # half tenon width (cm)
     _depv = r + 0.3            # interior reach past the leg centre, into the rail (cm)
-    def _tquad(name, lcx, lcy, locpts):
+    def _tquad(name, vexprs, anchor):
+        # vexprs: list of (x_e, y_e) parametric model coords; pinned to the corner
+        # leg's projected top-face centre via anchor_poly.
         pl = sp.off_plane(shc, shc.xYConstructionPlane, "sf_tn_z", name + "_Pl")
         sk = shc.sketches.add(pl); sk.name = name + "_Sk"
         lns = sk.sketchCurves.sketchLines
-        wp = [P(lcx + a, lcy + b, 0) for (a, b) in locpts]
-        first = lns.addByTwoPoints(wp[0], wp[1]); prev = first
+        wp = [P(ev(xe), ev(ye), 0) for (xe, ye) in vexprs]
+        first = lns.addByTwoPoints(wp[0], wp[1]); prev = first; lines = [first]
         for k in range(2, len(wp)):
-            prev = lns.addByTwoPoints(prev.endSketchPoint, wp[k])
-        lns.addByTwoPoints(prev.endSketchPoint, first.startSketchPoint)
-        b = sp.ext_new(shc, sk.profiles.item(0), "sf_tn_h", name).bodies.item(0)
+            prev = lns.addByTwoPoints(prev.endSketchPoint, wp[k]); lines.append(prev)
+        lines.append(lns.addByTwoPoints(prev.endSketchPoint, first.startSketchPoint))
+        prof = anchor_poly(sk, lines, anchor[0], occ_legs, "z", 1, anchor[1:],
+                           ("x", "y"), vexprs)
+        b = sp.ext_new(shc, prof, "sf_tn_h", name).bodies.item(0)
         b.name = name
         return b
     def mtenon(label, sx, sy, leg, long_rail, short_rail):
@@ -1054,8 +1246,27 @@ def run(context):
         long_q  = [(ix * dep, -HW), (ix * dep, HW), (ix * iy * HW, HW), (-ix * iy * HW, -HW)]
         # short tenon (along Y): x'<->y' swap; shares the same diagonal edge
         short_q = [(-HW, iy * dep), (HW, iy * dep), (HW, iy * ix * HW), (-HW, -iy * ix * HW)]
-        lt = _tquad(label + "_TnL", lcx, lcy, long_q)
-        st = _tquad(label + "_TnS", lcx, lcy, short_q)
+        # ---- parametric versions of the above (leg centre + local offsets), anchored
+        # to the corner leg's projected top-face centre (signs cancel -> tracks legs) ----
+        Lx_e = "leg_x_shelf" if sx > 0 else "-(leg_x_shelf)"
+        Ly_e = "leg_y_shelf" if sy > 0 else "-(leg_y_shelf)"
+        D = "leg_r + 0.3 cm"; Hw = "tenon_w / 2"
+        def adde(base, coef, term):
+            return "(%s) %s (%s)" % (base, "+" if coef > 0 else "-", term)
+        long_qe = [
+            (adde(Lx_e, ix, D),       adde(Ly_e, -1, Hw)),
+            (adde(Lx_e, ix, D),       adde(Ly_e, 1, Hw)),
+            (adde(Lx_e, ix * iy, Hw), adde(Ly_e, 1, Hw)),
+            (adde(Lx_e, -ix * iy, Hw), adde(Ly_e, -1, Hw))]
+        short_qe = [
+            (adde(Lx_e, -1, Hw),      adde(Ly_e, iy, D)),
+            (adde(Lx_e, 1, Hw),       adde(Ly_e, iy, D)),
+            (adde(Lx_e, 1, Hw),       adde(Ly_e, iy * ix, Hw)),
+            (adde(Lx_e, -1, Hw),      adde(Ly_e, -iy * ix, Hw))]
+        anch = (leg, "ltx" if sx > 0 else "-ltx",
+                "lty" if sy > 0 else "-lty", "leg_tip_z")
+        lt = _tquad(label + "_TnL", long_qe, anch)
+        st = _tquad(label + "_TnS", short_qe, anch)
         # cut the shared mortise in the leg
         sp.combine(proxy(leg, occ_legs),
                    [lt.createForAssemblyContext(occ_sh), st.createForAssemblyContext(occ_sh)],
@@ -1073,14 +1284,18 @@ def run(context):
 
     # 5. flush shelf panel with one-shoulder tongues, grooved into rails
     siw = "leg_x_shelf - leg_r"; sih = "leg_y_shelf - leg_r"
-    spanel = pbox(shc, "ShelfPanel",
-                  "-(%s)" % siw, siw,
-                  "-(%s)" % sih, sih,
-                  "shelf_z - sp_panel_t", "sp_panel_t")
-    stg_slab = pbox(shc, "SP_Tongue",
-                    "-(%s + tongue_ov)" % siw, "%s + tongue_ov" % siw,
-                    "-(%s + tongue_ov)" % sih, "%s + tongue_ov" % sih,
-                    "shelf_z - sp_panel_t", "tongue_w")
+    spanel = apbox(shc, "ShelfPanel",
+                   "-(%s)" % siw, siw,
+                   "-(%s)" % sih, sih,
+                   "shelf_z - sp_panel_t", "sp_panel_t",
+                   anchor=la("ltx + leg_r - leg_x_shelf",
+                             "lty + leg_r - leg_y_shelf"))
+    stg_slab = apbox(shc, "SP_Tongue",
+                     "-(%s + tongue_ov)" % siw, "%s + tongue_ov" % siw,
+                     "-(%s + tongue_ov)" % sih, "%s + tongue_ov" % sih,
+                     "shelf_z - sp_panel_t", "tongue_w",
+                     anchor=la("ltx + leg_r - leg_x_shelf - tongue_ov",
+                               "lty + leg_r - leg_y_shelf - tongue_ov"))
     sp.combine(spanel, [stg_slab], JOIN, False, "SP_TgJ")
     for rn in ("ShelfLong_F", "ShelfLong_B", "ShelfShort_L", "ShelfShort_R"):
         sp.combine(ctx.find_body(rn), [spanel], CUT, True, rn + "_Groove")
@@ -1095,23 +1310,32 @@ def run(context):
     yin = Ly - r  # long-rail inner face (cm) — for initial placement only
     sk = shc.sketches.add(sp.off_plane(shc, shc.xZConstructionPlane, "-(leg_y_shelf - leg_r)", "ShBt_Pl"))
     sk.name = "ShBatten_Sk"; m2s = sk.modelToSketchSpace
-    bpts = [(-bw/2, zbot), (-bw/2, pu), (-base/2, pu), (-topw/2, pu+sd),
-            (topw/2, pu+sd), (base/2, pu), (bw/2, pu), (bw/2, zbot)]
-    sps = [m2s(P(px2, -yin, pz)) for (px2, pz) in bpts]
+    _pu = "shelf_z - sp_panel_t"; _zb = "shelf_z - sf_t"; _ps = _pu + " + 0.1875 in"
+    bvex = [("-0.4375 in", _zb), ("-0.4375 in", _pu), ("-0.25 in", _pu),
+            ("-0.375 in", _ps), ("0.375 in", _ps), ("0.25 in", _pu),
+            ("0.4375 in", _pu), ("0.4375 in", _zb)]
+    sps = [m2s(P(ev(xe), -ev("leg_y_shelf - leg_r"), ev(ze))) for (xe, ze) in bvex]
     lns = sk.sketchCurves.sketchLines
     first = lns.addByTwoPoints(P(sps[0].x, sps[0].y, 0), P(sps[1].x, sps[1].y, 0)); prev = first
+    blines = [first]
     for k in range(2, len(sps)):
         prev = lns.addByTwoPoints(prev.endSketchPoint, P(sps[k].x, sps[k].y, 0))
-    lns.addByTwoPoints(prev.endSketchPoint, first.startSketchPoint)
-    sbt = sp.ext_new(shc, sk.profiles.item(0), "2 * (leg_y_shelf - leg_r)", "ShelfBatten").bodies.item(0)
+        blines.append(prev)
+    blines.append(lns.addByTwoPoints(prev.endSketchPoint, first.startSketchPoint))
+    _bxa = ("-(leg_x_shelf - leg_r)", "-(leg_y_shelf - leg_r)", "shelf_z")
+    bprof = anchor_poly(sk, blines, "ShelfPanel", occ_sh, "z", 1, _bxa,
+                        ("x", "z"), bvex)
+    sbt = sp.ext_new(shc, bprof, "2 * (leg_y_shelf - leg_r)", "ShelfBatten").bodies.item(0)
     sbt.name = "ShelfBatten"
     _bz = "shelf_z - sp_panel_t - (sf_t - sp_panel_t)*2/3"; _bh = "(sf_t - sp_panel_t)*2/3"
     _yin_e = "leg_y_shelf - leg_r"   # long-rail inner face Y (parametric)
-    tnF = pbox(shc, "ShBt_TnF", "-0.4375 in", "0.4375 in",
-               "-(%s + 0.5 in)" % _yin_e, "-(%s)" % _yin_e, _bz, _bh)
+    tnF = apbox(shc, "ShBt_TnF", "-0.4375 in", "0.4375 in",
+                "-(%s + 0.5 in)" % _yin_e, "-(%s)" % _yin_e, _bz, _bh,
+                anchor=la("ltx - 0.4375 in", "leg_y_shelf - leg_r + 0.5 in - lty"))
     sp.combine(sbt, [tnF], JOIN, False, "ShBt_TnF_J")
-    tnB = pbox(shc, "ShBt_TnB", "-0.4375 in", "0.4375 in",
-               _yin_e, "%s + 0.5 in" % _yin_e, _bz, _bh)
+    tnB = apbox(shc, "ShBt_TnB", "-0.4375 in", "0.4375 in",
+                _yin_e, "%s + 0.5 in" % _yin_e, _bz, _bh,
+                anchor=la("ltx - 0.4375 in", "leg_y_shelf - leg_r + lty"))
     sp.combine(sbt, [tnB], JOIN, False, "ShBt_TnB_J")
     sp.combine(ctx.find_body("ShelfPanel"), [sbt], CUT, True, "ShBt_PanelDT")
     sp.combine(ctx.find_body("ShelfLong_F"), [sbt], CUT, True, "ShBt_MortF")
@@ -1121,7 +1345,8 @@ def run(context):
     _chd = ev("tf_cham_d"); _chh = ev("tf_cham_h")
     _tfl = ev("table_l") / 2; _tfd = ev("table_d") / 2
     zbot_ch = ev("tf_bot")
-    def tf_cham_body(sketch_plane, out_coord, z, chd, chh, perp_val, name, ext_expr, axis='y', sign=1):
+    def tf_cham_body(sketch_plane, out_coord, z, chd, chh, perp_val, name, ext_expr,
+                     axis='y', sign=1, out_e=None, panel_a_e=None):
         opl = sp.off_plane(topc, sketch_plane, "0.001 cm", name + "_SkPl")
         sk = topc.sketches.add(opl); sk.name = name + "_Sk"
         m = sk.modelToSketchSpace
@@ -1144,18 +1369,56 @@ def run(context):
         spl = sk.sketchCurves.sketchFittedSplines.add(oc2)
         corner = m(mp(out_coord, z))
         cl1 = sk.sketchCurves.sketchLines.addByTwoPoints(spl.endSketchPoint, P(corner.x, corner.y, 0))
-        sk.sketchCurves.sketchLines.addByTwoPoints(cl1.endSketchPoint, spl.startSketchPoint)
+        cl2 = sk.sketchCurves.sketchLines.addByTwoPoints(cl1.endSketchPoint, spl.startSketchPoint)
+        # Lock the two straight legs H/V (corner->start runs along the bottom face,
+        # end->corner up the outer face) so the per-point pins below have no
+        # redundancy to skip — leaves only the spline interiors free.
+        _gc = sk.geometricConstraints
+        for _ln in (cl1, cl2):
+            _g1 = _ln.startSketchPoint.geometry; _g2 = _ln.endSketchPoint.geometry
+            _dx = abs(_g1.x - _g2.x); _dy = abs(_g1.y - _g2.y)
+            if _dx < 1e-6 and _dy > 1e-6:
+                _gc.addVertical(_ln)
+            elif _dy < 1e-6 and _dx > 1e-6:
+                _gc.addHorizontal(_ln)
+        # Anchor: project TopPanel's top face (the chamfer never cuts it -> no
+        # dependency cycle; it's inboard so it never splits this sliver) and pin the
+        # spline START + END + the outer-bottom CORNER. The 5 interior fit points
+        # stay free — the legitimate sculpted organic edge the validator allows.
+        sp.project_face(sk, ctx.find_body("TopPanel"), occ_top, "z", 1)
+        if axis == 'y':
+            axyz = ("0 cm", panel_a_e, "panel_under + panel_t")
+        else:
+            axyz = (panel_a_e, "0 cm", "panel_under + panel_t")
+        aP = sp.anchor_pt(sk, ev(axyz[0]), ev(axyz[1]), ev(axyz[2]))
+        orient = sp.probe_orientations(sk, ev(axyz[0]), ev(axyz[1]), ev(axyz[2]))
+        amap = {axis: panel_a_e, "z": "panel_under + panel_t"}
+        dd = sk.sketchDimensions
+        s_str = "1" if sign > 0 else "-1"
+        start_a = "(%s) + (%s) * tf_cham_d * 0.822" % (out_e, s_str)
+        pts3 = [(cl1.endSketchPoint, out_e, "tf_bot"),
+                (spl.startSketchPoint, start_a, "tf_bot"),
+                (spl.endSketchPoint, out_e, "tf_bot + tf_cham_h")]
+        for pt, a_e, z_e in pts3:
+            sp.rdim(sk, dd, aP, pt, orient, axis,
+                    "abs((%s) - (%s))" % (a_e, amap[axis]))
+            sp.rdim(sk, dd, aP, pt, orient, "z",
+                    "abs((%s) - (%s))" % (z_e, amap["z"]))
         prof = max((sk.profiles.item(i) for i in range(sk.profiles.count)),
                    key=lambda p: p.areaProperties().area)
         return sp.ext_new_sym(topc, prof, ext_expr, name).bodies.item(0)
     tf_chF = tf_cham_body(topc.yZConstructionPlane, -_tfd, zbot_ch, _chd, _chh,
-                          0, "TF_ChamF", "table_l / 2 + 1 cm", axis='y', sign=1)
+                          0, "TF_ChamF", "table_l / 2 + 1 cm", axis='y', sign=1,
+                          out_e="-(table_d / 2)", panel_a_e="-(table_d / 2 - tf_w)")
     tf_chB = tf_cham_body(topc.yZConstructionPlane, _tfd, zbot_ch, _chd, _chh,
-                          0, "TF_ChamB", "table_l / 2 + 1 cm", axis='y', sign=-1)
+                          0, "TF_ChamB", "table_l / 2 + 1 cm", axis='y', sign=-1,
+                          out_e="table_d / 2", panel_a_e="table_d / 2 - tf_w")
     tf_chL = tf_cham_body(topc.xZConstructionPlane, -_tfl, zbot_ch, _chd, _chh,
-                          0, "TF_ChamL", "table_d / 2 + 1 cm", axis='x', sign=1)
+                          0, "TF_ChamL", "table_d / 2 + 1 cm", axis='x', sign=1,
+                          out_e="-(table_l / 2)", panel_a_e="-(table_l / 2 - tf_w)")
     tf_chR = tf_cham_body(topc.xZConstructionPlane, _tfl, zbot_ch, _chd, _chh,
-                          0, "TF_ChamR", "table_d / 2 + 1 cm", axis='x', sign=-1)
+                          0, "TF_ChamR", "table_d / 2 + 1 cm", axis='x', sign=-1,
+                          out_e="table_l / 2", panel_a_e="table_l / 2 - tf_w")
     # Cut EVERY frame member by ALL FOUR chamfer tools (keep the tools), so the molding is
     # continuous around the corners AND trims the through-tenons where they exit each corner's
     # outer face (a tenon belongs to its long member but exits through the short member's edge,
