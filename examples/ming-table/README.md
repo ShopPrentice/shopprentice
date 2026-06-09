@@ -187,3 +187,23 @@ Change any parameter in Fusion 360's Change Parameters dialog. Key relationships
 - `leg_tip_z = tf_bot + leg_embed` — the leg top embeds a fixed amount into the frame regardless of height.
 
 Changing `splay` re-rakes the legs and the derived apron/shelf positions follow. Changing `leg_dia`, `apron_w`, or `fbd_tail_count` updates the joinery proportions automatically.
+
+---
+
+## Variations
+
+### 平头案 — large recessed-leg table (60" × 25" × 30")
+
+A full-size flat-end table (平头案) derived from this model with minimal edits: overall dimensions scaled up, the shelf removed, and two round stretchers added between each front/back leg pair (coped saddle shoulders wrapping the round legs + blind four-shoulder tenons). Members re-proportioned for the larger size — thicker legs/aprons/frames, doubled frame width, wider spandrels, three dovetail tails per apron corner — and the apron setback is equal on all four sides (`leg_setback_y` derives from `ap_end_inset + apron_t / 2`).
+
+![平头案 variation — iso](variations/pingtou-an/iso-top-right.png)
+
+**Script:** [`variations/pingtou-an/pingtou_an.py`](variations/pingtou-an/pingtou_an.py)
+
+```
+/woodworking
+Make a large 平头案 from the Ming side table: 60"L x 25"D x 30"H, same joinery, no shelf.
+Add 2 round stretchers at the lower 1/3 of the legs (2/3 leg diameter, coped shoulders
+wrapping the legs, blind tenons with shoulders on all four sides). Re-proportion the
+members for the size and keep the apron setback equal front-back and left-right.
+```
