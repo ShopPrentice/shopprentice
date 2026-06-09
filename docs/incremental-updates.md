@@ -269,9 +269,11 @@ After the script runs, call `get_product_shots` via MCP to capture presentation 
 
 ---
 
-## Size Variations (Resizing an Existing Model)
+## Size Variations (Deriving a Piece at a Very Different Size)
 
-When the user asks for "the same piece at a different size", the target is **one proportions conversation + one rebuild** — not a long trickle of "now make X thicker / that detail broke" prompts. (The Ming-table → 60×25×30 平头案 variation burned ~8 prompts; nearly all were avoidable with the rules below.)
+**Scope — when this section applies:** the user is *transforming* an existing model into a different piece (dropping/adding components, changing its role) AND the envelope changes substantially (roughly >30% in a dimension). Both signals together are what justify the proportional approach. It does NOT apply to ordinary edits — a single-parameter tweak ("make it 2" taller", "thicker legs") is just `modify_parameters` or one script edit + rebuild; don't turn one requested change into an unrequested proportions pass.
+
+When the scope DOES apply, the target is **one proportions conversation + one rebuild** — not a long trickle of "now make X thicker / that detail broke" prompts. (The Ming-table → 60×25×30 平头案 variation burned ~8 prompts; nearly all were avoidable with the rules below.)
 
 ### 1. Propose the full proportion set up front
 
