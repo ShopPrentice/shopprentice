@@ -61,7 +61,7 @@ def run(context):
     # can DERIVE from them: the apron outer face sits the same distance from the table
     # side edge as the apron ends sit from the table ends (equal setback all around).
     add("apron_t", "0.625 in", "in", "Apron stock thickness")
-    add("ap_end_inset", "0.875 in", "in", "Apron end inset from each frame end")
+    add("ap_end_inset", "1.3125 in", "in", "Apron end inset from each frame end")
     add("leg_setback_y", "ap_end_inset + apron_t / 2", "in",
         "Leg plane from table SIDE: apron outer face inset = ap_end_inset (derived)")
     add("ltx", "table_l / 2 - leg_setback_x", "in", "Leg half-spread in X = legs at +/-ltx (derived)")
