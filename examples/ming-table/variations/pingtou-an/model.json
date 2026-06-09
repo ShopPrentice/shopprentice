@@ -1,0 +1,115 @@
+{
+  "name": "Large 平头案 (flat-end table) — Ming table variation",
+  "deps": [
+    {
+      "body": "Leg_FL",
+      "ref": "origin",
+      "note": "front-left leg, sits on floor — root"
+    },
+    {
+      "body": "Leg_FR",
+      "ref": "Leg_FL",
+      "note": "mirror of FL across YZ"
+    },
+    {
+      "body": "Leg_BL",
+      "ref": "Leg_FL",
+      "note": "mirror of FL across XZ"
+    },
+    {
+      "body": "Leg_BR",
+      "ref": "Leg_FL",
+      "note": "mirror of FL"
+    },
+    {
+      "body": "TF_Front",
+      "ref": "Leg_FL",
+      "note": "top frame front, pierced by front legs"
+    },
+    {
+      "body": "TF_Back",
+      "ref": "Leg_FL",
+      "note": "mirror of TF_Front"
+    },
+    {
+      "body": "TF_Left",
+      "ref": "Leg_FL",
+      "note": "top frame left, pierced by left legs"
+    },
+    {
+      "body": "TF_Right",
+      "ref": "Leg_FL",
+      "note": "mirror of TF_Left"
+    },
+    {
+      "body": "TopPanel",
+      "ref": "TF_Front",
+      "note": "floating panel in frame groove"
+    },
+    {
+      "body": "Batten_R",
+      "ref": "TopPanel",
+      "note": "sliding-dovetail batten under panel"
+    },
+    {
+      "body": "Batten_L",
+      "ref": "TopPanel",
+      "note": "mirror of Batten_R"
+    },
+    {
+      "body": "Batten_C",
+      "ref": "TopPanel",
+      "note": "center sliding-dovetail batten (3 battens total)"
+    },
+    {
+      "body": "LongApron_F",
+      "ref": "Leg_FL",
+      "note": "apron band + connecting tongues, joined to spandrels via internal 1/8\" tongues"
+    },
+    {
+      "body": "LongApron_B",
+      "ref": "Leg_FL",
+      "note": "mirror of LongApron_F"
+    },
+    {
+      "body": "Spandrel_FL",
+      "ref": "Leg_FL",
+      "note": "front-left spandrel bracket, connected to band via tongue"
+    },
+    {
+      "body": "Spandrel_FR",
+      "ref": "Leg_FL",
+      "note": "front-right spandrel"
+    },
+    {
+      "body": "Spandrel_BL",
+      "ref": "Leg_FL",
+      "note": "back-left spandrel"
+    },
+    {
+      "body": "Spandrel_BR",
+      "ref": "Leg_FL",
+      "note": "back-right spandrel"
+    },
+    {
+      "body": "ShortApron_L",
+      "ref": "Leg_FL",
+      "note": "short apron, mitered to long aprons at the corners"
+    },
+    {
+      "body": "ShortApron_R",
+      "ref": "Leg_FL",
+      "note": "mirror of ShortApron_L"
+    },
+    {
+      "body": "Stretcher_L",
+      "ref": "Leg_FL",
+      "note": "round stretcher, coped saddle wraps both legs, blind 4-shoulder tenons"
+    },
+    {
+      "body": "Stretcher_R",
+      "ref": "Leg_FR",
+      "note": "round stretcher, coped saddle wraps both legs, blind 4-shoulder tenons"
+    }
+  ]
+}
