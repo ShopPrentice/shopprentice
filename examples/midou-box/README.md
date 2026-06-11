@@ -48,6 +48,11 @@ panel) and rebuilt the construction to be fully recompute-safe.
 
 **Script:** [`midou.py`](midou.py)
 
+> This construction is now packaged as the reusable
+> [`splayed_dovetail` template](../../woodworking/templates/splayed_dovetail.py)
+> (`frame()` / `boards()` / `corners()`) — see
+> [`docs/joinery/splayed-dovetail.md`](../../docs/joinery/splayed-dovetail.md).
+
 ---
 
 ## Why this build is interesting
