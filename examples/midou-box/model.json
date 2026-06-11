@@ -1,0 +1,45 @@
+{
+  "name": "Midou (米斗) Tapered Dovetail Box",
+  "deps": [
+    {
+      "body": "Front",
+      "ref": "origin",
+      "side": "outside",
+      "direction": [0, 0, 1],
+      "contact": true,
+      "note": "Front board sits on the floor at Z=0, tilted outward by `tilt`; root body"
+    },
+    {
+      "body": "Left",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [-1, 0, 0],
+      "contact": true,
+      "note": "Circular-pattern replica of Front (90deg about Z); shoulder + dovetail contact at front-left corner"
+    },
+    {
+      "body": "Right",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [1, 0, 0],
+      "contact": true,
+      "note": "Circular-pattern replica of Front; shoulder + dovetail contact at front-right corner"
+    },
+    {
+      "body": "Back",
+      "ref": "Left",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Circular-pattern replica of Front; tails join into Left/Right sockets at back corners"
+    },
+    {
+      "body": "Panel",
+      "ref": "Front",
+      "side": "outside",
+      "direction": [0, 1, 0],
+      "contact": true,
+      "note": "Bottom panel housed in grooves it cut into all four boards; anchored to Front/Left bottom-face projections"
+    }
+  ]
+}
