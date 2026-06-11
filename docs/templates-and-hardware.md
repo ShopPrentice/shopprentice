@@ -8,6 +8,7 @@ Reference for available reusable templates and hardware. Check this before writi
 |----------|--------|--------|---------|
 | `dovetail` | `from helpers.templates import dovetail` | Tested | pencil-box, dresser, tv-console |
 | `half_blind_dovetail` | `from helpers.templates import half_blind_dovetail` | Tested | tv-console, dresser (via drawer) |
+| `splayed_dovetail` | `from woodworking.templates import splayed_dovetail` | Tested | midou-box (compound-angle corners, square frustum) |
 | `dovetailed_drawer` | `from helpers.templates import dovetailed_drawer` | Tested | dresser, tv-console |
 | `drawer_box` | `from helpers.templates import drawer_box` | Tested | — |
 | `mortise_tenon` | `from helpers.templates import mortise_tenon` | Tested | wood-planter, rachel's-table |
