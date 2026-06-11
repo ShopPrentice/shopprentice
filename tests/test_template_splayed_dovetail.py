@@ -82,6 +82,17 @@ def run(context):
     VI = adsk.core.ValueInput.createByString
     ctx = sp.DesignContext(design)
 
+    # Safety: this test wipes user parameters and builds 5 boxes — refuse
+    # to run in a document that already contains bodies (document
+    # activation has been observed to silently not take).
+    existing = sum(root.occurrences.item(i).component.bRepBodies.count
+                   for i in range(root.occurrences.count))
+    existing += root.bRepBodies.count
+    if existing > 0:
+        raise RuntimeError(
+            f"refusing to run: active document already has {existing} "
+            f"bodies — switch to an empty document first")
+
     # drop lingering params from earlier runs
     for _ in range(6):
         progress = False
