@@ -137,6 +137,17 @@ def _baseline(design, root, prefixes):
     }
 
 
+def _fmt(items, cap=8):
+    """Join a list of names, truncated with a count — a catastrophic
+    parameter floods every downstream feature (the ming table produced
+    ~30 errored features and 21 stranded bodies per direction); a few
+    exemplars plus the total is what the agent needs."""
+    items = list(items)
+    if len(items) <= cap:
+        return ", ".join(items)
+    return ", ".join(items[:cap]) + f", ... (+{len(items) - cap} more)"
+
+
 def _compare(base, design, root, prefixes):
     """Issues introduced by the current parameter state vs the baseline."""
     issues = []
@@ -144,23 +155,25 @@ def _compare(base, design, root, prefixes):
 
     missing = sorted(set(base["bodies"]) - set(snap))
     if missing:
-        issues.append("bodies MISSING: " + ", ".join(missing))
+        issues.append(f"bodies MISSING ({len(missing)}): " + _fmt(missing))
     new = sorted(set(snap) - set(base["bodies"]))
     if new:
-        issues.append("NEW/stranded bodies appeared: " + ", ".join(new))
+        issues.append(f"NEW/stranded bodies appeared ({len(new)}): "
+                      + _fmt(new))
 
     impact = _check_feature_impact(design)
     unhealthy = [u for u in impact["unhealthyFeatures"]
                  if u["feature"] not in base["unhealthy"]]
     if unhealthy:
-        issues.append("features now unhealthy: " + "; ".join(
-            f"{u['feature']} ({u['state']}: {u['message'][:80]})"
-            for u in unhealthy))
+        issues.append(f"features now unhealthy ({len(unhealthy)}): "
+                      + _fmt([f"{u['feature']} ({u['state']}: "
+                              f"{u['message'][:60]})" for u in unhealthy],
+                             cap=6))
     zero = [z for z in impact["zeroImpactFeatures"]
             if z["feature"] not in base["zero"]]
     if zero:
-        issues.append("features became ZERO-IMPACT: " + ", ".join(
-            z["feature"] for z in zero))
+        issues.append(f"features became ZERO-IMPACT ({len(zero)}): "
+                      + _fmt([z["feature"] for z in zero]))
 
     inter = _check_interference(root, prefixes)["realCount"]
     if inter > base["interference"]:
@@ -169,8 +182,8 @@ def _compare(base, design, root, prefixes):
 
     floating = _isolated_bodies(snap, prefixes) - base["isolated"]
     if floating:
-        issues.append("bodies lost all contact (floating): "
-                      + ", ".join(sorted(floating)))
+        issues.append(f"bodies lost all contact / floating "
+                      f"({len(floating)}): " + _fmt(sorted(floating)))
     return issues
 
 
@@ -246,17 +259,27 @@ def handler(params: list = None, percent: float = None,
                         adsk.doEvents()
                     except Exception as re_err:
                         aborted = (f"could not revert {p.name}: {re_err} — "
-                                   f"sweep stopped, restore the document "
-                                   f"(Undo) before continuing")
+                                   f"sweep stopped; rebuild the model from "
+                                   f"its script to recover")
                 if aborted:
                     break
-
-            if not aborted and not _restored(base["bodies"], root):
-                entry["issues"]["revert"] = [
-                    "model did NOT return to baseline after revert"]
-                aborted = (f"baseline not restored after testing {p.name} — "
-                           f"sweep stopped to avoid mutating a broken "
-                           f"document; Undo to recover")
+                # Verify the revert actually restored the model BEFORE
+                # testing the next direction — on complex models a layout
+                # change can kill cached face/edge references permanently
+                # (ming table: "Pattern Source Lost", "sketch plane is
+                # lost"), and measuring the opposite direction against a
+                # corrupted base produces garbage findings while mutating
+                # the document further.
+                if not _restored(base["bodies"], root):
+                    entry["issues"][label] = entry["issues"].get(label, []) \
+                        + ["IRREVERSIBLE: model did NOT return to baseline "
+                           "after reverting this parameter"]
+                    aborted = (f"baseline not restored after {p.name} "
+                               f"{label} — sweep stopped to avoid mutating "
+                               f"a broken document; rebuild the model from "
+                               f"its script to recover (expression revert "
+                               f"does not restore lost references)")
+                    break
 
             tested.append(p.name)
             if entry["issues"]:
@@ -276,6 +299,10 @@ def handler(params: list = None, percent: float = None,
         }
         if aborted:
             result["aborted"] = aborted
+            # Resume path: rebuild the model from its script, then re-run
+            # with params=untestedParameters to finish the sweep.
+            result["untestedParameters"] = [p.name for p in leafs
+                                            if p.name not in tested]
 
         if passed:
             msg = (f"PASSED: {len(tested)} parameter(s) perturbed "
@@ -286,7 +313,10 @@ def handler(params: list = None, percent: float = None,
             names = ", ".join(f["parameter"] for f in fragile)
             msg = f"FAILED: fragile parameter(s): {names}"
             if aborted:
-                msg += f" — ABORTED: {aborted}"
+                n_left = len(result.get("untestedParameters", []))
+                msg += (f" — ABORTED: {aborted} ({n_left} parameter(s) "
+                        f"untested; rebuild and re-run with "
+                        f"params=untestedParameters)")
 
         return {"content": [{"type": "text",
                              "text": json.dumps(result, indent=2)}],
@@ -305,9 +335,16 @@ TOOL_DESCRIPTION = \
 Perturbs each LEAF user parameter (literal expressions like "60 in" —
 derived formulas are skipped) one at a time by a narrow step (default
 ±5%; ±1 for unitless counts), recomputes, compares against a baseline,
-and reverts. THE DOCUMENT IS MUTATED DURING THE SWEEP and restored
-parameter-by-parameter; if the model fails to return to baseline the
-sweep aborts immediately and tells you to Undo.
+and reverts.
+
+THE DOCUMENT IS MUTATED DURING THE SWEEP — run it on a freshly rebuilt
+or saved document. On complex models a layout change can permanently
+kill cached face/edge references ("Pattern Source Lost"); reverting the
+expression does NOT bring them back. Restoration is verified after
+EVERY perturbation; on the first failed round-trip the sweep aborts,
+reports the remaining parameter names in untestedParameters, and the
+reliable recovery is rebuilding the model from its script — then re-run
+with params=untestedParameters to finish the sweep.
 
 A parameter is flagged FRAGILE if its perturbation causes any of:
 - missing bodies (parts vanish)
