@@ -293,4 +293,27 @@ Grep the script for numeric literals in geometry code (`* IN`, raw `cm` values, 
 
 ### 5. Validate with scaling arithmetic, not eyeballs
 
+## Parameter Robustness — `validate_parametrics`
+
+Before final delivery (or after a big refactor), run the `validate_parametrics`
+MCP tool. It perturbs each LEAF user parameter (literal expressions; derived
+formulas are skipped) one at a time by a narrow step (default ±5%, ±1 for
+unitless counts), recomputes, diffs against a baseline, and reverts. Fragile
+parameters are reported by name with the exact symptom: missing bodies,
+stranded "(1)" lumps, features newly in warning health, cuts that became
+zero-impact, interference increases, or bodies left floating at baked
+positions. The sweep aborts immediately if the model fails to return to
+baseline, so a broken document is never mutated further.
+
+It found a real defect on its first run: the white-oak table's fixed 1"
+tenon depth corner-touched inside the leg, so leg_size -5% or apron_thick/
+tenon-thickness +5% collided the perpendicular tenons. Fix pattern: derive
+the fit dimension instead of fixing it (tenon_depth = "leg_size -
+(apron_thick + mt_tt) / 2 - 0.0625 in" keeps 1/16" clearance at any size).
+
+This is a local-robustness probe, not an envelope test — expressions that
+only break at large excursions won't show at ±5%. It is slower than
+`validate_design` (3 recomputes per parameter): run it at milestones, not
+after every phase.
+
 After the rebuild, compare per-body volumes against expected factors (length ×kl, section ×ks → volume ≈ kl·ks²). A body whose volume didn't move (baked constant) or moved wildly (wrong profile selected) shows up in one pass. Then `validate_design`, and section/inspect every joint that relies on a selection heuristic before presenting.
