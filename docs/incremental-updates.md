@@ -316,4 +316,18 @@ only break at large excursions won't show at ±5%. It is slower than
 `validate_design` (3 recomputes per parameter): run it at milestones, not
 after every phase.
 
+**Run it on a freshly rebuilt or saved document.** The ming-table example
+showed that on complex face-referencing joinery, a layout parameter change
+(table_l, leg setbacks) can permanently kill cached references ("Pattern
+Source Lost", "the sketch plane is lost") — reverting the expression does
+NOT bring them back. The sweep verifies restoration after EVERY
+perturbation and aborts on the first failed round-trip, reporting the
+remaining names in `untestedParameters`; the reliable recovery is
+rebuilding from the script, then re-running with
+`params=untestedParameters`. The same run also showed the robustness
+boundary on that example: every local detail/joinery dimension survived
+±5%, while the envelope/layout parameters collapsed — matching the
+size-variations playbook's advice to resize such models by
+transform + rebuild rather than parameter edits.
+
 After the rebuild, compare per-body volumes against expected factors (length ×kl, section ×ks → volume ≈ kl·ks²). A body whose volume didn't move (baked constant) or moved wildly (wrong profile selected) shows up in one pass. Then `validate_design`, and section/inspect every joint that relies on a selection heuristic before presenting.
