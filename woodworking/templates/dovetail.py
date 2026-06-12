@@ -101,10 +101,10 @@ METADATA = {
             "status": "planned",
         },
         "full_blind": {
-            "description": "Completely hidden dovetail — no visible joint",
-            "best_for": ["fine furniture", "hidden structural corners"],
+            "description": "Completely hidden dovetail — reads as a plain 45° miter on both faces (secret-mitred)",
+            "best_for": ["fine furniture", "jewelry boxes", "hidden structural corners"],
             "not_for": ["high-volume production"],
-            "status": "planned",
+            "template": "full_blind_dovetail",
         },
     },
     "params": {

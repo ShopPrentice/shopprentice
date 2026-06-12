@@ -246,7 +246,13 @@ def run(context):
     # ==== BACK PANEL ====
     # Back_Sk on the xZ plane (normal y); project Side_Left's back face (y,+1)
     # at corner (0, case_d, kick_h) and reanchor the x/z origin dims.
-    sk, pr = sp.sketch_rect_model(back_c, back_c.xZConstructionPlane,
+    # Sketch on a plane at the REAR (Y = case_d - back_thick) — the xZ plane
+    # at Y=0 drops the model_origin's Y, landing the panel at the front where
+    # it overlaps the doors, drawer and dividers (reanchor retargets dims but
+    # does NOT move the body).
+    back_pl = sp.off_plane(back_c, back_c.xZConstructionPlane,
+                           "case_d - back_thick", "Back_Pl")
+    sk, pr = sp.sketch_rect_model(back_c, back_pl,
         ("board_thick", "case_d - back_thick", "kick_h + board_thick"),
         {"x": "inner_w", "z": "inner_h"}, "Back_Sk", ev)
     pr = (sp.reanchor(sk, ref_side_left, case_occ, "y", +1,

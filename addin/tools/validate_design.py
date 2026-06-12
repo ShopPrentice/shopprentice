@@ -563,6 +563,25 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
                 }
                 if not deps_passed:
                     passed = False
+            else:
+                # validate_deps returned None → it could not run because there
+                # is no model.json next to the script. Surface this LOUDLY
+                # instead of a silent green light: connectivity + interference
+                # can pass while the sketch origin / traceability /
+                # fully-constrained checks never ran at all. Does NOT fail the
+                # build (a project may not have model.json yet), but the status
+                # line tells the agent to add it.
+                mj_path, mj_found = sp.resolve_model_json()
+                deps_result = {
+                    "skipped": True,
+                    "modelJsonMissing": not mj_found,
+                    "modelJsonPath": mj_path,
+                    "note": deps_output.strip() or (
+                        "No model.json next to the script — sketch origin, "
+                        "traceability, and fully-constrained checks were NOT "
+                        "enforced. Add model.json to enable dependency "
+                        "validation."),
+                }
         except Exception as de:
             deps_result = {"passed": None, "error": str(de)}
 
@@ -630,6 +649,10 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
                 parts.append("deps OK")
             elif deps_result.get("passed") is False:
                 parts.append("DEPS FAIL")
+            elif deps_result.get("skipped"):
+                parts.append("DEPS SKIPPED — no model.json; sketch origin / "
+                             "traceability / fully-constrained checks NOT "
+                             "enforced (add model.json next to the script)")
 
         if replication is not None and replication.get("groups"):
             g = replication["groups"]
@@ -692,6 +715,10 @@ Combines all structural checks in a single call:
    the judge; only fit-point spline interiors may stay free), bodies in
    components.
    Completeness check is advisory (printed but doesn't affect pass/fail).
+   If model.json is MISSING, this check cannot run — the result reports
+   "DEPS SKIPPED — add model.json" (it does not fail the build, but a PASS
+   without it means the sketch checks were never enforced). Create model.json
+   to turn the gate on.
 5. **Replication advisory** (ADVISORY — never affects pass/fail): congruent
    structural bodies built independently instead of via Mirror/Pattern (the
    token-wasteful, non-parametric anti-pattern). Suppressed when the bodies are

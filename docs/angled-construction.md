@@ -170,6 +170,31 @@ Build one leg (near-left), then mirror:
 
 All features — trapezoid sketch, splay Move, trim CUT — propagate through the mirrors.
 
+## Raked Construction Plane (sketch parallel to a splayed leg)
+
+For a member that lies in the same plane as a splayed leg (the Ming-table apron +
+spandrel, coplanar with the leg), it's cleaner to sketch on a plane **raked to match
+the leg** than to sketch vertical and `move_rot` the body afterward — the lean
+becomes intrinsic to the geometry and there's no separate Move to keep in sync.
+
+**Build the raked plane with `setByAngle`, NOT `setByThreePoints`.**
+`constructionPlanes.add()` rejected a `setByThreePoints` plane built from transient
+`Point3D`s with `InternalValidationError` (that API wants construction/sketch points,
+or the component activated). The robust path is `setByAngle` about a **sketch-line
+axis lying in a base plane**, with the angle driven by the `splay` parameter.
+
+**Anchor the raked sketch to the leg + top, not the origin — and expect non-exact
+"quarter-circles."** Project the **leg's silhouette edge** and the tabletop/apron
+edge into the sketch and draw the profile *from* those projected references (this is
+also what makes the sketch traceable for the `model.json` deps check). Because a
+splayed leg is ~1.5° off square to the top, the two references are **not
+perpendicular** — so the cove/corner transitions are **tangent arcs** that pick up
+the true angle, not exact 90° quarter-circles. Use `sp.project_face` /
+`sketch_on_plane` to bring the references in, then tangent-constrain the arcs to the
+projected edges so the radius is parametric (`cove_r`, `bot_r`) and the angle
+self-adjusts. See `feedback_parallel_to_projected_silhouette` and the
+construction-skeleton method in `docs/fusion-api-rules.md`.
+
 ## Splay-Adjusted Positions
 
 ### The Formula
@@ -665,6 +690,7 @@ This creates a domino whose long axis follows the tilted backrest direction, pro
 | Dimension uses `addDistanceDimension` for splay but value is negative | Distance dimensions are always positive | Use the `splay_shift` parameter directly — it's always positive (derived from `tan(splay)`) |
 | Tilted stretcher intersects footrest/rail | Splay Move raises stretcher edge into adjacent body | Run `check_interference` after splay moves; add trim CUT if non-zero |
 | Splay Move after `angled_tenon_end` — wrong shoulder | Move tilts the already-cut shoulder face | Move must come BEFORE `angled_tenon_end` — the tenon technique needs to see the tilted body |
+| Through-slot / joinery cut asymmetric across splayed legs | The slot CUT was applied AFTER the splay Move, so an axis-aligned cut met each splayed leg differently and the mirror copies inherited only the template's pre-cut shape | Cut the slot on the **canonical (pre-Move) leg**, then splay-Move and mirror — the CUT is in the timeline before the transforms, so it rotates with the leg and propagates identically to all copies. **Rule:** cut BEFORE the Move when you want the feature to follow the part's final orientation + copies; cut AFTER only when the technique must see the already-tilted geometry (e.g. `angled_tenon_end`). |
 | Stretcher 3.5" deep × 0.75" tall (swapped) | Put `str_w` (height) on sketch cross-axis, `str_t` on extrude | Sketch cross-axis = `str_t` (thickness), extrude = `str_w / 2` (half-height). See "Sketch vs. Extrude Dimension Mapping" |
 | Stretcher-to-stretcher interference at corners | Two thick stretchers overlap inside a leg | Swap to correct dims (above); run `check_interference` after stretcher extrudes |
 | Two-piece back leg has notch on inner face | Overlap from rotated backrest protrudes past vertical portion's inner face | Use single profile sketch + extrude instead of two-piece JOIN (see "Angled Chair Backrests") |

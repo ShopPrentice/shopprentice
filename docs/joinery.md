@@ -168,6 +168,59 @@ combine(board_b, domino_body, CUT, True, "DM_CutB")
 # Result: both mortises cut, domino body visible between boards
 ```
 
+## CUT-Tool Direction & Sequencing (round-leg joinery — Ming table)
+
+When two members meet, **which one is the CUT tool is a design decision, not an
+arbitrary one** — it must match how the real joint is cut, and you commit to ONE
+direction. Getting it backwards still validates (a void is a void) but models the
+wrong joint.
+
+**Pick the tool by the joint, and cut one direction only.** On the Ming table the
+spandrel, apron, and top frame all wrap a round leg. The correct mechanism is the
+**leg cuts them**, never the reverse:
+
+- Cut a **through-slot in the leg** first — narrower than the spandrel thickness
+  (e.g. 0.25" slot in a 0.375" spandrel). This forks the leg top and leaves a
+  connecting web.
+- Use the **forked leg as the CUT tool** against the spandrel, apron, and frame.
+  Because the slot is narrower than the part, the cut leaves a tongue/neck rather
+  than severing it — and the round cheeks of the leg automatically carve the
+  roughly-dovetailed channels into the spandrel.
+- Do **not** also cut the leg with the apron. "Only the leg cuts the apron" — a
+  symmetric both-ways cut double-removes material and reads as a butt, not a wrap.
+
+**Cut joinery on the canonical part BEFORE the orienting Move, so it follows the
+part and its copies.** A CUT feature is carried by a later Move/Mirror only if it's
+already in the body's timeline when those run. The leg slot was first cut *after*
+the splay Move and came out left/right asymmetric (the vertical slot met the splayed
+legs differently). Moving the slot CUT *before* the two splay rotations made it
+rotate with the leg and propagate identically through all four mirror copies
+(spandrel↔leg contact went from 52/10 cm² to a symmetric 74 on every leg). See
+`docs/angled-construction.md` for the cut-before/cut-after rule.
+
+**Coped M&T into a round leg ("frame embraces the leg").** To make a square frame
+member wrap a round leg with a rounded shoulder:
+
+1. **Cope** the rail to the round leg — cut the rail by the leg so its shoulder
+   takes the leg's round profile.
+2. **Build the tenon body** protruding from the coped shoulder.
+3. **Cut the leg by the tenon** to carve the mortise (`keepTool=True` — tenon
+   survives).
+4. **JOIN the tenon to the rail.**
+
+When long and short rails enter the same leg, **stagger their tenons in Z** so they
+don't collide inside the round leg (long-rail tenons upper, short-rail lower).
+
+**One continuous profile split by a miter line.** Where an apron and its spandrel
+brackets read as one continuous coved piece, draw them as a **single elevation
+sketch** (apron band on top, spandrels hanging below, blended by quarter-circle
+coves), then `SplitBody` along the miter line into separate bodies and re-JOIN the
+apron fragments into one continuous body. Cut the bridle slot into the spandrel
+inside the miter, then let the leg + spandrel cut the apron for the fit. **Heed the
+SplitBody single-tool rule** (`docs/fusion-api-rules.md`) — one tool per call, or
+prefer a bounded CUT-then-JOIN notch over an infinite-plane split that severs the
+piece.
+
 ## Inline Joint Types
 
 ### Mortise and Tenon

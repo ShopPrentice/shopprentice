@@ -73,11 +73,11 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 | **Angled Construction** | Splayed legs, stretchers/rails on splayed legs, through-tenons, compound angles, Sweep, Move, SplitBody | Tested (counter stool) | `docs/angled-construction.md` |
 | **Details & Finishing** | Fillets, chamfers, edge treatments (Phase 3) | Planned — inline quick reference below | `docs/details-and-finishing.md` |
 | **MCP Advanced** | Modifying existing designs, fixing dimensions, adding features to built models, delete-and-rebuild timeline sections | Tested (bar side table) | `docs/mcp-advanced.md` |
-| **Appearance** | Applying wood species, grain direction, multi-species designs — read before calling `apply_appearance`. Includes the `# APPEARANCE SPEC` comment-block convention for persisting grain overrides / multi-pass finish across `execute_script(clean=True)` rebuilds | Tested (blanket box) | `docs/appearance.md` |
+| **Appearance** | Applying wood species, grain direction, multi-species designs, lightening/darkening or recoloring a species ("make it lighter / less red") — read before calling `apply_appearance`. Includes the `# APPEARANCE SPEC` comment-block convention for persisting grain overrides / multi-pass finish across `execute_script(clean=True)` rebuilds | Tested (blanket box) | `docs/appearance.md` |
 | **Hardware Installation** | Importing STEP hardware (bed rail fasteners, hinges), positioning, caching, direction detection, component organization | Tested (queen + twin beds) | `docs/hardware-installation.md` |
 | **Joinery Rules** | Combine-based joinery, tooling bodies, edge rabbets, cross-component CUT patterns | Tested | `docs/joinery.md` |
 | **Screenshots** | Camera positioning, standard shots, transparent views, detail framing | Tested | `docs/screenshots.md` |
-| **Incremental Updates & Build Strategy** | Build order, component-by-component workflow, document management, script epilogue, interactive editing, rebuild-vs-patch | Tested | `docs/incremental-updates.md` |
+| **Incremental Updates & Build Strategy** | Build order, component-by-component workflow, document management, script epilogue, interactive editing, rebuild-vs-patch. Also **deriving a variation at a very different size** (propose the full proportion set up front, audit baked constants, datum-relative selection heuristics, volume-scaling validation) — read the Size Variations section only when the user is transforming the piece AND the envelope changes substantially; a single-parameter tweak needs none of it | Tested (Ming table → 平头案) | `docs/incremental-updates.md` |
 | **Replication & Common Errors** | Mirror, Pattern, body pattern ghost bodies, mirror+pattern limitation, 24-row error table | Tested | `docs/fusion-api-rules.md` |
 | **Helpers Reference** | `sp.*` function signatures, `sketch_rect_model`, `ev()`, feature builders | Tested | `docs/helpers-reference.md` |
 | **Organic Shapes** | Self-contained designer + recipe doc for sculpted forms. Shape taxonomy (5 classes): (1) turned/spindled parts — revolve, (2) flat-plan outlines — closed spline + extrude, (3) 3-D organic solids (lens-profile seats, rounded finial tips) — multi-section loft + tangent end conditions, (4) sculpted dish/saddle — sphere CUT, (5) character surfaces — Form T-splines (out-of-scope for scripting). Classes 1–4 include inline API snippets; also covers the approximate→refine→capture iteration loop and through-tenon trimming on organic surfaces | Tested (Esherick stool) | `docs/organic-shapes.md` |
@@ -95,6 +95,8 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | **Drawbore M&T** | Stretcher-to-leg with offset pins for permanent tightness — workbenches, trestle tables, timber frames | Tested (Roubo workbench — through & blind variants) | `docs/joinery/drawbore.md` + `drawbore` template |
 | **Domino** | Hidden structural joints, kick boards, shelf-to-back, panel alignment — any time you need a loose tenon | Tested (counter stool, bookshelf) | `docs/joinery/domino-joint.md` |
 | **Dovetail** | Drawer fronts, premium boxes, visible corner joints where mechanical strength matters | Tested (pencil box, wrap box) | `docs/joinery/dovetail.md` |
+| **Full-Blind (Secret-Mitred) Dovetail** | Hidden corners that must read as a plain 45° miter from both outer faces — jewelry boxes, humidors, fine casework. Through dovetail buried behind a mitered lip; `corner()` is a generator (builds both boards). | Tested (corner generator — through + parameter-change validated) | `docs/joinery/full-blind-dovetail.md` + `full_blind_dovetail` template |
+| **Splayed (Compound-Angle) Dovetail** | Through dovetails on boxes whose sides lean outward — rice measures (米斗), splayed trays, knife boxes. Every corner interface is tilted: tail baselines follow the slanted shoulder line (unequal flank lengths), pins run with the pin board's grain. `frame()`/`boards()`/`corners()` build the whole splayed case as exact oblique sweeps — recompute-safe, live parameter edits. v1: square frustum only | Tested (midou-box — build + live recompute at 3 geometries) | `docs/joinery/splayed-dovetail.md` + `splayed_dovetail` template |
 | **Box Joint** | Boxes, drawers, decorative interlocking corners — simpler alternative to dovetails | Draft | `docs/joinery/box-joint.md` |
 | **Dado & Rabbet** | Shelves into sides, case backs, drawer bottoms, any panel-into-groove connection | Tested (bookshelf, template fixtures — through/stopped dado, rabbet, panel groove) | `docs/joinery/dado-rabbet.md` |
 | **Bridle Joint** | Frame corners, T-connections, open mortise-and-tenon at end of a rail | Draft | `docs/joinery/bridle-joint.md` |
@@ -141,6 +143,7 @@ Before planning, identify the **furniture type** and **design style** from the u
 | Pergola | pergola, arbor, trellis, gazebo | `docs/types/pergola.md` |
 | Mirror frame | mirror, mirror frame, looking glass | `docs/types/mirror-frame.md` |
 | Shelf | shelf, floating shelf, wall shelf, ledge | `docs/types/shelf.md` |
+| Modular shelving | modular shelf, shelving system, post-and-peg shelving, standards-and-brackets, ladder shelf, wall shelf system | `docs/types/modular-shelving.md` |
 
 **Identify style** from visual cues, user description, or reference photos:
 
@@ -521,7 +524,7 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 
 **Core principle:** Build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), JOIN to the owner. Timeline order: CUT first (root, assembly proxies), JOIN second (owning component). Cross-component: use `body.createForAssemblyContext(occ)` for CUT in root.
 
-**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `tusk_tenon`, `tabletop_button`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `docs/joinery/README.md`.
+**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `full_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `tusk_tenon`, `tabletop_button`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `docs/joinery/README.md`.
 
 **Hardware:** use `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` for hinges, plus the `pull` and `chest_lock` templates for non-hinge hardware. See `docs/hardware-installation.md`.
 
@@ -567,9 +570,23 @@ This allows the user (or a new agent session) to resume work by reading the READ
 
 **Multi-agent / parallel sessions.** When agents run concurrently (a fan-out), the **Session Manager keeps a dedicated Fusion document per agent** (keyed by session ID); your `execute_script` / `capture_design` / `validate_design` calls operate on YOUR document and `clean=True` rebuilds only it, so parallel agents never collide. Fusion serializes execution — expect latency, not incorrectness — so run the normal loop with no document coordination. If you lose your binding or `claim_document` reports a conflict, re-bind (`resolution='transfer'` to take a contested doc); after a restore, `clean=True` is rejected until you `sync_script`. See `docs/mcp-advanced.md`.
 
-**model.json:** Before writing the build script, create a `model.json` dependency tree — each entry pairs a `"body"` with its `"ref"`, the parent it was positioned from. `"ref"` may be one name or a list: every body needs ≥1 parent (a part seating against two lists both), and exactly one body references `"origin"` (the root). A two-parent sketch anchors to each parent's projected geometry on the axis that parent controls.
+**model.json (MANDATORY — create it FIRST, before the build script):** The dependency
+tree is what turns on `validate_design`'s sketch-quality checks (sketch origin enforcement,
+traceability, fully-constrained). **Without a `model.json` next to the script those checks do
+not run at all** — `validate_design` then reports `DEPS SKIPPED — no model.json` and its
+"PASS" only covers connectivity + interference. A model can pass that way with every sketch
+floating on Python-computed coordinates (the Ming-table trap: a multi-hour build reported
+green the whole time because the gate was never armed). So create `model.json` at project
+start, not as a retrofit. Each entry pairs a `"body"` with its `"ref"`, the parent it was
+positioned from. `"ref"` may be one name or a list: every body needs ≥1 parent (a part
+seating against two lists both), and exactly one body references `"origin"` (the root). A
+two-parent sketch anchors to each parent's projected geometry on the axis that parent controls.
 
-**Phase validation:** `validate_design` runs connectivity, interference, and dependency checks (single origin, sketch origin enforcement, bodies in components). Run it after EVERY phase. Completeness (all bodies tracked) is advisory — it won't fail the build.
+**Phase validation:** `validate_design` runs connectivity, interference, and dependency checks
+(single origin, sketch origin enforcement, bodies in components). Run it after EVERY phase.
+Completeness (all bodies tracked) is advisory — it won't fail the build. **If you see
+`DEPS SKIPPED`, the dependency checks never ran — add `model.json` and re-validate; do not
+treat that result as a clean pass.**
 
 **Final step:** apply_appearance → get_product_shots → present to user.
 

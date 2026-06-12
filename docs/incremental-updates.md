@@ -266,3 +266,31 @@ sp.apply_appearance("white oak")
 **Step 3 is required** — scripts without `sp.apply_appearance()` produce grey models. Use the species the user requested; default to white oak if none specified. See `docs/appearance.md` for species and grain details.
 
 After the script runs, call `get_product_shots` via MCP to capture presentation images. It handles camera positioning, artifact cleanup, and framing automatically — no fit-view or hide-sketch code needed in the script.
+
+---
+
+## Size Variations (Deriving a Piece at a Very Different Size)
+
+**Scope — when this section applies:** the user is *transforming* an existing model into a different piece (dropping/adding components, changing its role) AND the envelope changes substantially (roughly >30% in a dimension). Both signals together are what justify the proportional approach. It does NOT apply to ordinary edits — a single-parameter tweak ("make it 2" taller", "thicker legs") is just `modify_parameters` or one script edit + rebuild; don't turn one requested change into an unrequested proportions pass.
+
+When the scope DOES apply, the target is **one proportions conversation + one rebuild** — not a long trickle of "now make X thicker / that detail broke" prompts. (The Ming-table → 60×25×30 平头案 variation burned ~8 prompts; nearly all were avoidable with the rules below.)
+
+### 1. Propose the full proportion set up front
+
+Envelope parameters scale by the user's numbers. Member **sections** (leg diameter, apron thickness/height, frame width/thickness, stretcher diameter, spandrel size) do NOT scale 1:1 — but leaving them unchanged is equally wrong (a 2× longer table with the small table's legs looks spindly). Before building anything, output a table: every section parameter, current value, proposed value. Rule of thumb: scale sections roughly **half as far as the envelope** (envelope ×2 → sections ×1.4–1.5), round to sensible stock sizes, and keep sheet/panel thicknesses unless asked. Get one approval, then apply ALL of it in one edit and one clean rebuild.
+
+### 2. Structural edits first, proportions second
+
+Copy the working script, change ONLY the envelope dims plus structural removals/additions (drop the shelf, add stretchers), and verify it builds before touching proportions. Never reproportion aggressively in the same step as the envelope change — when something breaks you cannot tell which change did it, and fragile features (projection-anchored sketches) fail at the combination.
+
+### 3. Resize exposes every baked constant — audit them
+
+Grep the script for numeric literals in geometry code (`* IN`, raw `cm` values, `"%.4f cm"` expressions). Each one is either a genuinely fixed detail (a chamfer, a lip) or a value that silently stopped tracking its stock (in this build: batten spacing baked from the old depth; a connector tongue baked at 1/8" instead of `apron_t / 4`; a split line placed "1 7/16 below the section top" instead of relative to the band bottom it must clear). Convert the latter to parameter expressions of the stock/envelope they belong to. Paired dimensions that must stay equal (setbacks all around) should be ONE parameter plus a derived expression — never two numbers that happen to match.
+
+### 4. Selection heuristics must be datum-relative
+
+"Pick the max-Y edge", "the profile touching the top vertex", fixed offsets from a projected reference — all proportion-dependent, and they fail **silently** at a new size by grabbing a different edge/profile (the model still builds; the joint is just wrong). Make every pick a geometric test against its governing datum: profile bounding box entirely above/below the split line; edge truly parallel AND nearest the expected world-Z; bands positioned by a stable edge + fixed height rather than offset from a drifting projection. API gotcha: `Profile.boundingBox` is the profile's true extent, but `profileCurves.item(k).sketchEntity` endpoints are the FULL entity's ends — a split line divides profiles, not entities — so never vertex-scan a profile to classify it.
+
+### 5. Validate with scaling arithmetic, not eyeballs
+
+After the rebuild, compare per-body volumes against expected factors (length ×kl, section ×ks → volume ≈ kl·ks²). A body whose volume didn't move (baked constant) or moved wildly (wrong profile selected) shows up in one pass. Then `validate_design`, and section/inspect every joint that relies on a selection heuristic before presenting.
