@@ -126,3 +126,34 @@ Chamfers and fillets are for **exposed structural edges only**. Skip:
 - Fillet radius must be less than half the smallest adjacent face dimension — too large and the fillet fails.
 - Chamfer distance must be less than the shortest edge length on any affected face.
 - When in doubt, start small (1/8") and let the user adjust via Change Parameters.
+
+## Leg Tapers — use the `taper_legs` template
+
+Never hand-roll taper wedge sketches with raw coordinates on construction
+planes — on the xZ plane sketch-Y maps to model **-Z**, so the wedge lands
+below the floor and the CUT silently removes nothing (the feature still
+reports a healthy body; only a volume check catches it).
+
+```python
+from woodworking.templates import taper_legs
+
+taper_legs.define_params(params, amount="0.5 in", run="25 in")
+
+# Standard 4-leg furniture: taper the two faces looking at the center.
+# Orientation-agnostic — same call works on straight, raked, and
+# splayed legs (apply AFTER any Move/rotation):
+taper_legs.inner_pair(comp, leg_body,
+    center=(ev("frame_l / 2"), ev("frame_w / 2"), 0),
+    ev=ev, thick_expr="leg_size * 2", name="Taper")
+
+# Single face:
+taper_legs.cut(comp, leg_body, taper_face, ev=ev,
+    thick_expr="leg_size * 2", name="TaperX")
+```
+
+The template anchors all geometry to the leg's own projected edges (no
+plane coordinates anywhere), derives the cut direction from the face
+normal, and RAISES if the cut removed no material. Taper one template
+leg, then mirror/pattern it to the other corners as usual. Tested on
+straight, 6° raked, and compound rake+splay legs with exact analytic
+volume checks (`tests/test_template_taper_legs.py`).
