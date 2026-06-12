@@ -61,7 +61,7 @@ Stretchers (if present) connect legs at a lower height
 6. Top board (single panel or glue-up)
 7. Top attachment (dominos or button slots)
 8. Breadboard ends (if present)
-9. Details (leg tapers, edge treatments)
+9. Details (leg tapers via the `taper_legs` template — never hand-rolled wedge sketches; edge treatments)
 ```
 
 ## Validation Rules
