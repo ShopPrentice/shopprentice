@@ -237,6 +237,109 @@ def _check_interference(root_comp, exclude_prefixes):
     }
 
 
+# ── Feature Impact Check ─────────────────────────────────────────────
+
+def _check_feature_impact(design):
+    """Find timeline features that exist but change no geometry.
+
+    A CUT whose profile/tool never intersects its target is a silent
+    modeling bug (e.g. a taper wedge sketched on the wrong side of a
+    construction plane lands below the floor and removes nothing) — the
+    feature computes "successfully", the body keeps its full volume, and
+    connectivity/interference/deps checks all still pass. Empirically
+    (probed June 2026):
+      - no-op CUT extrude:  healthState=WARNING, faces.count == 0
+      - no-op CUT combine:  healthState=HEALTHY(!), faces.count == 0
+      - healthy cuts always create/modify faces (faces.count > 0)
+    So faces.count == 0 on a material-removing feature is the reliable
+    signal; health warnings are reported as advisory context.
+
+    Mirrors/patterns are deliberately NOT flagged on zero bodies/faces:
+    a mirror whose products are consumed by a later JOIN (e.g. mirrored
+    tenons joined into their rail) legitimately reports zero of both —
+    verify replication by body COUNT in the build script instead.
+
+    Returns {"passed", "zeroImpactFeatures": [...], "unhealthyFeatures":
+    [...]} — zero-impact features fail validation and are named so the
+    agent knows exactly which feature to fix.
+    """
+    F = adsk.fusion
+    Hs = F.FeatureHealthStates
+    CUT = F.FeatureOperations.CutFeatureOperation
+    INT = F.FeatureOperations.IntersectFeatureOperation
+
+    zero = []
+    unhealthy = []
+    tl = design.timeline
+    for i in range(tl.count):
+        item = tl.item(i)
+        try:
+            if item.isSuppressed:
+                continue
+            ent = item.entity
+        except Exception:
+            continue
+        if ent is None:
+            continue
+        tname = ent.objectType.split("::")[-1]
+        name = getattr(ent, "name", tname)
+
+        try:
+            health = ent.healthState
+        except Exception:
+            health = Hs.HealthyFeatureHealthState
+        msg = ""
+        if health != Hs.HealthyFeatureHealthState:
+            try:
+                msg = ent.errorOrWarningMessage
+            except Exception:
+                pass
+            unhealthy.append({
+                "feature": name, "type": tname,
+                "state": ("error" if health == Hs.ErrorFeatureHealthState
+                          else "warning"),
+                "message": msg,
+            })
+
+        def _count(attr):
+            try:
+                return getattr(ent, attr).count
+            except Exception:
+                return None
+
+        faces = _count("faces")
+        op = getattr(ent, "operation", None)
+
+        reason = None
+        if tname == "ExtrudeFeature":
+            # Require unhealthy too: a (rare) healthy faces==0 extrude is
+            # a cut consuming an entire body — real impact, don't flag.
+            if (op in (CUT, INT) and faces == 0
+                    and health != Hs.HealthyFeatureHealthState):
+                reason = ("cut/intersect extrude created no faces — the "
+                          "profile does not intersect the participant "
+                          "bodies; it removed NOTHING")
+        elif tname == "CombineFeature":
+            # No-op combines stay HEALTHY — faces==0 is the only signal.
+            if op in (CUT, INT) and faces == 0:
+                reason = ("cut/intersect combine modified no faces — the "
+                          "tool body does not intersect the target; it "
+                          "removed NOTHING")
+        elif tname in ("FilletFeature", "ChamferFeature"):
+            if faces == 0:
+                reason = "fillet/chamfer modified no faces"
+
+        if reason:
+            zero.append({"feature": name, "type": tname, "reason": reason,
+                         "healthMessage": msg})
+
+    return {
+        "passed": len(zero) == 0,
+        "zeroImpactFeatures": zero,
+        "unhealthyFeatures": unhealthy,
+    }
+
+
 # ── Handler ──────────────────────────────────────────────────────────
 
 def _native_token(b):
@@ -436,10 +539,12 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
         bodies = _collect_bodies(root)
         connectivity = _check_connectivity(bodies, prefixes, min_area)
         interference = _check_interference(root, prefixes)
+        impact = _check_feature_impact(design)
 
         passed = (connectivity["connected"]
                   and not connectivity["weakConnections"]
-                  and interference["realCount"] == 0)
+                  and interference["realCount"] == 0
+                  and impact["passed"])
 
         # Run dependency tree validation if model.json exists
         deps_result = None
@@ -505,6 +610,7 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
             "passed": passed,
             "connectivity": connectivity,
             "interference": interference,
+            "featureImpact": impact,
         }
         if deps_result is not None:
             result["deps"] = deps_result
@@ -525,6 +631,18 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
             parts.append("interference OK (0 real)")
         else:
             parts.append(f"INTERFERENCE FAIL ({interference['realCount']} real)")
+
+        if impact["zeroImpactFeatures"]:
+            names = ", ".join(z["feature"]
+                              for z in impact["zeroImpactFeatures"])
+            parts.append(f"FEATURE IMPACT FAIL — zero-impact feature(s): "
+                         f"{names}")
+        elif impact["unhealthyFeatures"]:
+            parts.append(f"feature impact OK "
+                         f"({len(impact['unhealthyFeatures'])} health "
+                         f"warning(s) — see featureImpact.unhealthyFeatures)")
+        else:
+            parts.append("feature impact OK")
 
         if deps_result is not None:
             if deps_result.get("passed"):
@@ -573,13 +691,23 @@ def handler(exclude_prefixes: list = None, min_contact_cm2: float = None) -> dic
 TOOL_DESCRIPTION = \
 """Run all validation checks on the current design.
 
-Combines three checks in a single call:
+Combines all structural checks in a single call:
 1. **Connectivity** — all structural bodies must form 1 connected cluster
    with sufficient face-to-face contact area. Edge-only or point-only
    contacts don't count. Connections below min_contact_cm2 are flagged weak.
 2. **Interference** — no unintended body overlaps (excludes void-on-void
    pairs like joinery ghost bodies)
-3. **Dependency tree** — if model.json exists next to the script, validates:
+3. **Feature impact** — every CUT/INTERSECT extrude or combine must
+   actually change geometry. A cut whose profile/tool misses its target
+   computes "successfully" but removes nothing (classic cause: a sketch
+   drawn with raw coordinates on a plane whose sketch-Y maps to model -Z).
+   Zero-impact features FAIL validation and are returned by name in
+   featureImpact.zeroImpactFeatures so the agent knows which feature to
+   fix. No-op fillets/chamfers are flagged too; features in warning/error
+   health are listed as advisory context. Mirrors/patterns are exempt
+   (a later JOIN may legitimately consume their products — verify those
+   by body count).
+4. **Dependency tree** — if model.json exists next to the script, validates:
    single origin root, sketch origin enforcement (non-root sketches must
    not dimension from sk.originPoint), sketch traceability (every non-root
    sketch must project real reference geometry, use no Fix/Ground constraint,
@@ -591,7 +719,7 @@ Combines three checks in a single call:
    "DEPS SKIPPED — add model.json" (it does not fail the build, but a PASS
    without it means the sketch checks were never enforced). Create model.json
    to turn the gate on.
-4. **Replication advisory** (ADVISORY — never affects pass/fail): congruent
+5. **Replication advisory** (ADVISORY — never affects pass/fail): congruent
    structural bodies built independently instead of via Mirror/Pattern (the
    token-wasteful, non-parametric anti-pattern). Suppressed when the bodies are
    already a Mirror/Pattern output, when a body name contains `_norep`, or for
@@ -599,17 +727,17 @@ Combines three checks in a single call:
    a redo; the recommended response is to refactor the named group to one
    template + Mirror/Pattern (a sub-agent can do this so the main build's context
    stays lean).
-5. **Detail-after-replicate advisory** (ADVISORY — never affects pass/fail): the
+6. **Detail-after-replicate advisory** (ADVISORY — never affects pass/fail): the
    SAME detail sketched separately for each copy (e.g. tapering every leg AFTER
    mirroring) instead of detailing the template BEFORE the Mirror/Pattern. The
-   copy bodies are proper mirror outputs (so check 4 stays quiet), but the
+   copy bodies are proper mirror outputs (so check 5 stays quiet), but the
    per-copy detail SKETCHES are redundant. Detected roll-free via congruent
    sketches at mirror/pattern-symmetric positions; opt out with `_norep` in the
    sketch name.
 
 Returns a single pass/fail result. Fails if disconnected, has weak
-connections, or has interference (NOT for the two advisories).
-Run after EVERY phase."""
+connections, has interference, or has zero-impact features (NOT for the
+two advisories). Run after EVERY phase."""
 
 tool = Tool.create_simple(
     name="validate_design",
