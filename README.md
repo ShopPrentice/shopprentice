@@ -93,6 +93,9 @@ The agent can also work from images — show it a photo or sketch of a piece and
 <td align="center"><a href="examples/ming-table/"><img src="examples/ming-table/screenshots/iso-top-right.png" width="220" /><br /><b>Ming Table</b></a></td>
 <td align="center"><a href="examples/midou-box/"><img src="examples/midou-box/screenshots/iso-top-right.png" width="220" /><br /><b>Midou Rice Measure (米斗)</b></a></td>
 </tr>
+<tr>
+<td align="center"><a href="examples/bookcase-with-drawers/"><img src="examples/bookcase-with-drawers/screenshots/iso-top-right.png" width="220" /><br /><b>Bookcase with Drawers</b></a></td>
+</tr>
 </table>
 
 The **Step Stool** and **Pergola** were reverse-engineered from existing Fusion 360 designs using the capture-and-rebuild pipeline (search-based feature matching with per-body volume validation at 0.000% tolerance).
