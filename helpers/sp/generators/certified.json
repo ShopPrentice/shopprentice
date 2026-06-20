@@ -1,0 +1,13 @@
+{
+  "base_arch_cut@a79122da67357226195337e1273a820b28cee6a51036c82c11d8af56437b07ac": {
+    "branches": [
+      "center-shared",
+      "center-pair"
+    ],
+    "certified": true,
+    "certified_at": "2026-06-14",
+    "fusion_version": "2703.1.11",
+    "geometric_contract": "closed free-spline top edge mirrored about the span centre + a 3-line waste-rail frame; spline endpoints anchored to the floor line, interiors free; closes into one cut profile",
+    "name": "base_arch_cut"
+  }
+}
