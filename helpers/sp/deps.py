@@ -325,6 +325,48 @@ def resolve_model_json(metadata_path=None):
     return os.path.join(script_dir, "model.json"), False
 
 
+def _validate_joint_registry(ctx, joints):
+    """Run the declarative joint-registry checks (issue 106) and print their report.
+
+    Two parts: an ADVISORY undeclared-contact pass (most contacts legitimately need no
+    joint, so it only NOTEs), then the per-type strength check on each declared joint.
+    Returns False on a HARD failure — a malformed declaration (unknown type / missing
+    field / unresolved body) or an unexpected error in the check itself (fail-closed,
+    like any other dependency error). Advisory flags/notes never fail.
+    """
+    ok = True
+
+    # Undeclared-contact check (advisory; never fails). Surfaces contacting bodies with
+    # no declared joint to nudge declaring load-bearing ones — but glued panels, butt/
+    # edge joints, shelves in dados and seated rails legitimately need none.
+    try:
+        from helpers.sp.joint_registry import joint_covers
+        from helpers.sp.mating import contacting_pairs
+        pairs = contacting_pairs(ctx)
+    except Exception:
+        pairs = []
+    undeclared = [(a, b) for (a, b) in pairs
+                  if not any(joint_covers(j, a, b) for j in joints)]
+    if undeclared:
+        print("--- Undeclared contacts (advisory; many contacts need no joint) ---")
+        for a, b in undeclared[:10]:
+            print(f"  NOTE  {a} and {b} are in contact but no joint is declared")
+        if len(undeclared) > 10:
+            print(f"         ... and {len(undeclared) - 10} more")
+
+    try:
+        from helpers.sp.joint_registry import validate_joints
+        jres = validate_joints(ctx, joints)
+        if not jres.get("ok", True):
+            ok = False
+    except Exception as e:
+        # An exception here is an unexpected internal/import error, not a declaration
+        # problem (validate_joint never raises) — fail closed so it surfaces loudly.
+        ok = False
+        print(f"  FAIL  joint strength check errored: {e}")
+    return ok
+
+
 def validate_deps(ctx, metadata_path=None):
     """Validate dependency tree from model.json.
 
@@ -360,9 +402,16 @@ def validate_deps(ctx, metadata_path=None):
         meta = json.load(f)
 
     deps = meta.get("deps", [])
+    joints = meta.get("joints", [])
     if not deps:
         print("validate_deps: no deps entries in metadata")
-        return True
+        # Joints are validated independently of the dependency tree, so a model that
+        # only declares joints (no deps) still gets its strength checks.
+        if not joints:
+            return True
+        jok = _validate_joint_registry(ctx, joints)
+        print(f"=== Dependency validation: {'PASS' if jok else 'FAIL'} ===\n")
+        return jok
 
     print(f"\n=== Dependency tree ({len(deps)} entries) ===")
     all_ok = True
@@ -542,34 +591,8 @@ def validate_deps(ctx, metadata_path=None):
     # use the registry aren't spammed. Per-type strength checks surface advisory
     # WARNINGs; a malformed declaration (unknown type / unresolved body) is a HARD
     # failure like any other dependency error.
-    joints = meta.get("joints", [])
-    if joints:
-        # Undeclared-contact check (advisory). Most contacts legitimately need no joint
-        # (glued panels, butt/edge joints, shelves in dados, seated rails), so this is
-        # INFORMATIONAL — it never fails the build; it just nudges you to declare a
-        # load-bearing joint so it gets a strength check.
-        try:
-            from helpers.sp.joint_registry import joint_covers
-            from helpers.sp.mating import contacting_pairs
-            pairs = contacting_pairs(ctx)
-        except Exception:
-            pairs = []
-        undeclared = [(a, b) for (a, b) in pairs
-                      if not any(joint_covers(j, a, b) for j in joints)]
-        if undeclared:
-            print("--- Undeclared contacts (advisory; many contacts need no joint) ---")
-            for a, b in undeclared[:10]:
-                print(f"  NOTE  {a} and {b} are in contact but no joint is declared")
-            if len(undeclared) > 10:
-                print(f"         ... and {len(undeclared) - 10} more")
-
-        try:
-            from helpers.sp.joint_registry import validate_joints
-            jres = validate_joints(ctx, joints)
-            if not jres.get("ok", True):
-                all_ok = False
-        except Exception as e:
-            print(f"  joint strength check skipped (error: {e})")
+    if joints and not _validate_joint_registry(ctx, joints):
+        all_ok = False
 
     status = "PASS" if all_ok else "FAIL"
     print(f"=== Dependency validation: {status} ===\n")

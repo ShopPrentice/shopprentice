@@ -131,5 +131,34 @@ res, out = run_deps({"deps": ORIGIN_DEP}, ["Leg_FL", "Rail_F"])
 check("no joints array -> deps PASS", res is True)
 check("no joints array -> joint section NOT printed", "Joint strength check" not in out)
 
+# 6. NO deps but joints present -> joints validated independently (not skipped).
+res, out = run_deps({
+    "joints": [{"type": "mortise_tenon", "tenon": "Rail_F", "mortise": "Leg_FL",
+                "axis": "y", "width": "2 in", "thickness": "0.75 in", "depth": "1.5 in"}],
+}, ["Leg_FL", "Rail_F"])
+check("empty deps + clean joint -> joints still validated, PASS",
+      res is True and "Joint strength check" in out)
+
+res, out = run_deps({
+    "joints": [{"type": "bogus", "tenon": "Rail_F", "mortise": "Leg_FL"}],
+}, ["Leg_FL", "Rail_F"])
+check("empty deps + bad joint -> FAIL (not skipped by early return)", res is False)
+
+# 7. An exception inside validate_joints fails closed (all_ok=False).
+import helpers.sp.joint_registry as _jr
+_orig = _jr.validate_joints
+def _boom(ctx, joints):
+    raise RuntimeError("simulated internal error")
+_jr.validate_joints = _boom
+try:
+    res, out = run_deps({"deps": ORIGIN_DEP,
+                         "joints": [{"type": "mortise_tenon", "tenon": "Rail_F",
+                                     "mortise": "Leg_FL", "axis": "y"}]},
+                        ["Leg_FL", "Rail_F"])
+finally:
+    _jr.validate_joints = _orig
+check("validate_joints exception -> deps FAIL (fail-closed)",
+      res is False and "errored" in out)
+
 print("\n%d/%d cases passed" % (sum(R), len(R)))
 sys.exit(0 if all(R) else 1)
