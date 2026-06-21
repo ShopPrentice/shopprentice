@@ -92,6 +92,65 @@ direction by hand (see `grain_dir` in `tenon-wedge.md`).
 - **Drawbore pins / any pin**: a pin must cross the grain of every piece it
   pierces — a pin *along* the grain is a splitting wedge.
 
+## Sizing the tenon: maximize long-grain glue, minimize fibers cut
+
+Orientation (above) is only half the job — the **dimensions** follow from the same
+two facts, and they decide the joint's actual strength:
+
+1. **A joint's strength is its long-grain-to-long-grain glue area.** Only faces
+   that are long grain on BOTH pieces carry load; an end-grain contact glues to
+   almost nothing. So first identify which of the tenon's faces are the
+   load-bearing glue faces and which are not:
+   - **Cheeks** — the tenon faces parallel to BOTH the insertion axis AND the
+     mortise piece's fiber. Long grain on the tenon (they run along its fiber)
+     AND long grain on the mortise wall they meet (it runs along the mortise
+     fiber). **These faces ARE the joint.** Maximize their area.
+   - **Faces perpendicular to the mortise fiber** meet end-grain mortise walls →
+     weak. **The shoulder** seats the joint and hides the gap but is end grain →
+     not structural. Don't size the joint around either.
+
+2. **Cutting the mortise severs the mortise piece's fibers — cut as few as
+   possible.** The count severed ∝ the mortise cross-section *perpendicular to the
+   fiber* = (dimension across the fiber) × (depth).
+
+Put together, the dimensioning rule is:
+
+> **Grow the tenon along the directions that add long-grain glue area (along the
+> mortise fiber, and into the depth); keep it thin in the one direction that only
+> severs fibers (across the mortise fiber).**
+
+| Tenon dimension | Direction | Rule | Why |
+|---|---|---|---|
+| **Width** | along the fiber (in-section) | as large as the joint allows, less shoulder/relish | grows cheek glue; runs *with* the fiber so it severs none extra |
+| **Depth** | along the insertion axis | as deep as practical (through, or ≥⅔ for blind) | grows cheek glue |
+| **Thickness** | across the fiber (in-section) | ~⅓ of the stock it passes through (≈⅓ long-grain walls each side) | the ONLY dimension that severs fibers — minimal, but not so thin it shears |
+
+Caps on the maxima:
+- **Across-fiber walls** (long-grain cheeks left in the mortise piece): keep ~⅓
+  each — what the ⅓ thickness rule buys.
+- **End relish** (material between the mortise and the *end* of the mortise
+  piece): that end face is short/cross grain and blows out if the mortise crowds
+  it — keep the mortise back from the end.
+- **Shoulder** on the tenon piece: enough for a clean seat; it's end grain, so
+  more buys appearance, not strength.
+
+The orientation rule is just this rule's consequence: the *wide* dimension lands
+along the fiber because that is the dimension you grow for glue while the
+across-fiber dimension stays thin.
+
+### Worked example — a stretcher tenoning into a cross-member
+
+A spine (fiber X) tenons through a cross-stretcher (fiber **Y**), both 2″×2.75″
+stock, through the cross-stretcher's 2″ thickness:
+- **Cheeks** = the tenon's top/bottom faces (⊥ Z): long grain on the spine *and*
+  on the cross-stretcher. Area = width(Y) × depth(X) → **maximize Y and depth.**
+- **Thickness** is the Z dimension (across the cross-stretcher fiber): ~⅓ of
+  2.75″ ≈ 0.9″, leaving ~0.9″ long-grain walls top and bottom.
+- **Width** (Y) as wide as the spine allows less shoulders ≈ ~1.5″ of the 2″.
+- **Depth** = through (2″) + proud for the wedge.
+- Result: **wide-in-Y, thin-in-Z** — the opposite of a "tall" tenon, *because the
+  cross-stretcher's grain runs in Y.* (`validate_tenon_grain` confirms it.)
+
 ## The math (and how to apply it in code)
 
 Let **f** = the mortise piece's unit fiber direction, and **a** = the tenon
@@ -147,10 +206,18 @@ Joinery templates that cut mortises (`mortise_tenon`, `breadboard`, `drawbore`,
 
 1. Identify the **mortise piece** (the one the tenon goes into) and get its fiber
    direction (`sp.grain_vector`). For slender pieces this is the long axis.
-2. Make the tenon's **wider** cross-section dimension run **along** that fiber
-   (`sp.tenon_wide_axis`). Square section → keep an edge along the fiber.
-3. Keep the mortise away from the end of the piece (leave a long-grain wall / relish).
-4. If wedged, cut the kerf ⟂ to the mortise grain (`tenon-wedge.md`).
-5. If pinned, run the pin **across** the grain of both pieces, never along it.
-6. Assert with `sp.validate_tenon_grain` before joining the tenon.
+2. **Orient:** make the tenon's **wider** cross-section dimension run **along**
+   that fiber (`sp.tenon_wide_axis`). Square section → keep an edge along the fiber.
+3. **Size** (maximize long-grain glue, minimize fibers cut):
+   a. **Width** along the fiber — as wide as the joint allows, less shoulder/relish
+      (grows the long-grain cheeks).
+   b. **Depth** along the insertion axis — as deep as practical (through, or ≥⅔ for
+      blind) (grows the long-grain cheeks).
+   c. **Thickness** across the fiber — ~⅓ of the stock it passes through, leaving
+      ~⅓ long-grain walls each side (the only dimension that severs fibers).
+4. Keep the mortise back from the **end** of the piece (long-grain relish — the end
+   face is short grain and blows out).
+5. If wedged, cut the kerf ⟂ to the mortise grain (`tenon-wedge.md`).
+6. If pinned, run the pin **across** the grain of both pieces, never along it.
+7. Assert with `sp.validate_tenon_grain` before joining the tenon.
 </content>
