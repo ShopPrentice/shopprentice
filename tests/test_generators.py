@@ -197,7 +197,8 @@ class Comp:
 
 
 # ── run ─────────────────────────────────────────────────────────────────────
-EV = {"span": 20.0, "ei": 3.0, "0 in": 0.0, "0.5 in": 1.27}
+EV = {"span": 20.0, "ei": 3.0, "0 in": 0.0, "0.5 in": 1.27,
+      "kick": 3.0, "height": 20.0, "plumb": 4.0, "waste": 6.0}
 ev = lambda e: EV[e]
 
 # center-shared: last half point on the centreline (u*2.54 ≈ span/2 = 10 → u≈3.937)
@@ -246,6 +247,26 @@ case("base_arch_cut is registered with both topology branches",
      lambda: (lambda s: s is not None and set(s.branches)
               == {"center-shared", "center-pair"})(
                   sys.modules["sp.genreg"].spec_for("base_arch_cut")))
+
+
+# foot_flare_cut: floor (-kick,0) → top (0, height-plumb), 3 free interiors.
+FLARE_PTS = [(-3.0, 0.0), (-2.0, 4.0), (-1.0, 9.0), (-0.4, 13.0), (0.0, 16.0)]
+
+
+def _run_flare(axis):
+    sk, prof = generators.foot_flare_cut(
+        Comp(), None, axis, FLARE_PTS, "kick", "height", "plumb",
+        name="FootFlare", off_axis_cm=0.0, waste_expr="waste", ev=ev)
+    assert sk.attributes.added, "sketch was not stamped"
+    assert sk.attributes.added[0][2].startswith("foot_flare_cut@")
+    return sk, prof
+
+case("foot_flare_cut (axis y) balances + stamps", lambda: _run_flare("y"))
+case("foot_flare_cut (axis x) balances + stamps", lambda: _run_flare("x"))
+
+case("foot_flare_cut is registered (single 'default' branch)",
+     lambda: (lambda s: s is not None and list(s.branches) == ["default"])(
+         sys.modules["sp.genreg"].spec_for("foot_flare_cut")))
 
 
 print(f"\n{sum(R)}/{len(R)} cases passed")

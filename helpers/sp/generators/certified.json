@@ -9,5 +9,15 @@
     "fusion_version": "2703.1.11",
     "geometric_contract": "closed free-spline top edge mirrored about the span centre + a 3-line waste-rail frame; spline endpoints anchored to the floor line, interiors free; closes into one cut profile",
     "name": "base_arch_cut"
+  },
+  "foot_flare_cut@578394c576a88f952cf39023e9e23755ae26eb987f9cea7febcfea86474c888e": {
+    "branches": [
+      "default"
+    ],
+    "certified": true,
+    "certified_at": "2026-06-14",
+    "fusion_version": "2703.1.20",
+    "geometric_contract": "ONE open fitted spline from the floor point up to a plumb top, closed by a 4-line waste frame (vertical plumb band + 3 clearance lines); spline endpoints anchored to floor + show-face, interiors free; closes into one cut profile",
+    "name": "foot_flare_cut"
   }
 }
