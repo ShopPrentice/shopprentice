@@ -56,27 +56,13 @@ Before writing any code, plan the modeling steps the way an experienced designer
    - **End grain to side grain** (fiber ends meeting a surface) — mechanical joint required (rail into leg = M&T, board corner = dovetail).
    - **End grain to end grain** — weakest possible bond. Always reinforce with a cross-grain element (spline, domino, biscuit).
 
-   **Grain direction determines mortise/tenon ORIENTATION (cutting a mortise removes fibers):**
-   A mortise removes material from the mortise piece, so it must be cut WITH that
-   piece's grain — long along the fibers, narrow across them — to sever the fewest
-   long fibers and leave long-grain cheeks. Equivalently:
-   - **A rectangular tenon's WIDER cross-section dimension must run ALONG the mortise
-     piece's fiber direction** (a square section keeps one edge parallel to it).
-   - The shape is **derived from the mortise piece, never assumed.** A vertical-grain
-     leg ⇒ the tenon is taller than wide; a piece whose grain runs the other way ⇒
-     the tenon is wider than tall (e.g. breadboard tongues are wide because the
-     breadboard's grain runs across the panel). Do NOT default to "tall and narrow."
-   - This matters most for **slender** mortise pieces (legs, rails, stretchers): a
-     mortise cut wide-across-the-grain severs a band of long fibers and leaves weak
-     short-grain cheeks that split out.
-   - **Derive it:** `wide = sp.tenon_wide_axis(mortise_body, tenon_axis)` (or
-     `sp.tenon_wide_direction` for a vector); build the tenon's larger dimension
-     along it. **Check it:** `sp.validate_tenon_grain(tenon_body, mortise_body,
-     tenon_axis)` on the tenon body before JOINing — it WARNs if the section is
-     rotated 90° wrong. Fiber direction comes from `sp.grain_vector(body)`.
-   - Full rationale, math, and examples: **`docs/joinery/grain-and-strength.md`** —
-     read it before designing any M&T. (Same fiber-direction logic drives wedge
-     kerfs in `tenon-wedge.md` and pin direction in `drawbore.md`.)
+   **Mortise/tenon orientation:** cut the mortise WITH the mortise piece's grain (the
+   tenon's wider dimension runs ALONG that piece's fibers, derived from it — not
+   defaulted to "tall and narrow"). The joinery templates orient, gate, and auto-declare
+   this for you. **For a custom joint not in a template**, derive with
+   `sp.tenon_wide_axis`, gate with `sp.validate_mortise_tenon` (+ `validate_pegged_joint`
+   for pegs), declare it in `model.json`'s `joints` array, and read the whole story —
+   rationale, math, examples — in **`docs/joinery/grain-and-strength.md`**.
 
    **Wood movement determines attachment method:**
    - Wood expands/contracts across the grain (perpendicular to fiber direction). Narrow parts (legs, rails) are negligible. Wide panels (desk tops, table tops, seats > ~6") move measurably with seasonal humidity changes.
@@ -618,15 +604,10 @@ positioned from. `"ref"` may be one name or a list: every body needs ≥1 parent
 seating against two lists both), and exactly one body references `"origin"` (the root). A
 two-parent sketch anchors to each parent's projected geometry on the axis that parent controls.
 
-An optional top-level **`"joints"`** array declares load-bearing joints for a per-type
-strength check (issue 106): each entry is `{"type": "mortise_tenon"|"pegged_tenon"|
-"wedged_tenon", "tenon": <owning body>, "mortise": <owning body>, "axis": "x|y|z",
-"species": …, "width"/"thickness"/"depth": <expr>}` (pegged adds `pins`/`pin_dia`/
-`pin_end_distance`). `validate_deps` runs the right check on each and surfaces WARNINGs;
-joinery templates (`mortise_tenon`) **auto-declare** the joints they build, so you mainly
-add entries for **hand-built** joints. The completeness pass also flags contacting bodies
-with no declared joint (advisory — most contacts need none). See
-`docs/joinery/grain-and-strength.md`.
+`model.json` also takes an optional top-level **`"joints"`** array: each declared joint
+gets a per-type strength check every build, and the completeness pass flags contacting
+bodies with no declared joint (advisory). Templates auto-declare theirs — declare
+**hand-built** joints yourself; schema in `docs/joinery/grain-and-strength.md`.
 
 **Phase validation:** `validate_design` runs connectivity, interference, and dependency checks
 (single origin, sketch origin enforcement, bodies in components). Run it after EVERY phase.
