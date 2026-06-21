@@ -26,6 +26,63 @@ A **tenon wedge** is a small tapered piece of wood driven into a slot cut in the
 | `tw_sw` | Slot width at the tenon surface | `0.1 in` |
 | `tw_dr` | Wedge depth as a fraction of tenon depth | `2 / 3` |
 | `tw_or` | Offset ratio — wedge position from each end (rect only) | `1 / 4` |
+| `tw_theta` | Undercut / flare angle in degrees — the trapezoid's side slope (`rect(flare=True)`) | `6` |
+
+## Mechanical Lock (flare) — `rect(flare=True)`
+
+By default `rect()` cuts wedge slots into a **straight** tenon and the wedge bodies are
+effectively decorative — the mortise is not undercut and the tenon halves are not
+spread, so the mechanical lock is not represented. Pass **`flare=True`** to model the
+real lock:
+
+```python
+# THROUGH-wedged: build the tenon proud, flare it, then CUT the mortise with the
+# SOLID flared envelope = tenon + the 2 wedge bodies (which fill the kerfs), and JOIN.
+res = tw.rect(comp, tenon_body=tenon, mortise_body=leg, tenon_axis="x",
+              tenon_depth_expr="leg_w + mt_proud", slot_span_expr="mt_tt",
+              offset_dim_expr="mt_tw", name="TW", ev=ev,
+              flare=True, species="white_oak")     # res[0], res[1] = the 2 wedge bodies
+sp.combine(leg, [tenon, res[0], res[1]], CUT, True, "Mortise")  # matching trapezoid void
+sp.combine(rail, tenon, JOIN, False, "Join")
+
+# FOX-wedged (blind): same call on a blind tenon, fox=True
+res = tw.rect(comp, tenon_body=tenon, mortise_body=leg, tenon_axis="y",
+              tenon_depth_expr="mt_td", slot_span_expr="mt_tt",
+              offset_dim_expr="mt_tw", name="TW", ev=ev, flare=True, fox=True)
+sp.combine(leg, [tenon, res[0], res[1]], CUT, True, "Mortise")
+sp.combine(rail, tenon, JOIN, False, "Join")
+```
+
+**What it builds.** After the two wedges, a tapered **flare ear** is JOINed to each outer
+(`off_dir`) tenon face — zero at the **kerf root** (`tenon_depth * tw_dr` inside the end
+face) and growing, at the `tw_theta` undercut angle, to its full spread at the end. So
+each ear's spread is `tenon_depth * tw_dr * tan(tw_theta)`, and the tenon's outer profile
+becomes a **TRAPEZOID** — narrow at the shoulder/mouth, wide at the end — over the whole
+wedged region. **Cut the mortise with the solid flared envelope** = the tenon **plus the
+two wedge bodies** (which fill the kerfs); that void is then the **matching trapezoid**,
+wider at the exit (or, for fox, the blind bottom) than at the mouth, so the wide end can't
+pull back through the narrow mouth — the joint is **mechanically locked**. Because the
+tenon-∪-wedges solid is the cut tool, there is **zero interference** (the solid is the
+exact complement of the void) and the kerf stays ⟂ the mortise grain (the spread doesn't
+cleave the long-grain cheeks). Same "let the cut transfer the shape" pattern as the
+angled-corner dovetail. (Cut with the *slotted* tenon alone and the leg keeps protrusions
+in the kerfs; cut with the *whole rail* and the shoulder overlaps the leg — both leave
+interference, so cut with the tenon-∪-wedges envelope.)
+
+**Through vs fox.** `fox=False` (default) = through-wedged (driven from the exposed
+proud end after assembly). `fox=True` = blind fox-wedge (the mortise bottom drives the
+wedges as the tenon seats); leave a mortise-bottom wall and note it cannot be
+re-tightened.
+
+**Strength gate.** With `flare=True`, `rect()` automatically runs
+`sp.validate_wedged_tenon(...)` on the tenon before it is consumed — the
+mechanical-interlock counterpart of `validate_joint_strength`. It reports the
+glue-independent interlock withdrawal and **flags the brittle mortise-split mode**. The
+geometry's undercut angle `tw_theta` (and the derived spread `depth * tw_dr * tan(tw_theta)`)
+map directly to the strength model's `undercut_deg` / `flare_delta`
+(`joint_strength.estimate_wedged_tenon`). See
+`docs/joinery/grain-and-strength.md` for the interlock mechanics. Round tenons
+(`round_tenon`) keep the straight-spread model for now; the flare lock is on `rect`.
 
 ## Orientation Rule
 

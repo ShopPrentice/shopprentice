@@ -41,6 +41,7 @@ import math
 from helpers import sp
 
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
+JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 NEW = adsk.fusion.FeatureOperations.NewBodyFeatureOperation
 AL = adsk.fusion.DimensionOrientations.AlignedDimensionOrientation
 VI = adsk.core.ValueInput.createByString
@@ -51,26 +52,36 @@ V3 = adsk.core.Vector3D.create
 # ── Public API ──────────────────────────────────────────────────────
 
 def define_params(params, prefix="tw", slot_w="0.1 in",
-                  depth_ratio="2 / 3", offset_ratio="1 / 4"):
+                  depth_ratio="2 / 3", offset_ratio="1 / 4",
+                  undercut="6"):
     """Add wedge parameters to the design.
 
-    Returns dict ``{sw, dr, or}`` → full parameter names.
+    ``undercut`` drives the optional MECHANICAL LOCK (``rect(flare=True)``): the wedge
+    spreads the tenon into a TRAPEZOID — narrow at the mouth, wide at the end — that
+    locks behind a matching undercut mortise. The trapezoid tapers over the wedge depth
+    (``tenon_depth * tw_dr``) at ``tw_theta`` degrees, so the spread per half at the end
+    is ``depth * tw_dr * tan(tw_theta)``. ``tw_theta`` is the undercut angle the strength
+    model uses (``joint_strength.estimate_wedged_tenon``'s ``undercut_deg``).
+
+    Returns dict ``{sw, dr, or, theta}`` → full parameter names.
     """
     p = prefix
     for pname, expr, unit, desc in [
-        (f"{p}_sw", slot_w,       "in", "Wedge slot width"),
-        (f"{p}_dr", depth_ratio,  "",   "Wedge depth ratio"),
-        (f"{p}_or", offset_ratio, "",   "Wedge offset ratio"),
+        (f"{p}_sw",    slot_w,       "in", "Wedge slot width"),
+        (f"{p}_dr",    depth_ratio,  "",   "Wedge depth ratio"),
+        (f"{p}_or",    offset_ratio, "",   "Wedge offset ratio"),
+        (f"{p}_theta", undercut,     "",   "Undercut / flare angle (deg)"),
     ]:
         if not params.itemByName(pname):
             params.add(pname, VI(expr), unit, desc)
-    return {"sw": f"{p}_sw", "dr": f"{p}_dr", "or": f"{p}_or"}
+    return {"sw": f"{p}_sw", "dr": f"{p}_dr", "or": f"{p}_or", "theta": f"{p}_theta"}
 
 
 def rect(comp, tenon_body, mortise_body,
          tenon_depth_expr, slot_span_expr, offset_dim_expr,
          tenon_axis=None, tenon_dir=None, end_face=None,
-         grain_dir=None, prefix="tw", name="TW", ev=None):
+         grain_dir=None, prefix="tw", name="TW", ev=None,
+         flare=False, fox=False, species="hardwood", validate_strength=True):
     """Two wedges on a rectangular tenon, symmetric about the tenon axis.
 
     Provide *end_face* for arbitrary orientations (compound-angle),
@@ -79,6 +90,21 @@ def rect(comp, tenon_body, mortise_body,
     *grain_dir* overrides auto-detected mortise grain.  Pass a tuple
     ``(x, y, z)`` when the mortise piece has ambiguous proportions
     (e.g. a nearly-square seat plank).
+
+    *flare* models the MECHANICAL LOCK (off by default). When True, each outer
+    tenon half is spread by ``{prefix}_delta`` toward the exit at ``{prefix}_theta``
+    degrees of undercut, so the assembled tenon is **wider at the end than at the
+    shoulder**. Build the tenon proud (through-wedged) or blind (*fox*=True), call
+    this, JOIN the tenon, then CUT the mortise piece with it — the flared tenon
+    carves its own matching undercut mortise, so there is no interference and the
+    lock is real and visible. The flare spread is in ``off_dir`` (the wide,
+    along-grain dimension), into the mortise's end-grain flares; the kerf stays
+    perpendicular to the mortise grain so the spread never cleaves the long-grain
+    cheeks. *flare*=False keeps the original straight-tenon behavior.
+
+    *species* / *validate_strength*: when flaring, the wedged-tenon strength GATE
+    (``sp.validate_wedged_tenon``) runs on the tenon before it is consumed — the
+    forcing function lives here, not in the agent. Wrapped so it never breaks a build.
     """
     ev = ev or _default_ev()
     end_face = _resolve_end_face(
@@ -116,7 +142,44 @@ def rect(comp, tenon_body, mortise_body,
                      offset_dim_expr=offset_dim_expr,
                      face_centroid=face_centroid)
 
-    return [w1, w2]
+    if not flare:
+        return [w1, w2]
+
+    # ── Mechanical lock: spread the two outer halves into a TRAPEZOID ──
+    # The flare tapers over the wedge depth (tenon_depth * tw_dr) at the tw_theta
+    # undercut angle, so the tenon's outer profile becomes a trapezoid (narrow at the
+    # mouth, wide at the end) and the later mortise CUT carves the matching trapezoidal
+    # void — the lock. run_expr = the taper length; the spread per half = run * tan(theta).
+    run_expr = f"({tenon_depth_expr}) * {prefix}_dr"
+
+    # Gate the tenon BEFORE the flare ears (so w/t/depth are the nominal tenon).
+    # Advisory — never break. flare_delta (in) = run * tan(theta).
+    if validate_strength:
+        try:
+            axis = tenon_axis if tenon_axis else V3(face_n[0], face_n[1], face_n[2])
+            theta = ev(f"{prefix}_theta")
+            delta_cm = math.tan(math.radians(theta)) * ev(run_expr)
+            sp.validate_wedged_tenon(
+                tenon_body, mortise_body, axis, species=species,
+                flare_delta=delta_cm / 2.54,
+                undercut_deg=theta, fox=fox, through=not fox)
+        except Exception:
+            pass
+
+    ears = []
+    for sign, suff in ((+1, "FT"), (-1, "FB")):
+        # Re-find the end face each pass — the prior JOIN re-splits it.
+        if tenon_axis:
+            ef = _resolve_end_face(tenon_body, mortise_body, tenon_axis,
+                                   tenon_dir, None)
+        else:
+            ef = _find_face_by_normal(tenon_body, face_n)
+        ears.append(_make_flare_ear(
+            comp, tenon_body, ef, face_n, slot_dir, off_dir, sign,
+            face_centroid, offset_dim_expr, slot_span_expr,
+            f"{prefix}_theta", run_expr, prefix, f"{name}_{suff}", ev))
+
+    return [w1, w2] + ears
 
 
 def round_tenon(comp, tenon_body, mortise_body,
@@ -410,6 +473,94 @@ def _make_wedge(comp, tenon_body, end_face, face_n, slot_dir, off_dir,
         sp.combine(tenon_body, wedge, CUT, True, f"{name}_Cut")
 
     return wedge
+
+
+def _make_flare_ear(comp, tenon_body, end_face, face_n, slot_dir, off_dir, sign,
+                    face_centroid, offset_dim_expr, slot_span_expr,
+                    undercut_expr, run_expr, prefix, name, ev):
+    """Add one tapered FLARE EAR to a tenon's outer offset-dir edge, then JOIN it.
+
+    The ear is a long tapered wedge of wood on the +/-off_dir extreme face of the
+    tenon (``sign`` = +1 top, -1 bottom): it grows from ZERO at ``run_expr`` inside the
+    end face (the kerf root) to its full spread at the end (exit) face, tapering at the
+    undercut angle. Two ears (top + bottom) turn the tenon's outer profile into a
+    TRAPEZOID — narrow at the shoulder/mouth, wide at the end — so a later CUT of the
+    mortise piece with this tenon (plus the wedges that fill the kerfs) carves a matching
+    trapezoidal/undercut mortise: the wide end can't pull back through the narrow mouth,
+    so the wedged tenon is mechanically locked. No interference (the tenon IS the cut tool).
+
+    The taper spans ``run_expr`` (= the wedge depth, ``tenon_depth * tw_dr``) so the
+    trapezoid runs the full wedged region, and its side angle is ``undercut_expr`` deg;
+    the spread per half is therefore ``run * tan(undercut)`` (derived, fully parametric).
+    Built on the SAME perpendicular-plane machinery as ``_make_wedge`` so it works at any
+    orientation.
+    """
+    theta = ev(undercut_expr)                     # degrees — trapezoid side angle
+    flare_run = ev(run_expr)                       # taper length = wedge depth (depth*dr)
+    flare = math.tan(math.radians(theta)) * flare_run   # spread per half at the end
+    off_dim = ev(offset_dim_expr)
+
+    fc_x, fc_y, fc_z = face_centroid
+    # Ear base centre: the tenon's outer edge in off_dir, at the end face.
+    ecx = fc_x + sign * (off_dim / 2) * off_dir[0]
+    ecy = fc_y + sign * (off_dim / 2) * off_dir[1]
+    ecz = fc_z + sign * (off_dim / 2) * off_dir[2]
+
+    # ── construction line on end face along off_dir → 90° plane ──
+    aux = comp.sketches.add(end_face)
+    m2s_a = aux.modelToSketchSpace
+    p0 = m2s_a(P3(ecx, ecy, ecz))
+    p1 = m2s_a(P3(ecx + off_dir[0] * 5, ecy + off_dir[1] * 5, ecz + off_dir[2] * 5))
+    off_line = aux.sketchCurves.sketchLines.addByTwoPoints(
+        P3(p0.x, p0.y, 0), P3(p1.x, p1.y, 0))
+    off_line.isConstruction = True
+    sp.refs_to_construction(aux)
+    aux.name = f"{name}_Aux"
+
+    pl_inp = comp.constructionPlanes.createInput()
+    pl_inp.setByAngle(off_line, VI("90 deg"), end_face)
+    perp_plane = comp.constructionPlanes.add(pl_inp)
+    perp_plane.name = f"{name}_Pl"
+
+    # ── right-triangle ear profile on the perpendicular plane ──
+    # A — outer edge at the end (exit) face            (right-angle vertex)
+    # B — A + sign*flare along off_dir, at the exit     (the wide trapezoid corner)
+    # C — A - flare_run along face_n (the kerf root)     (where the taper starts, width 0)
+    sk = comp.sketches.add(perp_plane)
+    m2s = sk.modelToSketchSpace
+    a = m2s(P3(ecx, ecy, ecz))
+    b = m2s(P3(ecx + sign * flare * off_dir[0],
+               ecy + sign * flare * off_dir[1],
+               ecz + sign * flare * off_dir[2]))
+    c = m2s(P3(ecx - flare_run * face_n[0],
+               ecy - flare_run * face_n[1],
+               ecz - flare_run * face_n[2]))
+
+    lines = sk.sketchCurves.sketchLines
+    lab = lines.addByTwoPoints(P3(a.x, a.y, 0), P3(b.x, b.y, 0))
+    lbc = lines.addByTwoPoints(lab.endSketchPoint, P3(c.x, c.y, 0))
+    lines.addByTwoPoints(lbc.endSketchPoint, lab.startSketchPoint)
+
+    d = sk.sketchDimensions
+    d.addDistanceDimension(
+        lab.startSketchPoint, lab.endSketchPoint, AL,
+        P3((a.x + b.x) / 2, (a.y + b.y) / 2 - 0.3, 0)
+    ).parameter.expression = f"({run_expr}) * tan({undercut_expr} * 1 deg)"
+    d.addDistanceDimension(
+        lab.startSketchPoint, lbc.endSketchPoint, AL,
+        P3((a.x + c.x) / 2 - 0.3, (a.y + c.y) / 2, 0)
+    ).parameter.expression = run_expr
+
+    sk.name = f"{name}_Sk"
+    prof = sp.smallest_profile(sk)
+
+    ext = sp.ext_new_sym(comp, prof, f"{slot_span_expr} / 2", name)
+    ear = ext.bodies.item(0)
+    ear.name = name
+
+    # JOIN the ear onto the tenon (combine routes intra- or cross-component).
+    sp.combine(tenon_body, ear, JOIN, False, f"{name}_Join")
+    return ear
 
 
 def _intersect_trim(wedge, tenon_body, name):
