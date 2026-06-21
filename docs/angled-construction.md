@@ -697,6 +697,7 @@ This creates a domino whose long axis follows the tilted backrest direction, pro
 | Fillet misses bend edges (finds 0 or 1) | Filtering by `180 - acos(dot)` ≈ rake angle is wrong — `acos(dot)` already IS the small angle | Filter `acos(dot) < 20` for nearly-parallel normals at obtuse bends |
 | Back apron dominos don't CUT into back legs | Apron at Y = seat_d - leg_size (inner face) has zero Y overlap with leg | Position apron flush with outer face: Y = seat_d - apron_thick (within leg's Y range) |
 | Domino vertical on angled rail joint | Standard domino.grid uses long_axis="z" (vertical) | Build tilted dominos manually — sketch rotated rectangle on interface plane (see "Tilted Dominos") |
+| Curve kinks / steps at a joint between members | Each member built with its own curved edge, hoping they line up | They won't — exactly. Build the members **rectilinear**, assemble, then ONE Extrude-CUT (fitted spline) with all members as `participantBodies` so one curve shapes them together. SplitBody is single-tool (splits one body); this is a multi-target shaping cut. See `docs/continuous-cut.md` (rule 10). |
 
 ## Complete Build Sequence for Chair with Angled Backrest
 

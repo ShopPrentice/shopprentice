@@ -62,6 +62,16 @@ Before writing any code, plan the modeling steps the way an experienced designer
    - **Use slotted fasteners** for cross-grain top-to-apron connections: `tabletop_button` (shop-made small L-shaped wooden blocks / clips whose tongue rides in an elongated slot — all-wood, any count per side), `tabletop_bracket` (steel L-bracket with slotted screw holes), Z-clips, or figure-8 fasteners. The slot allows the panel to slide across the grain while staying flat.
    - **Rigid attachment is OK** when the apron runs WITH the grain (both parts move together).
 
+10. **Saw the shape after glue-up — one cut shapes every member it crosses.** When a
+    single sculpted curve must flow across a joint between **≥2 separate bodies** (an
+    arched apron into its legs, a flared foot wrapping two faces), don't curve each
+    part and hope they meet: build the members rectilinear, assemble, then make ONE
+    Extrude-CUT whose `participantBodies` span them all — continuity across the seam
+    is exact by construction. The **dual of rule 6** (one cut, many receivers — not
+    one tool, one void). A single-body curve, even a glued-up panel modeled as one
+    body, is NOT this — it's a normal per-part profile. Reach for `sp.base_arch_cut` /
+    `sp.foot_flare_cut`; mechanics + pitfalls in **`docs/continuous-cut.md`**.
+
 ## Topic Reference
 
 This skill is modular. The core (this file) covers fundamentals needed for every project. **Read topic files ONLY when you need them** — do NOT pre-load all files at the start. Read the type + style file during planning. Read joinery files only when writing joinery code. Read other topics only when the specific situation arises.
@@ -82,6 +92,7 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 | **Helpers Reference** | `sp.*` function signatures, `sketch_rect_model`, `ev()`, feature builders | Tested | `docs/helpers-reference.md` |
 | **Organic Shapes** | Self-contained designer + recipe doc for sculpted forms. Shape taxonomy (5 classes): (1) turned/spindled parts — revolve, (2) flat-plan outlines — closed spline + extrude, (3) 3-D organic solids (lens-profile seats, rounded finial tips) — multi-section loft + tangent end conditions, (4) sculpted dish/saddle — sphere CUT, (5) character surfaces — Form T-splines (out-of-scope for scripting). Classes 1–4 include inline API snippets; also covers the approximate→refine→capture iteration loop and through-tenon trimming on organic surfaces | Tested (Esherick stool) | `docs/organic-shapes.md` |
 | **Loft** | Deep feature reference for advanced loft variants: closed-ring topology, rail/centerline guides, 1→N→1 branching manifolds, surface-only and loft-as-cut variants, closed-spline cross-section generators (kidney/star/cardioid), all end-condition types. **Don't preload** for common organic shapes — use the inline recipes in `organic-shapes.md` instead. Read this file only when a build actually needs one of these variants | Tested (18 fixtures) | `docs/loft.md` |
+| **Continuous Cut Across Members** | A single sculpted curve must flow across ≥2 assembled members for exact continuity over the seam (arched apron→legs, flared foot wrapping two faces). Build rectilinear, assemble, then ONE spanning Extrude-CUT (rule 10). Certified generators `sp.base_arch_cut`, `sp.foot_flare_cut` | Tested (bookcase) | `docs/continuous-cut.md` |
 
 ### Joinery Reference Files
 
@@ -517,7 +528,7 @@ Quick reference:
 
 > **Full reference:** `docs/helpers-reference.md` — all `sp.*` function signatures, `sketch_rect_model` usage and limitations, `ev()` semantics, feature builder table.
 
-Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functions: `sketch_rect_model`, `ext_new`, `ext_op`, `combine`, `mirror_body`, `mirror_feats`, `body_pattern`, `off_plane`, `make_comp`, `find_face`, `probe_orientations`.
+Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functions: `sketch_rect_model`, `ext_new`, `ext_op`, `combine`, `mirror_body`, `mirror_feats`, `body_pattern`, `off_plane`, `make_comp`, `find_face`, `probe_orientations`. Certified sculpted-cut generators: `base_arch_cut`, `foot_flare_cut` (rule 10 / `docs/continuous-cut.md`).
 
 ## Joinery Rules
 
