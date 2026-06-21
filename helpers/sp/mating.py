@@ -323,3 +323,93 @@ def validate_tenon_grain(tenon_body, mortise_body, tenon_axis, tol=0.12):
                                  ext_u, mortise_body.name))
     return {"ok": ok, "fiber_extent": ext_u, "cross_extent": ext_w,
             "square": square}
+
+
+def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardwood",
+                            through=False, proud=0.0, pins=0, pin_dia=0.0,
+                            pin_end_distance=None, sized=False, expected=None,
+                            thin_ratio=0.25):
+    """Build-time strength sanity check for a mortise-and-tenon (the GATE half of
+    the joint-strength estimator). Measures the tenon's dimensions off the body,
+    runs ``joint_strength.estimate_mortise_tenon``, and prints a WARNING for the
+    LOAD-INDEPENDENT red flags a designer should never ship:
+
+      * grain orientation wrong (wider across the grain -- via validate_tenon_grain),
+      * thin slice (thickness < ``thin_ratio`` x width -> shear/bending collapse
+        even with maximal glue area -- the "don't optimize glue to a sliver" trap),
+      * brittle peg relish (drawbore peg end distance < 4 x peg diameter).
+
+    Optionally checks adequacy: pass ``expected={mode: load}`` (lbf, keys matching
+    the estimator's capacity names) and it WARNs on any direction loaded past
+    capacity. Like ``validate_tenon_grain`` it never raises -- call it on the tenon
+    body before JOINing it (design-time sizing should use ``estimate_mortise_tenon``
+    directly; this is the after-build safety net the joinery templates call).
+
+    Args:
+        tenon_body, mortise_body: the tenon (pre-JOIN) and the piece it enters.
+        tenon_axis: insertion direction, 'x'/'y'/'z' or Vector3D.
+        species: wood key into ``joint_strength.SPECIES``.
+        through/proud: through tenon? proud length (in) -- excluded from glue depth.
+        pins/pin_dia/pin_end_distance: drawbore peg count/dia/end-distance (in).
+        sized: end-grain glue surfaces primed/sized.
+        expected: optional {capacity_name: applied_load_lbf} for an adequacy check.
+        thin_ratio: thickness/width below which the tenon is flagged a thin slice.
+
+    Returns {ok, flags, weakest, dims_in, capacities, utilization, estimate}.
+    """
+    from helpers.sp.joint_strength import estimate_mortise_tenon
+    IN = 2.54
+    a = _axis_to_vec(tenon_axis)
+    u = tenon_wide_direction(mortise_body, tenon_axis)   # along-grain, in-section
+    if u is None:                                        # end-grain mortise (rare)
+        ta = tenon_axis if isinstance(tenon_axis, str) else _dominant_axis(a)
+        perp = [ax for ax in ("x", "y", "z") if ax != ta]
+        e0, e1 = _extent_along(tenon_body, perp[0]), _extent_along(tenon_body, perp[1])
+        w_cm, t_cm = max(e0, e1), min(e0, e1)
+    else:
+        wv = a.crossProduct(u); wv.normalize()
+        w_cm = _extent_along(tenon_body, u)              # along grain (the cheeks)
+        t_cm = _extent_along(tenon_body, wv)             # across grain
+    depth_cm = _extent_along(tenon_body, a) - proud * IN
+    w, t, depth = w_cm / IN, t_cm / IN, max(depth_cm, 1e-6) / IN
+
+    est = estimate_mortise_tenon(w, t, depth, species=species, through=through,
+                                 proud=proud, pins=pins, pin_dia=pin_dia,
+                                 pin_end_distance=pin_end_distance, sized=sized)
+    caps = est["capacities"]
+
+    flags = []
+    g = validate_tenon_grain(tenon_body, mortise_body, tenon_axis)
+    if not g["ok"]:
+        flags.append("grain orientation: wider ACROSS the grain (rotate 90 deg)")
+    if t < thin_ratio * w:
+        flags.append("thin slice: thickness %.2f in < %.2f x width (%.2f in) -> the "
+                     "tenon's own shear/bending governs even with full glue" % (
+                         t, thin_ratio, w))
+    if t < 0.1875:
+        flags.append("very thin tenon (t=%.2f in): fragile to cut and shear-weak" % t)
+    if pins and pin_dia and pin_end_distance is not None and pin_end_distance < 4.0 * pin_dia:
+        flags.append("brittle: peg end distance %.2f in < 4xD (%.2f in) -> relish "
+                     "tear-out" % (pin_end_distance, 4.0 * pin_dia))
+
+    forces = {k: v["value"] for k, v in caps.items() if v["unit"] == "lbf"}
+    weakest = min(forces, key=forces.get) if forces else None
+    util = {}
+    if expected:
+        for k, load in expected.items():
+            c = caps.get(k)
+            if c and load > 0:
+                util[k] = load / c["value"]
+                if util[k] > 1.0:
+                    flags.append("OVERLOADED %s: %.0f lbf > capacity %.0f (util %.2f)"
+                                 % (k, load, c["value"], util[k]))
+
+    ok = not flags
+    if flags:
+        print("WARNING validate_joint_strength: %s (%.2f w x %.2f t x %.2f deep, %s) "
+              "-> %s | weakest force dir: %s %.0f lbf" % (
+                  tenon_body.name, w, t, depth, species, "; ".join(flags),
+                  weakest, forces.get(weakest, 0.0)))
+    return {"ok": ok, "flags": flags, "weakest": weakest,
+            "dims_in": {"width": w, "thickness": t, "depth": depth},
+            "capacities": caps, "utilization": util, "estimate": est}

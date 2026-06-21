@@ -120,7 +120,8 @@ def select_variant(purpose, angled=False):
 
 def blind(comp, plane, origin, size, depth_expr,
           tenon_body, mortise_body, name="MT",
-          ev=None, mirror_plane=None, anchor=None):
+          ev=None, mirror_plane=None, anchor=None,
+          species="hardwood", validate_strength=True):
     """Create a blind M&T joint.
 
     Sketches tenon cross-section on the rail end face, extrudes into
@@ -172,6 +173,17 @@ def blind(comp, plane, origin, size, depth_expr,
     tenon_b = tenon_ext.bodies.item(0)
     tenon_b.name = f"{name}_Tenon"
 
+    # Strength sanity check on the tenon BEFORE the JOIN (after JOIN it is no
+    # longer a separate body to measure). Insertion axis = the sketch-plane
+    # normal. Advisory — never break the build (wrapped). Design-time sizing
+    # should call sp.estimate_mortise_tenon directly; this is the gate.
+    if validate_strength:
+        try:
+            sp.validate_joint_strength(tenon_b, mortise_body,
+                                       plane.geometry.normal, species=species)
+        except Exception:
+            pass
+
     result = {"tenon_ext": tenon_ext}
 
     # JOIN is always intra-component (tenon_b was just created in
@@ -193,7 +205,8 @@ def blind(comp, plane, origin, size, depth_expr,
 
 def through(comp, plane, origin, size, depth_expr,
             tenon_body, mortise_body, name="TT",
-            ev=None, mirror_plane=None, anchor=None):
+            ev=None, mirror_plane=None, anchor=None,
+            species="hardwood", validate_strength=True):
     """Create a through M&T joint.
 
     Unlike blind(), CUTs the mortise body with the tenon body directly
@@ -232,6 +245,16 @@ def through(comp, plane, origin, size, depth_expr,
     tenon_ext = sp.ext_new(comp, prof, depth_expr, f"{name}_Tenon")
     tenon_b = tenon_ext.bodies.item(0)
     tenon_b.name = f"{name}_Tenon"
+
+    # Strength sanity check before the tenon is consumed (advisory; never breaks
+    # the build). through=True so the depth note reflects the proud tenon.
+    if validate_strength:
+        try:
+            sp.validate_joint_strength(tenon_b, mortise_body,
+                                       plane.geometry.normal, species=species,
+                                       through=True)
+        except Exception:
+            pass
 
     result = {"tenon_ext": tenon_ext}
 

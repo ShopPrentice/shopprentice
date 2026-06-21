@@ -1,10 +1,20 @@
-# Wood Grain, Strength, and Tenon Orientation
+# Wood Grain, Strength, and Tenon Design
 
 **Read this before designing ANY mortise-and-tenon (or any joint that cuts a
 pocket into a piece).** It explains why fiber direction governs joint strength,
-and gives the mathematical rule — and the helpers/validator — for orienting a
-tenon's cross-section. This generalizes the kerf rule in `tenon-wedge.md` and the
-joint-choice rules in the core skill (rule 9).
+then gives the rules for both **orienting** and **sizing** a tenon — the math +
+helpers/validator, the two factors that *bound* the size (the tenon's own
+cross-section and its depth), and a **strength estimator** (`joint_strength.py`)
+that scores a joint's capacity in every direction so you can size for the loads
+you expect. Generalizes the kerf rule in `tenon-wedge.md` and the joint-choice
+rules in the core skill (rule 9).
+
+The design follows four facts, in order: **(1)** strength is long-grain-to-long-grain
+glue area; **(2)** cutting the mortise should sever as few fibers as possible;
+**(3)** the tenon must keep enough cross-section to carry shear/bending/twist itself;
+**(4)** depth adds glue and leverage but with diminishing returns and practical
+limits. (1)+(2) set the orientation and the wide/thin proportions; (3)+(4) keep
+you from optimizing (1)+(2) into a weak thin slice.
 
 ## Why fiber direction is everything
 
@@ -21,8 +31,15 @@ Strength is wildly directional:
 
 Every joinery decision follows from this. Two consequences matter most:
 
-1. **Glue:** long-grain-to-long-grain glues as strong as the wood; end-grain glue
-   is nearly worthless (rule 9 in the core skill covers joint *choice* from this).
+1. **Glue:** a sound long-grain-to-long-grain line is **wood-limited** — it fails in
+   the wood, so rate it at the wood's shear-parallel strength (`fl = τ`), *not* the
+   adhesive's datasheet psi (PVA ~3,400–4,200; the wood gives out first). End-grain
+   glue is weak but **not zero**: ~**15%** of long grain raw, up to ~**25%** if the
+   end grain is *sized* (primed) — the documented ceiling (USDA FPL Wood Handbook,
+   "not more than ~25%"). For a face at angle *x* to the grain, interpolate with
+   **Hankinson** — `N = fl·fe / (fl·sinⁿx + fe·cosⁿx)`, n≈2 — via
+   `glue_shear_per_area(x)`. (A linear `cos/sin` blend over-predicts mid-angles
+   2–4×; don't use it.) Rule 9 covers joint *choice* from this.
 2. **Material removal:** cutting a mortise *removes* fibers from the mortise piece.
    **Where** and **how** you remove them decides whether the piece stays strong —
    which is what this document is about.
@@ -151,6 +168,119 @@ stock, through the cross-stretcher's 2″ thickness:
 - Result: **wide-in-Y, thin-in-Z** — the opposite of a "tall" tenon, *because the
   cross-stretcher's grain runs in Y.* (`validate_tenon_grain` confirms it.)
 
+## Beyond glue & fiber: the tenon's own strength, and depth
+
+Maximizing glue area and minimizing fibers cut can be pushed too far — to a thin
+slice with huge cheeks that **shears or snaps**. Two more factors bound the size.
+
+### Factor 3 — the tenon's own strength is its CROSS-SECTION
+
+The cheeks carry pull-out (tension); the tenon *body* carries **shear, bending,
+and twist**, and those scale with the tenon's **cross-section (w × t)**, not its
+glue area. Optimize (1)+(2) to an extreme thin slice and the joint fails in
+shear/bending even with "maximal" glue.
+- Transverse shear ≈ (w·t)·τ. Bending ≈ section modulus · MOR, *capped by the
+  section*. Note the across-fiber **thickness** — the dimension the fiber rule
+  wants thin — is also what resists bending in the weak plane, so don't starve
+  it. The **~⅓ thickness** rule is the floor that keeps the section honest.
+
+### Factor 4 — depth (length): more is stronger, until it isn't
+
+A deeper tenon ⇒ more cheek glue and a longer bending lever (~L²). But the glue
+gain is **sublinear** — Eckelman (Purdue) found withdrawal ∝ **depth^0.89** (the
+deep end of the joint carries less load), so returns fall off past ~2.5× the tenon
+width. And:
+- **Blind:** leave a **mortise-bottom wall** at the far face — too thin and it
+  blows through when cut. The glue depth is the *tenon length*, not the mortise
+  depth (the mortise is cut slightly deeper; the wall stays).
+- **Through:** the **proud** part adds **no glue** — it's outside the joint. It
+  adds strength only if it carries a **tusk** (then a *mechanical* pull-out
+  couple, sized by the tusk + relish, not by glue).
+- **Diminishing returns + limits:** past **L\* = t·√(MOR/C⊥)** the tenon's own
+  section governs bending, so deeper stops adding moment capacity. And mortise
+  depth is limited by chisel reach and by a small mortise mouth (a deep mortise
+  behind a small opening is hard to cut). So don't reflexively max depth — track
+  it to the cross-section.
+
+## Glue carries pull-out; bearing carries the rest
+
+Not every direction is a glue problem — which is why a dry-fit joint still
+resists some loads. When sizing, ask *which mechanism* carries each direction:
+
+- **Pull-out (tension along the tenon axis)** is almost entirely **glue** (cheek
+  shear + a little end grain + any pin/wedge/tusk); friction is minor. Size the
+  glue cheeks for it (wide × deep).
+- **Transverse force (the member pushed sideways / down)** is carried by
+  **BEARING** — the tenon pressing on the mortise walls — and holds with **no
+  glue**. A stretcher between two legs resists being pushed to the floor because
+  the legs' inner **end grain bears the tenon's side** (compression *parallel* to
+  the leg grain — strong). The two transverse directions differ: a force *along*
+  the mortise grain bears on strong end grain (C∥); *across* it, on weak long
+  grain (C⊥). Size the tenon's **section** (and pick its orientation) for whichever
+  way the load actually comes.
+- **Racking / bending** is the bearing couple over the tenon depth (deeper = more)
+  capped by the tenon's own section; **twist** is the tenon's torsional section.
+- **Pegs / drawbore pins** add *mechanical* pull-out. Size them by the **European
+  Yield Model**: capacity = the **minimum** over yield modes — wood crushing under
+  the peg (bearing), the peg shearing, or the peg bending into hinges
+  (`Md = Fb·D³/6`) — and report which governs. Add a **relish tear-out** check (the
+  wood between the peg and the tenon end shears out; keep the peg ≥ **4×D** from the
+  end — a brittle mode). Glue and peg don't add (glue is stiffer, carries first; the
+  peg is the backstop, or the whole joint if unglued). **Drawboring is prestress
+  only** — it pulls the shoulder tight but adds no ultimate capacity.
+
+So: **glue for pull-out; wood section + bearing for everything else.** The
+estimator below reports each direction with its mechanism and flags the glue-free
+ones — so a joint that will mostly see side load isn't sized as if glue were
+holding it.
+
+## Strength estimator (code)
+
+`helpers/sp/joint_strength.py` turns all four factors into a tool. Given a tenon
+size it estimates the capacity in **every direction**, names the governing
+failure mode, and prints design guidance. Pure Python (no Fusion) — runs/tests
+anywhere:
+
+```python
+from helpers.sp.joint_strength import estimate_mortise_tenon, summarize, glue_shear_per_area
+print(summarize(estimate_mortise_tenon(width=1.5, thickness=0.875, depth=2.0,
+                                       species="white_oak", sized=True,
+                                       pins=1, pin_dia=0.375, pin_end_distance=1.5)))
+#   withdrawal_tension   ~12k lbf  [GLUE, wood-limited; end grain 25% sized; ~depth^0.89]
+#   shear_along_w/_t      ...  lbf [GLUE-FREE bearing — the side/down-load path]
+#   bending_about_w      ... in-lbf[embedment bearing; deeper helps to L*]
+#   pin_withdrawal       ...  lbf  [peg, EYM min over shear/bending/bearing]
+#   + guidance: thin-tenon, sublinear depth, relish 4xD/brittle, Hankinson, etc.
+# glue_shear_per_area(45, "white_oak")  -> off-axis face strength (Hankinson)
+```
+
+Use it while designing: pick a size, read which direction is weak for the loads
+you expect, and adjust — **more width/depth** for pull-out and moment, **more
+thickness** for shear/twist. Capacities are first-order (mean clear-wood
+strengths, simple failure models) — relative guidance and a sanity check, not a
+structural certification. `width` is the along-grain (cheek) dimension, `depth`
+is the *glue-engaged* length (exclude through-proud).
+
+### Two roles: design-time advisory + build-time gate
+
+The estimator is cheap (~5 µs, no Fusion), so it has two jobs:
+
+- **Design time (advisory):** call `estimate_mortise_tenon(...)` *while choosing*
+  dimensions — before any geometry — to find the weak direction and size for it.
+  This is where it prevents the mistake.
+- **Build time (gate):** `sp.validate_joint_strength(tenon_body, mortise_body,
+  tenon_axis, species=…, …)` measures the tenon off the body, runs the estimator,
+  and prints a WARNING for the **load-independent red flags** — grain rotated
+  wrong, a **thin slice** (thickness < ¼ width → its own shear/bending governs),
+  a **brittle peg** (drawbore end distance < 4×D) — and, if you pass
+  `expected={mode: lbf}`, any **overloaded** direction. It never raises. The
+  **joinery templates call it automatically** (e.g. `mortise_tenon` runs it on the
+  tenon before the JOIN), so the gate fires without the agent remembering — agents
+  reliably honor forcing functions, not advisories. For a hand-built joint, call
+  it yourself before JOINing (same place as `validate_tenon_grain`). Full adequacy
+  needs the expected loads, which furniture rarely quantifies, so the dependable
+  wins are the load-independent flags plus comparing candidate sizes.
+
 ## The math (and how to apply it in code)
 
 Let **f** = the mortise piece's unit fiber direction, and **a** = the tenon
@@ -215,9 +345,20 @@ Joinery templates that cut mortises (`mortise_tenon`, `breadboard`, `drawbore`,
       blind) (grows the long-grain cheeks).
    c. **Thickness** across the fiber — ~⅓ of the stock it passes through, leaving
       ~⅓ long-grain walls each side (the only dimension that severs fibers).
-4. Keep the mortise back from the **end** of the piece (long-grain relish — the end
+4. Keep enough **cross-section** (w·t) for the tenon's OWN shear/bending/twist —
+   don't thin to a slice chasing glue (factor 3).
+5. Mind the **depth** limits: blind → leave a mortise-bottom wall; through → proud
+   adds no glue (tusk for mechanical pull-out); diminishing returns past
+   L\* = t·√(MOR/C⊥); watch chisel reach / small mouths (factor 4).
+6. Keep the mortise back from the **end** of the piece (long-grain relish — the end
    face is short grain and blows out).
-5. If wedged, cut the kerf ⟂ to the mortise grain (`tenon-wedge.md`).
-6. If pinned, run the pin **across** the grain of both pieces, never along it.
-7. Assert with `sp.validate_tenon_grain` before joining the tenon.
+7. **Score it (design time):** `estimate_mortise_tenon(...)` → capacities per
+   direction + the weak axis for your expected loads; adjust width/depth (pull-out,
+   moment) or thickness (shear, twist).
+8. If wedged, cut the kerf ⟂ to the mortise grain (`tenon-wedge.md`); if pinned,
+   run the pin **across** the grain (and keep it ≥ 4×D from the tenon end).
+9. **Gate it (build time):** assert `sp.validate_joint_strength(tenon_body,
+   mortise_body, tenon_axis, …)` before JOINing (the joinery templates do this
+   automatically) — it folds in `validate_tenon_grain` and WARNs on grain-wrong,
+   thin-slice, brittle-peg, or overload.
 </content>
