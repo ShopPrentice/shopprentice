@@ -170,8 +170,12 @@ def run(context):
         {"y": "side_rail_l", "z": "rail_h - post_chamfer"}, "LeftRail_Sk", ev,
         anchor=dict(parent_body=post_fl, parent_occ=post_occ,
                     face_axis="x", face_dir=+1,
-                    anchor_xyz=("post_size", "0 in", "0 in"),
-                    off1=("y", "post_size"), off2=("z", "rail_z")))
+                    # Anchor to the post TOP-outer corner: the bottom-outer
+                    # corner projects onto the sketch origin and is excluded by
+                    # anchor_pt, which would flip the unsigned y-offset and shift
+                    # the rail by -post_size. Top corner gives clean offsets.
+                    anchor_xyz=("post_size", "0 in", "front_post_h"),
+                    off1=("y", "post_size"), off2=("z", "front_post_h - rail_z")))
     lr_ext = sp.ext_new(rail_c, pr, "rail_thick", "LeftRail")
     rail_left = lr_ext.bodies.item(0); rail_left.name = "Rail_Left"
 
@@ -186,8 +190,9 @@ def run(context):
         {"x": "end_rail_l", "z": "rail_h - post_chamfer"}, "FootRail_Sk", ev,
         anchor=dict(parent_body=post_fl, parent_occ=post_occ,
                     face_axis="y", face_dir=+1,
-                    anchor_xyz=("0 in", "post_size", "0 in"),
-                    off1=("x", "post_size"), off2=("z", "rail_z")))
+                    # Top-outer corner (bottom corner projects onto sketch origin).
+                    anchor_xyz=("0 in", "post_size", "front_post_h"),
+                    off1=("x", "post_size"), off2=("z", "front_post_h - rail_z")))
     fr_ext = sp.ext_new(rail_c, pr, "rail_thick", "FootRail")
     rail_foot = fr_ext.bodies.item(0); rail_foot.name = "Rail_Foot"
 
@@ -199,8 +204,10 @@ def run(context):
         {"x": "end_rail_l", "z": "back_rail_h"}, "BackRail_Sk", ev,
         anchor=dict(parent_body=post_bl, parent_occ=post_occ,
                     face_axis="y", face_dir=-1,
-                    anchor_xyz=("0 in", "bed_l + post_size", "0 in"),
-                    off1=("x", "post_size"), off2=("z", "rail_z")))
+                    # Top-outer corner of the (taller) back post; bottom corner
+                    # projects onto the sketch origin and is excluded.
+                    anchor_xyz=("0 in", "bed_l + post_size", "headboard_h"),
+                    off1=("x", "post_size"), off2=("z", "headboard_h - rail_z")))
     back_rail_ext = sp.ext_new(rail_c, pr, "rail_thick", "BackRail")
     rail_back = back_rail_ext.bodies.item(0); rail_back.name = "Rail_Back"
 
@@ -218,8 +225,9 @@ def run(context):
         {"y": "side_rail_l", "z": "ledger_h"}, "LedgerL_Sk", ev,
         anchor=dict(parent_body=post_fl, parent_occ=post_occ,
                     face_axis="x", face_dir=+1,
-                    anchor_xyz=("post_size", "0 in", "0 in"),
-                    off1=("y", "post_size"), off2=("z", "ledger_z")))
+                    # Top-outer corner (bottom corner projects onto sketch origin).
+                    anchor_xyz=("post_size", "0 in", "front_post_h"),
+                    off1=("y", "post_size"), off2=("z", "front_post_h - ledger_z")))
     ll_ext = sp.ext_new(rail_c, pr, "ledger_thick", "LedgerLeft")
     ledger_left = ll_ext.bodies.item(0); ledger_left.name = "Ledger_Left"
 
