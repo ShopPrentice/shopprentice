@@ -31,15 +31,21 @@ Strength is wildly directional:
 
 Every joinery decision follows from this. Two consequences matter most:
 
-1. **Glue:** a sound long-grain-to-long-grain line is **wood-limited** — it fails in
-   the wood, so rate it at the wood's shear-parallel strength (`fl = τ`), *not* the
-   adhesive's datasheet psi (PVA ~3,400–4,200; the wood gives out first). End-grain
-   glue is weak but **not zero**: ~**15%** of long grain raw, up to ~**25%** if the
-   end grain is *sized* (primed) — the documented ceiling (USDA FPL Wood Handbook,
-   "not more than ~25%"). For a face at angle *x* to the grain, interpolate with
-   **Hankinson** — `N = fl·fe / (fl·sinⁿx + fe·cosⁿx)`, n≈2 — via
-   `glue_shear_per_area(x)`. (A linear `cos/sin` blend over-predicts mid-angles
-   2–4×; don't use it.) Rule 9 covers joint *choice* from this.
+1. **Glue — what "long grain" actually means:** a glue bond is full-strength
+   **long-grain-to-long-grain when BOTH pieces' fibers lie PARALLEL TO the mating
+   (glue) face** — both grains running *in the plane of* that surface. This is the
+   precise definition of "glue along the grain," and it is **angle-independent**: a
+   tilted or angled joint keeps full long-grain glue as long as both fibers lie in
+   the face — **the joint's angle does not create end grain.** End grain appears
+   only where a fiber pokes *out of* the face (perpendicular to it); a face where a
+   fiber is *partly* perpendicular is *partly* end grain — grade it by that angle
+   (Hankinson, below). A sound long-long line is **wood-limited** — rate it at the
+   wood's shear-parallel strength (`fl = τ`), not the adhesive's datasheet psi (PVA
+   ~3,400–4,200; the wood gives first). End-grain glue is weak but **not zero**:
+   ~**15%** raw, up to ~**25%** sized (primed) — the documented ceiling (USDA FPL
+   Wood Handbook). For a face at angle *x* to a fiber, interpolate with **Hankinson**
+   `N = fl·fe / (fl·sinⁿx + fe·cosⁿx)`, n≈2 (`glue_shear_per_area(x)`; a linear
+   `cos/sin` blend over-predicts mid-angles 2–4×). Rule 9 covers joint *choice*.
 2. **Material removal:** cutting a mortise *removes* fibers from the mortise piece.
    **Where** and **how** you remove them decides whether the piece stays strong —
    which is what this document is about.
@@ -52,6 +58,17 @@ Every joinery decision follows from this. Two consequences matter most:
 
 Equivalently: the **mortise is long with the grain, narrow across it** — never the
 reverse.
+
+**This is the axis-aligned *shorthand* for the glue + fiber rules, not a separate
+law.** "Wider dimension along the mortise grain" is just what "both fibers parallel
+to the large glue cheeks, and few fibers severed" works out to when the pieces meet
+square. For an **angled** joint, do NOT apply it literally or flag the joint as
+"grain-wrong" — go back to the definitions: (a) are both fibers parallel to the
+cheek faces? and (b) does the mortise sever few fibers? A strut tenoning into a
+spine at 40° — both members horizontal — still has full long-grain glue on its
+horizontal cheeks, because both fibers lie in those faces; the plan angle changes
+nothing there. The angle is fine. What still binds at *any* angle: maximize the
+long-long cheek area, keep enough section + depth, and minimize fibers severed.
 
 ### Why — the fibers you cut
 

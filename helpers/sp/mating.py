@@ -294,6 +294,11 @@ def validate_tenon_grain(tenon_body, mortise_body, tenon_axis, tol=0.12):
     definition). Never raises -- mirrors validate_joint_contact; call it on the
     tenon body before JOINing it to its owner.
 
+    This is the AXIS-ALIGNED heuristic for the real rule -- both pieces' fibers
+    parallel to the glue (mating) face (see grain-and-strength.md). For ANGLED
+    joints it is ADVISORY: the joint angle alone does NOT create end grain, so an
+    angled tenon with long-grain cheeks is fine even if this flags it.
+
     Args:
         tenon_body:   the tenon (a separate body at build time, before JOIN).
         mortise_body: the piece the tenon inserts into.
@@ -313,16 +318,27 @@ def validate_tenon_grain(tenon_body, mortise_body, tenon_axis, tol=0.12):
     ext_w = _extent_along(tenon_body, w)   # across the grain
     wide = max(ext_u, ext_w)
     square = wide <= 1e-9 or (wide - min(ext_u, ext_w)) <= tol * wide
-    ok = bool(square or ext_u >= ext_w)
-    if not ok:
-        print("WARNING validate_tenon_grain: %s is wider ACROSS %s's grain "
-              "(%.2f cm) than along it (%.2f cm). Rotate the tenon 90 deg so its "
-              "wider cross-section dimension runs ALONG the grain -- otherwise the "
-              "mortise severs extra long fibers and leaves weak short-grain "
-              "cheeks in %s." % (tenon_body.name, mortise_body.name, ext_w,
-                                 ext_u, mortise_body.name))
+    along_ok = bool(square or ext_u >= ext_w)
+    # The wider-along-grain test is the AXIS-ALIGNED heuristic. When the joint is
+    # angled (the insertion axis or the in-section fibre direction isn't ~axis-
+    # aligned), the real rule -- both fibres parallel to the glue face -- can hold
+    # even when this heuristic doesn't, so it is ADVISORY there: never fail it.
+    def _axis_aligned(v):
+        return max(abs(v.x), abs(v.y), abs(v.z)) >= 0.95
+    angled = not (_axis_aligned(a) and _axis_aligned(u))
+    ok = bool(along_ok or angled)
+    if not along_ok:
+        kind = ("ADVISORY (angled joint -- the angle alone makes no end grain; "
+                "verify the cheeks: are both fibres parallel to the glue face?)"
+                if angled else
+                "AXIS-ALIGNED joint -- rotate the tenon 90 deg (more long-long cheek, "
+                "fewer fibres severed)")
+        print("WARNING validate_tenon_grain: %s's wider section (%.2f cm) runs ACROSS "
+              "%s's grain rather than along it (%.2f cm). %s See "
+              "docs/joinery/grain-and-strength.md." % (
+                  tenon_body.name, ext_w, mortise_body.name, ext_u, kind))
     return {"ok": ok, "fiber_extent": ext_u, "cross_extent": ext_w,
-            "square": square}
+            "square": square, "angled": angled, "along_grain_ok": along_ok}
 
 
 def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardwood",
