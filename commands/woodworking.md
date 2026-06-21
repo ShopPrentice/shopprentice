@@ -618,6 +618,16 @@ positioned from. `"ref"` may be one name or a list: every body needs ≥1 parent
 seating against two lists both), and exactly one body references `"origin"` (the root). A
 two-parent sketch anchors to each parent's projected geometry on the axis that parent controls.
 
+An optional top-level **`"joints"`** array declares load-bearing joints for a per-type
+strength check (issue 106): each entry is `{"type": "mortise_tenon"|"pegged_tenon"|
+"wedged_tenon", "tenon": <owning body>, "mortise": <owning body>, "axis": "x|y|z",
+"species": …, "width"/"thickness"/"depth": <expr>}` (pegged adds `pins`/`pin_dia`/
+`pin_end_distance`). `validate_deps` runs the right check on each and surfaces WARNINGs;
+joinery templates (`mortise_tenon`) **auto-declare** the joints they build, so you mainly
+add entries for **hand-built** joints. The completeness pass also flags contacting bodies
+with no declared joint (advisory — most contacts need none). See
+`docs/joinery/grain-and-strength.md`.
+
 **Phase validation:** `validate_design` runs connectivity, interference, and dependency checks
 (single origin, sketch origin enforcement, bodies in components). Run it after EVERY phase.
 Completeness (all bodies tracked) is advisory — it won't fail the build. **If you see

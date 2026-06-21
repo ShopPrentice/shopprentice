@@ -537,6 +537,40 @@ def validate_deps(ctx, metadata_path=None):
     else:
         print(f"   OK   All {len(all_bodies)} bodies are tracked")
 
+    # --- Joint registry (issue 106) ---
+    # Only engages when the model opts in with a `joints` array, so models that don't
+    # use the registry aren't spammed. Per-type strength checks surface advisory
+    # WARNINGs; a malformed declaration (unknown type / unresolved body) is a HARD
+    # failure like any other dependency error.
+    joints = meta.get("joints", [])
+    if joints:
+        # Undeclared-contact check (advisory). Most contacts legitimately need no joint
+        # (glued panels, butt/edge joints, shelves in dados, seated rails), so this is
+        # INFORMATIONAL — it never fails the build; it just nudges you to declare a
+        # load-bearing joint so it gets a strength check.
+        try:
+            from helpers.sp.joint_registry import joint_covers
+            from helpers.sp.mating import contacting_pairs
+            pairs = contacting_pairs(ctx)
+        except Exception:
+            pairs = []
+        undeclared = [(a, b) for (a, b) in pairs
+                      if not any(joint_covers(j, a, b) for j in joints)]
+        if undeclared:
+            print("--- Undeclared contacts (advisory; many contacts need no joint) ---")
+            for a, b in undeclared[:10]:
+                print(f"  NOTE  {a} and {b} are in contact but no joint is declared")
+            if len(undeclared) > 10:
+                print(f"         ... and {len(undeclared) - 10} more")
+
+        try:
+            from helpers.sp.joint_registry import validate_joints
+            jres = validate_joints(ctx, joints)
+            if not jres.get("ok", True):
+                all_ok = False
+        except Exception as e:
+            print(f"  joint strength check skipped (error: {e})")
+
     status = "PASS" if all_ok else "FAIL"
     print(f"=== Dependency validation: {status} ===\n")
     return all_ok

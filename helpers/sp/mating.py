@@ -325,39 +325,15 @@ def validate_tenon_grain(tenon_body, mortise_body, tenon_axis, tol=0.12):
             "square": square}
 
 
-def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardwood",
-                            through=False, proud=0.0, pins=0, pin_dia=0.0,
-                            pin_end_distance=None, sized=False, expected=None,
-                            thin_ratio=0.25):
-    """Build-time strength sanity check for a mortise-and-tenon (the GATE half of
-    the joint-strength estimator). Measures the tenon's dimensions off the body,
-    runs ``joint_strength.estimate_mortise_tenon``, and prints a WARNING for the
-    LOAD-INDEPENDENT red flags a designer should never ship:
+def _measure_tenon(tenon_body, mortise_body, tenon_axis, proud=0.0):
+    """Measure a tenon body's (width ALONG grain, thickness ACROSS grain, glue depth)
+    in INCHES, off the live body before JOIN. Shared by the per-type body checks.
 
-      * grain orientation wrong (wider across the grain -- via validate_tenon_grain),
-      * thin slice (thickness < ``thin_ratio`` x width -> shear/bending collapse
-        even with maximal glue area -- the "don't optimize glue to a sliver" trap),
-      * brittle peg relish (drawbore peg end distance < 4 x peg diameter).
-
-    Optionally checks adequacy: pass ``expected={mode: load}`` (lbf, keys matching
-    the estimator's capacity names) and it WARNs on any direction loaded past
-    capacity. Like ``validate_tenon_grain`` it never raises -- call it on the tenon
-    body before JOINing it (design-time sizing should use ``estimate_mortise_tenon``
-    directly; this is the after-build safety net the joinery templates call).
-
-    Args:
-        tenon_body, mortise_body: the tenon (pre-JOIN) and the piece it enters.
-        tenon_axis: insertion direction, 'x'/'y'/'z' or Vector3D.
-        species: wood key into ``joint_strength.SPECIES``.
-        through/proud: through tenon? proud length (in) -- excluded from glue depth.
-        pins/pin_dia/pin_end_distance: drawbore peg count/dia/end-distance (in).
-        sized: end-grain glue surfaces primed/sized.
-        expected: optional {capacity_name: applied_load_lbf} for an adequacy check.
-        thin_ratio: thickness/width below which the tenon is flagged a thin slice.
-
-    Returns {ok, flags, weakest, dims_in, capacities, utilization, estimate}.
+    width  = the cross-section dim along the mortise piece's fiber (the glue cheeks),
+    thick. = the cross-section dim across it,
+    depth  = embedded length along the insertion axis, minus any through-proud (which
+             carries no glue).
     """
-    from helpers.sp.joint_strength import estimate_mortise_tenon
     IN = 2.54
     a = _axis_to_vec(tenon_axis)
     u = tenon_wide_direction(mortise_body, tenon_axis)   # along-grain, in-section
@@ -371,45 +347,206 @@ def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardw
         w_cm = _extent_along(tenon_body, u)              # along grain (the cheeks)
         t_cm = _extent_along(tenon_body, wv)             # across grain
     depth_cm = _extent_along(tenon_body, a) - proud * IN
-    w, t, depth = w_cm / IN, t_cm / IN, max(depth_cm, 1e-6) / IN
+    return w_cm / IN, t_cm / IN, max(depth_cm, 1e-6) / IN
 
-    est = estimate_mortise_tenon(w, t, depth, species=species, through=through,
-                                 proud=proud, pins=pins, pin_dia=pin_dia,
-                                 pin_end_distance=pin_end_distance, sized=sized)
-    caps = est["capacities"]
 
-    flags = []
+def validate_mortise_tenon(tenon_body, mortise_body, tenon_axis, species="hardwood",
+                           through=False, proud=0.0, sized=False, expected=None,
+                           thin_ratio=0.25):
+    """Build-time strength check for a (plain) mortise-and-tenon — the per-type check
+    split out of the old monolith (issue 106; drawbore PEGS are now a SEPARATE concern,
+    see ``validate_pegged_joint``). Measures the tenon off the body, runs the grain-
+    orientation check + the pure ``joint_strength.mortise_tenon_flags`` core, and prints
+    a WARNING for the LOAD-INDEPENDENT red flags a designer should never ship:
+
+      * grain orientation wrong (wider across the grain -- via validate_tenon_grain),
+      * thin slice (thickness < ``thin_ratio`` x width -> shear/bending collapse even
+        with maximal glue area -- the "don't optimize glue to a sliver" trap),
+      * very thin tenon (< 3/16 in).
+
+    Optionally checks adequacy: pass ``expected={mode: load}`` (lbf, keys matching the
+    estimator's capacity names) and it WARNs on any direction loaded past capacity.
+    Never raises -- call it on the tenon body before JOINing it (design-time sizing
+    should use ``estimate_mortise_tenon`` directly; this is the after-build safety net
+    the joinery templates call).
+
+    Args:
+        tenon_body, mortise_body: the tenon (pre-JOIN) and the piece it enters.
+        tenon_axis: insertion direction, 'x'/'y'/'z' or Vector3D.
+        species: wood key into ``joint_strength.SPECIES``.
+        through/proud: through tenon? proud length (in) -- excluded from glue depth.
+        sized: end-grain glue surfaces primed/sized.
+        expected: optional {capacity_name: applied_load_lbf} for an adequacy check.
+        thin_ratio: thickness/width below which the tenon is flagged a thin slice.
+
+    Returns {ok, flags, weakest, dims_in, capacities, utilization, estimate}.
+    """
+    from helpers.sp.joint_strength import mortise_tenon_flags
+    w, t, depth = _measure_tenon(tenon_body, mortise_body, tenon_axis, proud)
+    res = mortise_tenon_flags(w, t, depth, species=species, through=through,
+                              proud=proud, sized=sized, expected=expected,
+                              thin_ratio=thin_ratio)
+    flags = list(res["flags"])
     g = validate_tenon_grain(tenon_body, mortise_body, tenon_axis)
     if not g["ok"]:
-        flags.append("grain orientation: wider ACROSS the grain (rotate 90 deg)")
-    if t < thin_ratio * w:
-        flags.append("thin slice: thickness %.2f in < %.2f x width (%.2f in) -> the "
-                     "tenon's own shear/bending governs even with full glue" % (
-                         t, thin_ratio, w))
-    if t < 0.1875:
-        flags.append("very thin tenon (t=%.2f in): fragile to cut and shear-weak" % t)
-    if pins and pin_dia and pin_end_distance is not None and pin_end_distance < 4.0 * pin_dia:
-        flags.append("brittle: peg end distance %.2f in < 4xD (%.2f in) -> relish "
-                     "tear-out" % (pin_end_distance, 4.0 * pin_dia))
+        flags.insert(0, "grain orientation: wider ACROSS the grain (rotate 90 deg)")
 
+    est = res["est"]
+    caps = est["capacities"]
+    weakest = res["weakest"]
     forces = {k: v["value"] for k, v in caps.items() if v["unit"] == "lbf"}
-    weakest = min(forces, key=forces.get) if forces else None
-    util = {}
-    if expected:
-        for k, load in expected.items():
-            c = caps.get(k)
-            if c and load > 0:
-                util[k] = load / c["value"]
-                if util[k] > 1.0:
-                    flags.append("OVERLOADED %s: %.0f lbf > capacity %.0f (util %.2f)"
-                                 % (k, load, c["value"], util[k]))
-
     ok = not flags
     if flags:
-        print("WARNING validate_joint_strength: %s (%.2f w x %.2f t x %.2f deep, %s) "
+        print("WARNING validate_mortise_tenon: %s (%.2f w x %.2f t x %.2f deep, %s) "
               "-> %s | weakest force dir: %s %.0f lbf" % (
                   tenon_body.name, w, t, depth, species, "; ".join(flags),
                   weakest, forces.get(weakest, 0.0)))
     return {"ok": ok, "flags": flags, "weakest": weakest,
             "dims_in": {"width": w, "thickness": t, "depth": depth},
-            "capacities": caps, "utilization": util, "estimate": est}
+            "capacities": caps, "utilization": res["utilization"], "estimate": est}
+
+
+def validate_pegged_joint(tenon_body, mortise_body, tenon_axis, pins, pin_dia,
+                          pin_end_distance, species="hardwood", peg_species=None):
+    """Dedicated build-time check for a PEGGED / drawbore tenon (issue 106): the peg
+    mechanism split out of the M&T sizing check. Measures the tenon (for the EYM
+    bearing term), runs the pure ``joint_strength.pegged_flags`` core -- the relish
+    tear-out flag (peg end distance >= 4xD) + the European-Yield-Model peg capacity
+    breakdown. Never raises.
+
+    Args:
+        tenon_body, mortise_body: the tenon (pre-JOIN) and the piece it enters.
+        tenon_axis: insertion direction, 'x'/'y'/'z' or Vector3D.
+        pins/pin_dia/pin_end_distance: drawbore peg count/dia/end-distance (in).
+        species: mortise wood key; peg_species: peg wood (else = species).
+
+    Returns {ok, flags, pin_modes, pin_withdrawal, dims_in}.
+    """
+    from helpers.sp.joint_strength import pegged_flags
+    w, t, depth = _measure_tenon(tenon_body, mortise_body, tenon_axis)
+    res = pegged_flags(pins, pin_dia, pin_end_distance, species=species,
+                       peg_species=peg_species, tenon_width=w, tenon_thickness=t,
+                       tenon_depth=depth)
+    flags = res["flags"]
+    ok = not flags
+    if flags:
+        print("WARNING validate_pegged_joint: %s (%d peg(s), D=%.3f in, end dist %s) "
+              "-> %s" % (tenon_body.name, pins, pin_dia,
+                         ("%.2f in" % pin_end_distance) if pin_end_distance is not None
+                         else "?", "; ".join(flags)))
+    return {"ok": ok, "flags": flags, "pin_modes": res["pin_modes"],
+            "pin_withdrawal": res["pin_withdrawal"],
+            "dims_in": {"width": w, "thickness": t, "depth": depth}}
+
+
+def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardwood",
+                            through=False, proud=0.0, pins=0, pin_dia=0.0,
+                            pin_end_distance=None, sized=False, expected=None,
+                            thin_ratio=0.25):
+    """DEPRECATED back-compat wrapper. Issue 106 split this monolith into dedicated
+    per-type checks: use ``validate_mortise_tenon`` (and ``validate_pegged_joint`` for
+    drawbore pegs). This keeps the old call signature working -- it runs the M&T check
+    and, when pins are given, the dedicated pegged check, merging their flags. Returns
+    the M&T result dict, augmented with ``pin_modes`` / ``pin_withdrawal`` when pegged.
+    """
+    res = validate_mortise_tenon(tenon_body, mortise_body, tenon_axis, species=species,
+                                 through=through, proud=proud, sized=sized,
+                                 expected=expected, thin_ratio=thin_ratio)
+    if pins and pin_dia:
+        peg = validate_pegged_joint(tenon_body, mortise_body, tenon_axis, pins, pin_dia,
+                                    pin_end_distance, species=species)
+        res["flags"] = list(res["flags"]) + list(peg["flags"])
+        res["ok"] = not res["flags"]
+        res["pin_modes"] = peg["pin_modes"]
+        res["pin_withdrawal"] = peg["pin_withdrawal"]
+    return res
+
+
+def contacting_pairs(ctx, min_area_cm2=1.0):
+    """Body-name pairs whose planar faces are in face-to-face contact, design-wide.
+
+    Mirrors validate_design's planar-face overlap test (opposed coplanar faces, in-plane
+    bbox overlap). Used by the deps completeness check to surface contacting bodies with
+    no declared joint. Best-effort and fail-soft: any body whose faces can't be read is
+    skipped, and an empty list is returned if the context has no real geometry (offline
+    stubs) -- so callers can run it unconditionally inside a try/except.
+
+    Returns a list of ``(name_a, name_b)`` tuples (names sorted within each pair) whose
+    contact area is at least ``min_area_cm2``.
+    """
+    TOL_CM = 0.05
+
+    def planar_faces(body):
+        out = []
+        try:
+            faces = body.faces
+            for i in range(faces.count):
+                face = faces.item(i)
+                if face.geometry.surfaceType != adsk.core.SurfaceTypes.PlaneSurfaceType:
+                    continue
+                ok, normal = face.evaluator.getNormalAtPoint(face.pointOnFace)
+                if not ok:
+                    continue
+                bb = face.boundingBox
+                if not bb:
+                    continue
+                out.append({"normal": normal, "point": face.pointOnFace,
+                            "bb_min": [bb.minPoint.x, bb.minPoint.y, bb.minPoint.z],
+                            "bb_max": [bb.maxPoint.x, bb.maxPoint.y, bb.maxPoint.z],
+                            "area": face.area})
+        except Exception:
+            return []
+        return out
+
+    def contact_area(fa_list, fb_list):
+        total = 0.0
+        for fa in fa_list:
+            na, pa = fa["normal"], fa["point"]
+            a_min, a_max = fa["bb_min"], fa["bb_max"]
+            for fb in fb_list:
+                nb = fb["normal"]
+                if na.x * nb.x + na.y * nb.y + na.z * nb.z > -0.95:
+                    continue
+                d = ((fb["point"].x - pa.x) * na.x + (fb["point"].y - pa.y) * na.y +
+                     (fb["point"].z - pa.z) * na.z)
+                if abs(d) > TOL_CM:
+                    continue
+                b_min, b_max = fb["bb_min"], fb["bb_max"]
+                ax, ay, az = abs(na.x), abs(na.y), abs(na.z)
+                if ax >= ay and ax >= az:
+                    i1, i2 = 1, 2
+                elif ay >= ax and ay >= az:
+                    i1, i2 = 0, 2
+                else:
+                    i1, i2 = 0, 1
+                o1 = min(a_max[i1], b_max[i1]) - max(a_min[i1], b_min[i1])
+                o2 = min(a_max[i2], b_max[i2]) - max(a_min[i2], b_min[i2])
+                if o1 <= 0 or o2 <= 0:
+                    continue
+                total += min(o1 * o2, fa["area"], fb["area"])
+        return total
+
+    bodies = []
+    try:
+        root = ctx.root
+        for j in range(root.occurrences.count):
+            comp = root.occurrences.item(j).component
+            for i in range(comp.bRepBodies.count):
+                bodies.append(comp.bRepBodies.item(i))
+        for i in range(root.bRepBodies.count):
+            bodies.append(root.bRepBodies.item(i))
+    except Exception:
+        return []
+
+    faces = [planar_faces(b) for b in bodies]
+    pairs = []
+    for i in range(len(bodies)):
+        if not faces[i]:
+            continue
+        for k in range(i + 1, len(bodies)):
+            if not faces[k]:
+                continue
+            if contact_area(faces[i], faces[k]) >= min_area_cm2:
+                na, nb = bodies[i].name, bodies[k].name
+                pairs.append((na, nb) if na <= nb else (nb, na))
+    return pairs

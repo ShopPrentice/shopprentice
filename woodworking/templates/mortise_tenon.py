@@ -42,6 +42,31 @@ from helpers import sp
 CUT = adsk.fusion.FeatureOperations.CutFeatureOperation
 JOIN = adsk.fusion.FeatureOperations.JoinFeatureOperation
 
+
+def _declare_mt(size, depth_expr, tenon_body, mortise_body, normal, species,
+                through, ev):
+    """Auto-declare the M&T this template just built into the model.json joint
+    registry (issue 106). Best-effort — the caller wraps it in try/except, and
+    ``sp.declare_joint`` no-ops when model.json isn't resolvable (tests / sandbox).
+
+    Stores the OWNING body names (the tenon piece + the mortise piece — both persist
+    after the tenon is fused) and the cross-section / depth EXPRESSIONS so the registry
+    check can re-evaluate them later (the transient tenon body is gone post-JOIN).
+    """
+    size_axes = list(size.keys())
+    axis = next((a for a in "xyz" if a not in set(size_axes)), None)
+    decl = {"type": "mortise_tenon", "tenon": tenon_body.name,
+            "mortise": mortise_body.name, "axis": axis, "species": species,
+            "through": bool(through)}
+    # width = the larger cross-section dim (= along-grain for a grain-correct joint),
+    # thickness = the smaller. Compare evaluated values but STORE the expressions.
+    if len(size_axes) == 2:
+        e0, e1 = ev(size[size_axes[0]]), ev(size[size_axes[1]])
+        wide, narrow = (size_axes if e0 >= e1 else size_axes[::-1])
+        decl["width"], decl["thickness"] = size[wide], size[narrow]
+        decl["depth"] = depth_expr
+    sp.declare_joint(decl)
+
 METADATA = {
     "name": "mortise_tenon",
     "category": "joinery",
@@ -179,8 +204,13 @@ def blind(comp, plane, origin, size, depth_expr,
     # should call sp.estimate_mortise_tenon directly; this is the gate.
     if validate_strength:
         try:
-            sp.validate_joint_strength(tenon_b, mortise_body,
-                                       plane.geometry.normal, species=species)
+            sp.validate_mortise_tenon(tenon_b, mortise_body,
+                                      plane.geometry.normal, species=species)
+        except Exception:
+            pass
+        try:
+            _declare_mt(size, depth_expr, tenon_body, mortise_body,
+                        plane.geometry.normal, species, through=False, ev=ev)
         except Exception:
             pass
 
@@ -250,9 +280,14 @@ def through(comp, plane, origin, size, depth_expr,
     # the build). through=True so the depth note reflects the proud tenon.
     if validate_strength:
         try:
-            sp.validate_joint_strength(tenon_b, mortise_body,
-                                       plane.geometry.normal, species=species,
-                                       through=True)
+            sp.validate_mortise_tenon(tenon_b, mortise_body,
+                                      plane.geometry.normal, species=species,
+                                      through=True)
+        except Exception:
+            pass
+        try:
+            _declare_mt(size, depth_expr, tenon_body, mortise_body,
+                        plane.geometry.normal, species, through=True, ev=ev)
         except Exception:
             pass
 

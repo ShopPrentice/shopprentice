@@ -281,6 +281,59 @@ The estimator is cheap (~5 µs, no Fusion), so it has two jobs:
   needs the expected loads, which furniture rarely quantifies, so the dependable
   wins are the load-independent flags plus comparing candidate sizes.
 
+The build-time gate is split by joint type (the monolith is retired):
+
+- `sp.validate_mortise_tenon(tenon_body, mortise_body, tenon_axis, …)` — the plain
+  M&T sizing + grain check.
+- `sp.validate_pegged_joint(tenon_body, mortise_body, tenon_axis, pins, pin_dia,
+  pin_end_distance, …)` — the **dedicated** drawbore/peg check (relish tear-out ≥ 4×D
+  + the European-Yield-Model peg capacity). No longer a `pins=` rider on the M&T check.
+- `sp.validate_joint_strength(...)` — kept as a deprecated back-compat shim that runs
+  both.
+
+### A third role: the declarative joint registry (covers hand-built joints)
+
+The build-time gate only fires where a template bakes it in. A hand-built or
+novel-geometry joint that skips the template also skips the check — and
+`validate_design` can't reliably guess *which bodies form a joint and which way the
+load runs* from geometry alone. So **declare** the joint, the same discipline already
+owed for dependencies. `model.json` grows a top-level `joints` array, and
+`sp.validate_deps` runs the right per-type check on every declared joint on every
+build (a forcing function the agent can't skip):
+
+```json
+{
+  "deps": [ … ],
+  "joints": [
+    {"type": "mortise_tenon", "tenon": "Rail_F", "mortise": "Leg_FL", "axis": "y",
+     "species": "white_oak", "width": "2 in", "thickness": "0.75 in", "depth": "1.5 in"},
+    {"type": "pegged_tenon",  "tenon": "Stretcher", "mortise": "Leg_FL", "axis": "y",
+     "species": "white_oak", "width": "1.5 in", "thickness": "0.5 in", "depth": "1 in",
+     "pins": 1, "pin_dia": "0.375 in", "pin_end_distance": "1.5 in"}
+  ]
+}
+```
+
+- `tenon` / `mortise` are the **owning** body names (the rail and the leg) — they
+  persist after the tenon is fused, so the check resolves them and the completeness
+  pass can match a contact to its declared joint.
+- `axis` is the insertion direction `'x'`/`'y'`/`'z'`. **Length fields are expression
+  strings** (`"0.375 in"`, `"rail_w"`) evaluated via `ctx.ev` — the tenon is gone
+  post-build, so the registry reads the dims from the *declaration*, not by
+  re-measuring. Omit them and the strength sizing is skipped (a NOTE), but the body
+  existence + mortise-grain checks still run.
+- `type` dispatches: `mortise_tenon`, `pegged_tenon` / `drawbore` (M&T + peg), and
+  `wedged_tenon` (plain M&T today; the flare interlock lands with issue #105). An
+  unknown type, a missing field, or an unresolved body is a **hard** failure;
+  strength findings are advisory WARNINGs.
+
+**Templates auto-declare** the joint they build (`sp.declare_joint(...)`) — the
+`mortise_tenon` template appends its joint to the registry on every build (idempotent,
+deduped by body pair), so the convenient path stays zero-effort. The registry is the
+safety net for everything else. The completeness check also lists **contacting bodies
+with no declared joint** (advisory — most contacts, like glued panels and seated
+rails, legitimately need none) so missing structural joints surface.
+
 ## The math (and how to apply it in code)
 
 Let **f** = the mortise piece's unit fiber direction, and **a** = the tenon
@@ -357,8 +410,12 @@ Joinery templates that cut mortises (`mortise_tenon`, `breadboard`, `drawbore`,
    moment) or thickness (shear, twist).
 8. If wedged, cut the kerf ⟂ to the mortise grain (`tenon-wedge.md`); if pinned,
    run the pin **across** the grain (and keep it ≥ 4×D from the tenon end).
-9. **Gate it (build time):** assert `sp.validate_joint_strength(tenon_body,
-   mortise_body, tenon_axis, …)` before JOINing (the joinery templates do this
-   automatically) — it folds in `validate_tenon_grain` and WARNs on grain-wrong,
-   thin-slice, brittle-peg, or overload.
+9. **Gate it (build time):** `sp.validate_mortise_tenon(tenon_body, mortise_body,
+   tenon_axis, …)` before JOINing (the joinery templates do this automatically) —
+   it folds in `validate_tenon_grain` and WARNs on grain-wrong, thin-slice, or
+   overload; add `sp.validate_pegged_joint(...)` for drawbore pegs.
+10. **Declare it (registry):** add the joint to `model.json`'s `joints` array so
+    `sp.validate_deps` runs the per-type check on every build — essential for
+    **hand-built** joints the templates don't cover. Templates auto-declare via
+    `sp.declare_joint`.
 </content>
