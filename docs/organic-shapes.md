@@ -16,6 +16,8 @@ This file is the **application / routing** doc: identify the kind of organic sha
 
 Classes 1 – 4 are built inline in this doc — each has a self-contained recipe below with the exact API calls needed. Agents don't need to load any other topic file to build the common organic shapes. For **advanced loft variants only** (branching manifolds, closed-ring topology, rail/centerline guides, surface-only lofts, loft-as-CUT pockets, irregular closed-spline cross-sections like kidney/star/cardioid), see `loft.md` — deep feature reference, don't preload unless a build actually needs those variants.
 
+Every class above shapes ONE body. When a single curve must flow across **≥2 assembled members** and stay continuous over the seam (an arched apron sweeping into its legs, a flared foot wrapping two faces), that's a different technique — build the members rectilinear, then make ONE cut spanning all of them (rule 10). See `docs/continuous-cut.md`; reach for the certified `sp.base_arch_cut` / `sp.foot_flare_cut` generators.
+
 **Scoops (class 4) and through-tenon trimming are techniques applied *on top of* any base body** — they're documented below regardless of how the base body was constructed.
 
 ## Core Workflow: Approximate → Refine → Capture

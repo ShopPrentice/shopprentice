@@ -31,6 +31,12 @@ This applies to **all** joint types (whether using templates or inline code):
 - **Tongue & groove**: tongue body cuts the groove, then joins the slat
 - **Panel grooves**: panel body (with tongues from edge rabbets) cuts the groove in each receiving board via Combine CUT (`keepTool=True`). The tongue-board overlap IS the groove — guaranteed perfect fit. Through tongues produce through grooves; stopped tongues produce stopped grooves. No separate groove sketches needed.
 
+**The dual — one cut shaping MANY members.** The inverse of combine-based joinery
+(one tool body → one receiver) is one *shaped* cut whose `participantBodies` span
+several assembled members at once, for a sculpted curve continuous across the seam.
+See rule 10 + `docs/continuous-cut.md` (generators `sp.base_arch_cut` /
+`sp.foot_flare_cut`).
+
 ## Tooling Body Pattern for Grooves
 
 > **When a groove receives a paneled body with tongues** (bottoms, lids, drawer bottoms), use the panel body itself as the cutting tool instead (see **Panel grooves** above). The tooling body approach below is for standalone grooves that don't receive a panel — dados for fixed shelves, rabbets for backs, etc.
