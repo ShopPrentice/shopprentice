@@ -84,7 +84,7 @@ def case(name, fn):
 
 
 MANIFEST = genreg.load_manifest()          # the committed certified.json
-EXPECT = ["base_arch_cut"]
+EXPECT = ["base_arch_cut", "foot_flare_cut"]
 
 case("certified.json exists and is non-empty",
      lambda: bool(MANIFEST))
