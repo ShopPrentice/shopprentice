@@ -177,3 +177,239 @@ def validate_joint_contact(body_a, body_b, joint_axis=None, tol_cm=0.1):
         "gap_cm": max(0, -overlap_along),
         "perp_overlaps": perp_overlaps,
     }
+
+
+# ---------------------------------------------------------------------------
+# Grain-aware tenon orientation (see docs/joinery/grain-and-strength.md)
+#
+# Wood is strong along its fibers and splits easily across them. Cutting a
+# mortise removes material from the mortise piece; to preserve its integrity the
+# mortise must run WITH the grain, severing the fewest long fibers and leaving
+# long-grain cheeks. Equivalently: a rectangular tenon's WIDER cross-section
+# dimension must lie ALONG the mortise piece's fiber direction (a square section
+# must keep one edge parallel to it). This matters most for slender mortise
+# pieces (legs, rails, stretchers) where a mortise cut the wrong way leaves weak
+# short-grain cheeks. The wider dimension is derived, not assumed, from the
+# mortise piece's fiber direction.
+# ---------------------------------------------------------------------------
+
+def _axis_to_vec(a):
+    """'x'/'y'/'z' or Vector3D -> unit Vector3D."""
+    if isinstance(a, str):
+        m = {"x": (1.0, 0.0, 0.0), "y": (0.0, 1.0, 0.0), "z": (0.0, 0.0, 1.0)}
+        return adsk.core.Vector3D.create(*m[a])
+    v = a.copy()
+    v.normalize()
+    return v
+
+
+def _dominant_axis(vec):
+    """Model axis name ('x'/'y'/'z') most aligned with a Vector3D."""
+    return max(("x", "y", "z"), key=lambda ax: abs(getattr(vec, ax)))
+
+
+def grain_axis(body):
+    """Grain/fiber direction of a body as an axis name ('x'/'y'/'z').
+
+    The body's longest bounding-box axis = its elongation = the fiber direction.
+    Public wrapper over the appearance module's detector."""
+    from helpers.sp.appearance import _grain_axis
+    return _grain_axis(body)
+
+
+def grain_vector(body):
+    """Grain/fiber direction of a body as a unit Vector3D.
+
+    Uses the principal axes of inertia (the axis with the smallest moment is the
+    elongation = fiber direction); falls back to the longest bounding-box axis.
+    Works for axis-aligned, slender, AND angled members. Public wrapper over the
+    appearance module's detector."""
+    from helpers.sp.appearance import _grain_vector
+    return _grain_vector(body)
+
+
+def tenon_wide_direction(mortise_body, tenon_axis):
+    """Direction the tenon's WIDER cross-section dimension should run.
+
+    = the mortise piece's fiber direction projected into the plane perpendicular
+    to the tenon insertion axis, returned as a unit Vector3D. Orienting the wide
+    dimension along this vector makes the mortise run WITH the grain.
+
+    Returns None when the fiber is (nearly) parallel to the insertion axis (an
+    end-grain mortise -- rare; the cross-section orientation is then unconstrained).
+
+    Args:
+        mortise_body: the piece the mortise is cut into (the tenon inserts into it).
+        tenon_axis:   the insertion direction, 'x'/'y'/'z' or a Vector3D.
+    """
+    f = grain_vector(mortise_body)
+    a = _axis_to_vec(tenon_axis)
+    dot = f.dotProduct(a)
+    fp = adsk.core.Vector3D.create(f.x - dot * a.x, f.y - dot * a.y, f.z - dot * a.z)
+    if fp.length < 1e-6:
+        return None
+    fp.normalize()
+    return fp
+
+
+def tenon_wide_axis(mortise_body, tenon_axis):
+    """Axis-aligned convenience for `tenon_wide_direction`.
+
+    Of the two model axes perpendicular to the insertion axis, returns the one
+    ('x'/'y'/'z') most aligned with the mortise piece's fiber. Build the tenon's
+    WIDE cross-section dimension along it and the NARROW dimension along the other
+    (a square cross-section should still keep an edge along it)."""
+    d = tenon_wide_direction(mortise_body, tenon_axis)
+    ta = tenon_axis if isinstance(tenon_axis, str) else _dominant_axis(tenon_axis)
+    perp = [ax for ax in ("x", "y", "z") if ax != ta]
+    if d is None:
+        return perp[0]
+    return max(perp, key=lambda ax: abs(getattr(d, ax)))
+
+
+def _extent_along(body, vec):
+    """Span (cm) of a body's vertices projected onto a unit direction."""
+    v = _axis_to_vec(vec)
+    lo, hi = 1e18, -1e18
+    verts = body.vertices
+    for i in range(verts.count):
+        p = verts.item(i).geometry
+        d = p.x * v.x + p.y * v.y + p.z * v.z
+        if d < lo:
+            lo = d
+        if d > hi:
+            hi = d
+    return hi - lo
+
+
+def validate_tenon_grain(tenon_body, mortise_body, tenon_axis, tol=0.12):
+    """Check a tenon's WIDER cross-section dimension runs ALONG the mortise grain.
+
+    The grain-strength rule (docs/joinery/grain-and-strength.md): a mortise must
+    be cut WITH the mortise piece's grain, so the tenon's wider cross-section
+    dimension lies along the fiber. This measures the tenon's extent along the
+    in-section fiber direction vs across it; if the tenon is wider ACROSS the
+    grain (the 90-degrees-wrong orientation) it prints a WARNING and returns
+    ok=False. A square cross-section passes (one edge is parallel to the fiber by
+    definition). Never raises -- mirrors validate_joint_contact; call it on the
+    tenon body before JOINing it to its owner.
+
+    Args:
+        tenon_body:   the tenon (a separate body at build time, before JOIN).
+        mortise_body: the piece the tenon inserts into.
+        tenon_axis:   insertion direction, 'x'/'y'/'z' or Vector3D.
+        tol:          square tolerance as a fraction of the wider dimension.
+
+    Returns {ok, fiber_extent, cross_extent, square}.
+    """
+    u = tenon_wide_direction(mortise_body, tenon_axis)
+    if u is None:
+        return {"ok": True, "fiber_extent": None, "cross_extent": None,
+                "square": False, "reason": "fiber parallel to insertion axis"}
+    a = _axis_to_vec(tenon_axis)
+    w = a.crossProduct(u)          # cross-fiber direction within the section
+    w.normalize()
+    ext_u = _extent_along(tenon_body, u)   # along the grain
+    ext_w = _extent_along(tenon_body, w)   # across the grain
+    wide = max(ext_u, ext_w)
+    square = wide <= 1e-9 or (wide - min(ext_u, ext_w)) <= tol * wide
+    ok = bool(square or ext_u >= ext_w)
+    if not ok:
+        print("WARNING validate_tenon_grain: %s is wider ACROSS %s's grain "
+              "(%.2f cm) than along it (%.2f cm). Rotate the tenon 90 deg so its "
+              "wider cross-section dimension runs ALONG the grain -- otherwise the "
+              "mortise severs extra long fibers and leaves weak short-grain "
+              "cheeks in %s." % (tenon_body.name, mortise_body.name, ext_w,
+                                 ext_u, mortise_body.name))
+    return {"ok": ok, "fiber_extent": ext_u, "cross_extent": ext_w,
+            "square": square}
+
+
+def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardwood",
+                            through=False, proud=0.0, pins=0, pin_dia=0.0,
+                            pin_end_distance=None, sized=False, expected=None,
+                            thin_ratio=0.25):
+    """Build-time strength sanity check for a mortise-and-tenon (the GATE half of
+    the joint-strength estimator). Measures the tenon's dimensions off the body,
+    runs ``joint_strength.estimate_mortise_tenon``, and prints a WARNING for the
+    LOAD-INDEPENDENT red flags a designer should never ship:
+
+      * grain orientation wrong (wider across the grain -- via validate_tenon_grain),
+      * thin slice (thickness < ``thin_ratio`` x width -> shear/bending collapse
+        even with maximal glue area -- the "don't optimize glue to a sliver" trap),
+      * brittle peg relish (drawbore peg end distance < 4 x peg diameter).
+
+    Optionally checks adequacy: pass ``expected={mode: load}`` (lbf, keys matching
+    the estimator's capacity names) and it WARNs on any direction loaded past
+    capacity. Like ``validate_tenon_grain`` it never raises -- call it on the tenon
+    body before JOINing it (design-time sizing should use ``estimate_mortise_tenon``
+    directly; this is the after-build safety net the joinery templates call).
+
+    Args:
+        tenon_body, mortise_body: the tenon (pre-JOIN) and the piece it enters.
+        tenon_axis: insertion direction, 'x'/'y'/'z' or Vector3D.
+        species: wood key into ``joint_strength.SPECIES``.
+        through/proud: through tenon? proud length (in) -- excluded from glue depth.
+        pins/pin_dia/pin_end_distance: drawbore peg count/dia/end-distance (in).
+        sized: end-grain glue surfaces primed/sized.
+        expected: optional {capacity_name: applied_load_lbf} for an adequacy check.
+        thin_ratio: thickness/width below which the tenon is flagged a thin slice.
+
+    Returns {ok, flags, weakest, dims_in, capacities, utilization, estimate}.
+    """
+    from helpers.sp.joint_strength import estimate_mortise_tenon
+    IN = 2.54
+    a = _axis_to_vec(tenon_axis)
+    u = tenon_wide_direction(mortise_body, tenon_axis)   # along-grain, in-section
+    if u is None:                                        # end-grain mortise (rare)
+        ta = tenon_axis if isinstance(tenon_axis, str) else _dominant_axis(a)
+        perp = [ax for ax in ("x", "y", "z") if ax != ta]
+        e0, e1 = _extent_along(tenon_body, perp[0]), _extent_along(tenon_body, perp[1])
+        w_cm, t_cm = max(e0, e1), min(e0, e1)
+    else:
+        wv = a.crossProduct(u); wv.normalize()
+        w_cm = _extent_along(tenon_body, u)              # along grain (the cheeks)
+        t_cm = _extent_along(tenon_body, wv)             # across grain
+    depth_cm = _extent_along(tenon_body, a) - proud * IN
+    w, t, depth = w_cm / IN, t_cm / IN, max(depth_cm, 1e-6) / IN
+
+    est = estimate_mortise_tenon(w, t, depth, species=species, through=through,
+                                 proud=proud, pins=pins, pin_dia=pin_dia,
+                                 pin_end_distance=pin_end_distance, sized=sized)
+    caps = est["capacities"]
+
+    flags = []
+    g = validate_tenon_grain(tenon_body, mortise_body, tenon_axis)
+    if not g["ok"]:
+        flags.append("grain orientation: wider ACROSS the grain (rotate 90 deg)")
+    if t < thin_ratio * w:
+        flags.append("thin slice: thickness %.2f in < %.2f x width (%.2f in) -> the "
+                     "tenon's own shear/bending governs even with full glue" % (
+                         t, thin_ratio, w))
+    if t < 0.1875:
+        flags.append("very thin tenon (t=%.2f in): fragile to cut and shear-weak" % t)
+    if pins and pin_dia and pin_end_distance is not None and pin_end_distance < 4.0 * pin_dia:
+        flags.append("brittle: peg end distance %.2f in < 4xD (%.2f in) -> relish "
+                     "tear-out" % (pin_end_distance, 4.0 * pin_dia))
+
+    forces = {k: v["value"] for k, v in caps.items() if v["unit"] == "lbf"}
+    weakest = min(forces, key=forces.get) if forces else None
+    util = {}
+    if expected:
+        for k, load in expected.items():
+            c = caps.get(k)
+            if c and load > 0:
+                util[k] = load / c["value"]
+                if util[k] > 1.0:
+                    flags.append("OVERLOADED %s: %.0f lbf > capacity %.0f (util %.2f)"
+                                 % (k, load, c["value"], util[k]))
+
+    ok = not flags
+    if flags:
+        print("WARNING validate_joint_strength: %s (%.2f w x %.2f t x %.2f deep, %s) "
+              "-> %s | weakest force dir: %s %.0f lbf" % (
+                  tenon_body.name, w, t, depth, species, "; ".join(flags),
+                  weakest, forces.get(weakest, 0.0)))
+    return {"ok": ok, "flags": flags, "weakest": weakest,
+            "dims_in": {"width": w, "thickness": t, "depth": depth},
+            "capacities": caps, "utilization": util, "estimate": est}

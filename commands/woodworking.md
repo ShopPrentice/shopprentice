@@ -56,6 +56,28 @@ Before writing any code, plan the modeling steps the way an experienced designer
    - **End grain to side grain** (fiber ends meeting a surface) — mechanical joint required (rail into leg = M&T, board corner = dovetail).
    - **End grain to end grain** — weakest possible bond. Always reinforce with a cross-grain element (spline, domino, biscuit).
 
+   **Grain direction determines mortise/tenon ORIENTATION (cutting a mortise removes fibers):**
+   A mortise removes material from the mortise piece, so it must be cut WITH that
+   piece's grain — long along the fibers, narrow across them — to sever the fewest
+   long fibers and leave long-grain cheeks. Equivalently:
+   - **A rectangular tenon's WIDER cross-section dimension must run ALONG the mortise
+     piece's fiber direction** (a square section keeps one edge parallel to it).
+   - The shape is **derived from the mortise piece, never assumed.** A vertical-grain
+     leg ⇒ the tenon is taller than wide; a piece whose grain runs the other way ⇒
+     the tenon is wider than tall (e.g. breadboard tongues are wide because the
+     breadboard's grain runs across the panel). Do NOT default to "tall and narrow."
+   - This matters most for **slender** mortise pieces (legs, rails, stretchers): a
+     mortise cut wide-across-the-grain severs a band of long fibers and leaves weak
+     short-grain cheeks that split out.
+   - **Derive it:** `wide = sp.tenon_wide_axis(mortise_body, tenon_axis)` (or
+     `sp.tenon_wide_direction` for a vector); build the tenon's larger dimension
+     along it. **Check it:** `sp.validate_tenon_grain(tenon_body, mortise_body,
+     tenon_axis)` on the tenon body before JOINing — it WARNs if the section is
+     rotated 90° wrong. Fiber direction comes from `sp.grain_vector(body)`.
+   - Full rationale, math, and examples: **`docs/joinery/grain-and-strength.md`** —
+     read it before designing any M&T. (Same fiber-direction logic drives wedge
+     kerfs in `tenon-wedge.md` and pin direction in `drawbore.md`.)
+
    **Wood movement determines attachment method:**
    - Wood expands/contracts across the grain (perpendicular to fiber direction). Narrow parts (legs, rails) are negligible. Wide panels (desk tops, table tops, seats > ~6") move measurably with seasonal humidity changes.
    - **Never rigidly attach a wide panel to a cross-grain apron.** Dominos, dowels, or screws through fixed holes lock the panel — when it shrinks, the cross-grain apron holds it in tension, splitting it.
@@ -86,6 +108,7 @@ This skill is modular. The core (this file) covers fundamentals needed for every
 | **Appearance** | Applying wood species, grain direction, multi-species designs, lightening/darkening or recoloring a species ("make it lighter / less red") — read before calling `apply_appearance`. Includes the `# APPEARANCE SPEC` comment-block convention for persisting grain overrides / multi-pass finish across `execute_script(clean=True)` rebuilds | Tested (blanket box) | `docs/appearance.md` |
 | **Hardware Installation** | Importing STEP hardware (bed rail fasteners, hinges), positioning, caching, direction detection, component organization | Tested (queen + twin beds) | `docs/hardware-installation.md` |
 | **Joinery Rules** | Combine-based joinery, tooling bodies, edge rabbets, cross-component CUT patterns | Tested | `docs/joinery.md` |
+| **Grain & Strength** | **Read before any mortise & tenon.** Why fiber direction governs strength; the rule that a tenon's wider cross-section dimension runs ALONG the mortise piece's grain (derived, not assumed); the math + helpers (`grain_vector`, `tenon_wide_axis`) + validator (`validate_tenon_grain`) | Tested | `docs/joinery/grain-and-strength.md` |
 | **Screenshots** | Camera positioning, standard shots, transparent views, detail framing | Tested | `docs/screenshots.md` |
 | **Incremental Updates & Build Strategy** | Build order, component-by-component workflow, document management, script epilogue, interactive editing, rebuild-vs-patch. Also **deriving a variation at a very different size** (propose the full proportion set up front, audit baked constants, datum-relative selection heuristics, volume-scaling validation) — read the Size Variations section only when the user is transforming the piece AND the envelope changes substantially; a single-parameter tweak needs none of it | Tested (Ming table → 平头案) | `docs/incremental-updates.md` |
 | **Replication & Common Errors** | Mirror, Pattern, body pattern ghost bodies, mirror+pattern limitation, 24-row error table | Tested | `docs/fusion-api-rules.md` |
@@ -120,6 +143,7 @@ Read the specific joint file **before writing joinery code**. Each file has para
 | **Tenon Wedge** | Through tenon tightening, fox wedging (blind tenons), Windsor spindle/stretcher locking — rect (2 wedges) or round (1 centred, trimmed to cylinder). Grain detected via principal axes of inertia; pass `grain_dir=` for ambiguous mortise pieces (seats, slabs) | Tested (Windsor chair — splayed legs + angled stretchers) | `docs/joinery/tenon-wedge.md` + `tenon_wedge` template |
 | **Bowtie / Butterfly Key** | Live edge slab crack stabilization, decorative inlay | Tested (twin bed) | `woodworking/templates/bowtie.py` |
 | **Tusk Tenon** | Knock-down through-tenon with tapered key — trestle tables, knock-down furniture, timber frames. Key blade MUST be narrower than tenon width. Multi-parent joint (key bears on receiver AND rides rail) | Tested (trestle table — through + mirror) | `docs/joinery/tusk-tenon.md` + `tusk_tenon` template |
+| **Breadboard End** | Cross-grain end cap for wide tops / doors / drop-leaves. Parametric tenon count + pins-per-tenon (0/1/2), through OR blind-from-bottom pins, and the wood-movement rule baked in: centre tenon pinned ROUND (fixed), every other tenon SLOTTED along the panel-width axis (grows with distance). Tongues grain-oriented per `grain-and-strength.md` | Draft | `docs/joinery/breadboard.md` + `breadboard` template |
 | **Tabletop Button** | Shop-made wooden top attachment — small L-shaped blocks (also: desktop clips, wood top clips) whose tongue rides in an elongated apron/frame slot, allowing cross-grain wood movement. Use instead of steel `tabletop_bracket` for all-wood builds. Caller decides pattern count (3, 4, or more per side) | Tested (trestle table) | `tabletop_button` template |
 
 **Read the topic/joinery file BEFORE writing code** that uses those techniques. The core skill provides the routing — the reference files provide the implementation details. For Draft files, treat instructions as a starting point and validate aggressively.
@@ -536,7 +560,7 @@ Scripts use `from helpers import sp` and `ctx = sp.DesignContext()`. Key functio
 
 **Core principle:** Build the tenon/tail as a body, CUT the receiving board (`keepTool=True`), JOIN to the owner. Timeline order: CUT first (root, assembly proxies), JOIN second (owning component). Cross-component: use `body.createForAssemblyContext(occ)` for CUT in root.
 
-**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `full_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `tusk_tenon`, `tabletop_button`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `docs/joinery/README.md`.
+**Templates:** `mortise_tenon`, `domino`, `dovetail`, `finger_joint`, `half_blind_dovetail`, `full_blind_dovetail`, `splayed_legs`, `dowel`, `drawbore`, `tenon_wedge`, `tusk_tenon`, `breadboard`, `tabletop_button`, `dovetailed_drawer`. Use for joints with 4+ features; write inline for dado/rabbet/T&G. See `docs/joinery/README.md`.
 
 **Hardware:** use `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` for hinges, plus the `pull` and `chest_lock` templates for non-hinge hardware. See `docs/hardware-installation.md`.
 
