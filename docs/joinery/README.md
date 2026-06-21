@@ -2,6 +2,8 @@
 
 Reference files for parametric joinery in Fusion 360. Each file documents a joint type with parameters, geometry workflow, and example code snippets.
 
+> **Read first — [grain-and-strength.md](grain-and-strength.md):** why fiber direction governs joint strength, and the mathematical rule for orienting a tenon's cross-section (its wider dimension runs ALONG the mortise piece's grain). Applies to every mortise-and-tenon. Helpers: `sp.grain_vector`, `sp.tenon_wide_axis`, `sp.validate_tenon_grain`.
+
 ## Templates
 
 Reusable Python templates in `addin/helpers/templates/` encapsulate complex joinery into single function calls. **Use templates when available** — they handle sketch geometry, CUT/JOIN operations, mirror/pattern replication, and parameter setup.
@@ -18,6 +20,7 @@ Reusable Python templates in `addin/helpers/templates/` encapsulate complex join
 | `dovetailed_drawer` | `from helpers.templates import dovetailed_drawer` | `define_params()`, `build()`, `pattern()` | Complete drawer box |
 | `tusk_tenon` | `from woodworking.templates import tusk_tenon` | `define_params()`, `through()` | Knock-down through-tenon + tapered key |
 | `tabletop_button` | `from woodworking.templates import tabletop_button` | `define_params()`, `attach()` | Wooden tabletop button with movement slot |
+| `breadboard` | `from woodworking.templates import breadboard` | `define_params()`, `build()` | Cross-grain end cap for wide tops; parametric tenon count + pins-per-tenon (0/1/2), through/blind pins, centre-fixed + movement-slotted holes |
 
 Templates require the ShopPrentice add-in's `helpers/` directory on the Python path (automatic via `execute_script`). For standalone use, copy `addin/helpers/` alongside your script.
 
@@ -43,6 +46,7 @@ Dado/rabbet joints (2-3 features) and tongue & groove (inline in skill) are simp
 | Drawbore M&T | [drawbore.md](drawbore.md) | `drawbore` | Very High | Stretchers, workbenches, timber frames |
 | Tusk Tenon | [tusk-tenon.md](tusk-tenon.md) | `tusk_tenon` | Very High | Trestle tables, knock-down, timber frames |
 | Tabletop Button | — | `tabletop_button` | Medium | L-shaped wooden blocks / clips holding tabletop to apron with movement slot |
+| Breadboard End | [breadboard.md](breadboard.md) | `breadboard` | High | Wide tabletops / doors / drop-leaves — flat, hides end grain, allows cross-grain movement |
 
 ## Also in woodworking.md
 
@@ -76,6 +80,7 @@ All joinery files and templates follow these conventions:
 | `db_` | Drawbore M&T |
 | `tk_` | Tusk Tenon |
 | `btn_` | Tabletop Button |
+| `bbd_` | Breadboard End |
 
 ## How Claude Uses These Files
 

@@ -3,6 +3,7 @@ import adsk.fusion
 import math
 
 from ._util import _make_ev
+from .dof import default_tracker
 
 Point3D = adsk.core.Point3D
 H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
@@ -53,16 +54,19 @@ def sketch_rect(comp, plane, x0_expr, y0_expr, w_expr, h_expr,
 
     sk = comp.sketches.add(plane)
     sk.name = name
+    dof = default_tracker(name)
     x0, y0, w, h = ev(x0_expr), ev(y0_expr), ev(w_expr), ev(h_expr)
     rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
         Point3D.create(x0, y0, 0),
         Point3D.create(x0 + w, y0 + h, 0))
+    dof.add_point(4)                      # 4 rectangle corners
 
     gc = sk.geometricConstraints
     gc.addHorizontal(rect[0])
     gc.addHorizontal(rect[2])
     gc.addVertical(rect[1])
     gc.addVertical(rect[3])
+    dof.add_hv(4)
 
     d = sk.sketchDimensions
     d.addDistanceDimension(
@@ -81,7 +85,9 @@ def sketch_rect(comp, plane, x0_expr, y0_expr, w_expr, h_expr,
         sk.originPoint, rect[0].startSketchPoint,
         V, Point3D.create(x0 - 1, y0 / 2, 0)
     ).parameter.expression = y0_expr
+    dof.add_dim(4)                        # w, h, x-offset, y-offset
 
+    dof.assert_balanced()
     return sk, sk.profiles.item(0)
 
 
@@ -148,6 +154,7 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
 
     sk = comp.sketches.add(plane)
     sk.name = name
+    dof = default_tracker(name)
     h_axis, v_axis = probe_sketch_axes(sk)
 
     ox = ev(model_origin[0])
@@ -164,12 +171,14 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
     rect = sk.sketchCurves.sketchLines.addTwoPointRectangle(
         Point3D.create(sk_o.x, sk_o.y, 0),
         Point3D.create(sk_f.x, sk_f.y, 0))
+    dof.add_point(4)
 
     gc = sk.geometricConstraints
     gc.addHorizontal(rect[0])
     gc.addHorizontal(rect[2])
     gc.addVertical(rect[1])
     gc.addVertical(rect[3])
+    dof.add_hv(4)
 
     def _to_expr(v):
         """Convert value to expression string. Floats become 'N cm'."""
@@ -192,15 +201,25 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
         rect[1].startSketchPoint, rect[1].endSketchPoint,
         V, Point3D.create(sk_f.x - dx, mid_y, 0)
     ).parameter.expression = _to_expr(model_size[v_axis])
+    # These are DISTANCE dimensions (magnitudes) from the sketch origin to the
+    # origin corner. The corner was already drawn on the correct side by
+    # addTwoPointRectangle(sk_o, ...); a distance dim must therefore be the
+    # ABSOLUTE offset. Feeding the raw signed coordinate (e.g. "-6 in") makes
+    # Fusion flip the corner to the opposite side of the axis (|-6| lands at
+    # +6), which silently mirrors the whole rectangle across the origin — the
+    # bug that put the breadboard tongue/tenons off the +Y edge of the board.
+    # abs() keeps the corner where it was drawn for either axis orientation.
     d.addDistanceDimension(
         sk.originPoint, rect[0].startSketchPoint,
         H, Point3D.create(sk_o.x / 2, sk_o.y + 2 * dy, 0)
-    ).parameter.expression = _to_expr(axis_to_origin[h_axis])
+    ).parameter.expression = f"abs({_to_expr(axis_to_origin[h_axis])})"
     d.addDistanceDimension(
         sk.originPoint, rect[0].startSketchPoint,
         V, Point3D.create(sk_o.x + dx, sk_o.y / 2, 0)
-    ).parameter.expression = _to_expr(axis_to_origin[v_axis])
+    ).parameter.expression = f"abs({_to_expr(axis_to_origin[v_axis])})"
+    dof.add_dim(4)                        # 2 size + 2 origin-offset
 
+    dof.assert_balanced()
     return sk, sk.profiles.item(0)
 
 
@@ -219,6 +238,7 @@ def _sketch_rect_model_anchored(comp, plane, model_origin, model_size,
 
     sk = comp.sketches.add(plane)
     sk.name = name
+    dof = default_tracker(name)
 
     ox, oy, oz = ev(model_origin[0]), ev(model_origin[1]), ev(model_origin[2])
 
@@ -253,6 +273,7 @@ def _sketch_rect_model_anchored(comp, plane, model_origin, model_size,
     L.append(lines.addByTwoPoints(L[0].endSketchPoint, _sp(corners_model[2])))
     L.append(lines.addByTwoPoints(L[1].endSketchPoint, _sp(corners_model[3])))
     L.append(lines.addByTwoPoints(L[2].endSketchPoint, L[0].startSketchPoint))
+    dof.add_point(4)                      # 4 chained corners (loop closed)
 
     gc = sk.geometricConstraints
 
@@ -267,6 +288,7 @@ def _sketch_rect_model_anchored(comp, plane, model_origin, model_size,
             gc.addHorizontal(ln)
         else:
             gc.addVertical(ln)
+    dof.add_hv(4)                         # one H or V per edge
 
     orient = probe_orientations(sk, ox, oy, oz)
     d = sk.sketchDimensions
@@ -284,6 +306,7 @@ def _sketch_rect_model_anchored(comp, plane, model_origin, model_size,
     else:
         rdim(sk, d, c0, c1, orient, a, model_size[a])  # near edge along a (0↔1)
         rdim(sk, d, c0, c3, orient, b, model_size[b])  # near edge along b (0↔3)
+    dof.add_dim(2)                        # 2 size dims
 
     # Project the parent face and anchor a chosen NON-origin corner to it.
     project_face(sk, anchor["parent_body"], anchor.get("parent_occ"),
@@ -301,7 +324,11 @@ def _sketch_rect_model_anchored(comp, plane, model_origin, model_size,
     if aP is not None:
         rdim(sk, d, aP, tgt, orient, off1[0], off1[1])
         rdim(sk, d, aP, tgt, orient, off2[0], off2[1])
+        dof.add_dim(2)                    # 2 anchor offset dims (to projected corner)
+    # If aP is None the anchor projection failed and the 2 dims are skipped — the
+    # guard then reports DOF=2 (under-constrained), which is exactly correct.
 
+    dof.assert_balanced()
     return sk, smallest_profile(sk)
 
 

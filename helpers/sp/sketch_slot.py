@@ -4,6 +4,7 @@ import math
 
 from ._util import _make_ev
 from .sketch import probe_sketch_axes
+from .dof import default_tracker
 
 Point3D = adsk.core.Point3D
 H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
@@ -35,6 +36,7 @@ def sketch_slot(comp, plane, cx_expr, cy_expr, long_expr, short_expr,
 
     sk = comp.sketches.add(plane)
     sk.name = name
+    dof = default_tracker(name)
     slines = sk.sketchCurves.sketchLines
     sarcs = sk.sketchCurves.sketchArcs
     cx, cy = ev(cx_expr), ev(cy_expr)
@@ -122,6 +124,16 @@ def sketch_slot(comp, plane, cx_expr, cy_expr, long_expr, short_expr,
             sk.originPoint, a_l.centerSketchPoint,
             V, Point3D.create(cx - hl - 2, cy / 2, 0)
         ).parameter.expression = cy_expr
+    # Same entity/constraint count in both branches: 2 lines (4 pts) + 2 arcs,
+    # 2 H-or-V on the straight edges, 4 tangents + 4 coincidents at the junctions,
+    # and 4 dims (radial + length + 2 origin position).
+    dof.add_point(4)
+    dof.add_arc(2)
+    dof.add_hv(2)
+    dof.add_constraint("tangent", 4)
+    dof.add_coincident(4)
+    dof.add_dim(4)
+    dof.assert_balanced()
     return sk, sk.profiles.item(0)
 
 
@@ -198,6 +210,7 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
 
     sk = comp.sketches.add(plane)
     sk.name = name
+    dof = default_tracker(name)
     h_axis, v_axis = probe_sketch_axes(sk)
 
     mcx = ev(model_center[0])
@@ -268,14 +281,18 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
         ).parameter.expression = long_expr + " - " + short_expr
         ref_center = a_b.centerSketchPoint   # arc center the position dims anchor
         if anchor is None:
+            # Distance dims (magnitudes) from origin to the reference arc
+            # centre. A signed coordinate (negative-Y slot centre) would flip
+            # the slot across the axis (same bug as sketch_rect_model); the arc
+            # centre is already drawn on the correct side, so abs() the value.
             d.addDistanceDimension(
                 sk.originPoint, a_b.centerSketchPoint,
                 H, Point3D.create(cx / 2, cy - hl - 1, 0)
-            ).parameter.expression = h_expr
+            ).parameter.expression = "abs(" + h_expr + ")"
             d.addDistanceDimension(
                 sk.originPoint, a_b.centerSketchPoint,
                 V, Point3D.create(cx - r - 1, (cy - hl) / 2, 0)
-            ).parameter.expression = v_expr + v_bot_op + half_str
+            ).parameter.expression = "abs(" + v_expr + v_bot_op + half_str + ")"
     else:
         bsl = Point3D.create(cx - hl, cy - r, 0)
         bsr = Point3D.create(cx + hl, cy - r, 0)
@@ -310,14 +327,28 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
         ).parameter.expression = long_expr + " - " + short_expr
         ref_center = a_l.centerSketchPoint   # arc center the position dims anchor
         if anchor is None:
+            # Distance dims (magnitudes) — abs() to avoid the sign-flip that
+            # mirrors a negative-coordinate slot across the axis (see above).
             d.addDistanceDimension(
                 sk.originPoint, a_l.centerSketchPoint,
                 H, Point3D.create((cx - hl) / 2, cy - r - 1, 0)
-            ).parameter.expression = h_expr + h_left_op + half_str
+            ).parameter.expression = "abs(" + h_expr + h_left_op + half_str + ")"
             d.addDistanceDimension(
                 sk.originPoint, a_l.centerSketchPoint,
                 V, Point3D.create(cx - hl - 2, cy / 2, 0)
-            ).parameter.expression = v_expr
+            ).parameter.expression = "abs(" + v_expr + ")"
+
+    # Common to both branches: 2 lines (4 pts) + 2 arcs, 2 H-or-V, 4 tangents +
+    # 4 coincidents, and 2 dims (radial + length). The 2 position dims are added
+    # only in ORIGIN mode; ANCHORED mode adds 2 anchor dims below instead.
+    dof.add_point(4)
+    dof.add_arc(2)
+    dof.add_hv(2)
+    dof.add_constraint("tangent", 4)
+    dof.add_coincident(4)
+    dof.add_dim(2)
+    if anchor is None:
+        dof.add_dim(2)                    # 2 origin position dims
 
     if anchor is not None:
         # ANCHORED mode: replace the two origin position dims with offset dims
@@ -337,5 +368,8 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
         if aP is not None:
             rdim(sk, sk.sketchDimensions, aP, ref_center, orient, o1[0], o1[1])
             rdim(sk, sk.sketchDimensions, aP, ref_center, orient, o2[0], o2[1])
+            dof.add_dim(2)                # 2 anchor offset dims (to projected corner)
+        # aP None ⇒ anchor projection failed; dims skipped ⇒ guard flags DOF=2.
 
+    dof.assert_balanced()
     return sk, sk.profiles.item(0)
