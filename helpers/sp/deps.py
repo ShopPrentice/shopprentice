@@ -1,6 +1,40 @@
 import adsk.core
 import adsk.fusion
 
+# Tier 2: certified-generator lookup. Optional — if genreg/manifest are absent,
+# every sketch falls back to the solver pin/resolve (current behavior, no-op).
+# Guarded import so deps.py still loads standalone (tests) and as a package.
+try:
+    from . import genreg as _genreg
+except Exception:
+    try:
+        import genreg as _genreg
+    except Exception:
+        _genreg = None
+
+
+def _generator_certified(sk, manifest):
+    """True iff ``sk`` carries a generator stamp that is certified + source-
+    unchanged in ``manifest``. False (→ solver fallback) whenever genreg is
+    missing, the manifest is empty, the sketch is unstamped, or the source hash
+    no longer matches (edited generator). Fail-closed in every uncertain case."""
+    if not manifest or _genreg is None:
+        return False
+    stamp = _genreg.read_stamp(sk)
+    if not stamp:
+        return False
+    return _genreg.is_certified_stamp(stamp, manifest=manifest)
+
+
+def _load_cert_manifest():
+    """Load the certification manifest once per validate_deps run; {} if absent."""
+    if _genreg is None:
+        return {}
+    try:
+        return _genreg.load_manifest()
+    except Exception:
+        return {}
+
 
 def _resolves(curve):
     """True if a reference curve resolves to real BRep geometry it was projected from."""
@@ -48,11 +82,24 @@ def _fc_modulo_spline_interiors(sk):
     Mutates-and-restores within a try/finally so the model is left untouched.
     This is safe for the document tracker: ActionLog logs UI commandTerminated
     events, not API mutations, so this toggle adds no entries and does not affect
-    pendingChanges / clean=True gating. Cost is one solver recompute per
-    under-constrained spline sketch.
+    pendingChanges / clean=True gating.
+
+    Tier 3 — compute deferral. ``fitPoint.isFixed`` recompute is EAGER (each set
+    forces a recompute; measured ≈2.5 ms/point shallow, seconds/point on a deep
+    timeline), while the ``isFullyConstrained`` read is ~free. So pinning N
+    interiors naively costs N recomputes. We wrap the pin loop (and the restore)
+    in ``sketch.isComputeDeferred`` — which suspends sketch compute — so all N
+    pins settle in ONE recompute. Measured 23.6× faster on a 46-interior spline
+    with the identical verdict, and verified non-destructive on a sketch that
+    drives a cut feature (body volume byte-identical before/after, survives
+    computeAll). Toggling isFixed and restoring it net-zero never moves a fit
+    point, so the API's "deferred edit corrupts dependents" caveat — which is
+    about geometry changes — does not apply. Falls back to eager per-set
+    recompute if ``isComputeDeferred`` is unsettable.
     """
     saved = []
     pin_failures = 0
+    deferred = _set_deferred(sk, True)   # suspend sketch compute (Tier 3)
     try:
         for ci in range(sk.sketchCurves.count):
             cur = sk.sketchCurves.item(ci)
@@ -69,6 +116,8 @@ def _fc_modulo_spline_interiors(sk):
                     fp.isFixed = True
                 except Exception:
                     pin_failures += 1
+        if deferred:
+            _set_deferred(sk, False)     # one recompute settles all N pins
         if pin_failures:
             # Don't fail silently: a legitimate sculpted profile would look
             # under-constrained if pinning didn't take (e.g. a Fusion-version
@@ -78,11 +127,26 @@ def _fc_modulo_spline_interiors(sk):
                   f"spurious (is SketchPoint.isFixed settable in this Fusion build?)")
         return _is_fully_constrained(sk)
     finally:
+        # Restore exactly, also under deferral so unpinning is one recompute.
+        # Always leave isComputeDeferred False (Fusion expects it false at rest).
+        _set_deferred(sk, True)
         for fp, val in saved:
             try:
                 fp.isFixed = val
             except Exception:
                 pass
+        _set_deferred(sk, False)
+
+
+def _set_deferred(sk, value):
+    """Set ``sketch.isComputeDeferred`` (suspend/resume sketch compute), returning
+    True if it took. Tolerates Fusion builds where the property is unsettable —
+    the caller then simply pays the eager per-set recompute."""
+    try:
+        sk.isComputeDeferred = bool(value)
+        return True
+    except Exception:
+        return False
 
 
 def _is_fixed(entity):
@@ -130,7 +194,7 @@ def _curve_kind(curve):
         return "curve"
 
 
-def _check_sketch_anchoring(comp, comp_name, is_root_comp, issues):
+def _check_sketch_anchoring(comp, comp_name, is_root_comp, issues, manifest=None):
     """Verify every drawn sketch entity is positioned by a reference, not a
     computed coordinate — using Fusion's own solver as the judge of 'no free
     coordinate remains', rather than re-implementing constraint propagation.
@@ -203,6 +267,16 @@ def _check_sketch_anchoring(comp, comp_name, is_root_comp, issues):
                 f"{comp_name}/{sk.name}: UNDER-CONSTRAINED — free coordinates "
                 f"remain ({kinds}) and there is no draggable spline to excuse "
                 f"them. Fully constrain against the projected reference.")
+            continue
+
+        # Tier 2 fast path: if this sketch was produced by a CERTIFIED generator
+        # whose source is unchanged, its constraint topology was already proven
+        # fully-constrained-modulo-interiors against the solver offline — so trust
+        # it and skip the per-build pin/resolve (the ~seconds-each cost). (a) and
+        # (b) above still ran, so anchoring + no-Fix are independently enforced.
+        if _generator_certified(sk, manifest):
+            print(f"  TRUST {comp_name}/{sk.name}: certified generator "
+                  f"'{_genreg.read_stamp(sk)}' — skipped solver pin/resolve")
             continue
 
         # Pin spline interiors and re-ask the solver. If still not fully
@@ -328,6 +402,7 @@ def validate_deps(ctx, metadata_path=None):
     origin_bodies = set(d["body"] for d in deps if "origin" in _parents(d))
     origin_dim_issues = []
     anchor_issues = []
+    cert_manifest = _load_cert_manifest()   # Tier 2: certified-generator skips
 
     def _check_sketch_origin(comp, comp_name):
         for si in range(comp.sketches.count):
@@ -388,7 +463,8 @@ def validate_deps(ctx, metadata_path=None):
         has_root_body = bool(comp_bodies_in & origin_bodies)
         if not has_root_body:
             _check_sketch_origin(comp, comp.name)
-        _check_sketch_anchoring(comp, comp.name, has_root_body, anchor_issues)
+        _check_sketch_anchoring(comp, comp.name, has_root_body, anchor_issues,
+                                cert_manifest)
 
     if origin_dim_issues:
         print("--- Sketch origin check ---")

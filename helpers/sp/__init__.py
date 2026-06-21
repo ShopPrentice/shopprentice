@@ -17,6 +17,9 @@ from helpers.sp.context import *
 from helpers.sp.faces import *
 from helpers.sp.sketch import *
 from helpers.sp.sketch_slot import *
+# Tier 2 certified library generators (explicit import — keeps the registry's
+# helper names like register/stamp out of the sp.* namespace).
+from helpers.sp.generators import base_arch_cut
 from helpers.sp.anchoring import *
 from helpers.sp.features import *
 from helpers.sp.spatial import *
