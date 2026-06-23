@@ -34,15 +34,30 @@ Run it the same way as the base (Fusion's script runner sets `__file__`, so it `
 
 ### Joinery registry + strength check
 
-[`model.json`](model.json) declares every joint in a `joints` array (members, tenon
-w×t×depth, species, peg count/dia). [`strength_check.py`](strength_check.py) reads it and
-runs the [`joint_strength.py`](joint_strength.py) estimator — pure Python, no Fusion:
+[`model.json`](model.json) declares every mortise-and-tenon in a `joints` array using the
+repo's **joint-registry schema** ([`helpers/sp/joint_registry.py`](../../helpers/sp/joint_registry.py)) —
+owning body names (`tenon`/`mortise`) + dims as expression strings:
+
+```json
+{ "type": "drawbore", "tenon": "post1_upper", "mortise": "beam_front", "axis": "z",
+  "species": "white_oak", "width": "3.5 in", "thickness": "1 in", "depth": "4 in",
+  "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "2.67 in", "peg_species": "hardwood" }
+```
+
+On every build, `validate_deps` (inside `validate_design`) runs the per-type check on each
+declared joint — M&T sizing + grain, plus relish tear-out ≥ 4×D and European-Yield-Model peg
+capacity for the drawbore pins — so hand-built joints like these are covered, not just
+template-baked ones. See [`docs/joinery/grain-and-strength.md`](../../docs/joinery/grain-and-strength.md).
+
+[`strength_check.py`](strength_check.py) is an offline convenience demo — it reads the same
+`joints` array and runs the repo's estimator (`helpers/sp/joint_strength.py`) for full
+capacity numbers, no Fusion needed:
 
 ```bash
 python3 strength_check.py
 ```
 
-**Strength results** (white oak; ⅜" teak pins estimated as hardwood; first-order
+**Strength results** (white oak; ⅜" teak pins → `hardwood` strength proxy; first-order
 engineering estimates, not a code-stamped analysis):
 
 | Joint | Tenon (in) | Shear (gravity) | Bending | Drawbore pull-out (uplift) |
@@ -52,7 +67,8 @@ engineering estimates, not a code-stamped analysis):
 
 The joints are loaded mostly in compression/shear (gravity), where they're very strong;
 wind uplift is carried by the drawbore pins at ~795 lbf/joint. No relish/brittleness flags —
-the pins sit 1/3 from the shoulder, well past the 4×diameter tear-out threshold.
+the pins sit 1/3 from the shoulder, well past the 4×diameter tear-out threshold. (The post
+scarf splices and the diagonal knee braces aren't M&T registry types, so they aren't declared.)
 
 **Geometry validation:** `check_interference` → 4 overlaps, all the base example's "let-in"
 diagonal braces (inherent to the source design); no new interference from the joinery or

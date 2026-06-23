@@ -33,62 +33,18 @@
   "_deps_note": "Frame + drawbore pins. Deck boards, rafters and railing balusters are not individually enumerated (as in the base example).",
 
   "joints": [
-    {
-      "type": "drawbore_mt", "name": "post1_to_beam",
-      "members": ["post1_upper", "beam_front"],
-      "tenon": { "w": 3.5, "t": 1.0, "depth": 4.0 },
-      "species": "white_oak",
-      "pegs": { "count": 2, "dia": 0.375, "species": "teak", "from_shoulder_frac": 0.333,
-                "names": ["peg_beam_post1_upper_0", "peg_beam_post1_upper_1"] },
-      "note": "Post tenon rises into the beam mortise; pins run front-to-back through the beam cheeks."
-    },
-    {
-      "type": "drawbore_mt", "name": "post2_to_beam",
-      "members": ["post2_upper", "beam_front"],
-      "tenon": { "w": 3.5, "t": 1.0, "depth": 4.0 },
-      "species": "white_oak",
-      "pegs": { "count": 2, "dia": 0.375, "species": "teak", "from_shoulder_frac": 0.333,
-                "names": ["peg_beam_post2_upper_0", "peg_beam_post2_upper_1"] }
-    },
-    {
-      "type": "drawbore_mt", "name": "stretcher_L_to_post",
-      "members": ["stretcher_L", "post1_upper"],
-      "tenon": { "w": 2.0, "t": 1.0, "depth": 2.5 },
-      "species": "white_oak",
-      "pegs": { "count": 2, "dia": 0.375, "species": "teak", "from_shoulder_frac": 0.333,
-                "names": ["peg_strut_post1_upper_0", "peg_strut_post1_upper_1"] },
-      "note": "Stretcher tenon enters the post mortise; pins run horizontally through the post cheeks."
-    },
-    {
-      "type": "drawbore_mt", "name": "stretcher_R_to_post",
-      "members": ["stretcher_R", "post2_upper"],
-      "tenon": { "w": 2.0, "t": 1.0, "depth": 2.5 },
-      "species": "white_oak",
-      "pegs": { "count": 2, "dia": 0.375, "species": "teak", "from_shoulder_frac": 0.333,
-                "names": ["peg_strut_post2_upper_0", "peg_strut_post2_upper_1"] }
-    },
-    {
-      "type": "scarf", "name": "post1_scarf",
-      "members": ["post1", "post1_upper"], "key": "wedge1",
-      "note": "Wedged scarf splice in the post; no closed-form estimator in joint_strength.py."
-    },
-    {
-      "type": "scarf", "name": "post2_scarf",
-      "members": ["post2", "post2_upper"], "key": "wedge2",
-      "note": "Wedged scarf splice in the post; no closed-form estimator."
-    },
-    {
-      "type": "pinned_brace", "name": "left_brace",
-      "members": ["left_brace", "post1_upper", "beam_front"],
-      "pegs": { "count": 2, "dia": 0.375, "species": "teak",
-                "names": ["peg_left_brace_foot", "peg_left_brace_head"] },
-      "note": "45-degree knee brace: carries compression to stiffen post->beam; pins locate the ends. No M&T estimator."
-    },
-    {
-      "type": "pinned_brace", "name": "right_brace",
-      "members": ["right_brace", "post2_upper", "beam_front"],
-      "pegs": { "count": 2, "dia": 0.375, "species": "teak",
-                "names": ["peg_right_brace_foot", "peg_right_brace_head"] }
-    }
-  ]
+    { "type": "drawbore", "tenon": "post1_upper", "mortise": "beam_front", "axis": "z",
+      "species": "white_oak", "width": "3.5 in", "thickness": "1 in", "depth": "4 in",
+      "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "2.67 in", "peg_species": "hardwood" },
+    { "type": "drawbore", "tenon": "post2_upper", "mortise": "beam_front", "axis": "z",
+      "species": "white_oak", "width": "3.5 in", "thickness": "1 in", "depth": "4 in",
+      "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "2.67 in", "peg_species": "hardwood" },
+    { "type": "drawbore", "tenon": "stretcher_L", "mortise": "post1_upper", "axis": "y",
+      "species": "white_oak", "width": "2 in", "thickness": "1 in", "depth": "2.5 in",
+      "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "1.67 in", "peg_species": "hardwood" },
+    { "type": "drawbore", "tenon": "stretcher_R", "mortise": "post2_upper", "axis": "y",
+      "species": "white_oak", "width": "2 in", "thickness": "1 in", "depth": "2.5 in",
+      "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "1.67 in", "peg_species": "hardwood" }
+  ],
+  "_joints_note": "Official joint-registry schema (helpers/sp/joint_registry.py): owning body names (tenon/mortise) + dims as expression strings; validate_deps runs the per-type strength check each build. peg_species 'hardwood' is the strength proxy for the teak pins (teak isn't in the species table). The post scarf splices (wedge1/wedge2) and the two pinned diagonal knee braces are not M&T registry types, so they aren't declared here (validate_deps flags their contacts as advisory)."
 }
