@@ -1,68 +1,94 @@
 {
+  "name": "Pergola with Deck (customized)",
   "deps": [
+    { "body": "wall", "ref": "origin" },
+    { "body": "ground", "ref": "wall" },
+    { "body": "post1", "ref": "ground" },
+    { "body": "post2", "ref": "ground" },
+    { "body": "post1_upper", "ref": "post1" },
+    { "body": "post2_upper", "ref": "post2" },
+    { "body": "wedge1", "ref": "post1" },
+    { "body": "wedge2", "ref": "post2" },
+    { "body": "beam_front", "ref": "post1_upper" },
+    { "body": "beam_back", "ref": "post2_upper" },
+    { "body": "stretcher_L", "ref": "beam_front" },
+    { "body": "stretcher_R", "ref": "beam_back" },
+    { "body": "pad_L", "ref": "beam_front" },
+    { "body": "pad_R", "ref": "beam_back" },
+    { "body": "left_brace", "ref": "post1_upper" },
+    { "body": "right_brace", "ref": "post2_upper" },
+    { "body": "peg_beam_post1_upper_0", "ref": "post1_upper" },
+    { "body": "peg_beam_post1_upper_1", "ref": "post1_upper" },
+    { "body": "peg_beam_post2_upper_0", "ref": "post2_upper" },
+    { "body": "peg_beam_post2_upper_1", "ref": "post2_upper" },
+    { "body": "peg_strut_post1_upper_0", "ref": "post1_upper" },
+    { "body": "peg_strut_post1_upper_1", "ref": "post1_upper" },
+    { "body": "peg_strut_post2_upper_0", "ref": "post2_upper" },
+    { "body": "peg_strut_post2_upper_1", "ref": "post2_upper" },
+    { "body": "peg_left_brace_foot", "ref": "left_brace" },
+    { "body": "peg_left_brace_head", "ref": "left_brace" },
+    { "body": "peg_right_brace_foot", "ref": "right_brace" },
+    { "body": "peg_right_brace_head", "ref": "right_brace" }
+  ],
+  "_deps_note": "Frame + drawbore pins. Deck boards, rafters and railing balusters are not individually enumerated (as in the base example).",
+
+  "joints": [
     {
-      "body": "wall",
-      "ref": "origin"
+      "type": "drawbore_mt", "name": "post1_to_beam",
+      "members": ["post1_upper", "beam_front"],
+      "tenon": { "w": 3.5, "t": 1.0, "depth": 4.0 },
+      "species": "white_oak",
+      "pegs": { "count": 2, "dia": 0.375, "species": "teak", "from_shoulder_frac": 0.333,
+                "names": ["peg_beam_post1_upper_0", "peg_beam_post1_upper_1"] },
+      "note": "Post tenon rises into the beam mortise; pins run front-to-back through the beam cheeks."
     },
     {
-      "body": "ground",
-      "ref": "wall"
+      "type": "drawbore_mt", "name": "post2_to_beam",
+      "members": ["post2_upper", "beam_front"],
+      "tenon": { "w": 3.5, "t": 1.0, "depth": 4.0 },
+      "species": "white_oak",
+      "pegs": { "count": 2, "dia": 0.375, "species": "teak", "from_shoulder_frac": 0.333,
+                "names": ["peg_beam_post2_upper_0", "peg_beam_post2_upper_1"] }
     },
     {
-      "body": "post1",
-      "ref": "ground"
+      "type": "drawbore_mt", "name": "stretcher_L_to_post",
+      "members": ["stretcher_L", "post1_upper"],
+      "tenon": { "w": 2.0, "t": 1.0, "depth": 2.5 },
+      "species": "white_oak",
+      "pegs": { "count": 2, "dia": 0.375, "species": "teak", "from_shoulder_frac": 0.333,
+                "names": ["peg_strut_post1_upper_0", "peg_strut_post1_upper_1"] },
+      "note": "Stretcher tenon enters the post mortise; pins run horizontally through the post cheeks."
     },
     {
-      "body": "post2",
-      "ref": "ground"
+      "type": "drawbore_mt", "name": "stretcher_R_to_post",
+      "members": ["stretcher_R", "post2_upper"],
+      "tenon": { "w": 2.0, "t": 1.0, "depth": 2.5 },
+      "species": "white_oak",
+      "pegs": { "count": 2, "dia": 0.375, "species": "teak", "from_shoulder_frac": 0.333,
+                "names": ["peg_strut_post2_upper_0", "peg_strut_post2_upper_1"] }
     },
     {
-      "body": "post1_upper",
-      "ref": "post1"
+      "type": "scarf", "name": "post1_scarf",
+      "members": ["post1", "post1_upper"], "key": "wedge1",
+      "note": "Wedged scarf splice in the post; no closed-form estimator in joint_strength.py."
     },
     {
-      "body": "post2_upper",
-      "ref": "post2"
+      "type": "scarf", "name": "post2_scarf",
+      "members": ["post2", "post2_upper"], "key": "wedge2",
+      "note": "Wedged scarf splice in the post; no closed-form estimator."
     },
     {
-      "body": "wedge1",
-      "ref": "post1"
+      "type": "pinned_brace", "name": "left_brace",
+      "members": ["left_brace", "post1_upper", "beam_front"],
+      "pegs": { "count": 2, "dia": 0.375, "species": "teak",
+                "names": ["peg_left_brace_foot", "peg_left_brace_head"] },
+      "note": "45-degree knee brace: carries compression to stiffen post->beam; pins locate the ends. No M&T estimator."
     },
     {
-      "body": "wedge2",
-      "ref": "post2"
-    },
-    {
-      "body": "Body1",
-      "ref": "post1_upper"
-    },
-    {
-      "body": "Body2",
-      "ref": "post2_upper"
-    },
-    {
-      "body": "Body3",
-      "ref": "Body1"
-    },
-    {
-      "body": "Body4",
-      "ref": "Body2"
-    },
-    {
-      "body": "Body5",
-      "ref": "Body1"
-    },
-    {
-      "body": "Body6",
-      "ref": "Body2"
-    },
-    {
-      "body": "left_brace",
-      "ref": "post1_upper"
-    },
-    {
-      "body": "right_brace",
-      "ref": "post2_upper"
+      "type": "pinned_brace", "name": "right_brace",
+      "members": ["right_brace", "post2_upper", "beam_front"],
+      "pegs": { "count": 2, "dia": 0.375, "species": "teak",
+                "names": ["peg_right_brace_foot", "peg_right_brace_head"] }
     }
   ]
 }
