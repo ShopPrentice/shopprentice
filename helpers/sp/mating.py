@@ -510,3 +510,93 @@ def validate_wedged_tenon(tenon_body, mortise_body, tenon_axis, species="hardwoo
             "withdrawal": caps["withdrawal_tension"]["value"],
             "dims_in": {"width": w, "thickness": t, "depth": depth},
             "utilization": util, "estimate": est}
+
+
+def contacting_pairs(ctx, min_area_cm2=1.0):
+    """Body-name pairs whose planar faces are in face-to-face contact, design-wide.
+
+    Mirrors validate_design's planar-face overlap test (opposed coplanar faces, in-plane
+    bbox overlap). Used by the deps completeness check to surface contacting bodies with
+    no declared joint. Best-effort and fail-soft: any body whose faces can't be read is
+    skipped, and an empty list is returned if the context has no real geometry (offline
+    stubs) -- so callers can run it unconditionally inside a try/except.
+
+    Returns a list of ``(name_a, name_b)`` tuples (names sorted within each pair) whose
+    contact area is at least ``min_area_cm2``.
+    """
+    TOL_CM = 0.05
+
+    def planar_faces(body):
+        out = []
+        try:
+            faces = body.faces
+            for i in range(faces.count):
+                face = faces.item(i)
+                if face.geometry.surfaceType != adsk.core.SurfaceTypes.PlaneSurfaceType:
+                    continue
+                ok, normal = face.evaluator.getNormalAtPoint(face.pointOnFace)
+                if not ok:
+                    continue
+                bb = face.boundingBox
+                if not bb:
+                    continue
+                out.append({"normal": normal, "point": face.pointOnFace,
+                            "bb_min": [bb.minPoint.x, bb.minPoint.y, bb.minPoint.z],
+                            "bb_max": [bb.maxPoint.x, bb.maxPoint.y, bb.maxPoint.z],
+                            "area": face.area})
+        except Exception:
+            return []
+        return out
+
+    def contact_area(fa_list, fb_list):
+        total = 0.0
+        for fa in fa_list:
+            na, pa = fa["normal"], fa["point"]
+            a_min, a_max = fa["bb_min"], fa["bb_max"]
+            for fb in fb_list:
+                nb = fb["normal"]
+                if na.x * nb.x + na.y * nb.y + na.z * nb.z > -0.95:
+                    continue
+                d = ((fb["point"].x - pa.x) * na.x + (fb["point"].y - pa.y) * na.y +
+                     (fb["point"].z - pa.z) * na.z)
+                if abs(d) > TOL_CM:
+                    continue
+                b_min, b_max = fb["bb_min"], fb["bb_max"]
+                ax, ay, az = abs(na.x), abs(na.y), abs(na.z)
+                if ax >= ay and ax >= az:
+                    i1, i2 = 1, 2
+                elif ay >= ax and ay >= az:
+                    i1, i2 = 0, 2
+                else:
+                    i1, i2 = 0, 1
+                o1 = min(a_max[i1], b_max[i1]) - max(a_min[i1], b_min[i1])
+                o2 = min(a_max[i2], b_max[i2]) - max(a_min[i2], b_min[i2])
+                if o1 <= 0 or o2 <= 0:
+                    continue
+                total += min(o1 * o2, fa["area"], fb["area"])
+        return total
+
+    bodies = []
+    try:
+        root = ctx.root
+        for j in range(root.occurrences.count):
+            comp = root.occurrences.item(j).component
+            for i in range(comp.bRepBodies.count):
+                bodies.append(comp.bRepBodies.item(i))
+        for i in range(root.bRepBodies.count):
+            bodies.append(root.bRepBodies.item(i))
+    except Exception:
+        return []
+
+    faces = [planar_faces(b) for b in bodies]
+    pairs = []
+    for i in range(len(bodies)):
+        if not faces[i]:
+            continue
+        for k in range(i + 1, len(bodies)):
+            if not faces[k]:
+                continue
+            if contact_area(faces[i], faces[k]) >= min_area_cm2:
+                na, nb = bodies[i].name, bodies[k].name
+                pairs.append((na, nb) if na <= nb else (nb, na))
+    return pairs

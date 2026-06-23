@@ -248,6 +248,84 @@ def estimate_mortise_tenon(width, thickness, depth, species="hardwood",
     }
 
 
+def mortise_tenon_flags(width, thickness, depth, species="hardwood", through=False,
+                        proud=0.0, sized=False, expected=None, thin_ratio=0.25):
+    """Load-INDEPENDENT red-flag check for a mortise-and-tenon, given the tenon SIZE
+    (inches). PURE — the shared core behind BOTH the build-time gate (which measures
+    the tenon body) and the declarative registry check (which reads the dims from
+    model.json). No Fusion dependency, so it unit-tests offline.
+
+    Flags a designer should never ship:
+      * thin slice (t < ``thin_ratio`` x w) -> the tenon's own shear/bending governs
+        even with maximal glue area (the "don't optimize glue to a sliver" trap),
+      * very thin tenon (t < 3/16 in) -> fragile to cut and shear-weak,
+      * OVERLOADED <dir> when ``expected={capacity_name: load_lbf}`` exceeds capacity.
+
+    Grain ORIENTATION is a geometric check (it needs the bodies) and lives in
+    ``mating.validate_joint_strength`` / ``validate_tenon_grain`` — not here.
+
+    Returns {flags, est, weakest, utilization}.
+    """
+    est = estimate_mortise_tenon(width, thickness, depth, species=species,
+                                 through=through, proud=proud, sized=sized)
+    caps = est["capacities"]
+    w, t = float(width), float(thickness)
+
+    flags = []
+    if t < thin_ratio * w:
+        flags.append("thin slice: thickness %.2f in < %.2f x width (%.2f in) -> the "
+                     "tenon's own shear/bending governs even with full glue" % (
+                         t, thin_ratio, w))
+    if t < 0.1875:
+        flags.append("very thin tenon (t=%.2f in): fragile to cut and shear-weak" % t)
+
+    forces = {k: v["value"] for k, v in caps.items() if v["unit"] == "lbf"}
+    weakest = min(forces, key=forces.get) if forces else None
+    util = {}
+    if expected:
+        for k, load in expected.items():
+            c = caps.get(k)
+            if c and load > 0:
+                util[k] = load / c["value"]
+                if util[k] > 1.0:
+                    flags.append("OVERLOADED %s: %.0f lbf > capacity %.0f (util %.2f)"
+                                 % (k, load, c["value"], util[k]))
+    return {"flags": flags, "est": est, "weakest": weakest, "utilization": util}
+
+
+def pegged_flags(pins, pin_dia, pin_end_distance, species="hardwood", peg_species=None,
+                 tenon_width=None, tenon_thickness=None, tenon_depth=None):
+    """Red-flag + capacity check for a PEGGED / drawbore tenon — the dedicated peg
+    mechanism, split out of the M&T sizing check (issue 106). PURE, offline-testable.
+
+    Flags:
+      * brittle relish: peg end distance < 4 x peg diameter -> the relish can tear
+        out the tenon end (move the peg back).
+
+    When the tenon dims (width/thickness/depth, INCHES) are supplied it also returns
+    the European-Yield-Model peg-capacity breakdown (``pin_modes``) and the peg
+    pull-out (``pin_withdrawal``) from ``estimate_mortise_tenon``; with no dims only
+    the (geometry-free) relish check runs.
+
+    Returns {flags, pin_modes, pin_withdrawal}.
+    """
+    flags = []
+    if pin_dia and pin_end_distance is not None and pin_end_distance < 4.0 * pin_dia:
+        flags.append("brittle: peg end distance %.2f in < 4xD (%.2f in) -> relish "
+                     "tear-out" % (pin_end_distance, 4.0 * pin_dia))
+
+    pin_modes, pin_withdrawal = {}, 0.0
+    if pins and pin_dia and None not in (tenon_width, tenon_thickness, tenon_depth):
+        est = estimate_mortise_tenon(tenon_width, tenon_thickness, tenon_depth,
+                                     species=species, pins=pins, pin_dia=pin_dia,
+                                     pin_end_distance=pin_end_distance,
+                                     peg_species=peg_species)
+        pin_modes = est["pin_modes"]
+        pw = est["capacities"].get("pin_withdrawal")
+        pin_withdrawal = pw["value"] if pw else 0.0
+    return {"flags": flags, "pin_modes": pin_modes, "pin_withdrawal": pin_withdrawal}
+
+
 def summarize(result):
     """Human-readable report of an estimate — the design-guidance view."""
     i = result["inputs"]

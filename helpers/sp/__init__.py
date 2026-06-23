@@ -27,6 +27,9 @@ from helpers.sp.mating import *
 from helpers.sp.appearance import *
 from helpers.sp.camera import *
 from helpers.sp.deps import *
+# Declarative joint registry + per-type strength checks (issue 106). Imports adsk
+# only lazily (inside functions), so this stays import-safe in offline contexts.
+from helpers.sp.joint_registry import *
 
 # Module-level constants that were in the original sp.py
 import adsk.core
