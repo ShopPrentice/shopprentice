@@ -205,7 +205,9 @@ def estimate_mortise_tenon(width, thickness, depth, species="hardwood",
             notes.append("BRITTLE: peg end distance %.2f in < 4xD (%.2f in) — the relish "
                          "can tear out the tenon end; move the peg back." % (pin_end_distance, 4 * pin_dia))
     if wedged:
-        notes.append("Wedged: flared tenon adds MECHANICAL withdrawal (not quantified).")
+        notes.append("Wedged: flared tenon adds MECHANICAL, glue-independent withdrawal — "
+                     "quantify it with estimate_wedged_tenon() (interlock bounded by mortise "
+                     "split / flare crush; the dry floor a plain M&T lacks).")
     if tusked:
         notes.append("Tusked: withdrawal is mechanical (tusk bears the far face).")
     notes.append("Off-axis grain? weight each face with glue_shear_per_area(angle) "
@@ -260,7 +262,7 @@ def mortise_tenon_flags(width, thickness, depth, species="hardwood", through=Fal
       * OVERLOADED <dir> when ``expected={capacity_name: load_lbf}`` exceeds capacity.
 
     Grain ORIENTATION is a geometric check (it needs the bodies) and lives in
-    ``mating.validate_mortise_tenon`` / ``validate_tenon_grain`` — not here.
+    ``mating.validate_joint_strength`` / ``validate_tenon_grain`` — not here.
 
     Returns {flags, est, weakest, utilization}.
     """
@@ -336,6 +338,249 @@ def summarize(result):
            "  capacities (first-order, relative):"]
     for k, c in result["capacities"].items():
         out.append("    %-20s %9.0f %-7s [%s]" % (k, c["value"], c["unit"], c["mechanism"]))
+    if "interlock_modes" in result:
+        im = result["interlock_modes"]
+        out.append("  interlock (mechanical, glue-INDEPENDENT): %.0f lbf  [governing: %s%s]"
+                   % (result["interlock_withdrawal"], im["governing"],
+                      ", BRITTLE" if im.get("brittle") else ""))
+        out.append("    modes: " + ", ".join(
+            "%s=%.0f" % (k, v) for k, v in im.items()
+            if isinstance(v, (int, float)) and not isinstance(v, bool)))
     out.append("  guidance:")
     out += ["    - " + n for n in result["notes"]]
     return "\n".join(out)
+
+
+# ── Mechanical interlock: wedged tenon & cut dovetail (issue 105) ────────────
+#
+# A flared/undercut LOCKED joint resists withdrawal MECHANICALLY, independent of
+# glue. A wedge splits the tenon along a kerf and bends the two halves OUTWARD into an
+# undercut/flared mortise (wider at the exit than at the mouth). The kerf is cut
+# PERPENDICULAR to the mortise grain (kept from the existing tenon_wedge template), so
+# the spread does NOT cleave the long-grain cheeks. The hooking faces are the original
+# tenon cheeks, BENT — continuous long-grain fiber, NOT sawn. To withdraw you must drive
+# the flared end back through the narrower mouth: resisted until the undercut WALL fails —
+# the MORTISE cheek SPLITS in tension perpendicular to grain (brittle) or the flared
+# TENON end CRUSHES back to mouth width — or the half itself folds/ruptures. None of these
+# touch a glue line, so the interlock is the FLOOR a DRY or glue-failed joint still holds.
+#
+# FREE BODY of one bent half hooking on a wall inclined at theta to the withdrawal
+# axis (full derivation in docs/joinery/grain-and-strength.md): the wall reaction N
+# has an axial hook component N*sin(theta); limiting friction adds mu*N*cos(theta);
+# both oppose withdrawal. Per half F = N*(sin theta + mu cos theta); n halves give
+# F = n*N*(sin theta + mu cos theta). N is bounded three independent ways:
+#   split  N_s = tens_perp * A_cleave / cos(theta)   the lateral push N*cos(theta) opens
+#                a long-grain cleavage plane in the MORTISE cheek (tens_perp; BRITTLE)
+#   crush  N_c = comp_perp * A_contact                the flared TENON end is crushed back
+#                toward mouth width — compression across the tenon (comp_perp; ductile)
+#   bend   the half folds/ruptures: F_b = n*M_half/delta, M_half = mor*w*(kf*t)^2/6
+# interlock = min(F_split, F_crush, F_bend[, F_tail_neck]); report the governing mode;
+# FLAG brittle when split governs. withdrawal = max(glue, interlock) — alternative load
+# paths (glue is stiffer and carries first; interlock is the dry backstop), NOT additive.
+#
+# A CUT DOVETAIL locks the same axis with the SAME wall statics, but its hooking faces
+# are SAWN (fibers cut at the angle), so the continuous-fiber bend reserve is gone:
+# knock the bend term down (k_fiber ~ 0.5) and add a tail-NECK shear bound (the sawn
+# tail can shear off at its root). estimate_interlock(continuous_fiber=False, ...) and
+# estimate_dovetail() cover it.
+#
+# HONEST SCOPE: first-order, and the ABSOLUTE value is friction-sensitive (at small
+# theta ~70% of F is friction) — treat the GOVERNING MODE + BRITTLE FLAG as the robust
+# outputs and the lbf as RELATIVE. Against a perfect long-grain GLUE line
+# (estimate_mortise_tenon withdrawal, wood-limited ~10k+ lbf) the interlock does NOT win
+# on raw lbf; against a DRY / end-grain-only / glue-failed plain M&T it is ~3x+ and
+# glue-INDEPENDENT — which is the joint's whole point ("works dry"). The split/crush
+# numbers assume the bent cheek bears FLAT on a planar wall; a real flare contacts at
+# the lip, concentrating load, so they are an UPPER bound on N (knock down for poor fit).
+
+FOX_WEDGE_FACTOR = 0.8          # blind fox-wedge: the mortise bottom drives the wedge
+                                # during assembly, so achieved spread < a through wedge
+                                # driven to seat (and it can't be re-tightened). 0.7-0.85.
+DOVETAIL_FIBER_KNOCKDOWN = 0.5  # a sawn dovetail hook recovers ~half the continuous-fiber
+                                # bend reserve of a bent wedged half (0.4-0.6).
+WEDGE_FRICTION = 0.4            # wood-on-wood dry static friction on the undercut contact
+                                # (literature 0.3-0.5; the interlock lbf is sensitive to it).
+
+
+def estimate_interlock(width, thickness, depth, species="hardwood",
+                       flare_delta=0.0625, undercut_deg=8.0, mu=WEDGE_FRICTION,
+                       engaged_ratio=2.0 / 3.0, kerf_fraction=0.5, n_halves=2,
+                       continuous_fiber=True, k_fiber=DOVETAIL_FIBER_KNOCKDOWN,
+                       tail_neck_thickness=None, fox=False):
+    """First-order MECHANICAL-INTERLOCK withdrawal capacity (lbf) of a flared/undercut
+    LOCKED joint — a wedged through/fox tenon (continuous bent fiber) or a cut dovetail
+    (sawn fiber). GLUE-INDEPENDENT: every bound is a WOOD property of the contact, none
+    an adhesive, so this is the floor a DRY or glue-failed joint still holds. Lengths in
+    INCHES, forces in lbf. Pure Python (no Fusion). See the module header for the free body.
+
+    Args (tenon-local frame, same as estimate_mortise_tenon):
+        width (w)      cross-section dim ALONG the mortise grain — the contact/cheek width.
+        thickness (t)  cross-section dim ACROSS the grain — split by the kerf into halves.
+        depth (L)      engaged length along the insertion axis.
+        flare_delta    spread per half at the flare (in) — the overhang past the mouth.
+        undercut_deg   undercut/flare angle theta of the wall from the withdrawal axis
+                       (mortise wider at exit than mouth). Realistic band ~6-12 deg.
+        mu             wood-on-wood dry friction on the undercut contact.
+        engaged_ratio  fraction of depth over which the half bears (ties to template tw_dr).
+        kerf_fraction  each spread half thickness = kerf_fraction * thickness (~0.5).
+        n_halves       number of spread halves / hooking faces (2 for a 1-kerf wedge).
+        continuous_fiber  True = bent uncut long grain (wedge); False = sawn (dovetail) ->
+                       knock the bend reserve down by k_fiber.
+        k_fiber        sawn-fiber bend knockdown (used when continuous_fiber is False).
+        tail_neck_thickness  cut-dovetail only: tail neck thickness (in) for the tail-shear
+                       bound (the sawn tail can shear off at its root). None to skip.
+        fox            blind fox-wedge -> derate the achieved spread by FOX_WEDGE_FACTOR.
+
+    Returns dict: value (lbf), governing, brittle, modes {split, crush, bend[, tail_neck]},
+    contact {areas, slide_factor, ramp_len_in, hook_only_lbf}, inputs.
+    """
+    if min(width, thickness, depth) <= 0:
+        raise ValueError("width, thickness, depth must be > 0")
+    if not (0.0 < undercut_deg < 45.0):
+        raise ValueError("undercut_deg must be in (0, 45)")
+    m = SPECIES.get(species)
+    if m is None:
+        raise ValueError("unknown species %r; choose from %s"
+                         % (species, ", ".join(sorted(SPECIES))))
+    w, t, L = float(width), float(thickness), float(depth)
+    tens_perp, cperp, mor, tau = m["tens_perp"], m["comp_perp"], m["mor"], m["shear"]
+    theta = math.radians(undercut_deg)
+    ct, st = math.cos(theta), math.sin(theta)
+    slide = st + mu * ct                      # axial resistance per unit wall normal N
+
+    Le = engaged_ratio * L                    # engaged bearing / cleavage length
+    A_cleave = w * Le                         # long-grain split plane behind the cheek (plan)
+    A_contact = w * Le / ct                   # slant bearing patch on the inclined wall
+
+    N_split = tens_perp * A_cleave / ct       # N at which N*cos(theta) opens the mortise cleavage
+    N_crush = cperp * A_contact               # N at which the flared tenon end crushes
+    F_split = n_halves * N_split * slide      # brittle: mortise cheek, tension perp to grain
+    F_crush = n_halves * N_crush * slide      # ductile: tenon flare crush, comp perp to tenon grain
+
+    half_t = kerf_fraction * t
+    M_half = mor * w * half_t ** 2 / 6.0      # rupture moment of one spread half
+    F_bend_full = n_halves * M_half / max(flare_delta, 1e-6)
+    F_bend = (1.0 if continuous_fiber else k_fiber) * F_bend_full
+
+    modes = {"split": F_split, "crush": F_crush, "bend": F_bend}
+    if tail_neck_thickness is not None:       # sawn dovetail: tail shears off at the neck
+        modes["tail_neck"] = n_halves * w * float(tail_neck_thickness) * tau
+
+    gov = min(modes, key=modes.get)
+    value = modes[gov] * (FOX_WEDGE_FACTOR if fox else 1.0)
+    brittle = gov == "split"
+    hook_only = value * (st / slide)          # friction-INDEPENDENT floor (transparency)
+
+    return {
+        "value": value, "unit": "lbf", "governing": gov, "brittle": brittle,
+        "modes": modes,
+        "contact": {"area_cleave_in2": A_cleave, "area_bearing_in2": A_contact,
+                    "engaged_len_in": Le, "slide_factor": slide,
+                    "ramp_len_in": flare_delta / math.tan(theta),
+                    "hook_only_lbf": hook_only},
+        "inputs": dict(width=w, thickness=t, depth=L, species=species,
+                       flare_delta=flare_delta, undercut_deg=undercut_deg, mu=mu,
+                       engaged_ratio=engaged_ratio, kerf_fraction=kerf_fraction,
+                       n_halves=n_halves, continuous_fiber=continuous_fiber, k_fiber=k_fiber,
+                       tail_neck_thickness=tail_neck_thickness, fox=fox),
+    }
+
+
+def estimate_wedged_tenon(width, thickness, depth, species="hardwood",
+                          flare_delta=0.0625, undercut_deg=8.0, mu=WEDGE_FRICTION,
+                          engaged_ratio=2.0 / 3.0, kerf_fraction=0.5, fox=False,
+                          through=None, glue=True, sized=False, end_grain_glue=None):
+    """Estimate a WEDGED tenon (through or fox) — the M&T capacities PLUS the
+    mechanical-interlock withdrawal. Dedicated per-joint-type check (does NOT overload
+    estimate_mortise_tenon). Calls estimate_mortise_tenon for the plain capacities + glue
+    withdrawal, then estimate_interlock, then sets
+
+        withdrawal_tension = max(glue, interlock)
+
+    so the joint NEVER drops below the glue-independent interlock floor (a wedged joint
+    holds DRY; a plain M&T pulls out without glue). thrust / shear / bending / torsion are
+    unchanged — the wedge only changes the withdrawal path. Lengths in INCHES.
+
+    glue=False models the DRY / unglued / glue-failed joint (withdrawal = interlock only) —
+    use it to see the glue-independent capacity (this is where a wedged tenon beats a plain
+    M&T, which has ~no dry withdrawal). Other args as estimate_mortise_tenon / estimate_interlock.
+
+    Returns the estimate_mortise_tenon dict PLUS: interlock_withdrawal (lbf), glue_withdrawal
+    (lbf), interlock_modes (+ governing, brittle), interlock_contact.
+    """
+    if through is None:           # blind fox-wedge defaults to a blind tenon
+        through = not fox
+    base = estimate_mortise_tenon(width, thickness, depth, species=species, through=through,
+                                  sized=sized, end_grain_glue=end_grain_glue)
+    il = estimate_interlock(width, thickness, depth, species=species, flare_delta=flare_delta,
+                            undercut_deg=undercut_deg, mu=mu, engaged_ratio=engaged_ratio,
+                            kerf_fraction=kerf_fraction, fox=fox, continuous_fiber=True)
+    glue_w = base["capacities"]["withdrawal_tension"]["value"]
+    interlock = il["value"]
+    gov = il["governing"]
+
+    if glue:
+        if interlock >= glue_w:
+            wd, mech = interlock, ("INTERLOCK (%s), glue-independent — %.0f lbf > glue %.0f"
+                                   % (gov, interlock, glue_w))
+        else:
+            wd, mech = glue_w, ("GLUE (cheeks, wood-limited) %.0f; interlock floor %.0f (%s) "
+                                "is the dry/glue-failed backstop" % (glue_w, interlock, gov))
+    else:
+        wd, mech = interlock, "INTERLOCK (%s) — DRY/unglued, mechanical only" % gov
+
+    base["capacities"]["withdrawal_tension"] = {"value": wd, "unit": "lbf", "mechanism": mech}
+    base["interlock_withdrawal"] = interlock
+    base["glue_withdrawal"] = glue_w
+    base["interlock_modes"] = {**il["modes"], "governing": gov, "brittle": il["brittle"]}
+    base["interlock_contact"] = il["contact"]
+    base["inputs"].update(wedged=True, fox=fox, glue=glue, flare_delta=flare_delta,
+                          undercut_deg=undercut_deg, mu=mu)
+
+    base["notes"].append(
+        "WEDGED interlock = %.0f lbf (governing: %s), GLUE-INDEPENDENT — the dry floor. "
+        "withdrawal = max(glue %.0f, interlock %.0f) = %.0f (%s). Against a DRY plain M&T "
+        "(~no withdrawal without glue) the wedge is the whole capacity; against a sound "
+        "long-grain glue line, glue carries first and the interlock is the backstop "
+        "against glue failure / seasonal movement." % (
+            interlock, gov, glue_w, interlock, wd, "GLUE" if (glue and wd == glue_w) else "INTERLOCK"))
+    if il["brittle"]:
+        base["notes"].append(
+            "BRITTLE: interlock governed by MORTISE-CHEEK SPLIT (tension perp to grain) — "
+            "sudden, low-energy cleavage along the grain. Keep margin, reduce flare/undercut, "
+            "or hoop/band the mortise; tens_perp is the most variable clear-wood property.")
+    if fox:
+        base["notes"].append(
+            "FOX-wedged (blind): the mortise bottom drives the wedge during assembly, so "
+            "achieved spread is derated x%.2f and the joint CANNOT be re-tightened; leave a "
+            "mortise-bottom wall." % FOX_WEDGE_FACTOR)
+    base["notes"].append(
+        "Interlock lbf is FRICTION-sensitive (mu=%.2f; friction-independent hook floor "
+        "%.0f lbf); treat the GOVERNING MODE + BRITTLE FLAG as the robust outputs, the lbf "
+        "as relative." % (mu, il["contact"]["hook_only_lbf"]))
+    return base
+
+
+def estimate_dovetail(tail_width, tail_thickness, socket_depth, species="hardwood",
+                      dovetail_deg=9.5, tail_neck_thickness=None, mu=WEDGE_FRICTION,
+                      engaged_ratio=1.0, k_fiber=DOVETAIL_FIBER_KNOCKDOWN, n_tails=1):
+    """Estimate a CUT DOVETAIL's locked-axis (withdrawal) capacity — the interlock model
+    generalized to SAWN hooking faces. Same wall statics as the wedged tenon (split via
+    tens_perp, crush via comp_perp on the socket wall), but the tail's fibers are CUT at the
+    dovetail angle, so the continuous-fiber bend reserve is knocked down (k_fiber) and a
+    tail-NECK shear bound is added (the sawn tail shears off at its root). This is the
+    cut-face-vs-continuous-fiber distinction from issue 105: a wedged flare is tougher than
+    a dovetail because its bent fiber is uninterrupted. Lengths in INCHES.
+
+    A dovetail has ONE flare angle per tail face; dovetail_deg ~ 7-10 deg (1:8 to 1:6).
+    tail_neck_thickness defaults to tail_thickness (the tail base). n_tails counts engaged
+    hooking faces.
+
+    Returns the estimate_interlock dict (value, governing, brittle, modes, contact, inputs).
+    """
+    neck = tail_thickness if tail_neck_thickness is None else tail_neck_thickness
+    return estimate_interlock(tail_width, tail_thickness, socket_depth, species=species,
+                              flare_delta=tail_thickness * math.tan(math.radians(dovetail_deg)),
+                              undercut_deg=dovetail_deg, mu=mu, engaged_ratio=engaged_ratio,
+                              kerf_fraction=1.0, n_halves=n_tails, continuous_fiber=False,
+                              k_fiber=k_fiber, tail_neck_thickness=neck)

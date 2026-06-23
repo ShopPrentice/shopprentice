@@ -104,8 +104,9 @@ direction by hand (see `grain_dir` in `tenon-wedge.md`).
 ### Related rules (same principle)
 
 - **Wedge kerfs** (`tenon-wedge.md`): a wedge slot is cut ⟂ to the *mortise*
-  piece's grain so the wedge spreads the tenon **across** the grain onto long
-  fibers, not splitting along them. Same fiber-direction logic, applied to the kerf.
+  piece's grain so the spread widens the tenon **without cleaving the long-grain
+  cheeks**, into the mortise's flared ends. Same fiber-direction logic, applied to
+  the kerf; the resulting mechanical lock is the interlock mechanism above.
 - **Drawbore pins / any pin**: a pin must cross the grain of every piece it
   pierces — a pin *along* the grain is a splitting wedge.
 
@@ -207,9 +208,10 @@ width. And:
 Not every direction is a glue problem — which is why a dry-fit joint still
 resists some loads. When sizing, ask *which mechanism* carries each direction:
 
-- **Pull-out (tension along the tenon axis)** is almost entirely **glue** (cheek
-  shear + a little end grain + any pin/wedge/tusk); friction is minor. Size the
-  glue cheeks for it (wide × deep).
+- **Pull-out (tension along the tenon axis)** is **glue** for a plain tenon (cheek
+  shear + a little end grain; friction is minor) — size the glue cheeks for it (wide ×
+  deep). A **wedge / fox-wedge / dovetail** adds a third, **glue-independent** path —
+  a mechanical **interlock** (see the next section) — that holds *dry*.
 - **Transverse force (the member pushed sideways / down)** is carried by
   **BEARING** — the tenon pressing on the mortise walls — and holds with **no
   glue**. A stretcher between two legs resists being pushed to the floor because
@@ -233,6 +235,76 @@ So: **glue for pull-out; wood section + bearing for everything else.** The
 estimator below reports each direction with its mechanism and flags the glue-free
 ones — so a joint that will mostly see side load isn't sized as if glue were
 holding it.
+
+## Mechanical interlock — the third pull-out mechanism (wedged tenon & dovetail)
+
+Glue carries pull-out and bearing carries the rest — but a **wedged tenon** (and its
+sawn cousin the **dovetail**) adds a **third** mechanism: a **mechanical interlock**
+that resists withdrawal with **no glue at all**. This is the whole point of the joint
+— it works *dry*, and survives glue failure, seasonal movement, and end-grain
+weakness.
+
+**The mechanics.** A wedge splits the tenon along a kerf and bends the two halves
+**outward** to fill an **undercut/flared mortise** — wider at the exit than at the
+mouth. The hooking faces are the original tenon cheeks, **bent — continuous long-grain
+fiber, not sawn.** To withdraw, the flared end must be driven back through the
+narrower mouth, which means either splitting the mortise or crushing the flare —
+resisted by solid wood, orders of magnitude more than the friction of a dry plain
+tenon. (Keep the kerf **perpendicular to the mortise grain** — `tenon-wedge.md` — so
+the spread does not cleave the long-grain cheeks.)
+
+**Free body** (one bent half on the undercut wall, inclined at the undercut angle θ to
+the withdrawal axis): the wall reaction **N** has an axial hook component `N·sin θ`,
+and limiting friction adds `μ·N·cos θ`; both oppose pull-out. Per half
+`F = N·(sin θ + μ cos θ)`; for *n* halves `F = n·N·(sin θ + μ cos θ)`. **N** is bounded
+three independent ways — the interlock is the **minimum**, exactly like the EYM peg:
+
+The split and crush bounds are on the wall **reaction N** (→ force via
+`F = n·N·(sin θ + μ cos θ)`); the bend bound is already a force.
+
+| bound | wall-reaction / force bound | mode | property |
+|---|---|---|---|
+| **mortise split** | `N_s = tens_perp · w·Lₑ / cos θ` → `F = n·N_s·(sinθ+μcosθ)` | cheek cleaves along the grain | `tens_perp` — **BRITTLE** |
+| **flare crush** | `N_c = comp_perp · w·Lₑ / cos θ` → `F = n·N_c·(sinθ+μcosθ)` | the flared tenon end crushes back to mouth width | `comp_perp` (ductile) |
+| **half bend-back** | `F_b = n·MOR·w·(t/2)²/6 / δ` (already a force) | the spread half folds/ruptures | `MOR` (high for continuous fiber) |
+
+where `w` = width along the grain, `Lₑ` = engaged depth (≈ ⅔ depth), `δ` = flare spread
+per half. **`interlock = min(F_split, F_crush, F_bend)`; report the governing mode and
+FLAG brittle when split governs.** For clear wood `tens_perp < comp_perp`, so the wedge
+is **essentially always split-governed (brittle)** — a wedged through-tenon "rarely
+withdraws cleanly; it splits." Size with margin, keep the flare/undercut modest, keep
+relish at the mortise ends, or hoop/band the mortise.
+
+**Integration — the honest part.** `withdrawal = max(glue, interlock)` — they are
+**alternative load paths, not additive** (glue is stiffer and carries first; the
+interlock is the dry backstop). Against a perfect long-grain **glue** line (wood-limited,
+~10k+ lbf) the interlock does **not** win on raw lbf — it is *not* a universal upgrade.
+Its value is the **floor**: a *dry* or glue-failed plain tenon has **~no** withdrawal
+capacity, while the wedged joint still holds the full interlock. That floor is what
+"far stronger than a plain M&T" means — in the regime that matters (absent/failed glue).
+The absolute lbf is **friction-sensitive** (at small θ most of it is friction), so treat
+the **governing mode + brittle flag** as the robust outputs and the lbf as relative.
+
+**Dovetail (the cut-face cousin).** A cut dovetail locks the same axis with the **same
+wall statics**, but its hooking faces are **sawn** (fibers cut at the angle), so the
+continuous-fiber **bend reserve is gone** — knock it down (≈0.5) and add a **tail-neck
+shear** bound (the sawn tail can shear off at its root). So a wedged flare is *tougher*
+than a dovetail of the same angle: uninterrupted fiber vs cut fiber.
+
+```python
+from helpers.sp.joint_strength import estimate_wedged_tenon, estimate_dovetail, summarize
+print(summarize(estimate_wedged_tenon(1.5, 0.5, 2.0, species="white_oak",
+                                      flare_delta=1/16, undercut_deg=8)))
+#   withdrawal_tension  11675 lbf  [GLUE; interlock floor 1730 (split) is the dry backstop]
+#   interlock (glue-INDEPENDENT): 1730 lbf  [governing: split, BRITTLE]
+# estimate_wedged_tenon(..., glue=False) -> withdrawal = 1730 (the dry capacity a plain M&T lacks)
+# estimate_dovetail(tail_w, tail_t, socket_depth, dovetail_deg=9.5) -> sawn-fiber interlock
+```
+
+Build-time gate: `sp.validate_wedged_tenon(tenon_body, mortise_body, tenon_axis, …)`
+(the dedicated wedged counterpart of `validate_joint_strength`) measures the tenon, runs
+the estimate, and surfaces the interlock + brittle flag; the `tenon_wedge` template calls
+it automatically when you build with `flare=True`.
 
 ## Strength estimator (code)
 
@@ -281,15 +353,18 @@ The estimator is cheap (~5 µs, no Fusion), so it has two jobs:
   needs the expected loads, which furniture rarely quantifies, so the dependable
   wins are the load-independent flags plus comparing candidate sizes.
 
-The build-time gate is split by joint type (the monolith is retired):
+The build-time gate is `sp.validate_joint_strength`, with a dedicated wedged-tenon check:
 
-- `sp.validate_mortise_tenon(tenon_body, mortise_body, tenon_axis, …)` — the plain
-  M&T sizing + grain check.
-- `sp.validate_pegged_joint(tenon_body, mortise_body, tenon_axis, pins, pin_dia,
-  pin_end_distance, …)` — the **dedicated** drawbore/peg check (relish tear-out ≥ 4×D
-  + the European-Yield-Model peg capacity). No longer a `pins=` rider on the M&T check.
-- `sp.validate_joint_strength(...)` — kept as a deprecated back-compat shim that runs
-  both.
+- `sp.validate_joint_strength(tenon_body, mortise_body, tenon_axis, …, pins=, pin_dia=,
+  pin_end_distance=, …)` — the M&T sizing + grain check; pass the `pins=`/`pin_dia=`/
+  `pin_end_distance=` riders to fold in the drawbore/peg check (relish tear-out ≥ 4×D +
+  the European-Yield-Model peg capacity). The joinery templates call it automatically.
+- `sp.validate_wedged_tenon(tenon_body, mortise_body, tenon_axis, …)` — the
+  **dedicated** wedged-tenon check (the mechanical-interlock estimate + brittle flag,
+  see "Mechanical interlock" above); the `tenon_wedge` template calls it on `flare=True`.
+
+The load-independent red-flag *cores* behind these — and behind the declarative
+registry below — are `joint_strength.mortise_tenon_flags` / `pegged_flags`.
 
 ### A third role: the declarative joint registry (covers hand-built joints)
 
@@ -410,10 +485,11 @@ Joinery templates that cut mortises (`mortise_tenon`, `breadboard`, `drawbore`,
    moment) or thickness (shear, twist).
 8. If wedged, cut the kerf ⟂ to the mortise grain (`tenon-wedge.md`); if pinned,
    run the pin **across** the grain (and keep it ≥ 4×D from the tenon end).
-9. **Gate it (build time):** `sp.validate_mortise_tenon(tenon_body, mortise_body,
+9. **Gate it (build time):** `sp.validate_joint_strength(tenon_body, mortise_body,
    tenon_axis, …)` before JOINing (the joinery templates do this automatically) —
    it folds in `validate_tenon_grain` and WARNs on grain-wrong, thin-slice, or
-   overload; add `sp.validate_pegged_joint(...)` for drawbore pegs.
+   overload; pass `pins=`/`pin_dia=`/`pin_end_distance=` for drawbore pegs, or use
+   `sp.validate_wedged_tenon(...)` for a wedged/fox-wedge flare.
 10. **Declare it (registry):** add the joint to `model.json`'s `joints` array so
     `sp.validate_deps` runs the per-type check on every build — essential for
     **hand-built** joints the templates don't cover. Templates auto-declare via

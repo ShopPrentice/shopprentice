@@ -60,8 +60,8 @@ Before writing any code, plan the modeling steps the way an experienced designer
    tenon's wider dimension runs ALONG that piece's fibers, derived from it — not
    defaulted to "tall and narrow"). The joinery templates orient, gate, and auto-declare
    this for you. **For a custom joint not in a template**, derive with
-   `sp.tenon_wide_axis`, gate with `sp.validate_mortise_tenon` (+ `validate_pegged_joint`
-   for pegs), declare it in `model.json`'s `joints` array, and read the whole story —
+   `sp.tenon_wide_axis`, gate with `sp.validate_joint_strength` (pass `pins=` for
+   pegs), declare it in `model.json`'s `joints` array, and read the whole story —
    rationale, math, examples — in **`docs/joinery/grain-and-strength.md`**.
 
    **Wood movement determines attachment method:**

@@ -204,8 +204,8 @@ def blind(comp, plane, origin, size, depth_expr,
     # should call sp.estimate_mortise_tenon directly; this is the gate.
     if validate_strength:
         try:
-            sp.validate_mortise_tenon(tenon_b, mortise_body,
-                                      plane.geometry.normal, species=species)
+            sp.validate_joint_strength(tenon_b, mortise_body,
+                                       plane.geometry.normal, species=species)
         except Exception:
             pass
         try:
@@ -280,9 +280,9 @@ def through(comp, plane, origin, size, depth_expr,
     # the build). through=True so the depth note reflects the proud tenon.
     if validate_strength:
         try:
-            sp.validate_mortise_tenon(tenon_b, mortise_body,
-                                      plane.geometry.normal, species=species,
-                                      through=True)
+            sp.validate_joint_strength(tenon_b, mortise_body,
+                                       plane.geometry.normal, species=species,
+                                       through=True)
         except Exception:
             pass
         try:

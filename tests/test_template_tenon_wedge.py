@@ -11,8 +11,13 @@ F6  Compound-angle round-in-round      → 3 bodies (leg, stretcher, wedge)
 F7  Cross-component round tenon+wedge  → 3 bodies across 3 comps
     (Seat, Spindle, Tenon each in their own component). Exercises
     tw.round_tenon()'s intersect-trim + wedge CUT via combine.
+F8  Rect THROUGH tenon + 2 wedges + FLARE LOCK → 4 bodies (issue 105)
+    rect(flare=True): outer halves spread into an undercut mortise.
+F9  Rect BLIND tenon + 2 FOX wedges + FLARE LOCK → 4 bodies (issue 105)
+    rect(flare=True, fox=True): flare at the blind tip.
 
-Total: 22 bodies (F1-F6 = 19 bodies in 6 comps, F7 = 3 bodies in 3 comps).
+Total: 31 bodies across 11 components (F1-F7 = 23, F8+F9 = 8). The flare ears JOIN
+into the tenon, so F8/F9 stay at 4 bodies like F1.
 """
 
 import adsk.core
@@ -524,6 +529,100 @@ def run(context):
     move_comp(f7_tenon_c, 180)
     print("F7 Cross-component round tenon: 3 bodies across 3 comps ✓")
 
+    # ══════════════════════════════════════════════════════════
+    #  F8: Rect THROUGH tenon + 2 wedges + FLARE LOCK (issue 105)
+    #      The two outer halves are spread (tw_delta @ tw_theta) so the
+    #      tenon is wider at the exit than at the shoulder; the mortise
+    #      CUT carves a matching undercut. Flare ears JOIN into the tenon
+    #      so the body count matches F1 (leg + rail + 2 wedges = 4).
+    # ══════════════════════════════════════════════════════════
+    if not params.itemByName("fl_proud"):
+        params.add("fl_proud", VI("0.25 in"), "in", "Flared-tenon proud length")
+    f8 = sp.make_comp(root, "F8_RectThroughFlare").component
+
+    _, pr = sp.sketch_rect_model(f8, f8.xYConstructionPlane,
+        ("0 in", "0 in", "0 in"), {"x": "leg_w", "y": "leg_w"}, "F8_LegSk", ev)
+    f8_leg = sp.ext_new(f8, pr, "leg_h", "F8_Leg").bodies.item(0)
+    f8_leg.name = "Leg"
+
+    rail_pl8 = sp.off_plane(f8, f8.xZConstructionPlane,
+        "(leg_w - rail_t) / 2", "F8_RailPl")
+    _, pr = sp.sketch_rect_model(f8, rail_pl8,
+        ("leg_w", "(leg_w - rail_t) / 2", "leg_h / 2 - rail_w / 2"),
+        {"x": "rail_l", "z": "rail_w"}, "F8_RailSk", ev)
+    f8_rail = sp.ext_new(f8, pr, "rail_t", "F8_Rail").bodies.item(0)
+    f8_rail.name = "Rail"
+
+    tenon_pl8 = sp.off_plane(f8, f8.yZConstructionPlane, "leg_w", "F8_TenonPl")
+    _, tn_prof8 = sp.sketch_rect_model(f8, tenon_pl8,
+        ("leg_w", "(leg_w - mt_tt) / 2", "leg_h / 2 - mt_tw / 2"),
+        {"y": "mt_tt", "z": "mt_tw"}, "F8_TenonSk", ev)
+    feats8 = f8.features.extrudeFeatures
+    inp8 = feats8.createInput(tn_prof8, NEW)
+    inp8.setOneSideExtent(
+        adsk.fusion.DistanceExtentDefinition.create(VI("leg_w + fl_proud")), NEG)
+    f8_tenon = feats8.add(inp8).bodies.item(0)
+    f8_tenon.name = "Tenon"
+
+    res8 = tw.rect(f8, tenon_body=f8_tenon, mortise_body=f8_leg,
+            tenon_axis="x", tenon_depth_expr="leg_w + fl_proud",
+            slot_span_expr="mt_tt", offset_dim_expr="mt_tw",
+            name="F8_TW", ev=ev, flare=True, species="white_oak")
+
+    # Cut the mortise with the SOLID flared envelope = tenon + the 2 wedges (res8[0:2],
+    # which fill the kerfs) so the void is the matching trapezoid with no leg protrusions
+    # in the kerf — NOT the slotted tenon or whole rail. Then JOIN the tenon to the rail.
+    sp.combine(f8_leg, [f8_tenon, res8[0], res8[1]], CUT, True, "F8_Mortise")
+    sp.combine(f8_rail, f8_tenon, JOIN, False, "F8_Join")
+
+    assert f8.bRepBodies.count == 4, f"F8: expected 4, got {f8.bRepBodies.count}"
+    move_comp(f8, 210)
+    print(f"F8 Rect through + flare lock: {f8.bRepBodies.count} bodies ✓")
+
+    # ══════════════════════════════════════════════════════════
+    #  F9: Rect BLIND tenon + 2 FOX wedges + FLARE LOCK (issue 105)
+    #      Blind fox-wedge: the flare is at the blind tip, so the mortise
+    #      is undercut at its bottom (driven home as the tenon seats).
+    # ══════════════════════════════════════════════════════════
+    f9 = sp.make_comp(root, "F9_RectFoxFlare").component
+
+    _, pr = sp.sketch_rect_model(f9, f9.xYConstructionPlane,
+        ("0 in", "0 in", "0 in"), {"x": "leg_w", "y": "leg_w"}, "F9_LegSk", ev)
+    f9_leg = sp.ext_new(f9, pr, "leg_h", "F9_Leg").bodies.item(0)
+    f9_leg.name = "Leg"
+
+    rail_pl9 = sp.off_plane(f9, f9.yZConstructionPlane,
+        "(leg_w - rail_t) / 2", "F9_RailPl")
+    _, pr = sp.sketch_rect_model(f9, rail_pl9,
+        ("(leg_w - rail_t) / 2", "leg_w", "leg_h / 2 - rail_w / 2"),
+        {"y": "rail_l", "z": "rail_w"}, "F9_RailSk", ev)
+    f9_rail = sp.ext_new(f9, pr, "rail_t", "F9_Rail").bodies.item(0)
+    f9_rail.name = "Rail"
+
+    tenon_pl9 = sp.off_plane(f9, f9.xZConstructionPlane, "leg_w", "F9_TenonPl")
+    _, tn_prof9 = sp.sketch_rect_model(f9, tenon_pl9,
+        ("(leg_w - mt_tt) / 2", "leg_w", "leg_h / 2 - mt_tw / 2"),
+        {"x": "mt_tt", "z": "mt_tw"}, "F9_TenonSk", ev)
+    feats9 = f9.features.extrudeFeatures
+    inp9 = feats9.createInput(tn_prof9, NEW)
+    inp9.setOneSideExtent(
+        adsk.fusion.DistanceExtentDefinition.create(VI("mt_td")), NEG)
+    f9_tenon = feats9.add(inp9).bodies.item(0)
+    f9_tenon.name = "Tenon"
+
+    res9 = tw.rect(f9, tenon_body=f9_tenon, mortise_body=f9_leg,
+            tenon_axis="y", tenon_depth_expr="mt_td",
+            slot_span_expr="mt_tt", offset_dim_expr="mt_tw",
+            name="F9_TW", ev=ev, flare=True, fox=True, species="white_oak")
+
+    # Solid-envelope mortise cut (tenon + wedges) — see F8.
+    sp.combine(f9_leg, [f9_tenon, res9[0], res9[1]], CUT, True, "F9_Mortise")
+    sp.combine(f9_rail, f9_tenon, JOIN, False, "F9_Join")
+
+    assert f9.bRepBodies.count == 4, f"F9: expected 4, got {f9.bRepBodies.count}"
+    move_comp(f9, 240)
+    print(f"F9 Rect fox + flare lock: {f9.bRepBodies.count} bodies ✓")
+
     # ── Epilogue ──────────────────────────────────────────────
     total = sum(root.occurrences.item(i).component.bRepBodies.count
                 for i in range(root.occurrences.count))
@@ -533,7 +632,8 @@ def run(context):
     sp.apply_appearance("white oak")
     sp.apply_appearance("walnut", bodies=[
         "F1_TW_1", "F1_TW_2", "F2_TW", "F3_TW_1", "F3_TW_2",
-        "F4_TW", "F5_TW", "F6_TW", "F7_TW"])
+        "F4_TW", "F5_TW", "F6_TW", "F7_TW",
+        "F8_TW_1", "F8_TW_2", "F9_TW_1", "F9_TW_2"])
 
     for i in range(root.occurrences.count):
         c = root.occurrences.item(i).component
