@@ -1,70 +1,73 @@
 #!/usr/bin/env python3
-"""Joinery strength check, tied to model.json.
+"""Offline joinery strength report for the joints declared in model.json.
 
-Reads the `joints` array from model.json and runs the joinery strength
-estimator (vendored joint_strength.py) on each drawbore mortise-and-tenon.
-Pure Python — no Fusion needed.
+This is a convenience demo. The build-time check is the real gate: with the
+`joints` array in model.json (joint-registry schema), `validate_deps` /
+`validate_design` runs `helpers/sp/joint_registry.validate_joints` on every
+build (per-type M&T sizing + grain, plus relish tear-out >= 4xD and EYM peg
+capacity for pegged/drawbore joints).
+
+Here we just load the repo's estimator directly (importlib, to skip the
+adsk-heavy `helpers.sp` package init -- same trick the offline tests use) and
+print full capacity numbers for each declared M&T:
 
     python3 strength_check.py
-
-Capacities are first-order engineering estimates (USDA Wood Handbook order of
-magnitude) for relative comparison, not a code-stamped analysis.
 """
 import json
 import os
+import re
 import importlib.util
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-_spec = importlib.util.spec_from_file_location(
-    "joint_strength", os.path.join(HERE, "joint_strength.py"))
+_JS = os.path.normpath(os.path.join(HERE, "..", "..", "helpers", "sp", "joint_strength.py"))
+_spec = importlib.util.spec_from_file_location("joint_strength", _JS)
 js = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(js)
 
+_MT_TYPES = {"mortise_tenon", "pegged_tenon", "drawbore", "wedged_tenon"}
+
+
+def inch(expr):
+    """Resolve a literal length expression ('3.5 in') to inches. None passes through."""
+    if expr is None:
+        return None
+    return float(re.sub(r"[^0-9.\-]", "", str(expr)))
+
+
 model = json.load(open(os.path.join(HERE, "model.json")))
 joints = model.get("joints", [])
-
-print("JOINERY STRENGTH CHECK  —  %s" % model.get("name", "model"))
-print("%d joints declared in model.json\n" % len(joints))
+print("JOINERY STRENGTH CHECK  --  %s   (%d declared M&T joints)\n"
+      % (model.get("name", "model"), len(joints)))
 
 for j in joints:
-    typ, name = j["type"], j["name"]
+    typ = j.get("type")
     print("=" * 72)
-    print("%-22s [%s]   %s" % (name, typ, " <-> ".join(j["members"])))
-
-    if typ != "drawbore_mt":
-        print("  %s" % j.get("note", "(no estimator for this joint type)"))
-        print()
+    print("%-26s [%s]   %s -> %s" % (
+        "%s~%s" % (j.get("tenon"), j.get("mortise")), typ, j.get("tenon"), j.get("mortise")))
+    if typ not in _MT_TYPES:
+        print("  (no closed-form estimator for this type)\n")
         continue
 
-    t, pg = j["tenon"], j.get("pegs", {})
-    depth = t["depth"]
-    frac = pg.get("from_shoulder_frac", 0.333)
-    # joint_strength's species table; substitute unknown peg woods (e.g. teak)
-    peg_sp = pg.get("species")
-    peg_note = ""
+    peg_sp, note = j.get("peg_species"), ""
     if peg_sp and peg_sp not in js.SPECIES:
-        peg_note = " (%s -> 'hardwood' proxy)" % peg_sp
+        note = "  (peg %s -> 'hardwood' proxy)" % peg_sp
         peg_sp = "hardwood"
 
     r = js.estimate_mortise_tenon(
-        width=t["w"], thickness=t["t"], depth=depth, species=j["species"],
-        pins=pg.get("count", 0), pin_dia=pg.get("dia", 0.0),
-        peg_species=peg_sp, pin_end_distance=depth * (1.0 - frac))
+        width=inch(j["width"]), thickness=inch(j["thickness"]), depth=inch(j["depth"]),
+        species=j.get("species", "hardwood"),
+        pins=int(j.get("pins", 0) or 0), pin_dia=inch(j.get("pin_dia")) or 0.0,
+        peg_species=peg_sp, pin_end_distance=inch(j.get("pin_end_distance")))
     c = r["capacities"]
     pw = c.get("pin_withdrawal", {}).get("value", 0.0)
 
-    print("  tenon %.2f x %.2f x %.2f in   %s,  %d x %.3f\" peg%s" % (
-        t["w"], t["t"], depth, j["species"], pg.get("count", 0), pg.get("dia", 0), peg_note))
-    print("  pull-out, drawbored (pegs):  %6.0f lbf   [%s]" % (pw, r["pin_modes"].get("governing", "-")))
+    print("  tenon %s x %s x %s   %s, %s x %s pin%s" % (
+        j["width"], j["thickness"], j["depth"], j.get("species"),
+        j.get("pins"), j.get("pin_dia"), note))
+    print("  pull-out, drawbored (pins):  %6.0f lbf   [%s]" % (pw, r["pin_modes"].get("governing", "-")))
     print("  shear, gravity direction:    %6.0f lbf" % c["shear_along_w"]["value"])
     print("  bending (about tenon width): %6.0f in-lbf" % c["bending_about_w"]["value"])
-    print("  pull-out IF glued:           %6.0f lbf" % c["withdrawal_tension"]["value"])
-    for note in r["notes"]:
-        if "BRITTLE" in note:
-            print("  !! " + note)
+    for nt in r["notes"]:
+        if "BRITTLE" in nt:
+            print("  !! " + nt)
     print()
-
-print("=" * 72)
-print("Note: members white oak; teak pegs estimated as 'hardwood'. Switch the")
-print("structure to a softwood (cedar) and the wood shear/bearing modes drop")
-print("~40-50%, but peg pull-out stays peg-shear-limited.")
