@@ -298,6 +298,29 @@ The estimator is cheap (~5 µs, no Fusion), so it has two jobs:
   needs the expected loads, which furniture rarely quantifies, so the dependable
   wins are the load-independent flags plus comparing candidate sizes.
 
+### Priority: get the SHAPE right *before* adding locks
+
+The two principles are not a menu — they are a **priority order**. A correct joint must
+satisfy the SHAPE principles FIRST, and the shape must stand on its own:
+
+1. maximize long-grain-to-long-grain glue cheeks (wide dim **along** the host grain), and
+2. sever the fewest host fibers — don't gut the host's section; leave real walls.
+
+**Only then**, and only if the load genuinely needs glue-independent withdrawal capacity,
+add a **lock** (drawbore peg, wedge, tusk, through-tenon). A lock is an optional add-on,
+never a substitute: *every lock severs MORE fiber*, so it can't rescue a bad shape — it
+can only add to a good one. Reaching for a lock to "strengthen" a weak joint is the
+classic mistake; it almost always means the **proportions** are wrong (usually a
+tall-narrow tenon that should be **wide-and-short** — width along the grain grows the glue
+cheek *and* cuts fewer fibers at once).
+
+The gate **enforces** this. `validate_joint_strength` evaluates SHAPE merit independently
+of any lock and returns `shape_ok`; `ok` requires `shape_ok`, so **a lock can never flip a
+non-compliant shape to ok**. With a lock present while the shape fails it prints
+`LOCK MASKS A NON-COMPLIANT SHAPE — fix the proportions first`. The shape checks include a
+**host-integrity** test (the mortise must leave the host real walls across its grain),
+which catches over-severing even at angled interfaces where the grain check goes advisory.
+
 ## The math (and how to apply it in code)
 
 Let **f** = the mortise piece's unit fiber direction, and **a** = the tenon
