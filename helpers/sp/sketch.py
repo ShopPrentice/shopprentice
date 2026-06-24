@@ -201,14 +201,22 @@ def sketch_rect_model(comp, plane, model_origin, model_size,
         rect[1].startSketchPoint, rect[1].endSketchPoint,
         V, Point3D.create(sk_f.x - dx, mid_y, 0)
     ).parameter.expression = _to_expr(model_size[v_axis])
+    # These are DISTANCE dimensions (magnitudes) from the sketch origin to the
+    # origin corner. The corner was already drawn on the correct side by
+    # addTwoPointRectangle(sk_o, ...); a distance dim must therefore be the
+    # ABSOLUTE offset. Feeding the raw signed coordinate (e.g. "-6 in") makes
+    # Fusion flip the corner to the opposite side of the axis (|-6| lands at
+    # +6), which silently mirrors the whole rectangle across the origin — the
+    # bug that put the breadboard tongue/tenons off the +Y edge of the board.
+    # abs() keeps the corner where it was drawn for either axis orientation.
     d.addDistanceDimension(
         sk.originPoint, rect[0].startSketchPoint,
         H, Point3D.create(sk_o.x / 2, sk_o.y + 2 * dy, 0)
-    ).parameter.expression = _to_expr(axis_to_origin[h_axis])
+    ).parameter.expression = f"abs({_to_expr(axis_to_origin[h_axis])})"
     d.addDistanceDimension(
         sk.originPoint, rect[0].startSketchPoint,
         V, Point3D.create(sk_o.x + dx, sk_o.y / 2, 0)
-    ).parameter.expression = _to_expr(axis_to_origin[v_axis])
+    ).parameter.expression = f"abs({_to_expr(axis_to_origin[v_axis])})"
     dof.add_dim(4)                        # 2 size + 2 origin-offset
 
     dof.assert_balanced()

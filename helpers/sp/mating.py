@@ -294,6 +294,11 @@ def validate_tenon_grain(tenon_body, mortise_body, tenon_axis, tol=0.12):
     definition). Never raises -- mirrors validate_joint_contact; call it on the
     tenon body before JOINing it to its owner.
 
+    This is the AXIS-ALIGNED heuristic for the real rule -- both pieces' fibers
+    parallel to the glue (mating) face (see grain-and-strength.md). For ANGLED
+    joints it is ADVISORY: the joint angle alone does NOT create end grain, so an
+    angled tenon with long-grain cheeks is fine even if this flags it.
+
     Args:
         tenon_body:   the tenon (a separate body at build time, before JOIN).
         mortise_body: the piece the tenon inserts into.
@@ -313,54 +318,66 @@ def validate_tenon_grain(tenon_body, mortise_body, tenon_axis, tol=0.12):
     ext_w = _extent_along(tenon_body, w)   # across the grain
     wide = max(ext_u, ext_w)
     square = wide <= 1e-9 or (wide - min(ext_u, ext_w)) <= tol * wide
-    ok = bool(square or ext_u >= ext_w)
-    if not ok:
-        print("WARNING validate_tenon_grain: %s is wider ACROSS %s's grain "
-              "(%.2f cm) than along it (%.2f cm). Rotate the tenon 90 deg so its "
-              "wider cross-section dimension runs ALONG the grain -- otherwise the "
-              "mortise severs extra long fibers and leaves weak short-grain "
-              "cheeks in %s." % (tenon_body.name, mortise_body.name, ext_w,
-                                 ext_u, mortise_body.name))
+    along_ok = bool(square or ext_u >= ext_w)
+    # The wider-along-grain test is the AXIS-ALIGNED heuristic. When the joint is
+    # angled (the insertion axis or the in-section fibre direction isn't ~axis-
+    # aligned), the real rule -- both fibres parallel to the glue face -- can hold
+    # even when this heuristic doesn't, so it is ADVISORY there: never fail it.
+    def _axis_aligned(v):
+        return max(abs(v.x), abs(v.y), abs(v.z)) >= 0.95
+    angled = not (_axis_aligned(a) and _axis_aligned(u))
+    ok = bool(along_ok or angled)
+    if not along_ok:
+        kind = ("ADVISORY (angled joint -- the angle alone makes no end grain; "
+                "verify the cheeks: are both fibres parallel to the glue face?)"
+                if angled else
+                "AXIS-ALIGNED joint -- rotate the tenon 90 deg (more long-long cheek, "
+                "fewer fibres severed)")
+        print("WARNING validate_tenon_grain: %s's wider section (%.2f cm) runs ACROSS "
+              "%s's grain rather than along it (%.2f cm). %s See "
+              "docs/joinery/grain-and-strength.md." % (
+                  tenon_body.name, ext_w, mortise_body.name, ext_u, kind))
     return {"ok": ok, "fiber_extent": ext_u, "cross_extent": ext_w,
-            "square": square}
+            "square": square, "angled": angled, "along_grain_ok": along_ok}
 
 
 def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardwood",
                             through=False, proud=0.0, pins=0, pin_dia=0.0,
                             pin_end_distance=None, sized=False, expected=None,
-                            thin_ratio=0.25):
-    """Build-time strength sanity check for a mortise-and-tenon (the GATE half of
-    the joint-strength estimator). Measures the tenon's dimensions off the body,
-    runs ``joint_strength.estimate_mortise_tenon``, and prints a WARNING for the
-    LOAD-INDEPENDENT red flags a designer should never ship:
+                            thin_ratio=0.25, wedged=False, tusked=False,
+                            max_host_severed=0.5):
+    """Build-time GATE for a mortise-and-tenon, enforcing the PRINCIPLE PRIORITY.
 
-      * grain orientation wrong (wider across the grain -- via validate_tenon_grain),
-      * thin slice (thickness < ``thin_ratio`` x width -> shear/bending collapse
-        even with maximal glue area -- the "don't optimize glue to a sliver" trap),
-      * brittle peg relish (drawbore peg end distance < 4 x peg diameter).
+    A correct joint must satisfy the two SHAPE principles FIRST, and the shape must
+    pass ON ITS OWN, independent of any lock:
+      #1  maximize long-grain-to-long-grain glue cheeks (wide dim ALONG the host grain),
+      #2  sever the fewest host fibers (don't gut the host's section).
+    Locks (drawbore pins, wedges, tusk, through-tenons) are OPTIONAL add-ons, checked
+    SECOND. A lock can ADD capacity but NEVER substitutes for a compliant shape -- every
+    lock actually severs MORE fiber -- so a lock can never flip a failing shape to ok.
+    ``shape_ok`` reports the shape verdict alone; if a lock is present while the shape
+    fails, a loud 'LOCK MASKS A NON-COMPLIANT SHAPE' flag fires.
 
-    Optionally checks adequacy: pass ``expected={mode: load}`` (lbf, keys matching
-    the estimator's capacity names) and it WARNs on any direction loaded past
-    capacity. Like ``validate_tenon_grain`` it never raises -- call it on the tenon
-    body before JOINing it (design-time sizing should use ``estimate_mortise_tenon``
-    directly; this is the after-build safety net the joinery templates call).
+    SHAPE flags (must be empty for shape_ok):
+      * grain orientation wrong -- wider ACROSS the grain (via validate_tenon_grain),
+      * thin slice -- thickness < ``thin_ratio`` x width (tenon's own shear/bending governs),
+      * guts the host -- the mortise removes > ``max_host_severed`` of the host's section
+        across its grain (the "too many fibers severed / left no walls" trap).
+    LOCK flags: brittle peg relish (end distance < 4 x dia); lock-masks-shape.
+    Plus an optional load-adequacy check via ``expected={mode: load_lbf}``.
 
-    Args:
-        tenon_body, mortise_body: the tenon (pre-JOIN) and the piece it enters.
-        tenon_axis: insertion direction, 'x'/'y'/'z' or Vector3D.
-        species: wood key into ``joint_strength.SPECIES``.
-        through/proud: through tenon? proud length (in) -- excluded from glue depth.
-        pins/pin_dia/pin_end_distance: drawbore peg count/dia/end-distance (in).
-        sized: end-grain glue surfaces primed/sized.
-        expected: optional {capacity_name: applied_load_lbf} for an adequacy check.
-        thin_ratio: thickness/width below which the tenon is flagged a thin slice.
+    Never raises (call it on the tenon before JOIN). Args as before, plus
+    ``wedged``/``tusked`` (declare locks so the gate knows one is present) and
+    ``max_host_severed`` (host-gutting threshold).
 
-    Returns {ok, flags, weakest, dims_in, capacities, utilization, estimate}.
+    Returns {ok, shape_ok, flags, shape_flags, lock_flags, weakest, dims_in,
+             capacities, utilization, estimate}.
     """
     from helpers.sp.joint_strength import estimate_mortise_tenon
     IN = 2.54
     a = _axis_to_vec(tenon_axis)
     u = tenon_wide_direction(mortise_body, tenon_axis)   # along-grain, in-section
+    wv = None
     if u is None:                                        # end-grain mortise (rare)
         ta = tenon_axis if isinstance(tenon_axis, str) else _dominant_axis(a)
         perp = [ax for ax in ("x", "y", "z") if ax != ta]
@@ -369,48 +386,74 @@ def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardw
     else:
         wv = a.crossProduct(u); wv.normalize()
         w_cm = _extent_along(tenon_body, u)              # along grain (the cheeks)
-        t_cm = _extent_along(tenon_body, wv)             # across grain
+        t_cm = _extent_along(tenon_body, wv)             # across grain (severs fibers)
     depth_cm = _extent_along(tenon_body, a) - proud * IN
     w, t, depth = w_cm / IN, t_cm / IN, max(depth_cm, 1e-6) / IN
 
     est = estimate_mortise_tenon(w, t, depth, species=species, through=through,
                                  proud=proud, pins=pins, pin_dia=pin_dia,
-                                 pin_end_distance=pin_end_distance, sized=sized)
+                                 pin_end_distance=pin_end_distance, sized=sized,
+                                 wedged=wedged, tusked=tusked)
     caps = est["capacities"]
 
-    flags = []
+    # ---- SHAPE merit (principles #1 + #2) -- must pass independent of any lock ----
+    shape_flags = []
     g = validate_tenon_grain(tenon_body, mortise_body, tenon_axis)
     if not g["ok"]:
-        flags.append("grain orientation: wider ACROSS the grain (rotate 90 deg)")
+        shape_flags.append("grain: wider ACROSS host grain -> rotate so the WIDE dim runs "
+                           "ALONG the grain (more glue cheek, fewer fibers cut)")
     if t < thin_ratio * w:
-        flags.append("thin slice: thickness %.2f in < %.2f x width (%.2f in) -> the "
-                     "tenon's own shear/bending governs even with full glue" % (
-                         t, thin_ratio, w))
+        shape_flags.append("thin slice: t=%.2f in < %.2f x w=%.2f in -> the tenon's own "
+                           "shear/bending governs even at full glue" % (t, thin_ratio, w))
     if t < 0.1875:
-        flags.append("very thin tenon (t=%.2f in): fragile to cut and shear-weak" % t)
-    if pins and pin_dia and pin_end_distance is not None and pin_end_distance < 4.0 * pin_dia:
-        flags.append("brittle: peg end distance %.2f in < 4xD (%.2f in) -> relish "
-                     "tear-out" % (pin_end_distance, 4.0 * pin_dia))
+        shape_flags.append("very thin tenon (t=%.2f in): fragile + shear-weak" % t)
+    host_across = (_extent_along(mortise_body, wv) / IN) if wv is not None else None
+    if host_across and host_across > 1e-6:
+        sev = t / host_across
+        if sev > max_host_severed:
+            shape_flags.append("guts the host: mortise takes %.0f%% of the host section "
+                               "across its grain (only %.2f in walls left) -> reshape "
+                               "WIDER+SHORTER (grow width ALONG the grain, drop height)" % (
+                                   100.0 * sev, max(host_across - t, 0.0)))
 
+    # ---- LOCK merit (optional add-ons) -- a lock NEVER excuses a bad shape ----
+    lock_flags = []
+    has_lock = bool(pins) or wedged or tusked
+    if pins and pin_dia and pin_end_distance is not None and pin_end_distance < 4.0 * pin_dia:
+        lock_flags.append("brittle peg: end distance %.2f in < 4xD (%.2f in) -> relish "
+                          "tear-out" % (pin_end_distance, 4.0 * pin_dia))
+    if has_lock and shape_flags:
+        lock_flags.append("LOCK MASKS A NON-COMPLIANT SHAPE -- fix the tenon proportions "
+                          "FIRST (shape principles come before locks); a peg/wedge/tusk "
+                          "adds capacity but severs MORE fiber and cannot make a bad shape ok")
+
+    # ---- load adequacy (optional) ----
     forces = {k: v["value"] for k, v in caps.items() if v["unit"] == "lbf"}
     weakest = min(forces, key=forces.get) if forces else None
     util = {}
+    overload_flags = []
     if expected:
         for k, load in expected.items():
             c = caps.get(k)
             if c and load > 0:
                 util[k] = load / c["value"]
                 if util[k] > 1.0:
-                    flags.append("OVERLOADED %s: %.0f lbf > capacity %.0f (util %.2f)"
-                                 % (k, load, c["value"], util[k]))
+                    overload_flags.append("OVERLOADED %s: %.0f lbf > capacity %.0f (util %.2f)"
+                                          % (k, load, c["value"], util[k]))
 
-    ok = not flags
+    shape_ok = not shape_flags
+    brittle = any(f.startswith("brittle") for f in lock_flags)
+    flags = shape_flags + lock_flags + overload_flags
+    # ok requires the SHAPE to pass on its own (principle priority) + no brittle lock +
+    # no overload. Locks add capacity but can never flip a failing shape to ok.
+    ok = shape_ok and not brittle and not overload_flags
     if flags:
         print("WARNING validate_joint_strength: %s (%.2f w x %.2f t x %.2f deep, %s) "
-              "-> %s | weakest force dir: %s %.0f lbf" % (
-                  tenon_body.name, w, t, depth, species, "; ".join(flags),
+              "shape_ok=%s -> %s | weakest: %s %.0f lbf" % (
+                  tenon_body.name, w, t, depth, species, shape_ok, "; ".join(flags),
                   weakest, forces.get(weakest, 0.0)))
-    return {"ok": ok, "flags": flags, "weakest": weakest,
+    return {"ok": ok, "shape_ok": shape_ok, "flags": flags,
+            "shape_flags": shape_flags, "lock_flags": lock_flags, "weakest": weakest,
             "dims_in": {"width": w, "thickness": t, "depth": depth},
             "capacities": caps, "utilization": util, "estimate": est}
 

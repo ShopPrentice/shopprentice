@@ -18,6 +18,29 @@ import adsk.core
 app = adsk.core.Application.get()
 
 
+def _pin_helpers_to_main():
+    """Pin ``helpers``/``woodworking`` imports to the MAIN (deployed) worktree.
+
+    Fusion runs ONE Python interpreter, shared across every conductor agent. Each
+    agent's worktree gets prepended to ``sys.path``, so ``import helpers`` would
+    resolve to whichever agent imported first -- not the deployed code. Policy: every
+    script runs against MAIN; an agent's own-worktree edits only take effect once
+    MERGED to main ("deploy = merge"). So before each run we force main to the front
+    of ``sys.path`` and drop cached helper/template modules (also picks up edits to
+    main). main = repo root, three levels up from this file (addin/tools/..).
+    """
+    import sys
+    main = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    while main in sys.path:
+        sys.path.remove(main)
+    sys.path.insert(0, main)
+    for k in list(sys.modules):
+        if k == 'helpers' or k.startswith('helpers.') \
+                or k == 'woodworking' or k.startswith('woodworking.'):
+            del sys.modules[k]
+    return main
+
+
 def _execute_sandbox(script):
     """Run script in a throwaway document and return a design snapshot."""
     import adsk.fusion
@@ -43,6 +66,7 @@ def _execute_sandbox(script):
         app.executeTextCommand('PTransaction.Start "Sandbox Script"')
         transaction_started = True
 
+        _pin_helpers_to_main()
         script += "\nrun(None)"
         with tempfile.NamedTemporaryFile(
                 mode='w', prefix='sandbox_', suffix='.py',
@@ -378,11 +402,9 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
     transacted_doc = None
     original_script = script  # preserve before appending run(None)
     try:
-        # Invalidate cached helper modules so scripts pick up file changes
-        import sys as _sys
-        for _k in list(_sys.modules):
-            if _k.startswith('helpers'):
-                del _sys.modules[_k]
+        # Pin helper/template imports to MAIN (deployed) -- not a parallel agent's
+        # worktree -- and invalidate the cache so edits to main are picked up.
+        _pin_helpers_to_main()
 
         script += "\nrun(None)"
 
