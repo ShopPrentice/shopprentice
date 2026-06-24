@@ -1,68 +1,50 @@
 {
+  "name": "Pergola with Deck (customized)",
   "deps": [
-    {
-      "body": "wall",
-      "ref": "origin"
-    },
-    {
-      "body": "ground",
-      "ref": "wall"
-    },
-    {
-      "body": "post1",
-      "ref": "ground"
-    },
-    {
-      "body": "post2",
-      "ref": "ground"
-    },
-    {
-      "body": "post1_upper",
-      "ref": "post1"
-    },
-    {
-      "body": "post2_upper",
-      "ref": "post2"
-    },
-    {
-      "body": "wedge1",
-      "ref": "post1"
-    },
-    {
-      "body": "wedge2",
-      "ref": "post2"
-    },
-    {
-      "body": "Body1",
-      "ref": "post1_upper"
-    },
-    {
-      "body": "Body2",
-      "ref": "post2_upper"
-    },
-    {
-      "body": "Body3",
-      "ref": "Body1"
-    },
-    {
-      "body": "Body4",
-      "ref": "Body2"
-    },
-    {
-      "body": "Body5",
-      "ref": "Body1"
-    },
-    {
-      "body": "Body6",
-      "ref": "Body2"
-    },
-    {
-      "body": "left_brace",
-      "ref": "post1_upper"
-    },
-    {
-      "body": "right_brace",
-      "ref": "post2_upper"
-    }
-  ]
+    { "body": "wall", "ref": "origin" },
+    { "body": "ground", "ref": "wall" },
+    { "body": "post1", "ref": "ground" },
+    { "body": "post2", "ref": "ground" },
+    { "body": "post1_upper", "ref": "post1" },
+    { "body": "post2_upper", "ref": "post2" },
+    { "body": "wedge1", "ref": "post1" },
+    { "body": "wedge2", "ref": "post2" },
+    { "body": "beam_front", "ref": "post1_upper" },
+    { "body": "beam_back", "ref": "post2_upper" },
+    { "body": "stretcher_L", "ref": "beam_front" },
+    { "body": "stretcher_R", "ref": "beam_back" },
+    { "body": "pad_L", "ref": "beam_front" },
+    { "body": "pad_R", "ref": "beam_back" },
+    { "body": "left_brace", "ref": "post1_upper" },
+    { "body": "right_brace", "ref": "post2_upper" },
+    { "body": "peg_beam_post1_upper_0", "ref": "post1_upper" },
+    { "body": "peg_beam_post1_upper_1", "ref": "post1_upper" },
+    { "body": "peg_beam_post2_upper_0", "ref": "post2_upper" },
+    { "body": "peg_beam_post2_upper_1", "ref": "post2_upper" },
+    { "body": "peg_strut_post1_upper_0", "ref": "post1_upper" },
+    { "body": "peg_strut_post1_upper_1", "ref": "post1_upper" },
+    { "body": "peg_strut_post2_upper_0", "ref": "post2_upper" },
+    { "body": "peg_strut_post2_upper_1", "ref": "post2_upper" },
+    { "body": "peg_left_brace_foot", "ref": "left_brace" },
+    { "body": "peg_left_brace_head", "ref": "left_brace" },
+    { "body": "peg_right_brace_foot", "ref": "right_brace" },
+    { "body": "peg_right_brace_head", "ref": "right_brace" }
+  ],
+  "_deps_note": "Frame + drawbore pins. Deck boards, rafters and railing balusters are not individually enumerated (as in the base example).",
+
+  "joints": [
+    { "type": "drawbore", "tenon": "post1_upper", "mortise": "beam_front", "axis": "z",
+      "species": "white_oak", "width": "3.5 in", "thickness": "1 in", "depth": "4 in",
+      "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "2.67 in", "peg_species": "hardwood" },
+    { "type": "drawbore", "tenon": "post2_upper", "mortise": "beam_front", "axis": "z",
+      "species": "white_oak", "width": "3.5 in", "thickness": "1 in", "depth": "4 in",
+      "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "2.67 in", "peg_species": "hardwood" },
+    { "type": "drawbore", "tenon": "stretcher_L", "mortise": "post1_upper", "axis": "y",
+      "species": "white_oak", "width": "2 in", "thickness": "1 in", "depth": "2.5 in",
+      "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "1.67 in", "peg_species": "hardwood" },
+    { "type": "drawbore", "tenon": "stretcher_R", "mortise": "post2_upper", "axis": "y",
+      "species": "white_oak", "width": "2 in", "thickness": "1 in", "depth": "2.5 in",
+      "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "1.67 in", "peg_species": "hardwood" }
+  ],
+  "_joints_note": "Official joint-registry schema (helpers/sp/joint_registry.py): owning body names (tenon/mortise) + dims as expression strings; validate_deps runs the per-type strength check each build. peg_species 'hardwood' is the strength proxy for the teak pins (teak isn't in the species table). The post scarf splices (wedge1/wedge2) and the two pinned diagonal knee braces are not M&T registry types, so they aren't declared here (validate_deps flags their contacts as advisory)."
 }

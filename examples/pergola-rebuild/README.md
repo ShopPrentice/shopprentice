@@ -1,12 +1,79 @@
-# Pergola with Attached Deck (Rebuild)
+# Pergola with Attached Deck (Rebuild + Drawbore Joinery)
 
-A parametric pergola and deck structure modeled in Fusion 360. 90"W x 60"D pergola at 168" height, with an attached 135"W x 70"D elevated deck, diagonal braces, scarf-jointed posts, and 10 rafters.
+A parametric pergola and deck structure modeled in Fusion 360. 90"W x 60"D pergola at 168" height, with an attached 135"W x 70"D elevated deck, diagonal braces, scarf-jointed posts, and 10 rafters. The customized build adds teak drawbore mortise-and-tenon joinery, a black-aluminum deck railing, matte-black lower posts, and a model-tied joint-strength check.
 
-![Pergola overview](screenshots/overview.png)
+**The actual build, by the maker** — a cedar pergola over a railed deck, attached to the house:
 
-![Pergola front](screenshots/front.png)
+![The actual pergola, built by the maker](screenshots/actual-build.png)
 
-![Post joint close-up](screenshots/joint.png)
+Modeled in Fusion 360 (joinery-detailed reconstruction):
+
+![Pergola overview — customized build with railing, black posts, beige backdrop](screenshots/overview.png)
+
+![Pergola front elevation](screenshots/front.png)
+
+![Drawbore pins at the post-to-beam joint](screenshots/joint.png)
+
+## Customized build — drawbore joinery, railing, strength check
+
+Beyond the bare rebuild ([`pergola.py`](pergola.py)), [`pergola_custom.py`](pergola_custom.py)
+layers on a fully detailed, structurally-checked variant:
+
+- **Drawbore mortise-and-tenon joinery** (teak pins, ⅜", 1/8" proud), placed with the
+  `drawbore` template's rule — each pin runs *perpendicular through the mortise cheeks* at
+  **1/3 of the tenon depth from the shoulder**, two per joint: post↔beam (×2),
+  stretcher↔post (×2), plus a pin at each brace foot/head.
+- **Black-aluminum deck railing** ([`pergola_railing.py`](pergola_railing.py)) — slim
+  top/bottom rails + thin balusters, tied into the posts' inner faces.
+- **Finishes** — white-oak frame, matte-black lower posts, beige clapboard backdrop.
+- **Clean model** — every body named (`beam_front`, `stretcher_L`, `deck_board_01`, …);
+  all sketches + construction geometry hidden.
+
+Run it the same way as the base (Fusion's script runner sets `__file__`, so it `exec`s
+`pergola.py` for the frame and resolves the sibling scripts automatically).
+
+### Joinery registry + strength check
+
+[`model.json`](model.json) declares every mortise-and-tenon in a `joints` array using the
+repo's **joint-registry schema** ([`helpers/sp/joint_registry.py`](../../helpers/sp/joint_registry.py)) —
+owning body names (`tenon`/`mortise`) + dims as expression strings:
+
+```json
+{ "type": "drawbore", "tenon": "post1_upper", "mortise": "beam_front", "axis": "z",
+  "species": "white_oak", "width": "3.5 in", "thickness": "1 in", "depth": "4 in",
+  "pins": 2, "pin_dia": "0.375 in", "pin_end_distance": "2.67 in", "peg_species": "hardwood" }
+```
+
+On every build, `validate_deps` (inside `validate_design`) runs the per-type check on each
+declared joint — M&T sizing + grain, plus relish tear-out ≥ 4×D and European-Yield-Model peg
+capacity for the drawbore pins — so hand-built joints like these are covered, not just
+template-baked ones. See [`docs/joinery/grain-and-strength.md`](../../docs/joinery/grain-and-strength.md).
+
+[`strength_check.py`](strength_check.py) is an offline convenience demo — it reads the same
+`joints` array and runs the repo's estimator (`helpers/sp/joint_strength.py`) for full
+capacity numbers, no Fusion needed:
+
+```bash
+python3 strength_check.py
+```
+
+**Strength results** (white oak; ⅜" teak pins → `hardwood` strength proxy; first-order
+engineering estimates, not a code-stamped analysis):
+
+| Joint | Tenon (in) | Shear (gravity) | Bending | Drawbore pull-out (uplift) |
+|-------|-----------|-----------------|---------|----------------------------|
+| post ↔ beam (×2) | 3.5 × 1.0 × 4.0 | 7,000 lbf | 8,867 in-lbf | **795 lbf** (peg-shear-limited) |
+| stretcher ↔ post (×2) | 2.0 × 1.0 × 2.5 | 4,000 lbf | 2,229 in-lbf | **795 lbf** |
+
+The joints are loaded mostly in compression/shear (gravity), where they're very strong;
+wind uplift is carried by the drawbore pins at ~795 lbf/joint. No relish/brittleness flags —
+the pins sit 1/3 from the shoulder, well past the 4×diameter tear-out threshold. (The post
+scarf splices and the diagonal knee braces aren't M&T registry types, so they aren't declared.)
+
+**Geometry validation:** `check_interference` → 4 overlaps, all the base example's "let-in"
+diagonal braces (inherent to the source design); no new interference from the joinery or
+railing. `check_connectivity` → the frame is one connected cluster (deck boards are gapped
+and round pins read as singletons — expected).
 
 ## Regenerated Model
 

@@ -31,20 +31,12 @@ Strength is wildly directional:
 
 Every joinery decision follows from this. Two consequences matter most:
 
-1. **Glue — what "long grain" actually means:** a glue bond is full-strength
-   **long-grain-to-long-grain when BOTH pieces' fibers lie PARALLEL TO the mating
-   (glue) face** — both grains running *in the plane of* that surface. This is the
-   precise definition of "glue along the grain," and it is **angle-independent**: a
-   tilted or angled joint keeps full long-grain glue as long as both fibers lie in
-   the face — **the joint's angle does not create end grain.** End grain appears
-   only where a fiber pokes *out of* the face (perpendicular to it); a face where a
-   fiber is *partly* perpendicular is *partly* end grain — grade it by that angle
-   (Hankinson, below). A sound long-long line is **wood-limited** — it fails in the
-   wood, so rate it at the wood's shear-parallel strength (`fl = τ`), *not* the
+1. **Glue:** a sound long-grain-to-long-grain line is **wood-limited** — it fails in
+   the wood, so rate it at the wood's shear-parallel strength (`fl = τ`), *not* the
    adhesive's datasheet psi (PVA ~3,400–4,200; the wood gives out first). End-grain
    glue is weak but **not zero**: ~**15%** of long grain raw, up to ~**25%** if the
    end grain is *sized* (primed) — the documented ceiling (USDA FPL Wood Handbook,
-   "not more than ~25%"). For a face at angle *x* to a fiber, interpolate with
+   "not more than ~25%"). For a face at angle *x* to the grain, interpolate with
    **Hankinson** — `N = fl·fe / (fl·sinⁿx + fe·cosⁿx)`, n≈2 — via
    `glue_shear_per_area(x)`. (A linear `cos/sin` blend over-predicts mid-angles
    2–4×; don't use it.) Rule 9 covers joint *choice* from this.
@@ -60,17 +52,6 @@ Every joinery decision follows from this. Two consequences matter most:
 
 Equivalently: the **mortise is long with the grain, narrow across it** — never the
 reverse.
-
-**This is the axis-aligned *shorthand* for the glue + fiber rules, not a separate
-law.** "Wider dimension along the mortise grain" is just what "both fibers parallel
-to the large glue cheeks, and few fibers severed" works out to when the pieces meet
-square. For an **angled** joint, do NOT apply it literally or flag the joint as
-"grain-wrong" — go back to the definitions: (a) are both fibers parallel to the
-cheek faces? and (b) does the mortise sever few fibers? A strut tenoning into a
-spine at 40° — both members horizontal — still has full long-grain glue on its
-horizontal cheeks, because both fibers lie in those faces; the plan angle changes
-nothing there. The angle is fine. What still binds at *any* angle: maximize the
-long-long cheek area, keep enough section + depth, and minimize fibers severed.
 
 ### Why — the fibers you cut
 
@@ -125,8 +106,7 @@ direction by hand (see `grain_dir` in `tenon-wedge.md`).
 - **Wedge kerfs** (`tenon-wedge.md`): a wedge slot is cut ⟂ to the *mortise*
   piece's grain so the spread widens the tenon **without cleaving the long-grain
   cheeks**, into the mortise's flared ends. Same fiber-direction logic, applied to
-  the kerf; the resulting mechanical lock is the interlock mechanism (see the
-  mechanical-interlock section below).
+  the kerf; the resulting mechanical lock is the interlock mechanism below.
 - **Drawbore pins / any pin**: a pin must cross the grain of every piece it
   pierces — a pin *along* the grain is a splitting wedge.
 
@@ -256,76 +236,6 @@ estimator below reports each direction with its mechanism and flags the glue-fre
 ones — so a joint that will mostly see side load isn't sized as if glue were
 holding it.
 
-## Strength estimator (code)
-
-`helpers/sp/joint_strength.py` turns all four factors into a tool. Given a tenon
-size it estimates the capacity in **every direction**, names the governing
-failure mode, and prints design guidance. Pure Python (no Fusion) — runs/tests
-anywhere:
-
-```python
-from helpers.sp.joint_strength import estimate_mortise_tenon, summarize, glue_shear_per_area
-print(summarize(estimate_mortise_tenon(width=1.5, thickness=0.875, depth=2.0,
-                                       species="white_oak", sized=True,
-                                       pins=1, pin_dia=0.375, pin_end_distance=1.5)))
-#   withdrawal_tension   ~12k lbf  [GLUE, wood-limited; end grain 25% sized; ~depth^0.89]
-#   shear_along_w/_t      ...  lbf [GLUE-FREE bearing — the side/down-load path]
-#   bending_about_w      ... in-lbf[embedment bearing; deeper helps to L*]
-#   pin_withdrawal       ...  lbf  [peg, EYM min over shear/bending/bearing]
-#   + guidance: thin-tenon, sublinear depth, relish 4xD/brittle, Hankinson, etc.
-# glue_shear_per_area(45, "white_oak")  -> off-axis face strength (Hankinson)
-```
-
-Use it while designing: pick a size, read which direction is weak for the loads
-you expect, and adjust — **more width/depth** for pull-out and moment, **more
-thickness** for shear/twist. Capacities are first-order (mean clear-wood
-strengths, simple failure models) — relative guidance and a sanity check, not a
-structural certification. `width` is the along-grain (cheek) dimension, `depth`
-is the *glue-engaged* length (exclude through-proud).
-
-### Two roles: design-time advisory + build-time gate
-
-The estimator is cheap (~5 µs, no Fusion), so it has two jobs:
-
-- **Design time (advisory):** call `estimate_mortise_tenon(...)` *while choosing*
-  dimensions — before any geometry — to find the weak direction and size for it.
-  This is where it prevents the mistake.
-- **Build time (gate):** `sp.validate_joint_strength(tenon_body, mortise_body,
-  tenon_axis, species=…, …)` measures the tenon off the body, runs the estimator,
-  and prints a WARNING for the **load-independent red flags** — grain rotated
-  wrong, a **thin slice** (thickness < ¼ width → its own shear/bending governs),
-  a **brittle peg** (drawbore end distance < 4×D) — and, if you pass
-  `expected={mode: lbf}`, any **overloaded** direction. It never raises. The
-  **joinery templates call it automatically** (e.g. `mortise_tenon` runs it on the
-  tenon before the JOIN), so the gate fires without the agent remembering — agents
-  reliably honor forcing functions, not advisories. For a hand-built joint, call
-  it yourself before JOINing (same place as `validate_tenon_grain`). Full adequacy
-  needs the expected loads, which furniture rarely quantifies, so the dependable
-  wins are the load-independent flags plus comparing candidate sizes.
-
-### Priority: get the SHAPE right *before* adding locks
-
-The two principles are not a menu — they are a **priority order**. A correct joint must
-satisfy the SHAPE principles FIRST, and the shape must stand on its own:
-
-1. maximize long-grain-to-long-grain glue cheeks (wide dim **along** the host grain), and
-2. sever the fewest host fibers — don't gut the host's section; leave real walls.
-
-**Only then**, and only if the load genuinely needs glue-independent withdrawal capacity,
-add a **lock** (drawbore peg, wedge, tusk, through-tenon). A lock is an optional add-on,
-never a substitute: *every lock severs MORE fiber*, so it can't rescue a bad shape — it
-can only add to a good one. Reaching for a lock to "strengthen" a weak joint is the
-classic mistake; it almost always means the **proportions** are wrong (usually a
-tall-narrow tenon that should be **wide-and-short** — width along the grain grows the glue
-cheek *and* cuts fewer fibers at once).
-
-The gate **enforces** this. `validate_joint_strength` evaluates SHAPE merit independently
-of any lock and returns `shape_ok`; `ok` requires `shape_ok`, so **a lock can never flip a
-non-compliant shape to ok**. With a lock present while the shape fails it prints
-`LOCK MASKS A NON-COMPLIANT SHAPE — fix the proportions first`. The shape checks include a
-**host-integrity** test (the mortise must leave the host real walls across its grain),
-which catches over-severing even at angled interfaces where the grain check goes advisory.
-
 ## Mechanical interlock — the third pull-out mechanism (wedged tenon & dovetail)
 
 Glue carries pull-out and bearing carries the rest — but a **wedged tenon** (and its
@@ -395,6 +305,133 @@ Build-time gate: `sp.validate_wedged_tenon(tenon_body, mortise_body, tenon_axis,
 (the dedicated wedged counterpart of `validate_joint_strength`) measures the tenon, runs
 the estimate, and surfaces the interlock + brittle flag; the `tenon_wedge` template calls
 it automatically when you build with `flare=True`.
+
+## Strength estimator (code)
+
+`helpers/sp/joint_strength.py` turns all four factors into a tool. Given a tenon
+size it estimates the capacity in **every direction**, names the governing
+failure mode, and prints design guidance. Pure Python (no Fusion) — runs/tests
+anywhere:
+
+```python
+from helpers.sp.joint_strength import estimate_mortise_tenon, summarize, glue_shear_per_area
+print(summarize(estimate_mortise_tenon(width=1.5, thickness=0.875, depth=2.0,
+                                       species="white_oak", sized=True,
+                                       pins=1, pin_dia=0.375, pin_end_distance=1.5)))
+#   withdrawal_tension   ~12k lbf  [GLUE, wood-limited; end grain 25% sized; ~depth^0.89]
+#   shear_along_w/_t      ...  lbf [GLUE-FREE bearing — the side/down-load path]
+#   bending_about_w      ... in-lbf[embedment bearing; deeper helps to L*]
+#   pin_withdrawal       ...  lbf  [peg, EYM min over shear/bending/bearing]
+#   + guidance: thin-tenon, sublinear depth, relish 4xD/brittle, Hankinson, etc.
+# glue_shear_per_area(45, "white_oak")  -> off-axis face strength (Hankinson)
+```
+
+Use it while designing: pick a size, read which direction is weak for the loads
+you expect, and adjust — **more width/depth** for pull-out and moment, **more
+thickness** for shear/twist. Capacities are first-order (mean clear-wood
+strengths, simple failure models) — relative guidance and a sanity check, not a
+structural certification. `width` is the along-grain (cheek) dimension, `depth`
+is the *glue-engaged* length (exclude through-proud).
+
+### Two roles: design-time advisory + build-time gate
+
+The estimator is cheap (~5 µs, no Fusion), so it has two jobs:
+
+- **Design time (advisory):** call `estimate_mortise_tenon(...)` *while choosing*
+  dimensions — before any geometry — to find the weak direction and size for it.
+  This is where it prevents the mistake.
+- **Build time (gate):** `sp.validate_joint_strength(tenon_body, mortise_body,
+  tenon_axis, species=…, …)` measures the tenon off the body, runs the estimator,
+  and prints a WARNING for the **load-independent red flags** — grain rotated
+  wrong, a **thin slice** (thickness < ¼ width → its own shear/bending governs),
+  a **brittle peg** (drawbore end distance < 4×D) — and, if you pass
+  `expected={mode: lbf}`, any **overloaded** direction. It never raises. The
+  **joinery templates call it automatically** (e.g. `mortise_tenon` runs it on the
+  tenon before the JOIN), so the gate fires without the agent remembering — agents
+  reliably honor forcing functions, not advisories. For a hand-built joint, call
+  it yourself before JOINing (same place as `validate_tenon_grain`). Full adequacy
+  needs the expected loads, which furniture rarely quantifies, so the dependable
+  wins are the load-independent flags plus comparing candidate sizes.
+
+The build-time gate is `sp.validate_joint_strength`, with a dedicated wedged-tenon check:
+
+- `sp.validate_joint_strength(tenon_body, mortise_body, tenon_axis, …, pins=, pin_dia=,
+  pin_end_distance=, …)` — the M&T sizing + grain check; pass the `pins=`/`pin_dia=`/
+  `pin_end_distance=` riders to fold in the drawbore/peg check (relish tear-out ≥ 4×D +
+  the European-Yield-Model peg capacity). The joinery templates call it automatically.
+- `sp.validate_wedged_tenon(tenon_body, mortise_body, tenon_axis, …)` — the
+  **dedicated** wedged-tenon check (the mechanical-interlock estimate + brittle flag,
+  see "Mechanical interlock" above); the `tenon_wedge` template calls it on `flare=True`.
+
+The load-independent red-flag *cores* behind these — and behind the declarative
+registry below — are `joint_strength.mortise_tenon_flags` / `pegged_flags`.
+
+
+### Priority: get the SHAPE right *before* adding locks
+
+The two principles are not a menu — they are a **priority order**. A correct joint must
+satisfy the SHAPE principles FIRST, and the shape must stand on its own:
+
+1. maximize long-grain-to-long-grain glue cheeks (wide dim **along** the host grain), and
+2. sever the fewest host fibers — don't gut the host's section; leave real walls.
+
+**Only then**, and only if the load genuinely needs glue-independent withdrawal capacity,
+add a **lock** (drawbore peg, wedge, tusk, through-tenon). A lock is an optional add-on,
+never a substitute: *every lock severs MORE fiber*, so it can't rescue a bad shape — it
+can only add to a good one. Reaching for a lock to "strengthen" a weak joint is the
+classic mistake; it almost always means the **proportions** are wrong (usually a
+tall-narrow tenon that should be **wide-and-short** — width along the grain grows the glue
+cheek *and* cuts fewer fibers at once).
+
+The gate **enforces** this. `validate_joint_strength` evaluates SHAPE merit independently
+of any lock and returns `shape_ok`; `ok` requires `shape_ok`, so **a lock can never flip a
+non-compliant shape to ok**. With a lock present while the shape fails it prints
+`LOCK MASKS A NON-COMPLIANT SHAPE — fix the proportions first`. The shape checks include a
+**host-integrity** test (the mortise must leave the host real walls across its grain),
+which catches over-severing even at angled interfaces where the grain check goes advisory.
+
+### A third role: the declarative joint registry (covers hand-built joints)
+
+The build-time gate only fires where a template bakes it in. A hand-built or
+novel-geometry joint that skips the template also skips the check — and
+`validate_design` can't reliably guess *which bodies form a joint and which way the
+load runs* from geometry alone. So **declare** the joint, the same discipline already
+owed for dependencies. `model.json` grows a top-level `joints` array, and
+`sp.validate_deps` runs the right per-type check on every declared joint on every
+build (a forcing function the agent can't skip):
+
+```json
+{
+  "deps": [ … ],
+  "joints": [
+    {"type": "mortise_tenon", "tenon": "Rail_F", "mortise": "Leg_FL", "axis": "y",
+     "species": "white_oak", "width": "2 in", "thickness": "0.75 in", "depth": "1.5 in"},
+    {"type": "pegged_tenon",  "tenon": "Stretcher", "mortise": "Leg_FL", "axis": "y",
+     "species": "white_oak", "width": "1.5 in", "thickness": "0.5 in", "depth": "1 in",
+     "pins": 1, "pin_dia": "0.375 in", "pin_end_distance": "1.5 in"}
+  ]
+}
+```
+
+- `tenon` / `mortise` are the **owning** body names (the rail and the leg) — they
+  persist after the tenon is fused, so the check resolves them and the completeness
+  pass can match a contact to its declared joint.
+- `axis` is the insertion direction `'x'`/`'y'`/`'z'`. **Length fields are expression
+  strings** (`"0.375 in"`, `"rail_w"`) evaluated via `ctx.ev` — the tenon is gone
+  post-build, so the registry reads the dims from the *declaration*, not by
+  re-measuring. Omit them and the strength sizing is skipped (a NOTE), but the body
+  existence + mortise-grain checks still run.
+- `type` dispatches: `mortise_tenon`, `pegged_tenon` / `drawbore` (M&T + peg), and
+  `wedged_tenon` (plain M&T today; the flare interlock lands with issue #105). An
+  unknown type, a missing field, or an unresolved body is a **hard** failure;
+  strength findings are advisory WARNINGs.
+
+**Templates auto-declare** the joint they build (`sp.declare_joint(...)`) — the
+`mortise_tenon` template appends its joint to the registry on every build (idempotent,
+deduped by body pair), so the convenient path stays zero-effort. The registry is the
+safety net for everything else. The completeness check also lists **contacting bodies
+with no declared joint** (advisory — most contacts, like glued panels and seated
+rails, legitimately need none) so missing structural joints surface.
 
 ## The math (and how to apply it in code)
 
@@ -472,7 +509,13 @@ Joinery templates that cut mortises (`mortise_tenon`, `breadboard`, `drawbore`,
    moment) or thickness (shear, twist).
 8. If wedged, cut the kerf ⟂ to the mortise grain (`tenon-wedge.md`); if pinned,
    run the pin **across** the grain (and keep it ≥ 4×D from the tenon end).
-9. **Gate it (build time):** assert `sp.validate_joint_strength(tenon_body,
-   mortise_body, tenon_axis, …)` before JOINing (the joinery templates do this
-   automatically) — it folds in `validate_tenon_grain` and WARNs on grain-wrong,
-   thin-slice, brittle-peg, or overload.
+9. **Gate it (build time):** `sp.validate_joint_strength(tenon_body, mortise_body,
+   tenon_axis, …)` before JOINing (the joinery templates do this automatically) —
+   it folds in `validate_tenon_grain` and WARNs on grain-wrong, thin-slice, or
+   overload; pass `pins=`/`pin_dia=`/`pin_end_distance=` for drawbore pegs, or use
+   `sp.validate_wedged_tenon(...)` for a wedged/fox-wedge flare.
+10. **Declare it (registry):** add the joint to `model.json`'s `joints` array so
+    `sp.validate_deps` runs the per-type check on every build — essential for
+    **hand-built** joints the templates don't cover. Templates auto-declare via
+    `sp.declare_joint`.
+</content>
