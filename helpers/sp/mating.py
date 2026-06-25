@@ -341,6 +341,40 @@ def validate_tenon_grain(tenon_body, mortise_body, tenon_axis, tol=0.12):
             "square": square, "angled": angled, "along_grain_ok": along_ok}
 
 
+def _shape_flags(tenon_body, mortise_body, tenon_axis, w, t, wv,
+                 thin_ratio=0.25, max_host_severed=0.5):
+    """SHAPE-merit flags shared by EVERY joint-type gate (validate_joint_strength,
+    validate_wedged_tenon, ...). Encodes the two core principles a joint must satisfy
+    ON ITS OWN, before any lock is credited:
+      #1 maximize long-grain glue cheeks (wide dim ALONG the host grain),
+      #2 sever the fewest host fibers (don't gut the host's section),
+    plus the tenon's own section (a sliver shears no matter the glue/lock). ``w``/``t``
+    are the tenon's along-/across-grain dims (in); ``wv`` is the across-grain direction
+    (None for an end-grain mortise -> host-integrity check skipped). A LOCK (wedge/peg/
+    tusk/dovetail) can ADD capacity but NEVER clears these -- callers keep the shape
+    passing before crediting any lock. See docs/joinery/grain-and-strength.md "Priority".
+    """
+    IN = 2.54
+    flags = []
+    g = validate_tenon_grain(tenon_body, mortise_body, tenon_axis)
+    if not g["ok"]:
+        flags.append("grain: wider ACROSS host grain -> rotate so the WIDE dim runs "
+                     "ALONG the grain (more glue cheek, fewer fibers cut)")
+    if t < thin_ratio * w:
+        flags.append("thin slice: t=%.2f in < %.2f x w=%.2f in -> the tenon's own "
+                     "shear/bending governs even at full glue" % (t, thin_ratio, w))
+    if t < 0.1875:
+        flags.append("very thin tenon (t=%.2f in): fragile + shear-weak" % t)
+    if wv is not None:
+        host_across = _extent_along(mortise_body, wv) / IN
+        if host_across > 1e-6 and (t / host_across) > max_host_severed:
+            flags.append("guts the host: mortise takes %.0f%% of the host section across "
+                         "its grain (only %.2f in walls left) -> reshape WIDER+SHORTER "
+                         "(grow width ALONG the grain, drop height)" % (
+                             100.0 * t / host_across, max(host_across - t, 0.0)))
+    return flags
+
+
 def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardwood",
                             through=False, proud=0.0, pins=0, pin_dia=0.0,
                             pin_end_distance=None, sized=False, expected=None,
@@ -396,25 +430,9 @@ def validate_joint_strength(tenon_body, mortise_body, tenon_axis, species="hardw
                                  wedged=wedged, tusked=tusked)
     caps = est["capacities"]
 
-    # ---- SHAPE merit (principles #1 + #2) -- must pass independent of any lock ----
-    shape_flags = []
-    g = validate_tenon_grain(tenon_body, mortise_body, tenon_axis)
-    if not g["ok"]:
-        shape_flags.append("grain: wider ACROSS host grain -> rotate so the WIDE dim runs "
-                           "ALONG the grain (more glue cheek, fewer fibers cut)")
-    if t < thin_ratio * w:
-        shape_flags.append("thin slice: t=%.2f in < %.2f x w=%.2f in -> the tenon's own "
-                           "shear/bending governs even at full glue" % (t, thin_ratio, w))
-    if t < 0.1875:
-        shape_flags.append("very thin tenon (t=%.2f in): fragile + shear-weak" % t)
-    host_across = (_extent_along(mortise_body, wv) / IN) if wv is not None else None
-    if host_across and host_across > 1e-6:
-        sev = t / host_across
-        if sev > max_host_severed:
-            shape_flags.append("guts the host: mortise takes %.0f%% of the host section "
-                               "across its grain (only %.2f in walls left) -> reshape "
-                               "WIDER+SHORTER (grow width ALONG the grain, drop height)" % (
-                                   100.0 * sev, max(host_across - t, 0.0)))
+    # ---- SHAPE merit (principles #1 + #2) -- shared check; must pass independent of any lock ----
+    shape_flags = _shape_flags(tenon_body, mortise_body, tenon_axis, w, t, wv,
+                               thin_ratio=thin_ratio, max_host_severed=max_host_severed)
 
     # ---- LOCK merit (optional add-ons) -- a lock NEVER excuses a bad shape ----
     lock_flags = []
@@ -488,6 +506,7 @@ def validate_wedged_tenon(tenon_body, mortise_body, tenon_axis, species="hardwoo
     IN = 2.54
     a = _axis_to_vec(tenon_axis)
     u = tenon_wide_direction(mortise_body, tenon_axis)
+    wv = None
     if u is None:                                       # end-grain mortise (rare)
         ta = tenon_axis if isinstance(tenon_axis, str) else _dominant_axis(a)
         perp = [ax for ax in ("x", "y", "z") if ax != ta]
@@ -510,45 +529,56 @@ def validate_wedged_tenon(tenon_body, mortise_body, tenon_axis, species="hardwoo
     im = est["interlock_modes"]
     gov, brittle = im["governing"], im["brittle"]
 
-    flags, notes = [], []
-    g = validate_tenon_grain(tenon_body, mortise_body, tenon_axis)
-    if not g["ok"]:
-        flags.append("grain orientation: wider ACROSS the grain (rotate 90 deg)")
-    if t < thin_ratio * w:
-        flags.append("thin slice: thickness %.2f in < %.2f x width (%.2f in)" % (t, thin_ratio, w))
+    # ---- SHAPE merit FIRST (shared with validate_joint_strength): the wedge is a LOCK
+    #      and cannot excuse a non-compliant shape (incl. gutting the host). ----
+    shape_flags = _shape_flags(tenon_body, mortise_body, tenon_axis, w, t, wv,
+                               thin_ratio=thin_ratio)
+
+    # ---- LOCK / interlock merit (the wedge add-on) ----
+    lock_flags, notes = [], []
     if not (3.0 <= undercut_deg <= 15.0):
-        flags.append("undercut angle %.1f deg outside buildable band 3-15 deg" % undercut_deg)
+        lock_flags.append("undercut angle %.1f deg outside buildable band 3-15 deg" % undercut_deg)
     if brittle and not glue:
-        flags.append("BRITTLE sole load path: dry/unglued joint relies on the interlock, which "
-                     "is governed by mortise-cheek SPLIT (tension perp to grain) — sudden "
-                     "cleavage; glue it, reduce flare/undercut, or hoop the mortise")
+        lock_flags.append("BRITTLE sole load path: dry/unglued joint relies on the interlock, "
+                          "which is governed by mortise-cheek SPLIT (tension perp to grain) -- "
+                          "sudden cleavage; glue it, reduce flare/undercut, or hoop the mortise")
     elif brittle:
-        notes.append("interlock is brittle (mortise-cheek split governs) — a backstop behind "
+        notes.append("interlock is brittle (mortise-cheek split governs) -- a backstop behind "
                      "the glue line; size with margin")
     if fox:
         notes.append("fox-wedged: spread is set by assembly (cannot be re-tightened); "
                      "leave a mortise-bottom wall")
+    if shape_flags:
+        lock_flags.append("LOCK MASKS A NON-COMPLIANT SHAPE -- the wedge interlock cannot "
+                          "excuse a bad tenon shape; fix the proportions FIRST")
 
-    util = {}
+    util, overload_flags = {}, []
     if expected:
         for k, load in expected.items():
             c = caps.get(k)
             if c and load > 0:
                 util[k] = load / c["value"]
                 if util[k] > 1.0:
-                    flags.append("OVERLOADED %s: %.0f lbf > capacity %.0f (util %.2f)"
-                                 % (k, load, c["value"], util[k]))
+                    overload_flags.append("OVERLOADED %s: %.0f lbf > capacity %.0f (util %.2f)"
+                                          % (k, load, c["value"], util[k]))
 
-    ok = not flags
+    shape_ok = not shape_flags
+    # ok requires the SHAPE to pass on its own + no hard lock defect (bad undercut /
+    # dry-brittle reliance) + no overload. The interlock is REPORTED, not required.
+    hard_lock = [f for f in lock_flags if not f.startswith("LOCK MASKS")]
+    ok = shape_ok and not hard_lock and not overload_flags
+    flags = shape_flags + lock_flags + overload_flags
     head = ("%s (%.2f w x %.2f t x %.2f deep, %s): interlock %.0f lbf (%s%s), withdrawal %.0f"
             % (tenon_body.name, w, t, depth, species, interlock, gov,
                ", BRITTLE" if brittle else "", caps["withdrawal_tension"]["value"]))
     if flags:
-        print("WARNING validate_wedged_tenon: %s -> %s" % (head, "; ".join(flags + notes)))
+        print("WARNING validate_wedged_tenon: %s shape_ok=%s -> %s" % (
+            head, shape_ok, "; ".join(flags + notes)))
     elif notes:
         print("NOTE validate_wedged_tenon: %s -> %s" % (head, "; ".join(notes)))
 
-    return {"ok": ok, "flags": flags, "notes": notes,
+    return {"ok": ok, "shape_ok": shape_ok, "flags": flags,
+            "shape_flags": shape_flags, "lock_flags": lock_flags, "notes": notes,
             "interlock_withdrawal": interlock, "governing": gov, "brittle": brittle,
             "withdrawal": caps["withdrawal_tension"]["value"],
             "dims_in": {"width": w, "thickness": t, "depth": depth},
