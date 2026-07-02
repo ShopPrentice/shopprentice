@@ -37,9 +37,11 @@ MODELS = {
 # captures/ as converter regression fixtures but are not served).
 CAPTURES = {
     "pencil_box": "captures/pencil_box_capture.json",
+    "ming_table_cap": "captures/ming_table_capture.json",
 }
 LABELS = {"midou": "Midou 米斗", "ming_table": "Ming 平头案",
-          "pencil_box": "Pencil box"}
+          "pencil_box": "Pencil box",
+          "ming_table_cap": "Ming 平头案 (Fusion exact)"}
 _lock = threading.Lock()
 
 

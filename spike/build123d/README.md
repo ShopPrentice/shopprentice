@@ -193,12 +193,13 @@ its splitting tool. Next round: capture-helper upgrades (elliptical-arc
 geometry + on-arc mid via the evaluator, a Loft handler with profile refs,
 SplitBody tool refs), then re-capture.
 
-**Ming-table conversion status** (247 features, the hardest example): builds
-END-TO-END and passes validation (0 interference, 1 connected cluster).
-**21/25 bodies at exact parity.** The remaining 4 are the spandrels at 0.12%
-volume / 0.6 mm bbox: the original tops them up via gable-connector joins
-past the projected underside line before trimming flat, a construction detail
-below the recorded profile-area resolution. Two capture fields closed most of
+**Ming-table conversion: FULL PARITY — 25/25 bodies exact** (247 features,
+the hardest example), validation PASS. The final fix was EXCLUSIVE region
+assignment: when a sketch hosts multiple profiles with overlapping bboxes
+(band + spandrels), regions are claimed in ascending recorded-area order
+(most-constrained profile first), so the band can no longer steal the
+overshoot slivers the spandrels need — which had made the downstream flat
+trim a no-op and left them 0.12% light. Two capture fields closed most of
 the earlier gap: per-profile **area** (exact region-match gate for the
 arrangement fallback) and **isFullLength** on symmetric extrudes; the last
 big fix was direction handling for NEGATIVE captured distance expressions

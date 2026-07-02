@@ -168,6 +168,52 @@ def _loop_pts2d(loop):
     return pts
 
 
+_ASSIGN_CACHE = {}
+
+
+def _assign_regions(sk, regions_2d):
+    """Partition arrangement regions among a sketch's profiles EXCLUSIVELY:
+    profiles claim regions in ascending recorded-area order (most
+    constrained first), so a large profile cannot steal a sliver that a
+    smaller overlapping profile needs to reach its exact area."""
+    profs = sk.get("profiles") or []
+    order = sorted((p_ for p_ in profs if "area" in p_),
+                   key=lambda p_: p_["area"])
+    assigned = {}
+    taken = set()
+    tol, near = 2e-2, 0.35
+    for p_ in order:
+        pmin, pmax, target = p_["min"], p_["max"], p_["area"]
+        cands = [i for i, (fc, (umin, vmin, umax, vmax)) in enumerate(regions_2d)
+                 if i not in taken
+                 and umin > pmin[0] - tol and vmin > pmin[1] - tol
+                 and umax < pmax[0] + tol and vmax < pmax[1] + tol]
+        got = sum(regions_2d[i][0].area for i in cands)
+        if got < target - max(0.001 * target, 0.02):
+            extra = [i for i, (fc, (umin, vmin, umax, vmax)) in enumerate(regions_2d)
+                     if i not in taken and i not in cands
+                     and umin > pmin[0] - near and vmin > pmin[1] - near
+                     and umax < pmax[0] + near and vmax < pmax[1] + near]
+            extra.sort(key=lambda i: regions_2d[i][0].area)
+            for i in extra:
+                a_ = regions_2d[i][0].area
+                if got + a_ <= target * 1.01 + 0.01:
+                    cands.append(i); got += a_
+                if got >= target - max(0.001 * target, 0.02):
+                    break
+        if got > target * 1.01 + 0.01:
+            cands.sort(key=lambda i: -regions_2d[i][0].area)
+            kept, tot = [], 0.0
+            for i in cands:
+                a_ = regions_2d[i][0].area
+                if tot + a_ <= target * 1.01 + 0.01:
+                    kept.append(i); tot += a_
+            cands, got = kept, tot
+        assigned[p_["index"]] = cands
+        taken.update(cands)
+    return assigned
+
+
 def _arrangement_face(sk, profile_index):
     """Planar-arrangement fallback: Fusion profiles can be bounded by
     projected reference geometry meeting at ref/ref corners, which loop
@@ -234,25 +280,6 @@ def _arrangement_face(sk, profile_index):
     # curves crossing the region split it into sub-faces (their construction
     # flags at profile-consume time are unrecoverable), but the union of
     # inside-regions is exactly the Fusion profile
-    exp = TopExp_Explorer(sp.Shape(), TopAbs_FACE)
-    inside, outside = [], []
-    tol = 2e-2
-    near = 0.35
-    while exp.More():
-        fc = Face(TopoDS.Face_s(exp.Current()))
-        exp.Next()
-        u, v = [], []
-        for vt in fc.vertices():
-            rel = Vector(vt.X, vt.Y, vt.Z) - o
-            u.append(rel.dot(xd)); v.append(rel.dot(yd))
-        if not u:
-            continue
-        if min(u) > pmin[0] - tol and min(v) > pmin[1] - tol \
-                and max(u) < pmax[0] + tol and max(v) < pmax[1] + tol:
-            inside.append(fc)
-        elif min(u) > pmin[0] - near and min(v) > pmin[1] - near \
-                and max(u) < pmax[0] + near and max(v) < pmax[1] + near:
-            outside.append(fc)
     def _rebuild_poly(fc):
         """Rebuild a splitter-output face as a fresh polygonal face —
         splitter faces carry pcurve baggage that can poison later pairwise
@@ -276,6 +303,38 @@ def _arrangement_face(sk, profile_index):
         except Exception:
             return fc
 
+    exp = TopExp_Explorer(sp.Shape(), TopAbs_FACE)
+    regions_2d = []
+    tol = 2e-2
+    near = 0.35
+    big_area = big.area
+    while exp.More():
+        fc = Face(TopoDS.Face_s(exp.Current()))
+        exp.Next()
+        u, v = [], []
+        for vt in fc.vertices():
+            rel = Vector(vt.X, vt.Y, vt.Z) - o
+            u.append(rel.dot(xd)); v.append(rel.dot(yd))
+        if u and fc.area < big_area * 0.9:
+            regions_2d.append((fc, (min(u), min(v), max(u), max(v))))
+    # exclusive assignment when the sketch has multiple area-recorded
+    # profiles (overlapping bboxes can otherwise steal each other's slivers)
+    profs = sk.get("profiles") or []
+    if len(profs) > 1 and all("area" in p_ for p_ in profs):
+        key = id(sk)
+        if key not in _ASSIGN_CACHE:
+            _ASSIGN_CACHE[key] = _assign_regions(sk, regions_2d)
+        idxs = _ASSIGN_CACHE[key].get(profile_index, [])
+        if idxs:
+            return [_rebuild_poly(regions_2d[i][0]) for i in idxs], xd.cross(yd)
+    inside, outside = [], []
+    for fc, (umin, vmin, umax, vmax) in regions_2d:
+        if umin > pmin[0] - tol and vmin > pmin[1] - tol \
+                and umax < pmax[0] + tol and vmax < pmax[1] + tol:
+            inside.append(fc)
+        elif umin > pmin[0] - near and vmin > pmin[1] - near \
+                and umax < pmax[0] + near and vmax < pmax[1] + near:
+            outside.append(fc)
     target_area = prof.get("area")
     if inside and target_area:
         got = sum(f_.area for f_ in inside)
