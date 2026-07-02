@@ -297,7 +297,17 @@ async function load(m, opts = {}) {
     new THREE.ShadowMaterial({ opacity: 0.28 }));
   g.position.y = box.min.y; g.rotation.x = -Math.PI / 2; g.receiveShadow = true;
   scene.add(g); ground = g;
+  // shadow camera sized to the model (defaults cover a tiny clipped
+  // square); normal bias avoids acne on the ground drop shadow
+  key.position.copy(ctr).add(new THREE.Vector3(0.5, 1.2, -0.8)
+    .normalize().multiplyScalar(radius * 3));
   key.target.position.copy(ctr); scene.add(key.target);
+  const sc_ = key.shadow.camera;
+  sc_.left = -radius * 1.6; sc_.right = radius * 1.6;
+  sc_.top = radius * 1.6; sc_.bottom = -radius * 1.6;
+  sc_.near = radius * 0.5; sc_.far = radius * 6;
+  sc_.updateProjectionMatrix();
+  key.shadow.normalBias = radius * 0.01;
 
   modelBox = box.clone(); modelRadius = radius;
   if (saved) {
