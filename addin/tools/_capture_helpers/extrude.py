@@ -69,11 +69,35 @@ def _capture_extrude(ext, idx, tl, design=None):
     except:
         pass
 
-    # Direction flipped
+    # Direction flipped (note: ExtrudeFeature does NOT expose this — kept for
+    # forward compat; the authoritative signal is the face centroids below)
     try:
         info["isDirectionFlipped"] = ext.isDirectionFlipped
     except:
         pass
+
+    # Direction ground truth: start/end face centroids, read just AFTER the
+    # feature (rollTo(False)) where the faces are guaranteed alive. The end
+    # face lies at +distance along the TRUE extrude direction from the
+    # profile plane, so a converter recovers the direction sign exactly —
+    # sign(dot(endFaceCentroid - sketchOrigin, sketchNormal)).
+    if design:
+        try:
+            ext.timelineObject.rollTo(False)
+            try:
+                for key, coll in (("startFaceCentroid", ext.startFaces),
+                                  ("endFaceCentroid", ext.endFaces)):
+                    try:
+                        if coll.count:
+                            c = coll.item(0).centroid
+                            info[key] = [round(c.x, 4), round(c.y, 4),
+                                         round(c.z, 4)]
+                    except:
+                        pass
+            finally:
+                design.timeline.moveToEnd()
+        except:
+            pass
 
     # Sketch — multi-strategy capture (only when timeline context is available)
     if idx is not None and tl is not None:

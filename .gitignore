@@ -34,3 +34,8 @@ promo/
 Thumbs.db
 .claude/
 dist/
+
+# build123d spike venv + generated artifacts
+.venv-b123d/
+spike/build123d/out/
+spike/build123d/__pycache__/
