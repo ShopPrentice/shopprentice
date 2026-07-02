@@ -141,12 +141,12 @@ const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100000);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x40382a, 1.05));
+scene.add(new THREE.HemisphereLight(0xffffff, 0x584a38, 1.45));
 const key = new THREE.DirectionalLight(0xfff3e0, 2.1);
 key.position.set(1, -1.4, 2); key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
 scene.add(key);
-const fill = new THREE.DirectionalLight(0xbcd0ff, 0.5);
+const fill = new THREE.DirectionalLight(0xbcd0ff, 0.9);
 fill.position.set(-1.5, 1, 0.6); scene.add(fill);
 
 let ground = null, current = null, meshes = [], spinning = false, wire = false;
@@ -398,8 +398,11 @@ document.getElementById("edges").addEventListener("click", (e) => {
 function buildParamsPanel(manifest) {
   const host = document.getElementById("params");
   host.innerHTML = "";
+  const ro = manifest.editable === false;
   document.getElementById("punit").textContent =
-    manifest.units ? "(" + manifest.units + ")" : "";
+    (manifest.units ? "(" + manifest.units + ")" : "") +
+    (ro ? " · captured, read-only" : "");
+  document.getElementById("rebuild").style.display = ro ? "none" : "";
   const params = manifest.params || {};
   for (const [k, v] of Object.entries(params)) {
     const lab = document.createElement("label");
@@ -407,6 +410,7 @@ function buildParamsPanel(manifest) {
     const inp = document.createElement("input");
     inp.type = "number"; inp.step = "any";
     inp.value = v; inp.dataset.key = k; inp.dataset.orig = v;
+    inp.disabled = ro;
     inp.addEventListener("input", () =>
       inp.classList.toggle("dirty", +inp.value !== +inp.dataset.orig));
     host.appendChild(lab); host.appendChild(inp);

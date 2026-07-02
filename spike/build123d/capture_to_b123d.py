@@ -1033,7 +1033,21 @@ def convert(capture_path, verbose=True):
         raise NotImplementedError(f"unhandled feature type {ft} ({f['name']})")
 
     # ---- parity gate ------------------------------------------------------
-    m = Model(cap.get("designName") or "capture", units="cm")
+    m = Model(cap.get("designName") or "capture", units="in")
+    disp = {}
+    for up in cap.get("userParameters", []):
+        u_, v_ = up.get("unit", ""), up["value"]
+        if u_ == "in":
+            v_ = v_ / 2.54
+        elif u_ == "mm":
+            v_ = v_ * 10
+        elif u_ == "m":
+            v_ = v_ / 100
+        elif u_ in ("deg", "rad"):
+            v_ = math.degrees(v_)
+        disp[up["name"]] = round(v_, 4)
+    m.params = disp
+    m.editable = False       # captured coordinates are baked; display-only
     palette = ["#c79a6b", "#b07a45", "#9c6b3f", "#a06a3c", "#8a5a30", "#7a4a28"]
     ok = True
     print(f"\n=== parity: rebuilt vs captured ground truth ===")

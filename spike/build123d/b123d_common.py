@@ -44,6 +44,7 @@ class Model:
     parts: list[Part] = field(default_factory=list)
     params: dict | None = None      # user parameters (original units)
     units: str = "cm"               # unit the params are expressed in
+    editable: bool = True           # False: display-only (captured) params
 
     def add(self, name, solid, color="#b8895a", component=""):
         self.parts.append(Part(name, solid, color, component))
@@ -70,7 +71,8 @@ class Model:
         os.makedirs(parts_dir, exist_ok=True)
         # stamp lets the viewer auto-reload when a rebuild lands
         manifest = {"name": self.name, "stamp": time.time(), "parts": [],
-                    "params": self.params or {}, "units": self.units}
+                    "params": self.params or {}, "units": self.units,
+                    "editable": self.editable}
         for i, p in enumerate(self.parts):
             rel = f"{os.path.basename(parts_dir)}/body_{i:02d}.stl"
             export_stl(p.solid, f"{stem}_parts/body_{i:02d}.stl")
