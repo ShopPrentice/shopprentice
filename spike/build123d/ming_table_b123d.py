@@ -1,29 +1,44 @@
-"""Classic Ming side table (平头案) — visible form, in build123d.
+"""Classic Ming side table (平头案) — authored as STOCK + JOINTS.
 
-Port of the form of examples/ming-table/ming_table.py (1450 lines of Fusion).
-28"L x 13.75"D x 30.875"H, round 1-3/8" legs splayed 1.5 deg, mitered
-frame-and-panel top, an apron band with carved spandrel brackets flanking
-each leg, and a frame-and-panel shelf coped to the round legs.
+28"L x 13.75"D x 30.875"H. Round legs splayed 1.5deg. The joinery schedule —
+every joint a named form from joints.py, the vocabulary the piece is
+"written" in:
 
-SCOPE: this reproduces everything you can SEE. The Ming table's signature is
-that almost every joint is *concealed* (hidden full-blind dovetails, blind
-mitered tenons inside the round legs) -- by design they don't show. The
-1450-line Fusion script is mostly machinery to make those hidden joints while
-fighting the sketch constraint solver (anchor_poly, pin_free, _poly_cut,
-projected-leg-silhouette addParallel, the deps gate). Here, parts are seated
-against the legs with booleans so the assembly is interference-free and
-connected; the dovetail/tenon-carving technique itself is shown in full on
-the midou. The leg splay plane for the apron is taken vertical (the real 1.5
-deg apron tilt is omitted -- invisible at this scale).
+  top frame corners     格角榫    miter_tenon_frame      (concealed tenon,
+                                                          reads as a miter)
+  top / shelf panels    槽口装板  tongue_panel           (floating in grooves,
+                                                          free to move)
+  top battens           带        sliding_batten         (anti-cup, sliding)
+  shelf batten          穿带      sliding_batten
+  apron ring corners    闷齿斗角榫 full_blind_dovetail_corner (locked ring,
+                                                          nothing shows)
+  shelf rails -> legs   圆包圆内榫 mitered_leg_tenons     (tenons meet at 45deg
+                                                          inside the round leg)
+  aprons -> legs        夹头式     leg_slot               (the leg yields; the
+                                                          band stays whole)
+
+Details carried outside the joint vocabulary: the spandrel bracket profile
+with quarter-circle coves, the hollow spline edge molding (curve sampled
+from the Fusion original), and the 1.5deg lean of the apron plane — built
+vertical, rotated rigidly about the leg-top axis (the dovetail pieces ride
+the same rotation, so the joint fit survives), then sheared flat against
+the frame underside.
 """
+import importlib
 import math
 
-from build123d import Solid, Face, Wire, Vector, Plane, Location, Axis, fillet, chamfer
-from b123d_common import Model, summarize, run_cli
+from build123d import Solid, Vector, Plane, Location, Axis, chamfer
+
+import joints
+importlib.reload(joints)        # dev: pick up vocabulary edits on rebuild
+from joints import (box, fuse, poly_prism, edges_at, one_solid,
+                    miter_tenon_frame, tongue_panel,
+                    full_blind_dovetail_corner, sliding_batten,
+                    mitered_leg_tenons, leg_slot)
+from b123d_common import Model, run_cli
 
 IN = 2.54
 
-# user parameters (inches / deg) -- the key rows of the Fusion table
 PARAMS = {
     "table_l": 28.0, "table_d": 13.75, "table_h": 30.875, "splay_deg": 1.5,
     "tf_t": 1.0625, "tf_w": 2.0, "panel_t": 0.3125,
@@ -40,431 +55,195 @@ def inch(x):
     return x * IN
 
 
-def V(t):
-    return Vector(t[0], t[1], t[2])
-
-
-def poly_prism(corners_2d, fixed_axis, fixed_val, extrude_vec, fillets=None):
-    """Polygon given as (a,b) pairs in a plane; `fixed_axis` ('x'|'y'|'z')
-    held at fixed_val supplies the third coord. Extruded along extrude_vec.
-
-    fillets: optional [(corner_index, radius), ...] — rounds those profile
-    vertices BEFORE extruding (2D wire fillet). Works on both convex corners
-    (round-over) and reflex corners (cove); this is how the Fusion script's
-    sketch addFillet coves are reproduced. Profile-level filleting is far more
-    robust than filleting the extruded solid's edges afterwards."""
-    pts = []
-    for a, b in corners_2d:
-        if fixed_axis == "y":
-            pts.append((a, fixed_val, b))        # (x, y=fix, z)
-        elif fixed_axis == "x":
-            pts.append((fixed_val, a, b))        # (x=fix, y, z)
-        else:
-            pts.append((a, b, fixed_val))        # (x, y, z=fix)
-    face = Face(Wire.make_polygon([V(p) for p in pts]))
-    if fillets:
-        by_r = {}
-        for idx, r in fillets:
-            by_r.setdefault(r, []).append(pts[idx])
-        for r, locs in by_r.items():
-            vs = [v for v in face.vertices()
-                  if any(abs(v.X - p[0]) < 1e-6 and abs(v.Y - p[1]) < 1e-6
-                         and abs(v.Z - p[2]) < 1e-6 for p in locs)]
-            assert len(vs) == len(locs), \
-                f"fillet vertex pick: wanted {len(locs)} got {len(vs)}"
-            face = fillet(vs, r).faces()[0]
-    return Solid.extrude(face, V(extrude_vec))
-
-
-def edges_at(solid, x=None, y=None, z=None, tol=0.05):
-    """Edges whose bounding box is pinned to the given coordinate(s) — e.g.
-    z=top and y=outer selects the top outer edge run (possibly split into
-    several segments by boolean cuts)."""
-    out = []
-    for e in solid.edges():
-        bb = e.bounding_box()
-        ok = True
-        for val, lo, hi in ((x, bb.min.X, bb.max.X), (y, bb.min.Y, bb.max.Y),
-                            (z, bb.min.Z, bb.max.Z)):
-            if val is not None and not (abs(lo - val) < tol and abs(hi - val) < tol):
-                ok = False
-        if ok:
-            out.append(e)
-    return out
-
-
-def one_solid(shape):
-    """fillet()/chamfer() return a Part (compound); unwrap the single solid."""
-    sols = shape.solids()
-    assert len(sols) == 1, f"expected 1 solid, got {len(sols)}"
-    return sols[0]
-
-
-def box(x0, x1, y0, y1, z0, z1):
-    return Solid.make_box(x1 - x0, y1 - y0, z1 - z0).moved(Location((x0, y0, z0)))
-
-
-def fuse(solids):
-    out = solids[0]
-    for s in solids[1:]:
-        out = out + s
-    return out
+# hollow edge-molding profile: the original's designed curve, sampled from
+# the Fusion capture (dz up from the frame underside, dy inward from the
+# outer face, cm)
+MOLDING = [(0.0, 0.2171), (0.0131, 0.162), (0.2257, 0.1407),
+           (0.5282, 0.1383), (0.7732, 0.1334), (0.8897, 0.1122),
+           (0.9667, 0.079), (1.1405, 0.0477), (1.4297, 0.0259),
+           (1.7613, 0.0137), (2.0509, 0.0081), (2.2662, 0.0057),
+           (2.4266, 0.0043), (2.5648, 0.0026), (2.6988, 0.0)]
 
 
 def build(overrides=None):
     p = {**PARAMS, **(overrides or {})}
-    # ---- parameters (converted to cm) ----
     table_l, table_d, table_h = inch(p["table_l"]), inch(p["table_d"]), inch(p["table_h"])
     splay = math.radians(p["splay_deg"])
     tf_t, tf_w = inch(p["tf_t"]), inch(p["tf_w"])
     tf_bot = table_h - tf_t
     panel_t = inch(p["panel_t"])
     panel_under = table_h - panel_t
-
     leg_r = inch(p["leg_dia"]) / 2
     ltx = table_l / 2 - inch(p["leg_setback_x"])
     lty = table_d / 2 - inch(p["leg_setback_y"])
-    leg_embed = inch(0.5)
-    leg_tip_z = tf_bot + leg_embed
+    leg_tip_z = tf_bot + inch(0.5)          # legs embed 1/2" up into the frame
     foot_off = leg_tip_z * math.tan(splay)
-
     apron_t, apron_w = inch(p["apron_t"]), inch(p["apron_w"])
     spandrel_depth = inch(p["spandrel_depth"])
-    ap_end_inset = inch(p["ap_end_inset"])
-    la_half = table_l / 2 - ap_end_inset
+    la_half = table_l / 2 - inch(p["ap_end_inset"])
     sp_edge_gap = inch(p["sp_edge_gap"])
-
-    shelf_z = inch(p["shelf_z"])
-    sf_t = inch(p["sf_t"])
+    shelf_z, sf_t = inch(p["shelf_z"]), inch(p["sf_t"])
     sp_panel_t = inch(p["sp_panel_t"])
+    l2, d2 = table_l / 2, table_d / 2
 
     LEGC, FRAME, PANEL, APRON, SHELF = (
         "#7a4a28", "#b07a45", "#9c6b3f", "#a06a3c", "#8a5a30")
     m = Model("Ming table (平头案)", params=p, units="in")
 
-    # =====================================================================
-    # LEGS -- a circle swept along the splayed centerline (foot on floor ->
-    # top under the frame). The centerline carries the compound splay; no
-    # extrude-then-rotate.
-    # =====================================================================
-    def leg(sx, sy, name):
-        top = (sx * ltx, sy * lty, leg_tip_z)
-        foot = (sx * ltx + sx * foot_off, sy * lty + sy * foot_off, 0.0)
-        axis = (top[0] - foot[0], top[1] - foot[1], top[2] - foot[2])
-        length = math.sqrt(sum(c * c for c in axis))
-        zdir = Vector(*[c / length for c in axis])
-        pl = Plane(origin=Vector(*foot), z_dir=zdir)
-        return Solid.make_cylinder(leg_r, length, pl)
+    # ================= STOCK: legs (splayed, swept) ======================
+    def leg(sx, sy):
+        top = Vector(sx * ltx, sy * lty, leg_tip_z)
+        foot = Vector(sx * (ltx + foot_off), sy * (lty + foot_off), 0.0)
+        axis = top - foot
+        return Solid.make_cylinder(
+            leg_r, axis.length, Plane(origin=foot, z_dir=axis.normalized()))
 
-    legs = {
-        "Leg_FL": leg(-1, -1, "Leg_FL"), "Leg_FR": leg(1, -1, "Leg_FR"),
-        "Leg_BL": leg(-1, 1, "Leg_BL"), "Leg_BR": leg(1, 1, "Leg_BR"),
-    }
+    legs = {"Leg_FL": leg(-1, -1), "Leg_FR": leg(1, -1),
+            "Leg_BL": leg(-1, 1), "Leg_BR": leg(1, 1)}
     legunion = fuse(list(legs.values()))
 
-    # =====================================================================
-    # TOP -- 格角榫 mitered mortise-and-tenon frame + panel with tongue.
-    # Faithful port of the Fusion shape_rail_end(): each rail is a FULL box
-    # overlapping the corner; at each end the TOP and BOTTOM thirds lose a
-    # 45-deg miter triangle and the MIDDLE third loses the tenon-waste
-    # pentagon -- leaving a shouldered, mitered, CONCEALED tenon. The stiles
-    # are then CUT by the rails, inheriting the mating miter + mortise.
-    # Template proportions: depth 1.5/3.5, inner shoulder 1.2/3.5, outer
-    # shoulder 0.6/3.5 of the member width.
-    # =====================================================================
-    l2, d2 = table_l / 2, table_d / 2
-    tn_d, tn_st, tn_sb = tf_w * 1.5 / 3.5, tf_w * 1.2 / 3.5, tf_w * 0.6 / 3.5
-    t3 = tf_t / 3
-    OYf, IYf = -d2, -d2 + tf_w
-    tri = [(l2, OYf), (l2, IYf), (l2 - tf_w, IYf)]
-    pent = [(l2, OYf + tn_sb), (l2, IYf - tn_st), (l2 - tn_d, IYf - tn_st),
-            (l2 - tn_d, OYf + tn_d), (l2 - tn_sb, OYf + tn_sb)]
-    end_cut_r = fuse([
-        poly_prism(tri, "z", tf_bot + 2 * t3, (0, 0, t3)),   # top miter
-        poly_prism(tri, "z", tf_bot, (0, 0, t3)),            # bottom miter
-        poly_prism(pent, "z", tf_bot + t3, (0, 0, t3)),      # tenon waste
-    ])
-    end_cuts = end_cut_r + end_cut_r.mirror(Plane.YZ)
-    rail_f = box(-l2, l2, OYf, IYf, tf_bot, tf_bot + tf_t) - end_cuts
-    rail_b = rail_f.mirror(Plane.XZ)
-    stile_l = (box(-l2, -l2 + tf_w, -d2, d2, tf_bot, tf_bot + tf_t)
-               - rail_f - rail_b)        # inherits mating miter + mortise
-    stile_r = stile_l.mirror(Plane.YZ)
-    # panel: flush field + a tongue slab lapping tongue_ov into the frame;
-    # subtracting the panel from the frame members cuts their groove.
-    tongue_ov, tongue_w = inch(0.25), panel_t / 2
+    def cope(s):
+        return s - legunion
+
+    # ================= TOP: 格角榫 frame + floating panel =================
+    rail_f, rail_b, stile_l, stile_r = miter_tenon_frame(
+        l2, d2, tf_w, tf_t, tf_bot)
+
     iw, ih = l2 - tf_w, d2 - tf_w
-    top_panel = (box(-iw, iw, -ih, ih, panel_under, table_h)
-                 + box(-(iw + tongue_ov), iw + tongue_ov,
-                       -(ih + tongue_ov), ih + tongue_ov,
-                       panel_under, panel_under + tongue_w))
+    top_panel = cope(tongue_panel(iw, ih, panel_under, table_h,
+                                  tongue_ov=inch(0.25), tongue_w=panel_t / 2))
 
-    # =====================================================================
-    # APRONS -- long sides carry the spandrel brackets; short sides plain.
-    # The bracket elevation is the same polygon the Fusion long_side() draws,
-    # now with the real curved treatments: quarter-circle coves (cove_r) at
-    # the band/spandrel transitions -- reflex corners, so the 2D fillet cuts
-    # a concave arc -- and rounded spandrel bottom corners (bot_r). Same
-    # radii/vertices as the Fusion fil() calls at lines 3,6,7,10 / 4,5,8,9.
-    # (The Fusion gable miter lines are interior split lines between the band
-    # and spandrel BOARDS -- part decomposition, not outline geometry -- so
-    # they don't appear here where each side is one body.)
-    # =====================================================================
-    cove_r, bot_r = inch(0.75), inch(0.75)
+    # hollow spline molding wraps the frame's outer faces (the miters let
+    # it run around the corners)
+    mold_f = poly_prism([(-d2 + dy, tf_bot + dz) for dz, dy in MOLDING]
+                        + [(-d2, tf_bot)], "x", -l2 - 1, (2 * (l2 + 1), 0, 0))
+    mold_l = poly_prism([(-l2 + dy, tf_bot + dz) for dz, dy in MOLDING]
+                        + [(-l2, tf_bot)], "y", -d2 - 1, (0, 2 * (d2 + 1), 0))
+    molding = mold_f + mold_f.mirror(Plane.XZ) + mold_l + mold_l.mirror(Plane.YZ)
+
+    rail_f = cope(rail_f) - molding - top_panel      # cope: round leg mortises
+    rail_b = cope(rail_b) - molding - top_panel      # - panel: tongue grooves
+    stile_l = cope(stile_l) - molding - top_panel
+    stile_r = cope(stile_r) - molding - top_panel
+
+    # 带 battens keep the wide top panel flat; the panel still slides
+    bt_w, bt_h = inch(0.875), tf_t - panel_t
+    batten_r = sliding_batten(inch(7.0), bt_w, panel_under - bt_h, panel_under,
+                              ridge_narrow=inch(0.5), ridge_wide=inch(0.75),
+                              ridge_depth=inch(0.1875), y_half=ih,
+                              tenon_len=inch(0.6), tenon_h=bt_h * 2 / 3)
+    batten_l = batten_r.mirror(Plane.YZ)
+    battens = batten_r + batten_l
+    top_panel = top_panel - battens                  # sliding dovetail grooves
+    rail_f, rail_b = rail_f - battens, rail_b - battens   # tenon mortises
+
+    # ================= APRON RING (leaning, dovetailed) ==================
     AT, AB = tf_bot, tf_bot - apron_w
+    ATT = AT + 0.15               # overshoot; sheared flat after the lean
     SB = AB - spandrel_depth
-    spo = ltx + leg_r + sp_edge_gap
-    spi = ltx - leg_r - sp_edge_gap
+    spo, spi = ltx + leg_r + sp_edge_gap, ltx - leg_r - sp_edge_gap
     LH = la_half
-    ATT = AT + 0.15          # overshoot; sheared flat at tf_bot after the lean
-    bracket = [(-LH, ATT), (LH, ATT), (LH, AB), (spo, AB), (spo, SB), (spi, SB),
-               (spi, AB), (-spi, AB), (-spi, SB), (-spo, SB), (-spo, AB), (-LH, AB)]
-    coves = [(i, cove_r) for i in (3, 6, 7, 10)]     # band/spandrel coves
-    bots = [(i, bot_r) for i in (4, 5, 8, 9)]        # spandrel bottom rounds
+    bracket = [(-LH, ATT), (LH, ATT), (LH, AB), (spo, AB), (spo, SB),
+               (spi, SB), (spi, AB), (-spi, AB), (-spi, SB), (-spo, SB),
+               (-spo, AB), (-LH, AB)]
+    cove_r = inch(0.75)
     apron_f = poly_prism(bracket, "y", -lty - apron_t / 2, (0, apron_t, 0),
-                         fillets=coves + bots)
-    # short aprons: plain band between the legs, running in Y at x = -+ltx
-    # ------------------------------------------------------------------
-    # Apron RING with hidden full-blind dovetail corners (the original's
-    # 闷齿斗角榫): the short aprons sit at the table ends (x = +-la_half)
-    # and meet the long aprons corner to corner. At each corner the long
-    # apron keeps a LIP (fbd_lip) concealing the joint from the front;
-    # the short apron sends dovetail TAILS (stacked in Z, flaring toward
-    # the front so the ring cannot pull open) into sockets cut in the
-    # long apron's end block. A lip-thick wall also remains at the very
-    # end (tails start at X0+fbd_lip), so nothing shows end-on either.
-    # ------------------------------------------------------------------
-    fbd_lip = inch(p.get("fbd_lip", 0.1))
-    fbd_pad = inch(p.get("fbd_pad", 0.1))
-    fbd_angle = math.radians(p.get("fbd_angle_deg", 10.0))
-    fbd_tail_w = inch(p.get("fbd_tail_w", 0.225))
-    fbd_n = int(p.get("fbd_tail_count", 2))
-    X0 = -la_half
-    y0, y1 = -lty - apron_t / 2, -lty + apron_t / 2   # long apron band (front)
-    Ys = lty + apron_t / 2                            # short apron half-span
-    fbd_socket = apron_t - fbd_lip
-    fbd_nw = fbd_tail_w - 2 * fbd_socket * math.tan(fbd_angle)
-    fbd_pitch = (apron_w - 2 * fbd_pad) / fbd_n
+                         fillets=[(i, cove_r) for i in (3, 6, 7, 10)]     # coves
+                         + [(i, cove_r) for i in (4, 5, 8, 9)])           # feet
 
-    tails = []
-    for k in range(fbd_n):
-        zc = AB + fbd_pad + (k + 0.5) * fbd_pitch
-        trap = [(y0 + fbd_lip, zc - fbd_tail_w / 2),   # deep end: WIDE
-                (y0 + fbd_lip, zc + fbd_tail_w / 2),
-                (y1, zc + fbd_nw / 2),                 # entry: narrow
-                (y1, zc - fbd_nw / 2)]
-        tails.append(poly_prism(trap, "x", X0 + fbd_lip,
-                                (apron_t - fbd_lip, 0, 0)))
-    tailsFL = fuse(tails)
-    tailsFR = tailsFL.mirror(Plane.YZ)
+    # 闷齿斗角榫 at the ring corners: tails on the short aprons, sockets in
+    # the long aprons, lip conceals everything
+    X0, y0, y1 = -la_half, -lty - apron_t / 2, -lty + apron_t / 2
+    Ys = lty + apron_t / 2
+    tailsFL, cubeFL = full_blind_dovetail_corner(
+        X0, y0, y1, AB, AT, apron_t,
+        lip=inch(p["fbd_lip"]), pad=inch(p["fbd_pad"]),
+        angle=math.radians(p["fbd_angle_deg"]),
+        tail_w=inch(p["fbd_tail_w"]), n=int(p["fbd_tail_count"]))
+    tailsFR, cubeFR = tailsFL.mirror(Plane.YZ), cubeFL.mirror(Plane.YZ)
+    apron_f = apron_f - tailsFL - tailsFR            # dovetail sockets
 
-    # corner overlap block, extended past the band top/bottom so it still
-    # covers the full (vertical) short-apron column after the lean rotation
-    cubeFL = box(X0, X0 + apron_t, y0, y1, AB - 0.3, AT + 0.3)
-    cubeFR = cubeFL.mirror(Plane.YZ)
-    apron_f = apron_f - tailsFL - tailsFR              # dovetail sockets
-
-    # ---- the 1.5-deg lean: the apron plane contains the splayed leg
-    # centerlines. Rotate the whole front assembly (band+spandrels with
-    # sockets, tails, corner blocks) about the leg-top axis, then shear
-    # the overshot band top flat against the frame underside. The FBD
-    # pieces ride the same rigid rotation, so the joint fit is preserved.
+    # the 1.5deg lean: rotate the whole front assembly rigidly about the
+    # leg-top axis (dovetail pieces ride along -> fit preserved), then
+    # shear the overshot top flat against the frame underside
     ax_f = Axis((0, -lty, leg_tip_z), (1, 0, 0))
-    sdeg = p["splay_deg"]
     shear = box(-l2 - 2, l2 + 2, -d2 - 5, d2 + 5, tf_bot, tf_bot + 3)
-    apron_f = apron_f.rotate(ax_f, -sdeg) - shear
-    tailsFL = tailsFL.rotate(ax_f, -sdeg)
-    tailsFR = tailsFR.rotate(ax_f, -sdeg)
-    cubeFL = cubeFL.rotate(ax_f, -sdeg)
-    cubeFR = cubeFR.rotate(ax_f, -sdeg)
+    apron_f = apron_f.rotate(ax_f, -p["splay_deg"]) - shear
+    tailsFL = tailsFL.rotate(ax_f, -p["splay_deg"])
+    tailsFR = tailsFR.rotate(ax_f, -p["splay_deg"])
+    cubeFL = cubeFL.rotate(ax_f, -p["splay_deg"])
+    cubeFR = cubeFR.rotate(ax_f, -p["splay_deg"])
     apron_b = apron_f.mirror(Plane.XZ)
-    tailsBL = tailsFL.mirror(Plane.XZ)
-    tailsBR = tailsFR.mirror(Plane.XZ)
-    cubeBL = cubeFL.mirror(Plane.XZ)
-    cubeBR = cubeFR.mirror(Plane.XZ)
+    tailsBL, tailsBR = tailsFL.mirror(Plane.XZ), tailsFR.mirror(Plane.XZ)
+    cubeBL, cubeBR = cubeFL.mirror(Plane.XZ), cubeFR.mirror(Plane.XZ)
 
-    # short aprons stay vertical; their end faces come from subtracting the
-    # LEANED corner blocks, so they mate the leaning long aprons flush
+    # short aprons stay vertical; subtracting the LEANED corner blocks
+    # gives them leaning end faces that mate the long aprons flush
     apron_l = (box(X0, X0 + apron_t, -Ys, Ys, AB, AT)
                - cubeFL - cubeBL + tailsFL + tailsBL)
     apron_r = (box(la_half - apron_t, la_half, -Ys, Ys, AB, AT)
                - cubeFR - cubeBR + tailsFR + tailsBR)
 
-    # legs get SLOTS for the ring to pass through (the original's swept
-    # leg slot) — slotting the LEG keeps the apron band in one piece,
-    # where coping the apron on the leg would sever it into three lumps
+    # 夹头式: the legs are slotted so the band+spandrel sides pass through
+    # whole — cutting the aprons on the legs would sever the band
     ring_fb = apron_f + apron_b
-    for k_ in list(legs):
-        legs[k_] = legs[k_] - ring_fb
+    for k in list(legs):
+        legs[k] = leg_slot(legs[k], ring_fb)
 
-    # =====================================================================
-    # SHELF -- frame-and-panel coped to the legs. Leg X/Y are further out at
-    # shelf height (the leg leans), so the frame tracks them.
-    # =====================================================================
+    # ================= SHELF: frame, leg tenons, panel, 穿带 =============
     lxs = ltx + (leg_tip_z - (shelf_z - sf_t / 2)) * math.tan(splay)
     lys = lty + (leg_tip_z - (shelf_z - sf_t / 2)) * math.tan(splay)
     sz0, sz1 = shelf_z - sf_t, shelf_z
     sh_long_f = box(-lxs, lxs, -lys - leg_r, -lys + leg_r, sz0, sz1)
     sh_long_b = sh_long_f.mirror(Plane.XZ)
-    sh_short_l = box(-lxs - leg_r, -lxs + leg_r, -lys, lys, sz0, sz1)
-    # short rails cope to the long rails at the corners (the mitered tenons
-    # meet inside the leg) -- same as the Fusion ShS_*_cope combine
-    sh_short_l = sh_short_l - sh_long_f - sh_long_b
+    sh_short_l = (box(-lxs - leg_r, -lxs + leg_r, -lys, lys, sz0, sz1)
+                  - sh_long_f - sh_long_b)           # coped at the corners
     sh_short_r = sh_short_l.mirror(Plane.YZ)
-    # flush shelf panel (like the original: top surface at shelf_z)
-    sh_panel = box(-(lxs - leg_r), lxs - leg_r, -(lys - leg_r), lys - leg_r,
-                   sz1 - sp_panel_t, sz1)
 
-    # =====================================================================
-    # Seat everything against the round legs: subtract the legs from every
-    # member that embeds into them (the cope / blind-tenon shoulder). This is
-    # the boolean half of the concealed joinery -- it removes all overlaps and
-    # leaves coped contact faces, so the assembly is interference-free and
-    # connected.
-    # =====================================================================
-    def cope(s):
-        return s - legunion
-
-    # =====================================================================
-    # 3D edge treatments -- applied AFTER the leg cope, so the fillet /
-    # chamfer terminates against boolean-cut faces (the OCCT stress case
-    # this spike exercises):
-    #   * top frame: round-over on the outer top edge of each mitered rail
-    #     (the Fusion original does this with spline cutter bodies, tf_cham;
-    #     here it's a native OCCT edge fillet)
-    #   * shelf rails: sf_cham chamfer on the top outer edge. Chamfering
-    #     AFTER the cope fails here ("BRep_API: command not done"): the cope
-    #     cylinder is near-tangent to the rail's outer face, and OCCT cannot
-    #     terminate the chamfer face against that cylindrical cut surface.
-    #     Workaround: chamfer the pristine edge FIRST, cope after -- booleans
-    #     resolve the same intersection fine (and it matches shop order:
-    #     mold the edge profile, then cut the joinery).
-    # =====================================================================
-    tf_round = inch(0.25)
     sf_cham = inch(0.3125)
 
-    # hollow spline edge molding on the frame's outer faces — the profile
-    # is the original's designed curve, sampled from the Fusion capture
-    # (offsets: dz up from tf_bot, dy inward from the outer face, cm)
-    MOLDING = [(0.0, 0.2171), (0.0131, 0.162), (0.2257, 0.1407),
-               (0.5282, 0.1383), (0.7732, 0.1334), (0.8897, 0.1122),
-               (0.9667, 0.079), (1.1405, 0.0477), (1.4297, 0.0259),
-               (1.7613, 0.0137), (2.0509, 0.0081), (2.2662, 0.0057),
-               (2.4266, 0.0043), (2.5648, 0.0026), (2.6988, 0.0)]
-    mold_f = poly_prism([(-d2 + dy, tf_bot + dz) for dz, dy in MOLDING]
-                        + [(-d2, tf_bot)], "x", -l2 - 1, (2 * (l2 + 1), 0, 0))
-    mold_b = mold_f.mirror(Plane.XZ)
-    mold_l = poly_prism([(-l2 + dy, tf_bot + dz) for dz, dy in MOLDING]
-                        + [(-l2, tf_bot)], "y", -d2 - 1, (0, 2 * (d2 + 1), 0))
-    mold_r = mold_l.mirror(Plane.YZ)
-    molding = mold_f + mold_b + mold_l + mold_r
-    rail_f = cope(rail_f) - molding
-    rail_b = cope(rail_b) - molding
-    stile_l = cope(stile_l) - molding
-    stile_r = cope(stile_r) - molding
-
-    # the panel tongue cuts its groove into all four frame members
-    top_panel = cope(top_panel)
-    rail_f, rail_b = rail_f - top_panel, rail_b - top_panel
-    stile_l, stile_r = stile_l - top_panel, stile_r - top_panel
-
-    # ------------------------------------------------------------------
-    # Sliding-dovetail battens under the top panel: dovetail ridge up into
-    # the panel, body stopped at the frame inner faces, a 2/3-height tenon
-    # into each rail. Battens cut their own panel groove + rail mortises.
-    # ------------------------------------------------------------------
-    bt_w, bt_off = inch(0.875), inch(7.0)
-    bt_h = tf_t - panel_t
-    dtb, dtt, dtd = inch(0.5), inch(0.75), inch(0.1875)
-    ihf = d2 - tf_w                        # frame inner face |y|
-
-    def batten(cx):
-        prof = [(cx - bt_w / 2, panel_under - bt_h), (cx - bt_w / 2, panel_under),
-                (cx - dtb / 2, panel_under), (cx - dtt / 2, panel_under + dtd),
-                (cx + dtt / 2, panel_under + dtd), (cx + dtb / 2, panel_under),
-                (cx + bt_w / 2, panel_under), (cx + bt_w / 2, panel_under - bt_h)]
-        b = poly_prism(prof, "y", -ihf, (0, 2 * ihf, 0))
-        tn_h = bt_h * 2 / 3
-        tnf = box(cx - bt_w / 2, cx + bt_w / 2, -ihf - inch(0.6), -ihf,
-                  panel_under - tn_h, panel_under)
-        return b + tnf + tnf.mirror(Plane.XZ)
-
-    batten_r = batten(bt_off)
-    batten_l = batten_r.mirror(Plane.YZ)
-    battens = batten_r + batten_l
-    top_panel = top_panel - battens        # sliding-dovetail grooves
-    rail_f, rail_b = rail_f - battens, rail_b - battens   # tenon mortises
-
-    def cham_top(s, x=None, y=None):
-        es = edges_at(s, x=x, y=y, z=sz1)
-        return one_solid(chamfer(es, sf_cham))
+    def cham_top(s, x=None, y=None):                 # edge profile, then cope
+        return one_solid(chamfer(edges_at(s, x=x, y=y, z=sz1), sf_cham))
 
     sh_long_f = cope(cham_top(sh_long_f, y=-lys - leg_r))
     sh_long_b = cope(cham_top(sh_long_b, y=lys + leg_r))
     sh_short_l = cope(cham_top(sh_short_l, x=-lxs - leg_r))
     sh_short_r = cope(cham_top(sh_short_r, x=lxs + leg_r))
 
-    # ------------------------------------------------------------------
-    # Shelf-rail tenons: full-height mitered tenons that MEET INSIDE each
-    # round leg (the original's coped-shoulder M&T). Per corner, the long
-    # and the short rail each send a tenon_w x sf_t tenon into the leg; a
-    # 45-deg plane through the leg axis miters the pair against each other.
-    # Tenons JOIN their rails; each leg is mortised by subtracting both.
-    # Local coords: u grows toward the long rail's body, v toward the
-    # short rail's body (x = X - sx*u, y = Y - sy*v); miter plane is u = v.
-    # ------------------------------------------------------------------
-    tenon_w = inch(0.5)
-    L3 = 3 * leg_r
-
-    def shelf_tenons(sx, sy, cyl):
-        X, Y = sx * lxs, sy * lys
-
-        def half(st):
-            return poly_prism([(X - sx * s, Y - sy * t) for s, t in st],
-                              "z", sz0, (0, 0, sf_t))
-        rm_long = half([(-L3, -L3), (-L3, L3), (L3, L3)])    # v > u half
-        rm_short = half([(-L3, -L3), (L3, -L3), (L3, L3)])   # u > v half
-        t_long = (box(X - leg_r, X + leg_r, Y - tenon_w / 2, Y + tenon_w / 2,
-                      sz0, sz1) & cyl) - rm_long
-        t_short = (box(X - tenon_w / 2, X + tenon_w / 2, Y - leg_r, Y + leg_r,
-                       sz0, sz1) & cyl) - rm_short
-        return t_long, t_short
-
+    # 圆包圆内榫: each corner's rail pair sends full-height tenons that
+    # meet at 45deg INSIDE the round leg; the legs get exact mortises
     shelf_longs = {"F": sh_long_f, "B": sh_long_b}
     shelf_shorts = {"L": sh_short_l, "R": sh_short_r}
     for sx, sy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
-        lk, sk = ("F" if sy < 0 else "B"), ("L" if sx < 0 else "R")
-        key = "Leg_" + lk + sk
-        t_long, t_short = shelf_tenons(sx, sy, legs[key])
-        legs[key] = legs[key] - t_long - t_short             # the mortise
+        lk, sk_ = ("F" if sy < 0 else "B"), ("L" if sx < 0 else "R")
+        key = "Leg_" + lk + sk_
+        t_long, t_short = mitered_leg_tenons(
+            sx * lxs, sy * lys, sx, sy, legs[key], sz0, sz1,
+            tenon_w=inch(0.5), leg_r=leg_r)
+        legs[key] = legs[key] - t_long - t_short
         shelf_longs[lk] = shelf_longs[lk] + t_long
-        shelf_shorts[sk] = shelf_shorts[sk] + t_short
+        shelf_shorts[sk_] = shelf_shorts[sk_] + t_short
     sh_long_f, sh_long_b = shelf_longs["F"], shelf_longs["B"]
-
-    # ------------------------------------------------------------------
-    # 穿带 sliding batten under the shelf panel: dovetail ridge up into the
-    # panel underside, ends housed in the long shelf rails.
-    # ------------------------------------------------------------------
-    shb_w = inch(0.875)
-    pus = sz1 - sp_panel_t                 # shelf panel underside
-    ily = lys - leg_r                      # long rails' inner face |y|
-    prof = [(-shb_w / 2, sz0), (-shb_w / 2, pus),
-            (-dtb / 2, pus), (-dtt / 2, pus + dtd),
-            (dtt / 2, pus + dtd), (dtb / 2, pus),
-            (shb_w / 2, pus), (shb_w / 2, sz0)]
-    sh_batten = poly_prism(prof, "y", -(ily + inch(0.5)),
-                           (0, 2 * (ily + inch(0.5)), 0))
-    sh_panel = sh_panel - sh_batten        # dovetail groove
-    sh_long_f = sh_long_f - sh_batten      # housed ends
-    sh_long_b = sh_long_b - sh_batten
     sh_short_l, sh_short_r = shelf_shorts["L"], shelf_shorts["R"]
 
+    # flush shelf panel + 穿带 batten holding it flat
+    sh_panel = box(-(lxs - leg_r), lxs - leg_r, -(lys - leg_r), lys - leg_r,
+                   sz1 - sp_panel_t, sz1)
+    sh_batten = sliding_batten(0.0, inch(0.875), sz0, sz1 - sp_panel_t,
+                               ridge_narrow=inch(0.5), ridge_wide=inch(0.75),
+                               ridge_depth=inch(0.1875),
+                               y_half=(lys - leg_r) + inch(0.5))
+    sh_panel = sh_panel - sh_batten                  # sliding dovetail groove
+    sh_long_f = sh_long_f - sh_batten                # housed ends
+    sh_long_b = sh_long_b - sh_batten
+
+    # ================= assembly =========================================
     parts = {
         "Leg_FL": (legs["Leg_FL"], LEGC), "Leg_FR": (legs["Leg_FR"], LEGC),
         "Leg_BL": (legs["Leg_BL"], LEGC), "Leg_BR": (legs["Leg_BR"], LEGC),
         "TF_Front": (rail_f, FRAME), "TF_Back": (rail_b, FRAME),
         "TF_Left": (stile_l, FRAME), "TF_Right": (stile_r, FRAME),
-        "TopPanel": (top_panel, PANEL),      # already coped (groove source)
+        "TopPanel": (top_panel, PANEL),
         "Batten_R": (batten_r, FRAME), "Batten_L": (batten_l, FRAME),
         "Apron_Front": (apron_f, APRON), "Apron_Back": (apron_b, APRON),
         "Apron_Left": (apron_l, APRON), "Apron_Right": (apron_r, APRON),
@@ -473,11 +252,10 @@ def build(overrides=None):
         "ShelfPanel": (cope(sh_panel), PANEL),
         "ShelfBatten": (sh_batten, SHELF),
     }
-    comp = {"Leg": "Legs", "TF": "Top", "Top": "Top", "Apron": "Aprons",
-            "Shelf": "Shelf"}
+    comp = {"Leg": "Legs", "TF": "Top", "Top": "Top", "Batten": "Top",
+            "Apron": "Aprons", "Shelf": "Shelf"}
     for name, (solid, col) in parts.items():
-        c = comp.get(name.split("_")[0], "")
-        m.add(name, solid, col, c)
+        m.add(name, solid, col, comp.get(name.split("_")[0], ""))
     return m
 
 
