@@ -199,8 +199,11 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
             off: ((axis1, expr1), (axis2, expr2)) — the two offset dims from
                 the anchored parent corner to the slot's reference arc center.
                 POSITIVE magnitudes; axes are model axis names. The reference
-                arc center is the arc on the ``-`` side along each axis (the
-                same arc the origin dims used).
+                arc center is the arc on the ``-`` side of the slot center
+                along the long MODEL axis (sign-aware — on planes where sketch
+                axes are flipped vs model axes, the correct arc is still
+                chosen; write the exprs in model terms, e.g.
+                ``center_z - (long - short)/2``).
 
     Returns:
         (sketch, profile)
@@ -279,7 +282,13 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
             a_b.centerSketchPoint, a_t.centerSketchPoint,
             V, Point3D.create(cx + r + 2, cy, 0)
         ).parameter.expression = long_expr + " - " + short_expr
-        ref_center = a_b.centerSketchPoint   # arc center the position dims anchor
+        # Reference arc for the ANCHORED position dims: the arc on the "-"
+        # side of the slot center along the long MODEL axis. With v_sign < 0
+        # (sketch +Y = model -axis) the sketch-bottom arc a_b sits on the
+        # model "+" side, so the model "-" arc is a_t. The ORIGIN-mode dims
+        # below always use a_b — their expressions carry the sign via
+        # v_bot_op instead.
+        ref_center = (a_b if v_sign > 0 else a_t).centerSketchPoint
         if anchor is None:
             # Distance dims (magnitudes) from origin to the reference arc
             # centre. A signed coordinate (negative-Y slot centre) would flip
@@ -325,7 +334,8 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
             a_l.centerSketchPoint, a_r.centerSketchPoint,
             H, Point3D.create(cx, cy - r - 2, 0)
         ).parameter.expression = long_expr + " - " + short_expr
-        ref_center = a_l.centerSketchPoint   # arc center the position dims anchor
+        # Sign-aware reference arc for ANCHORED mode — see vertical branch.
+        ref_center = (a_l if h_sign > 0 else a_r).centerSketchPoint
         if anchor is None:
             # Distance dims (magnitudes) — abs() to avoid the sign-flip that
             # mirrors a negative-coordinate slot across the axis (see above).
@@ -337,18 +347,6 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
                 sk.originPoint, a_l.centerSketchPoint,
                 V, Point3D.create(cx - hl - 2, cy / 2, 0)
             ).parameter.expression = "abs(" + v_expr + ")"
-
-    # Common to both branches: 2 lines (4 pts) + 2 arcs, 2 H-or-V, 4 tangents +
-    # 4 coincidents, and 2 dims (radial + length). The 2 position dims are added
-    # only in ORIGIN mode; ANCHORED mode adds 2 anchor dims below instead.
-    dof.add_point(4)
-    dof.add_arc(2)
-    dof.add_hv(2)
-    dof.add_constraint("tangent", 4)
-    dof.add_coincident(4)
-    dof.add_dim(2)
-    if anchor is None:
-        dof.add_dim(2)                    # 2 origin position dims
 
     # Common to both branches: 2 lines (4 pts) + 2 arcs, 2 H-or-V, 4 tangents +
     # 4 coincidents, and 2 dims (radial + length). The 2 position dims are added
@@ -375,6 +373,24 @@ def sketch_slot_model(comp, plane, model_center, long_model_axis,
                      anchor["face_axis"], anchor["face_dir"])
         ax_pt = anchor["anchor_xyz"]
         aP = anchor_pt(sk, ev(ax_pt[0]), ev(ax_pt[1]), ev(ax_pt[2]))
+        if aP is not None:
+            # anchor_pt returns the NEAREST projected point, excluding any
+            # that coincide with the sketch origin. If the caller's
+            # anchor_xyz lands ON the sketch-origin projection, the nearest
+            # eligible point is some OTHER corner — dimensioning from it
+            # silently drags the slot to the wrong side of the parent
+            # (zero-impact CUTs downstream). Fail loudly instead.
+            tgt = sk.modelToSketchSpace(
+                Point3D.create(ev(ax_pt[0]), ev(ax_pt[1]), ev(ax_pt[2])))
+            g = aP.geometry
+            miss = math.hypot(g.x - tgt.x, g.y - tgt.y)
+            if miss > 0.05:
+                raise RuntimeError(
+                    f"{name}: anchor_xyz {tuple(ax_pt)} matched no projected "
+                    f"parent point (nearest is {miss:.3f} cm away). Most "
+                    f"likely anchor_xyz projects onto the sketch origin, "
+                    f"which anchor_pt excludes — anchor a different parent "
+                    f"corner and adjust the off= expressions.")
         orient = probe_orientations(sk, mcx, mcy, mcz)
         (o1, o2) = anchor["off"]
         if aP is not None:

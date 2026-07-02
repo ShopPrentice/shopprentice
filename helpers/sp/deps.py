@@ -322,7 +322,8 @@ def resolve_model_json(metadata_path=None):
     per_script = os.path.join(script_dir, f"{stem}_model.json")
     if os.path.exists(per_script):
         return per_script, True
-    return os.path.join(script_dir, "model.json"), False
+    fallback = os.path.join(script_dir, "model.json")
+    return fallback, os.path.exists(fallback)
 
 
 def _validate_joint_registry(ctx, joints):
