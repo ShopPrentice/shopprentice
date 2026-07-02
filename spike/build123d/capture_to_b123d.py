@@ -984,7 +984,10 @@ if __name__ == "__main__":
     model.validate()
     import os
     os.makedirs("out", exist_ok=True)
-    stem = "out/" + os.path.splitext(os.path.basename(path))[0].replace("_capture", "")
+    # "_cap" suffix so converted output never clobbers a hand-ported
+    # model's manifest (which carries live parameters)
+    stem = "out/" + os.path.splitext(os.path.basename(path))[0] \
+        .replace("_capture", "") + "_cap"
     model.export_parts(stem)
     model.export(stem)
     print(f"exported {stem}.*")

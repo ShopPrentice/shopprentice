@@ -84,7 +84,7 @@
       <div class="tgroup">
         <button class="btn" id="wire" title="Wireframe">Wire</button>
         <button class="btn on" id="grain" title="Wood grain texture">Grain</button>
-        <button class="btn" id="edges" title="Feature edge lines">Edges</button>
+        <button class="btn on" id="edges" title="Feature edge lines">Edges</button>
         <button class="btn" id="spin" title="Turntable spin">Spin</button>
         <button class="btn" id="reset" title="Reset camera">Reset</button>
       </div>
@@ -195,7 +195,7 @@ function makeWoodTexture() {
   return t;
 }
 const woodTex = makeWoodTexture();
-let grainOn = true, edgesOn = false;
+let grainOn = true, edgesOn = true;
 
 // Box-project UVs in model space, U axis = the body's longest bbox axis --
 // the same longest-axis heuristic apply_appearance uses for grain direction.
