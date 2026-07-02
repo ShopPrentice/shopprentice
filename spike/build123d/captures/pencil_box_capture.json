@@ -1,0 +1,6095 @@
+{
+  "designName": "(Unsaved)",
+  "designType": "Parametric",
+  "userParameters": [
+    {
+      "name": "box_length",
+      "expression": "9 in",
+      "unit": "in",
+      "value": 22.86,
+      "comment": ""
+    },
+    {
+      "name": "box_width",
+      "expression": "3 in",
+      "unit": "in",
+      "value": 7.62,
+      "comment": ""
+    },
+    {
+      "name": "box_height",
+      "expression": "2.5 in",
+      "unit": "in",
+      "value": 6.35,
+      "comment": ""
+    },
+    {
+      "name": "board_thick",
+      "expression": "0.25 in",
+      "unit": "in",
+      "value": 0.635,
+      "comment": ""
+    },
+    {
+      "name": "bottom_thick",
+      "expression": "0.3125 in",
+      "unit": "in",
+      "value": 0.79375,
+      "comment": ""
+    },
+    {
+      "name": "lid_thick",
+      "expression": "0.3125 in",
+      "unit": "in",
+      "value": 0.79375,
+      "comment": ""
+    },
+    {
+      "name": "groove_depth",
+      "expression": "0.125 in",
+      "unit": "in",
+      "value": 0.3175,
+      "comment": ""
+    },
+    {
+      "name": "groove_up",
+      "expression": "0.125 in",
+      "unit": "in",
+      "value": 0.3175,
+      "comment": ""
+    },
+    {
+      "name": "lid_down",
+      "expression": "0.125 in",
+      "unit": "in",
+      "value": 0.3175,
+      "comment": ""
+    },
+    {
+      "name": "dt_angle",
+      "expression": "8 deg",
+      "unit": "deg",
+      "value": 0.13962634015954636,
+      "comment": ""
+    },
+    {
+      "name": "dt_tail_w",
+      "expression": "0.5 in",
+      "unit": "in",
+      "value": 1.27,
+      "comment": ""
+    },
+    {
+      "name": "dt_tail_count",
+      "expression": "3",
+      "unit": "",
+      "value": 3.0,
+      "comment": ""
+    },
+    {
+      "name": "bottom_tongue",
+      "expression": "bottom_thick - groove_up",
+      "unit": "in",
+      "value": 0.47624999999999995,
+      "comment": ""
+    },
+    {
+      "name": "lid_tongue",
+      "expression": "lid_thick - lid_down",
+      "unit": "in",
+      "value": 0.47624999999999995,
+      "comment": ""
+    },
+    {
+      "name": "open_height",
+      "expression": "box_height - lid_thick",
+      "unit": "in",
+      "value": 5.5562499999999995,
+      "comment": ""
+    },
+    {
+      "name": "side_inner_len",
+      "expression": "box_width - 2 * board_thick",
+      "unit": "in",
+      "value": 6.35,
+      "comment": ""
+    },
+    {
+      "name": "lid_down_z",
+      "expression": "box_height - lid_down",
+      "unit": "in",
+      "value": 6.0325,
+      "comment": ""
+    },
+    {
+      "name": "dt_pin_w",
+      "expression": "open_height / dt_tail_count - dt_tail_w",
+      "unit": "in",
+      "value": 0.5820833333333331,
+      "comment": ""
+    },
+    {
+      "name": "dt_pitch",
+      "expression": "open_height / dt_tail_count",
+      "unit": "in",
+      "value": 1.852083333333333,
+      "comment": ""
+    },
+    {
+      "name": "dt_start_z",
+      "expression": "dt_pin_w / 2 + dt_tail_w / 2",
+      "unit": "in",
+      "value": 0.9260416666666665,
+      "comment": ""
+    },
+    {
+      "name": "dt_narrow_w",
+      "expression": "dt_tail_w - 2 * board_thick * tan(dt_angle)",
+      "unit": "in",
+      "value": 1.091513139927963,
+      "comment": ""
+    },
+    {
+      "name": "dt_half_pin",
+      "expression": "dt_pin_w / 2",
+      "unit": "in",
+      "value": 0.29104166666666653,
+      "comment": ""
+    }
+  ],
+  "components": {
+    "name": "(Unsaved)",
+    "bodies": [],
+    "sketches": [],
+    "constructionPlanes": [],
+    "children": [
+      {
+        "name": "Case",
+        "bodies": [
+          {
+            "name": "Front",
+            "volume": 82.6953,
+            "boundingBox": {
+              "min": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "max": [
+                22.86,
+                0.635,
+                6.35
+              ]
+            }
+          },
+          {
+            "name": "Back",
+            "volume": 82.6953,
+            "boundingBox": {
+              "min": [
+                0.0,
+                6.985,
+                0.0
+              ],
+              "max": [
+                22.86,
+                7.62,
+                6.35
+              ]
+            }
+          },
+          {
+            "name": "Side_Left",
+            "volume": 26.5411,
+            "boundingBox": {
+              "min": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "max": [
+                0.635,
+                7.62,
+                6.35
+              ]
+            }
+          },
+          {
+            "name": "Side_Right",
+            "volume": 24.3007,
+            "boundingBox": {
+              "min": [
+                22.225,
+                0.0,
+                0.0
+              ],
+              "max": [
+                22.86,
+                7.62,
+                5.5562
+              ]
+            }
+          },
+          {
+            "name": "Bottom",
+            "volume": 117.462,
+            "boundingBox": {
+              "min": [
+                0.3175,
+                0.3175,
+                0.0
+              ],
+              "max": [
+                22.5425,
+                7.3025,
+                0.7937
+              ]
+            }
+          },
+          {
+            "name": "Lid",
+            "volume": 119.7984,
+            "boundingBox": {
+              "min": [
+                0.3175,
+                0.3175,
+                5.5562
+              ],
+              "max": [
+                22.86,
+                7.3025,
+                6.35
+              ]
+            }
+          }
+        ],
+        "sketches": [
+          {
+            "name": "Front_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d23",
+                "expression": "box_length",
+                "value": 22.86
+              },
+              {
+                "name": "d24",
+                "expression": "box_height",
+                "value": 6.35
+              },
+              {
+                "name": "d25",
+                "expression": "0 in",
+                "value": 0.0
+              },
+              {
+                "name": "d26",
+                "expression": "0 in",
+                "value": 0.0
+              }
+            ]
+          },
+          {
+            "name": "Back_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d30",
+                "expression": "box_length",
+                "value": 22.86
+              },
+              {
+                "name": "d31",
+                "expression": "box_height",
+                "value": 6.35
+              },
+              {
+                "name": "d32",
+                "expression": "0 in",
+                "value": 0.0
+              },
+              {
+                "name": "d33",
+                "expression": "0 in",
+                "value": 0.0
+              }
+            ]
+          },
+          {
+            "name": "LeftSide_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d36",
+                "expression": "box_height",
+                "value": 6.35
+              },
+              {
+                "name": "d37",
+                "expression": "side_inner_len",
+                "value": 6.35
+              },
+              {
+                "name": "d38",
+                "expression": "0 in",
+                "value": 0.0
+              },
+              {
+                "name": "d39",
+                "expression": "board_thick",
+                "value": 0.635
+              }
+            ]
+          },
+          {
+            "name": "RightSide_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d43",
+                "expression": "open_height",
+                "value": 5.55625
+              },
+              {
+                "name": "d44",
+                "expression": "side_inner_len",
+                "value": 6.35
+              },
+              {
+                "name": "d45",
+                "expression": "0 in",
+                "value": 0.0
+              },
+              {
+                "name": "d46",
+                "expression": "board_thick",
+                "value": 0.635
+              }
+            ]
+          },
+          {
+            "name": "BGL_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d50",
+                "expression": "groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d51",
+                "expression": "box_width",
+                "value": 7.62
+              },
+              {
+                "name": "d52",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d53",
+                "expression": "0 in",
+                "value": 0.0
+              }
+            ]
+          },
+          {
+            "name": "BGR_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d56",
+                "expression": "groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d57",
+                "expression": "box_width",
+                "value": 7.62
+              },
+              {
+                "name": "d58",
+                "expression": "box_length - board_thick",
+                "value": 22.225
+              },
+              {
+                "name": "d59",
+                "expression": "0 in",
+                "value": 0.0
+              }
+            ]
+          },
+          {
+            "name": "BGF_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d62",
+                "expression": "box_length - 2 * board_thick",
+                "value": 21.59
+              },
+              {
+                "name": "d63",
+                "expression": "groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d64",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d65",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              }
+            ]
+          },
+          {
+            "name": "BGB_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d68",
+                "expression": "box_length - 2 * board_thick",
+                "value": 21.59
+              },
+              {
+                "name": "d69",
+                "expression": "groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d70",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d71",
+                "expression": "box_width - board_thick",
+                "value": 6.985
+              }
+            ]
+          },
+          {
+            "name": "LGL_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d75",
+                "expression": "groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d76",
+                "expression": "box_width",
+                "value": 7.62
+              },
+              {
+                "name": "d77",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d78",
+                "expression": "0 in",
+                "value": 0.0
+              }
+            ]
+          },
+          {
+            "name": "LGF_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d81",
+                "expression": "box_length - board_thick",
+                "value": 22.225
+              },
+              {
+                "name": "d82",
+                "expression": "groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d83",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d84",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              }
+            ]
+          },
+          {
+            "name": "LGB_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d87",
+                "expression": "box_length - board_thick",
+                "value": 22.225
+              },
+              {
+                "name": "d88",
+                "expression": "groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d89",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d90",
+                "expression": "box_width - board_thick",
+                "value": 6.985
+              }
+            ]
+          },
+          {
+            "name": "DT_FL_Sk",
+            "dimensionCount": 5,
+            "dimensions": [
+              {
+                "name": "d94",
+                "expression": "dt_narrow_w",
+                "value": 1.091513
+              },
+              {
+                "name": "d95",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d96",
+                "expression": "dt_pin_w / 2 + board_thick * tan(dt_angle)",
+                "value": 0.380285
+              },
+              {
+                "name": "d97",
+                "expression": "0 in + board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d98",
+                "expression": "90 deg - dt_angle",
+                "value": 1.43117
+              }
+            ]
+          },
+          {
+            "name": "DT_BL_Sk",
+            "dimensionCount": 5,
+            "dimensions": [
+              {
+                "name": "d111",
+                "expression": "dt_narrow_w",
+                "value": 1.091513
+              },
+              {
+                "name": "d112",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d113",
+                "expression": "dt_pin_w / 2 + board_thick * tan(dt_angle)",
+                "value": 0.380285
+              },
+              {
+                "name": "d114",
+                "expression": "box_width - board_thick",
+                "value": 6.985
+              },
+              {
+                "name": "d115",
+                "expression": "90 deg - dt_angle",
+                "value": 1.43117
+              }
+            ]
+          },
+          {
+            "name": "DT_FR_Sk",
+            "dimensionCount": 5,
+            "dimensions": [
+              {
+                "name": "d128",
+                "expression": "dt_narrow_w",
+                "value": 1.091513
+              },
+              {
+                "name": "d129",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d130",
+                "expression": "dt_pin_w / 2 + board_thick * tan(dt_angle)",
+                "value": 0.380285
+              },
+              {
+                "name": "d131",
+                "expression": "0 in + board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d132",
+                "expression": "90 deg - dt_angle",
+                "value": 1.43117
+              }
+            ]
+          },
+          {
+            "name": "DT_BR_Sk",
+            "dimensionCount": 5,
+            "dimensions": [
+              {
+                "name": "d145",
+                "expression": "dt_narrow_w",
+                "value": 1.091513
+              },
+              {
+                "name": "d146",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d147",
+                "expression": "dt_pin_w / 2 + board_thick * tan(dt_angle)",
+                "value": 0.380285
+              },
+              {
+                "name": "d148",
+                "expression": "box_width - board_thick",
+                "value": 6.985
+              },
+              {
+                "name": "d149",
+                "expression": "90 deg - dt_angle",
+                "value": 1.43117
+              }
+            ]
+          },
+          {
+            "name": "Bottom_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d162",
+                "expression": "box_length - 2 * board_thick + 2 * groove_depth",
+                "value": 22.225
+              },
+              {
+                "name": "d163",
+                "expression": "box_width - 2 * board_thick + 2 * groove_depth",
+                "value": 6.985
+              },
+              {
+                "name": "d164",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d165",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              }
+            ]
+          },
+          {
+            "name": "BottomRabbet_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d168",
+                "expression": "box_length - 2 * board_thick + 2 * groove_depth",
+                "value": 22.225
+              },
+              {
+                "name": "d169",
+                "expression": "box_width - 2 * board_thick + 2 * groove_depth",
+                "value": 6.985
+              },
+              {
+                "name": "d170",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d171",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              }
+            ]
+          },
+          {
+            "name": "BottomLip_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d174",
+                "expression": "box_length - 2 * board_thick",
+                "value": 21.59
+              },
+              {
+                "name": "d175",
+                "expression": "box_width - 2 * board_thick",
+                "value": 6.35
+              },
+              {
+                "name": "d176",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d177",
+                "expression": "board_thick",
+                "value": 0.635
+              }
+            ]
+          },
+          {
+            "name": "Lid_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d180",
+                "expression": "box_length - board_thick + groove_depth",
+                "value": 22.5425
+              },
+              {
+                "name": "d181",
+                "expression": "box_width - 2 * board_thick + 2 * groove_depth",
+                "value": 6.985
+              },
+              {
+                "name": "d182",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d183",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              }
+            ]
+          },
+          {
+            "name": "LidRabbet_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d187",
+                "expression": "box_length - board_thick + groove_depth",
+                "value": 22.5425
+              },
+              {
+                "name": "d188",
+                "expression": "box_width - 2 * board_thick + 2 * groove_depth",
+                "value": 6.985
+              },
+              {
+                "name": "d189",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              },
+              {
+                "name": "d190",
+                "expression": "board_thick - groove_depth",
+                "value": 0.3175
+              }
+            ]
+          },
+          {
+            "name": "LidLip_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d193",
+                "expression": "box_length - board_thick",
+                "value": 22.225
+              },
+              {
+                "name": "d194",
+                "expression": "side_inner_len",
+                "value": 6.35
+              },
+              {
+                "name": "d195",
+                "expression": "board_thick",
+                "value": 0.635
+              },
+              {
+                "name": "d196",
+                "expression": "board_thick",
+                "value": 0.635
+              }
+            ]
+          }
+        ],
+        "constructionPlanes": [
+          "Back_Pl",
+          "Right_Pl",
+          "BG_Pl",
+          "LG_Pl",
+          "DT_Right_Pl",
+          "LidLip_Pl"
+        ],
+        "children": []
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "index": 0,
+      "isGroup": false,
+      "isRolledBack": false,
+      "type": "ComponentCreation",
+      "name": "Case"
+    },
+    {
+      "index": 1,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "Front_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "XZ",
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            0.0
+          ],
+          "end": [
+            22.86,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            0.0
+          ],
+          "end": [
+            22.86,
+            -6.35
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            -6.35
+          ],
+          "end": [
+            0.0,
+            -6.35
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            -6.35
+          ],
+          "end": [
+            0.0,
+            0.0
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.0,
+            -6.35
+          ],
+          "max": [
+            22.86,
+            0.0
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length",
+          "value": 22.86,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_height",
+          "value": 6.35,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 2,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "FrontBoard",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.43,
+        0.0,
+        3.175
+      ],
+      "endFaceCentroid": [
+        11.43,
+        0.635,
+        3.175
+      ],
+      "sketch": "Front_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Front"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 3,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "ConstructionPlane",
+      "name": "Back_Pl",
+      "definitionType": "Offset",
+      "offset": "box_width - board_thick",
+      "basePlane": "XZ",
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "origin": [
+        0.0,
+        6.985,
+        0.0
+      ]
+    },
+    {
+      "index": 4,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "Back_Sk",
+      "sketchOrigin": [
+        0.0,
+        6.985,
+        0.0
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "Back_Pl",
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "origin": [
+          0.0,
+          6.985,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            0.0
+          ],
+          "end": [
+            22.86,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            0.0
+          ],
+          "end": [
+            22.86,
+            -6.35
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            -6.35
+          ],
+          "end": [
+            0.0,
+            -6.35
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            -6.35
+          ],
+          "end": [
+            0.0,
+            0.0
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.0,
+            -6.35
+          ],
+          "max": [
+            22.86,
+            0.0
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length",
+          "value": 22.86,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_height",
+          "value": 6.35,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 5,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "BackBoard",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.43,
+        6.985,
+        3.175
+      ],
+      "endFaceCentroid": [
+        11.43,
+        7.62,
+        3.175
+      ],
+      "sketch": "Back_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Back"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 6,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "LeftSide_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "YZ",
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            0.635
+          ],
+          "end": [
+            -6.35,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -6.35,
+            0.635
+          ],
+          "end": [
+            -6.35,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -6.35,
+            6.985
+          ],
+          "end": [
+            0.0,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            6.985
+          ],
+          "end": [
+            0.0,
+            0.635
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            -6.35,
+            0.635
+          ],
+          "max": [
+            0.0,
+            6.985
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_height",
+          "value": 6.35,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "side_inner_len",
+          "value": 6.35,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 7,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "LeftSide",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        0.0,
+        3.81,
+        3.175
+      ],
+      "endFaceCentroid": [
+        0.635,
+        3.81,
+        3.175
+      ],
+      "sketch": "LeftSide_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Side_Left"
+      ]
+    },
+    {
+      "index": 8,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "ConstructionPlane",
+      "name": "Right_Pl",
+      "definitionType": "Offset",
+      "offset": "box_length - board_thick",
+      "basePlane": "YZ",
+      "normal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "origin": [
+        22.225,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "index": 9,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "RightSide_Sk",
+      "sketchOrigin": [
+        22.225,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "Right_Pl",
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "origin": [
+          22.225,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            0.635
+          ],
+          "end": [
+            -5.5562,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -5.5562,
+            0.635
+          ],
+          "end": [
+            -5.5562,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -5.5562,
+            6.985
+          ],
+          "end": [
+            0.0,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            6.985
+          ],
+          "end": [
+            0.0,
+            0.635
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            -5.5562,
+            0.635
+          ],
+          "max": [
+            0.0,
+            6.985
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "open_height",
+          "value": 5.55625,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "side_inner_len",
+          "value": 6.35,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 10,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "RightSide",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        22.225,
+        3.81,
+        2.7781
+      ],
+      "endFaceCentroid": [
+        22.86,
+        3.81,
+        2.7781
+      ],
+      "sketch": "RightSide_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Side_Right"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 11,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "ConstructionPlane",
+      "name": "BG_Pl",
+      "definitionType": "Offset",
+      "offset": "groove_up",
+      "basePlane": "XY",
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "origin": [
+        0.0,
+        0.0,
+        0.3175
+      ]
+    },
+    {
+      "index": 12,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "BGL_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.3175
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "BG_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.3175
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            0.0
+          ],
+          "end": [
+            0.635,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            0.0
+          ],
+          "end": [
+            0.635,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            7.62
+          ],
+          "end": [
+            0.3175,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            7.62
+          ],
+          "end": [
+            0.3175,
+            0.0
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.3175,
+            0.0
+          ],
+          "max": [
+            0.635,
+            7.62
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width",
+          "value": 7.62,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 13,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "BGL",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "bottom_tongue",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        0.4762,
+        3.81,
+        0.3175
+      ],
+      "endFaceCentroid": [
+        0.4762,
+        3.81,
+        0.7937
+      ],
+      "sketch": "BGL_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Body5"
+      ]
+    },
+    {
+      "index": 14,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Combine",
+      "name": "BGL_Cut",
+      "operation": "Cut",
+      "targetBody": "Side_Left",
+      "targetComponent": "Case",
+      "toolBodies": [
+        "Body5"
+      ],
+      "toolComponents": [
+        "Case"
+      ],
+      "isKeepToolBodies": false,
+      "outputBodies": [
+        "Side_Left"
+      ]
+    },
+    {
+      "index": 15,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "BGR_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.3175
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "BG_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.3175
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            22.225,
+            0.0
+          ],
+          "end": [
+            22.5425,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.5425,
+            0.0
+          ],
+          "end": [
+            22.5425,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.5425,
+            7.62
+          ],
+          "end": [
+            22.225,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.225,
+            7.62
+          ],
+          "end": [
+            22.225,
+            0.0
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            22.225,
+            0.0
+          ],
+          "max": [
+            22.5425,
+            7.62
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width",
+          "value": 7.62,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - board_thick",
+          "value": 22.225,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 16,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "BGR",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "bottom_tongue",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        22.3837,
+        3.81,
+        0.3175
+      ],
+      "endFaceCentroid": [
+        22.3837,
+        3.81,
+        0.7937
+      ],
+      "sketch": "BGR_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Body6"
+      ]
+    },
+    {
+      "index": 17,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Combine",
+      "name": "BGR_Cut",
+      "operation": "Cut",
+      "targetBody": "Side_Right",
+      "targetComponent": "Case",
+      "toolBodies": [
+        "Body6"
+      ],
+      "toolComponents": [
+        "Case"
+      ],
+      "isKeepToolBodies": false,
+      "outputBodies": [
+        "Side_Right"
+      ]
+    },
+    {
+      "index": 18,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "BGF_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.3175
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "BG_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.3175
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            0.3175
+          ],
+          "end": [
+            22.225,
+            0.3175
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.225,
+            0.3175
+          ],
+          "end": [
+            22.225,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.225,
+            0.635
+          ],
+          "end": [
+            0.635,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            0.635
+          ],
+          "end": [
+            0.635,
+            0.3175
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.635,
+            0.3175
+          ],
+          "max": [
+            22.225,
+            0.635
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - 2 * board_thick",
+          "value": 21.59,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 19,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "BGF",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "bottom_tongue",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.43,
+        0.4763,
+        0.3175
+      ],
+      "endFaceCentroid": [
+        11.43,
+        0.4763,
+        0.7937
+      ],
+      "sketch": "BGF_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Body7"
+      ]
+    },
+    {
+      "index": 20,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Combine",
+      "name": "BGF_Cut",
+      "operation": "Cut",
+      "targetBody": "Front",
+      "targetComponent": "Case",
+      "toolBodies": [
+        "Body7"
+      ],
+      "toolComponents": [
+        "Case"
+      ],
+      "isKeepToolBodies": false,
+      "outputBodies": [
+        "Front"
+      ]
+    },
+    {
+      "index": 21,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "BGB_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.3175
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "BG_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.3175
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            6.985
+          ],
+          "end": [
+            22.225,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.225,
+            6.985
+          ],
+          "end": [
+            22.225,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.225,
+            7.3025
+          ],
+          "end": [
+            0.635,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            7.3025
+          ],
+          "end": [
+            0.635,
+            6.985
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.635,
+            6.985
+          ],
+          "max": [
+            22.225,
+            7.3025
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - 2 * board_thick",
+          "value": 21.59,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width - board_thick",
+          "value": 6.985,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 22,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "BGB",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "bottom_tongue",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.43,
+        7.1438,
+        0.3175
+      ],
+      "endFaceCentroid": [
+        11.43,
+        7.1438,
+        0.7938
+      ],
+      "sketch": "BGB_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Body8"
+      ]
+    },
+    {
+      "index": 23,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Combine",
+      "name": "BGB_Cut",
+      "operation": "Cut",
+      "targetBody": "Back",
+      "targetComponent": "Case",
+      "toolBodies": [
+        "Body8"
+      ],
+      "toolComponents": [
+        "Case"
+      ],
+      "isKeepToolBodies": false,
+      "outputBodies": [
+        "Back"
+      ]
+    },
+    {
+      "index": 24,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "ConstructionPlane",
+      "name": "LG_Pl",
+      "definitionType": "Offset",
+      "offset": "open_height",
+      "basePlane": "XY",
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "origin": [
+        0.0,
+        0.0,
+        5.5562
+      ]
+    },
+    {
+      "index": 25,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "LGL_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        5.5562
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "LG_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          5.5562
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            0.0
+          ],
+          "end": [
+            0.635,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            0.0
+          ],
+          "end": [
+            0.635,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            7.62
+          ],
+          "end": [
+            0.3175,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            7.62
+          ],
+          "end": [
+            0.3175,
+            0.0
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.3175,
+            0.0
+          ],
+          "max": [
+            0.635,
+            7.62
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width",
+          "value": 7.62,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 26,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "LGL",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "lid_tongue",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        0.4762,
+        3.81,
+        5.5562
+      ],
+      "endFaceCentroid": [
+        0.4762,
+        3.81,
+        6.0325
+      ],
+      "sketch": "LGL_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Body9"
+      ]
+    },
+    {
+      "index": 27,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Combine",
+      "name": "LGL_Cut",
+      "operation": "Cut",
+      "targetBody": "Side_Left",
+      "targetComponent": "Case",
+      "toolBodies": [
+        "Body9"
+      ],
+      "toolComponents": [
+        "Case"
+      ],
+      "isKeepToolBodies": false,
+      "outputBodies": [
+        "Side_Left"
+      ]
+    },
+    {
+      "index": 28,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "LGF_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        5.5562
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "LG_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          5.5562
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            0.3175
+          ],
+          "end": [
+            22.86,
+            0.3175
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            0.3175
+          ],
+          "end": [
+            22.86,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            0.635
+          ],
+          "end": [
+            0.635,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            0.635
+          ],
+          "end": [
+            0.635,
+            0.3175
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.635,
+            0.3175
+          ],
+          "max": [
+            22.86,
+            0.635
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - board_thick",
+          "value": 22.225,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 29,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "LGF",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "lid_tongue",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.7475,
+        0.4763,
+        5.5562
+      ],
+      "endFaceCentroid": [
+        11.7475,
+        0.4763,
+        6.0325
+      ],
+      "sketch": "LGF_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Body10"
+      ]
+    },
+    {
+      "index": 30,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Combine",
+      "name": "LGF_Cut",
+      "operation": "Cut",
+      "targetBody": "Front",
+      "targetComponent": "Case",
+      "toolBodies": [
+        "Body10"
+      ],
+      "toolComponents": [
+        "Case"
+      ],
+      "isKeepToolBodies": false,
+      "outputBodies": [
+        "Front"
+      ]
+    },
+    {
+      "index": 31,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "LGB_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        5.5562
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "LG_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          5.5562
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            6.985
+          ],
+          "end": [
+            22.86,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            6.985
+          ],
+          "end": [
+            22.86,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            7.3025
+          ],
+          "end": [
+            0.635,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            7.3025
+          ],
+          "end": [
+            0.635,
+            6.985
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.635,
+            6.985
+          ],
+          "max": [
+            22.86,
+            7.3025
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - board_thick",
+          "value": 22.225,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width - board_thick",
+          "value": 6.985,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 32,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "LGB",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "lid_tongue",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.7475,
+        7.1438,
+        5.5562
+      ],
+      "endFaceCentroid": [
+        11.7475,
+        7.1438,
+        6.0325
+      ],
+      "sketch": "LGB_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Body11"
+      ]
+    },
+    {
+      "index": 33,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Combine",
+      "name": "LGB_Cut",
+      "operation": "Cut",
+      "targetBody": "Back",
+      "targetComponent": "Case",
+      "toolBodies": [
+        "Body11"
+      ],
+      "toolComponents": [
+        "Case"
+      ],
+      "isKeepToolBodies": false,
+      "outputBodies": [
+        "Back"
+      ]
+    },
+    {
+      "index": 34,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "ConstructionPlane",
+      "name": "DT_Right_Pl",
+      "definitionType": "Offset",
+      "offset": "box_length - board_thick",
+      "basePlane": "YZ",
+      "normal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "origin": [
+        22.225,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "index": 35,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "DT_FL_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "YZ",
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            -0.3803,
+            0.635
+          ],
+          "end": [
+            -1.4718,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -1.4718,
+            0.635
+          ],
+          "end": [
+            -1.561,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -1.561,
+            0.0
+          ],
+          "end": [
+            -0.291,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -0.291,
+            0.0
+          ],
+          "end": [
+            -0.3803,
+            0.635
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            -1.561,
+            0.0
+          ],
+          "max": [
+            -0.291,
+            0.635
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "dt_narrow_w",
+          "value": 1.091513,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 2,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "dt_pin_w / 2 + board_thick * tan(dt_angle)",
+          "value": 0.380285,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in + board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchAngularDimension",
+          "expression": "90 deg - dt_angle",
+          "value": 1.43117,
+          "lineOne": {
+            "type": "SketchLine",
+            "curveIndex": 3
+          },
+          "lineTwo": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        }
+      ],
+      "constraints": [
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        },
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 2
+          }
+        }
+      ]
+    },
+    {
+      "index": 36,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "DT_FL_Cut",
+      "operation": "Cut",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "endFaceCentroid": [
+        0.635,
+        0.2724,
+        1.0053
+      ],
+      "sketch": "DT_FL_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Front"
+      ],
+      "participantBodies": [
+        "Front"
+      ]
+    },
+    {
+      "index": 37,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "DT_FL_Join",
+      "operation": "Join",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        0.0,
+        3.7461,
+        3.1339
+      ],
+      "endFaceCentroid": [
+        0.635,
+        3.7253,
+        3.1206
+      ],
+      "sketch": "DT_FL_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Side_Left"
+      ],
+      "participantBodies": [
+        "Side_Left"
+      ]
+    },
+    {
+      "index": 38,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "RectangularPattern",
+      "name": "DT_FL_PatCut",
+      "quantityOne": "dt_tail_count",
+      "distanceOne": "dt_pitch",
+      "quantityTwo": "3",
+      "distanceTwo": "0.00 in",
+      "axisOne": "Z",
+      "distanceType": "Spacing",
+      "directionOne": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "directionTwo": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "isSymmetricOne": false,
+      "isSymmetricTwo": false,
+      "elementOffsets": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ]
+      ],
+      "inputs": [
+        "DT_FL_Cut"
+      ],
+      "bodies": [
+        "Front"
+      ],
+      "patternCopies": [
+        "Back"
+      ]
+    },
+    {
+      "index": 39,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "RectangularPattern",
+      "name": "DT_FL_PatJoin",
+      "quantityOne": "dt_tail_count",
+      "distanceOne": "dt_pitch",
+      "quantityTwo": "3",
+      "distanceTwo": "0.00 in",
+      "axisOne": "Z",
+      "distanceType": "Spacing",
+      "directionOne": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "directionTwo": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "isSymmetricOne": false,
+      "isSymmetricTwo": false,
+      "elementOffsets": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ]
+      ],
+      "inputs": [
+        "DT_FL_Join"
+      ],
+      "bodies": [
+        "Side_Left"
+      ]
+    },
+    {
+      "index": 40,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "DT_BL_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "YZ",
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            -0.3803,
+            6.985
+          ],
+          "end": [
+            -1.4718,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -1.4718,
+            6.985
+          ],
+          "end": [
+            -1.561,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -1.561,
+            7.62
+          ],
+          "end": [
+            -0.291,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -0.291,
+            7.62
+          ],
+          "end": [
+            -0.3803,
+            6.985
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            -1.561,
+            6.985
+          ],
+          "max": [
+            -0.291,
+            7.62
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "dt_narrow_w",
+          "value": 1.091513,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 2,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "dt_pin_w / 2 + board_thick * tan(dt_angle)",
+          "value": 0.380285,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width - board_thick",
+          "value": 6.985,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchAngularDimension",
+          "expression": "90 deg - dt_angle",
+          "value": 1.43117,
+          "lineOne": {
+            "type": "SketchLine",
+            "curveIndex": 3
+          },
+          "lineTwo": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        }
+      ],
+      "constraints": [
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        },
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 2
+          }
+        }
+      ]
+    },
+    {
+      "index": 41,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "DT_BL_Cut",
+      "operation": "Cut",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "endFaceCentroid": [
+        0.635,
+        7.3476,
+        1.0053
+      ],
+      "sketch": "DT_BL_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Back"
+      ],
+      "participantBodies": [
+        "Back"
+      ]
+    },
+    {
+      "index": 42,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "DT_BL_Join",
+      "operation": "Join",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        0.0,
+        3.6888,
+        3.1155
+      ],
+      "endFaceCentroid": [
+        0.635,
+        3.6521,
+        3.0974
+      ],
+      "sketch": "DT_BL_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Side_Left"
+      ],
+      "participantBodies": [
+        "Side_Left"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 43,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "RectangularPattern",
+      "name": "DT_BL_PatCut",
+      "quantityOne": "dt_tail_count",
+      "distanceOne": "dt_pitch",
+      "quantityTwo": "3",
+      "distanceTwo": "0.00 in",
+      "axisOne": "Z",
+      "distanceType": "Spacing",
+      "directionOne": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "directionTwo": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "isSymmetricOne": false,
+      "isSymmetricTwo": false,
+      "elementOffsets": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ]
+      ],
+      "inputs": [
+        "DT_BL_Cut"
+      ],
+      "bodies": [
+        "Back"
+      ],
+      "patternCopies": [
+        "Front"
+      ]
+    },
+    {
+      "index": 44,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "RectangularPattern",
+      "name": "DT_BL_PatJoin",
+      "quantityOne": "dt_tail_count",
+      "distanceOne": "dt_pitch",
+      "quantityTwo": "3",
+      "distanceTwo": "0.00 in",
+      "axisOne": "Z",
+      "distanceType": "Spacing",
+      "directionOne": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "directionTwo": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "isSymmetricOne": false,
+      "isSymmetricTwo": false,
+      "elementOffsets": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ]
+      ],
+      "inputs": [
+        "DT_BL_Join"
+      ],
+      "bodies": [
+        "Side_Left"
+      ]
+    },
+    {
+      "index": 45,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "DT_FR_Sk",
+      "sketchOrigin": [
+        22.225,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "DT_Right_Pl",
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "origin": [
+          22.225,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            -0.3803,
+            0.635
+          ],
+          "end": [
+            -1.4718,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -1.4718,
+            0.635
+          ],
+          "end": [
+            -1.561,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -1.561,
+            0.0
+          ],
+          "end": [
+            -0.291,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -0.291,
+            0.0
+          ],
+          "end": [
+            -0.3803,
+            0.635
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            -1.561,
+            0.0
+          ],
+          "max": [
+            -0.291,
+            0.635
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "dt_narrow_w",
+          "value": 1.091513,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 2,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "dt_pin_w / 2 + board_thick * tan(dt_angle)",
+          "value": 0.380285,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "0 in + board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchAngularDimension",
+          "expression": "90 deg - dt_angle",
+          "value": 1.43117,
+          "lineOne": {
+            "type": "SketchLine",
+            "curveIndex": 3
+          },
+          "lineTwo": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        }
+      ],
+      "constraints": [
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        },
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 2
+          }
+        }
+      ]
+    },
+    {
+      "index": 46,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "DT_FR_Cut",
+      "operation": "Cut",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        22.225,
+        0.2724,
+        1.0053
+      ],
+      "sketch": "DT_FR_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Front"
+      ],
+      "participantBodies": [
+        "Front"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 47,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "DT_FR_Join",
+      "operation": "Join",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        22.225,
+        3.7253,
+        3.1206
+      ],
+      "endFaceCentroid": [
+        22.86,
+        3.7372,
+        2.7396
+      ],
+      "sketch": "DT_FR_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Side_Right"
+      ],
+      "participantBodies": [
+        "Side_Right"
+      ]
+    },
+    {
+      "index": 48,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "RectangularPattern",
+      "name": "DT_FR_PatCut",
+      "quantityOne": "dt_tail_count",
+      "distanceOne": "dt_pitch",
+      "quantityTwo": "3",
+      "distanceTwo": "0.00 in",
+      "axisOne": "Z",
+      "distanceType": "Spacing",
+      "directionOne": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "directionTwo": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "isSymmetricOne": false,
+      "isSymmetricTwo": false,
+      "elementOffsets": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ]
+      ],
+      "inputs": [
+        "DT_FR_Cut"
+      ],
+      "bodies": [
+        "Front"
+      ],
+      "patternCopies": [
+        "Back"
+      ]
+    },
+    {
+      "index": 49,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "RectangularPattern",
+      "name": "DT_FR_PatJoin",
+      "quantityOne": "dt_tail_count",
+      "distanceOne": "dt_pitch",
+      "quantityTwo": "3",
+      "distanceTwo": "0.00 in",
+      "axisOne": "Z",
+      "distanceType": "Spacing",
+      "directionOne": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "directionTwo": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "isSymmetricOne": false,
+      "isSymmetricTwo": false,
+      "elementOffsets": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ]
+      ],
+      "inputs": [
+        "DT_FR_Join"
+      ],
+      "bodies": [
+        "Side_Right"
+      ]
+    },
+    {
+      "index": 50,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "DT_BR_Sk",
+      "sketchOrigin": [
+        22.225,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "DT_Right_Pl",
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "origin": [
+          22.225,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            -0.3803,
+            6.985
+          ],
+          "end": [
+            -1.4718,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -1.4718,
+            6.985
+          ],
+          "end": [
+            -1.561,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -1.561,
+            7.62
+          ],
+          "end": [
+            -0.291,
+            7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            -0.291,
+            7.62
+          ],
+          "end": [
+            -0.3803,
+            6.985
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            -1.561,
+            6.985
+          ],
+          "max": [
+            -0.291,
+            7.62
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "dt_narrow_w",
+          "value": 1.091513,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 2,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "dt_pin_w / 2 + board_thick * tan(dt_angle)",
+          "value": 0.380285,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width - board_thick",
+          "value": 6.985,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchAngularDimension",
+          "expression": "90 deg - dt_angle",
+          "value": 1.43117,
+          "lineOne": {
+            "type": "SketchLine",
+            "curveIndex": 3
+          },
+          "lineTwo": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        }
+      ],
+      "constraints": [
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        },
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 2
+          }
+        }
+      ]
+    },
+    {
+      "index": 51,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "DT_BR_Cut",
+      "operation": "Cut",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        22.225,
+        7.3476,
+        1.0053
+      ],
+      "sketch": "DT_BR_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Back"
+      ],
+      "participantBodies": [
+        "Back"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 52,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "DT_BR_Join",
+      "operation": "Join",
+      "extentType": "Distance",
+      "distance": "board_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        22.225,
+        3.6521,
+        3.0974
+      ],
+      "endFaceCentroid": [
+        22.86,
+        3.6729,
+        2.7418
+      ],
+      "sketch": "DT_BR_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Side_Right"
+      ],
+      "participantBodies": [
+        "Side_Right"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 53,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "RectangularPattern",
+      "name": "DT_BR_PatCut",
+      "quantityOne": "dt_tail_count",
+      "distanceOne": "dt_pitch",
+      "quantityTwo": "3",
+      "distanceTwo": "0.00 in",
+      "axisOne": "Z",
+      "distanceType": "Spacing",
+      "directionOne": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "directionTwo": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "isSymmetricOne": false,
+      "isSymmetricTwo": false,
+      "elementOffsets": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ]
+      ],
+      "inputs": [
+        "DT_BR_Cut"
+      ],
+      "bodies": [
+        "Back"
+      ],
+      "patternCopies": [
+        "Front"
+      ]
+    },
+    {
+      "index": 54,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "RectangularPattern",
+      "name": "DT_BR_PatJoin",
+      "quantityOne": "dt_tail_count",
+      "distanceOne": "dt_pitch",
+      "quantityTwo": "3",
+      "distanceTwo": "0.00 in",
+      "axisOne": "Z",
+      "distanceType": "Spacing",
+      "directionOne": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "directionTwo": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "isSymmetricOne": false,
+      "isSymmetricTwo": false,
+      "elementOffsets": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.8521
+        ],
+        [
+          0.0,
+          0.0,
+          3.7042
+        ]
+      ],
+      "inputs": [
+        "DT_BR_Join"
+      ],
+      "bodies": [
+        "Side_Right"
+      ]
+    },
+    {
+      "index": 55,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "Bottom_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "XY",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            0.3175
+          ],
+          "end": [
+            22.5425,
+            0.3175
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.5425,
+            0.3175
+          ],
+          "end": [
+            22.5425,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.5425,
+            7.3025
+          ],
+          "end": [
+            0.3175,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            7.3025
+          ],
+          "end": [
+            0.3175,
+            0.3175
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.3175,
+            0.3175
+          ],
+          "max": [
+            22.5425,
+            7.3025
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - 2 * board_thick + 2 * groove_depth",
+          "value": 22.225,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width - 2 * board_thick + 2 * groove_depth",
+          "value": 6.985,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 56,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "Bottom",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "bottom_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.43,
+        3.81,
+        0.0
+      ],
+      "endFaceCentroid": [
+        11.43,
+        3.81,
+        0.7937
+      ],
+      "sketch": "Bottom_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Bottom"
+      ]
+    },
+    {
+      "index": 57,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "BottomRabbet_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "XY",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            0.3175
+          ],
+          "end": [
+            22.5425,
+            0.3175
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.5425,
+            0.3175
+          ],
+          "end": [
+            22.5425,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.5425,
+            7.3025
+          ],
+          "end": [
+            0.3175,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            7.3025
+          ],
+          "end": [
+            0.3175,
+            0.3175
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.3175,
+            0.3175
+          ],
+          "max": [
+            22.5425,
+            7.3025
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - 2 * board_thick + 2 * groove_depth",
+          "value": 22.225,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width - 2 * board_thick + 2 * groove_depth",
+          "value": 6.985,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 58,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "BottomRabbet",
+      "operation": "Cut",
+      "extentType": "Distance",
+      "distance": "groove_up",
+      "taperAngle": "0.0 deg",
+      "endFaceCentroid": [
+        11.43,
+        3.81,
+        0.3175
+      ],
+      "sketch": "BottomRabbet_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Bottom"
+      ],
+      "participantBodies": [
+        "Bottom"
+      ]
+    },
+    {
+      "index": 59,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "BottomLip_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "XY",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            0.635
+          ],
+          "end": [
+            22.225,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.225,
+            0.635
+          ],
+          "end": [
+            22.225,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.225,
+            6.985
+          ],
+          "end": [
+            0.635,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            6.985
+          ],
+          "end": [
+            0.635,
+            0.635
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.635,
+            0.635
+          ],
+          "max": [
+            22.225,
+            6.985
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - 2 * board_thick",
+          "value": 21.59,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width - 2 * board_thick",
+          "value": 6.35,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 60,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "BottomLip",
+      "operation": "Join",
+      "extentType": "Distance",
+      "distance": "groove_up",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.43,
+        3.81,
+        0.0
+      ],
+      "sketch": "BottomLip_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Bottom"
+      ],
+      "participantBodies": [
+        "Bottom"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 61,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "Lid_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        5.5562
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "LG_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          5.5562
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            0.3175
+          ],
+          "end": [
+            22.86,
+            0.3175
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            0.3175
+          ],
+          "end": [
+            22.86,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            7.3025
+          ],
+          "end": [
+            0.3175,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            7.3025
+          ],
+          "end": [
+            0.3175,
+            0.3175
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.3175,
+            0.3175
+          ],
+          "max": [
+            22.86,
+            7.3025
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - board_thick + groove_depth",
+          "value": 22.5425,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width - 2 * board_thick + 2 * groove_depth",
+          "value": 6.985,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 62,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "Lid",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "lid_thick",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.5887,
+        3.81,
+        5.5562
+      ],
+      "endFaceCentroid": [
+        11.5887,
+        3.81,
+        6.35
+      ],
+      "sketch": "Lid_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Lid"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 63,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "ConstructionPlane",
+      "name": "LidLip_Pl",
+      "definitionType": "Offset",
+      "offset": "box_height - lid_down",
+      "basePlane": "XY",
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "origin": [
+        0.0,
+        0.0,
+        6.0325
+      ]
+    },
+    {
+      "index": 64,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "LidRabbet_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        6.0325
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "LidLip_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          6.0325
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            0.3175
+          ],
+          "end": [
+            22.86,
+            0.3175
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            0.3175
+          ],
+          "end": [
+            22.86,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            7.3025
+          ],
+          "end": [
+            0.3175,
+            7.3025
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.3175,
+            7.3025
+          ],
+          "end": [
+            0.3175,
+            0.3175
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.3175,
+            0.3175
+          ],
+          "max": [
+            22.86,
+            7.3025
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - board_thick + groove_depth",
+          "value": 22.5425,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_width - 2 * board_thick + 2 * groove_depth",
+          "value": 6.985,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick - groove_depth",
+          "value": 0.3175,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 65,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "LidRabbet",
+      "operation": "Cut",
+      "extentType": "Distance",
+      "distance": "lid_down",
+      "taperAngle": "0.0 deg",
+      "startFaceCentroid": [
+        11.5887,
+        3.81,
+        6.0325
+      ],
+      "sketch": "LidRabbet_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Lid"
+      ],
+      "participantBodies": [
+        "Lid"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 66,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Sketch",
+      "name": "LidLip_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        6.0325
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "LidLip_Pl",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          6.0325
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            0.635
+          ],
+          "end": [
+            22.86,
+            0.635
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            0.635
+          ],
+          "end": [
+            22.86,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            22.86,
+            6.985
+          ],
+          "end": [
+            0.635,
+            6.985
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.635,
+            6.985
+          ],
+          "end": [
+            0.635,
+            0.635
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.635,
+            0.635
+          ],
+          "max": [
+            22.86,
+            6.985
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "box_length - board_thick",
+          "value": 22.225,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "side_inner_len",
+          "value": 6.35,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "board_thick",
+          "value": 0.635,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": []
+    },
+    {
+      "index": 67,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Case",
+      "type": "Extrude",
+      "name": "LidLip",
+      "operation": "Join",
+      "extentType": "Distance",
+      "distance": "lid_down",
+      "taperAngle": "0.0 deg",
+      "endFaceCentroid": [
+        11.7475,
+        3.81,
+        6.35
+      ],
+      "sketch": "LidLip_Sk",
+      "sketchComponent": "Case",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Lid"
+      ],
+      "participantBodies": [
+        "Lid"
+      ]
+    }
+  ]
+}

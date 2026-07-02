@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ShopPrentice — build123d viewer</title>
+<style>
+  :root { --bg:#1a1712; --panel:#241f18; --line:#3a3125; --ink:#e8ddc9; --muted:#a3937a; --accent:#d59a5b; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--ink); }
+  #app { display:flex; height:100%; }
+  #side { width:270px; flex:none; background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; }
+  #stage { flex:1; position:relative; }
+  canvas { display:block; }
+  h1 { font-size:14px; margin:0; padding:14px 16px; letter-spacing:.02em; border-bottom:1px solid var(--line); }
+  h1 small { color:var(--muted); font-weight:400; }
+  .sec { padding:12px 16px; border-bottom:1px solid var(--line); }
+  .sec h2 { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 8px; }
+  #modelSel { width:100%; background:#2f2818; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:9px 10px; font-size:13px; cursor:pointer; appearance:none;
+              background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23a3937a'/></svg>");
+              background-repeat:no-repeat; background-position:right 12px center; }
+  #modelSel:focus { outline:none; border-color:var(--accent); }
+  .row { display:flex; align-items:center; gap:8px; font-size:12px; margin:6px 0; }
+  .row label { flex:1; }
+  input[type=range] { width:100%; accent-color:var(--accent); }
+  #bodies { overflow:auto; flex:1; padding:8px 10px; }
+  .bd { display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:6px; font-size:12px; cursor:default; }
+  .bd:hover { background:#2c2618; }
+  .sw { width:12px; height:12px; border-radius:3px; flex:none; border:1px solid rgba(255,255,255,.15); }
+  .bd .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bd .solo { color:var(--muted); cursor:pointer; font-size:10px; text-transform:uppercase; letter-spacing:.05em; opacity:0; }
+  .bd:hover .solo { opacity:1; }
+  .bd input { accent-color:var(--accent); }
+  #hud { position:absolute; left:12px; bottom:12px; font-size:11px; color:var(--muted); background:rgba(0,0,0,.35); padding:6px 10px; border-radius:6px; }
+  #stat { padding:10px 16px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line); }
+  .btn { background:#2f2818; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:7px 10px; cursor:pointer; font-size:12px; }
+  .btn.on { background:var(--accent); color:#1a1712; border-color:var(--accent); font-weight:600; }
+  .pgrid { display:grid; grid-template-columns:1fr 76px; gap:4px 8px; max-height:34vh; overflow:auto; }
+  .pgrid label { font-size:11px; color:var(--muted); align-self:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pgrid input { width:100%; background:#171310; color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:3px 6px; font-size:12px; }
+  .pgrid input.dirty { border-color:var(--accent); }
+  /* floating viewport toolbar — view controls live with the canvas */
+  #toolbar { position:absolute; top:10px; left:10px; right:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; z-index:5; pointer-events:none; }
+  .tgroup { display:flex; align-items:center; gap:5px; background:rgba(30,25,18,.88); border:1px solid var(--line); border-radius:9px; padding:5px 8px; backdrop-filter:blur(6px); pointer-events:auto; }
+  .tgroup .btn { padding:4px 9px; font-size:11px; border-radius:6px; }
+  .tlab { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+  .tgroup input[type=range] { width:90px; }
+  /* collapsible sidebar sections; Bodies always gets the remaining space */
+  details.acc { border-bottom:1px solid var(--line); }
+  details.acc summary { cursor:pointer; padding:10px 16px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); list-style:none; user-select:none; }
+  details.acc summary::-webkit-details-marker { display:none; }
+  details.acc summary::before { content:"▸ "; }
+  details.acc[open] summary::before { content:"▾ "; }
+  .accbody { padding:0 16px 12px; }
+  #bodysec { flex:1; display:flex; flex-direction:column; min-height:140px; padding:10px 10px 6px; }
+  #bodysec h2 { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 6px; padding:0 6px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <h1>ShopPrentice <small>· build123d</small></h1>
+    <div class="sec">
+      <select id="modelSel" title="Model"></select>
+    </div>
+    <div id="stat">loading…</div>
+    <details class="acc" open>
+      <summary>Parameters <span id="punit" style="color:var(--muted)"></span></summary>
+      <div class="accbody">
+        <div id="params" class="pgrid"></div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn" id="rebuild">Rebuild</button>
+          <span id="bstat" style="font-size:11px; color:var(--muted);"></span>
+        </div>
+      </div>
+    </details>
+    <div id="bodysec">
+      <h2>Bodies <span id="bcount" style="color:var(--muted)"></span></h2>
+      <div id="bodies"></div>
+    </div>
+  </div>
+  <div id="stage">
+    <div id="toolbar">
+      <div class="tgroup">
+        <button class="btn" id="wire" title="Wireframe">Wire</button>
+        <button class="btn on" id="grain" title="Wood grain texture">Grain</button>
+        <button class="btn" id="edges" title="Feature edge lines">Edges</button>
+        <button class="btn" id="spin" title="Turntable spin">Spin</button>
+        <button class="btn" id="reset" title="Reset camera">Reset</button>
+      </div>
+      <div class="tgroup">
+        <span class="tlab">Explode</span>
+        <input type="range" id="explode" min="0" max="100" value="0" />
+      </div>
+      <div class="tgroup">
+        <span class="tlab">Section</span>
+        <button class="btn ax on" data-ax="off">Off</button>
+        <button class="btn ax" data-ax="x">X</button>
+        <button class="btn ax" data-ax="y">Y</button>
+        <button class="btn ax" data-ax="z">Z</button>
+        <input type="range" id="secpos" min="0" max="100" value="50" />
+      </div>
+      <div class="tgroup">
+        <button class="btn" id="measure" title="Click two surface points">Measure</button>
+        <span id="mval" style="color:var(--accent); font-size:12px;"></span>
+      </div>
+    </div>
+    <div id="hud">drag rotate · scroll zoom · right-drag pan</div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { STLLoader } from "three/addons/loaders/STLLoader.js";
+
+const MODELS = [
+  { key: "midou",      label: "Midou 米斗",   file: "out/midou.json" },
+  { key: "ming_table", label: "Ming 平头案",  file: "out/ming_table.json" },
+  { key: "pencil_box", label: "Pencil box",   file: "out/pencil_box.json" },
+  // mirror-frame / toy-box captures remain in captures/ as converter tests,
+  // but only README-referenced examples are surfaced here
+];
+
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;          // section plane
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x40382a, 1.05));
+const key = new THREE.DirectionalLight(0xfff3e0, 2.1);
+key.position.set(1, -1.4, 2); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xbcd0ff, 0.5);
+fill.position.set(-1.5, 1, 0.6); scene.add(fill);
+
+let ground = null, current = null, meshes = [], spinning = false, wire = false;
+let currentDef = null, lastStamp = 0, loading = false;      // auto-reload
+let modelBox = null, modelRadius = 1;                       // section/measure
+const overlay = new THREE.Group(); scene.add(overlay);      // measure markers
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+
+function clearModel() {
+  if (current) { scene.remove(current); current = null; }
+  if (ground) { scene.remove(ground); ground = null; }
+  meshes = [];
+  overlay.clear(); mpts = [];
+  const mv = document.getElementById("mval"); if (mv) mv.textContent = "";
+}
+
+// ---- procedural wood grain (grayscale streaks; body color tints it) ----
+function makeWoodTexture() {
+  const c = document.createElement("canvas"); c.width = c.height = 1024;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, 1024, 1024);
+  for (let i = 0; i < 900; i++) {              // long wavy streaks along X
+    const y = Math.random() * 1024, len = 200 + Math.random() * 800;
+    const x = Math.random() * 1224 - 200;
+    g.strokeStyle = `rgba(90,60,30,${0.03 + Math.random() * 0.09})`;
+    g.lineWidth = 0.6 + Math.random() * 1.8;
+    g.beginPath(); g.moveTo(x, y);
+    for (let s = 1; s <= 6; s++)
+      g.lineTo(x + len * s / 6, y + Math.sin(s * 1.7 + i) * (1 + Math.random() * 2));
+    g.stroke();
+  }
+  for (let i = 0; i < 40; i++) {               // broad growth-ring bands
+    const y = Math.random() * 1024, h = 8 + Math.random() * 40;
+    g.fillStyle = `rgba(120,80,40,${0.025 + Math.random() * 0.04})`;
+    g.fillRect(0, y, 1024, h);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+const woodTex = makeWoodTexture();
+let grainOn = true, edgesOn = false;
+
+// Box-project UVs in model space, U axis = the body's longest bbox axis --
+// the same longest-axis heuristic apply_appearance uses for grain direction.
+function boxUV(geom, scale = 1 / 24) {
+  geom.computeBoundingBox();
+  const sz = new THREE.Vector3(); geom.boundingBox.getSize(sz);
+  const grain = [sz.x, sz.y, sz.z].indexOf(Math.max(sz.x, sz.y, sz.z));
+  const pos = geom.attributes.position, nor = geom.attributes.normal;
+  const uv = new Float32Array(pos.count * 2);
+  const get = (i, ax) => ax === 0 ? pos.getX(i) : ax === 1 ? pos.getY(i) : pos.getZ(i);
+  for (let t = 0; t < pos.count; t += 3) {     // STL: per-face normals
+    const nx = Math.abs(nor.getX(t)), ny = Math.abs(nor.getY(t)), nz = Math.abs(nor.getZ(t));
+    const dom = nx >= ny && nx >= nz ? 0 : (ny >= nz ? 1 : 2);
+    const rem = [0, 1, 2].filter(a => a !== dom);
+    const uAx = rem.includes(grain) ? grain : rem[0];
+    const vAx = rem[0] === uAx ? rem[1] : rem[0];
+    for (let k = 0; k < 3; k++) {
+      uv[2 * (t + k)] = get(t + k, uAx) * scale;
+      uv[2 * (t + k) + 1] = get(t + k, vAx) * scale;
+    }
+  }
+  geom.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+}
+
+const loader = new STLLoader();
+async function load(m, opts = {}) {
+  // preserve camera / body-visibility / explode across an auto-reload
+  const saved = opts.preserve ? {
+    p: camera.position.clone(), t: controls.target.clone(),
+    vis: new Map(meshes.map(o => [o.name, o.visible])),
+  } : null;
+  loading = true; currentDef = m;
+  clearModel();
+  document.getElementById("stat").textContent = "loading " + m.file + " …";
+  let manifest;
+  try {
+    manifest = await (await fetch(m.file, { cache: "no-store" })).json();
+  } catch (e) {
+    document.getElementById("stat").textContent = "load error (serve over http, not file://)";
+    console.error(e); loading = false; return;
+  }
+  lastStamp = manifest.stamp || 0;
+  const base = m.file.substring(0, m.file.lastIndexOf("/") + 1);
+
+  const root = new THREE.Group();
+  // per-body STL is model-space Z-up; rotate so Z is up on screen (three is Y-up)
+  root.rotation.x = -Math.PI / 2;
+  scene.add(root); current = root;
+  meshes = [];
+
+  // one STL file per body -> one mesh per body (reliable name/color/explode)
+  await Promise.all(manifest.parts.map((p) => new Promise((res) => {
+    loader.load(base + p.file, (geo) => {
+      geo.computeVertexNormals();
+      boxUV(geo);                               // grain-aligned box UVs
+      const col = new THREE.Color(p.color);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial(
+        { color: col, metalness: 0.0, roughness: 0.72,
+          map: grainOn ? woodTex : null }));
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.name = p.name;
+      mesh.userData.baseColor = col;
+      // feature edges (CAD-style outline; child, so explode/hide follows)
+      const eg = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo, 20),
+        new THREE.LineBasicMaterial({ color: 0x1d1206, transparent: true, opacity: 0.55 }));
+      eg.visible = edgesOn; eg.raycast = () => {};   // never block measure picks
+      mesh.add(eg); mesh.userData.edges = eg;
+      root.add(mesh);
+      meshes.push(mesh);
+      res();
+    }, undefined, res);
+  })));
+  // keep body list in manifest order
+  meshes.sort((a, b) => manifest.parts.findIndex(p => p.name === a.name)
+                       - manifest.parts.findIndex(p => p.name === b.name));
+
+  root.updateWorldMatrix(true, true);                 // <-- essential before measuring
+  // glTF is authored in meters; our model is cm-magnitude. Normalize so a
+  // ~30-80 cm piece isn't 0.3 units and clipped by the near plane.
+  let raw = new THREE.Box3().setFromObject(root);
+  if (raw.getSize(new THREE.Vector3()).length() / 2 < 5) {
+    root.scale.setScalar(100);
+    root.updateWorldMatrix(true, true);
+  }
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3());   // y = height (Y-up glTF)
+  const ctr = box.getCenter(new THREE.Vector3());
+  const ctrLocal = root.worldToLocal(ctr.clone());
+  for (const o of meshes) {
+    const bc = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
+    o.userData.dirLocal = root.worldToLocal(bc).sub(ctrLocal);   // outward, root-local
+    o.userData.basePos = o.position.clone();
+  }
+  const radius = size.length() / 2;
+
+  const g = new THREE.Mesh(
+    new THREE.PlaneGeometry(radius * 8, radius * 8),
+    new THREE.ShadowMaterial({ opacity: 0.28 }));
+  g.position.y = box.min.y; g.rotation.x = -Math.PI / 2; g.receiveShadow = true;
+  scene.add(g); ground = g;
+  key.target.position.copy(ctr); scene.add(key.target);
+
+  modelBox = box.clone(); modelRadius = radius;
+  if (saved) {
+    camera.near = radius / 100; camera.far = radius * 100;
+    camera.updateProjectionMatrix();
+    camera.position.copy(saved.p); controls.target.copy(saved.t); controls.update();
+  } else {
+    frame(ctr, radius);
+  }
+  buildBodyList();
+  buildParamsPanel(manifest);
+  if (saved) {
+    meshes.forEach(o => { if (saved.vis.has(o.name)) o.visible = saved.vis.get(o.name); });
+    document.querySelectorAll("#bodies input").forEach((c, k) => c.checked = meshes[k].visible);
+  }
+  applyExplode();
+  applySection();
+  loading = false;
+  document.getElementById("stat").innerHTML =    // L x D x H (world y is height)
+    `<b style="color:var(--ink)">${meshes.length}</b> bodies · ${size.x.toFixed(1)}×${size.z.toFixed(1)}×${size.y.toFixed(1)} cm`;
+}
+
+let homeCam = null;
+function frame(ctr, radius) {
+  camera.near = radius / 100; camera.far = radius * 100; camera.updateProjectionMatrix();
+  const d = radius / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.15;
+  camera.position.set(ctr.x + d * 0.75, ctr.y + d * 0.55, ctr.z + d * 0.75);
+  controls.target.copy(ctr); controls.update();
+  homeCam = { p: camera.position.clone(), t: ctr.clone() };
+}
+
+function buildBodyList() {
+  const host = document.getElementById("bodies");
+  host.innerHTML = "";
+  document.getElementById("bcount").textContent = "(" + meshes.length + ")";
+  meshes.forEach((o, i) => {
+    const c = o.userData.baseColor;
+    const el = document.createElement("div");
+    el.className = "bd";
+    el.innerHTML =
+      `<input type="checkbox" checked data-i="${i}">
+       <span class="sw" style="background:#${c.getHexString()}"></span>
+       <span class="nm">${o.name || ("body_" + i)}</span>
+       <span class="solo" data-solo="${i}">solo</span>`;
+    host.appendChild(el);
+  });
+  host.onchange = (e) => {
+    const i = e.target.dataset.i; if (i !== undefined) meshes[i].visible = e.target.checked;
+  };
+  host.onclick = (e) => {
+    const i = e.target.dataset.solo; if (i === undefined) return;
+    meshes.forEach((o, k) => o.visible = (k == i));
+    host.querySelectorAll("input").forEach((c, k) => c.checked = (k == i));
+  };
+}
+
+function applyExplode() {
+  const f = +document.getElementById("explode").value / 100 * 1.4;
+  for (const o of meshes) {
+    if (!o.userData.dirLocal) continue;
+    o.position.copy(o.userData.basePos).addScaledVector(o.userData.dirLocal, f);
+  }
+}
+
+document.getElementById("explode").addEventListener("input", applyExplode);
+document.getElementById("wire").addEventListener("click", (e) => {
+  wire = !wire; e.target.classList.toggle("on", wire);
+  for (const o of meshes) o.traverse(x => { if (x.isMesh) x.material.wireframe = wire; });
+});
+document.getElementById("spin").addEventListener("click", (e) => {
+  spinning = !spinning; e.target.classList.toggle("on", spinning);
+});
+document.getElementById("reset").addEventListener("click", () => {
+  if (homeCam) { camera.position.copy(homeCam.p); controls.target.copy(homeCam.t); controls.update(); }
+});
+
+// ---- grain / edges toggles ----
+document.getElementById("grain").addEventListener("click", (e) => {
+  grainOn = !grainOn; e.target.classList.toggle("on", grainOn);
+  for (const o of meshes) { o.material.map = grainOn ? woodTex : null; o.material.needsUpdate = true; }
+});
+document.getElementById("edges").addEventListener("click", (e) => {
+  edgesOn = !edgesOn; e.target.classList.toggle("on", edgesOn);
+  for (const o of meshes) if (o.userData.edges) o.userData.edges.visible = edgesOn;
+});
+
+// ---- parameter panel + rebuild ----
+function buildParamsPanel(manifest) {
+  const host = document.getElementById("params");
+  host.innerHTML = "";
+  document.getElementById("punit").textContent =
+    manifest.units ? "(" + manifest.units + ")" : "";
+  const params = manifest.params || {};
+  for (const [k, v] of Object.entries(params)) {
+    const lab = document.createElement("label");
+    lab.textContent = k; lab.title = k;
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.step = "any";
+    inp.value = v; inp.dataset.key = k; inp.dataset.orig = v;
+    inp.addEventListener("input", () =>
+      inp.classList.toggle("dirty", +inp.value !== +inp.dataset.orig));
+    host.appendChild(lab); host.appendChild(inp);
+  }
+}
+document.getElementById("rebuild").addEventListener("click", async () => {
+  if (!currentDef) return;
+  const set = {};
+  document.querySelectorAll("#params input").forEach(i => {
+    if (i.value !== "" && isFinite(+i.value)) set[i.dataset.key] = +i.value;
+  });
+  const bstat = document.getElementById("bstat");
+  const btn = document.getElementById("rebuild");
+  btn.disabled = true; bstat.textContent = "building…";
+  try {
+    const r = await (await fetch("/rebuild", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: currentDef.key, set }),
+    })).json();
+    bstat.textContent = r.ok ? "OK — reloading" : "BUILD FAILED (see console)";
+    if (!r.ok) console.error(r.log); else console.log(r.log);
+    // on success the manifest stamp changed; the auto-reload poll swaps it in
+  } catch (e) {
+    bstat.textContent = "server error (run server.py, not http.server)";
+  }
+  btn.disabled = false;
+  setTimeout(() => { bstat.textContent = ""; }, 6000);
+});
+
+// ---- section plane (model axes; root is rotated Z-up -> Y-up) ----
+// world direction of each +model axis under root.rotation.x = -PI/2
+const AXDIR = { x: new THREE.Vector3(1, 0, 0),
+                y: new THREE.Vector3(0, 0, -1),
+                z: new THREE.Vector3(0, 1, 0) };
+let secAxis = "off";
+const secPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
+
+function applySection() {
+  const on = secAxis !== "off" && modelBox;
+  if (on) {
+    const a = AXDIR[secAxis];
+    let mn = Infinity, mx = -Infinity;                 // box extent along a
+    for (const cx of [modelBox.min.x, modelBox.max.x])
+      for (const cy of [modelBox.min.y, modelBox.max.y])
+        for (const cz of [modelBox.min.z, modelBox.max.z]) {
+          const d = a.x * cx + a.y * cy + a.z * cz;
+          mn = Math.min(mn, d); mx = Math.max(mx, d);
+        }
+    const t = +document.getElementById("secpos").value / 100;
+    // keep points with a.p <= c  (slider 100 = fully visible)
+    secPlane.normal.copy(a).negate();
+    secPlane.constant = mn + (mx - mn) * t + 1e-4;
+  }
+  for (const o of meshes) {
+    o.material.clippingPlanes = on ? [secPlane] : null;
+    o.material.clipShadows = !!on;
+    if (o.userData.edges)
+      o.userData.edges.material.clippingPlanes = on ? [secPlane] : null;
+  }
+}
+document.querySelectorAll(".ax").forEach(b => b.addEventListener("click", () => {
+  secAxis = b.dataset.ax;
+  document.querySelectorAll(".ax").forEach(x => x.classList.toggle("on", x.dataset.ax === secAxis));
+  applySection();
+}));
+document.getElementById("secpos").addEventListener("input", applySection);
+
+// ---- measure: click two surface points, distance in cm ----
+let measuring = false, mpts = [], downXY = null;
+document.getElementById("measure").addEventListener("click", (e) => {
+  measuring = !measuring; e.target.classList.toggle("on", measuring);
+  if (!measuring) { overlay.clear(); mpts = []; document.getElementById("mval").textContent = ""; }
+});
+const ray = new THREE.Raycaster();
+renderer.domElement.addEventListener("pointerdown", (e) => { downXY = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (!measuring || !downXY) return;
+  const moved = Math.hypot(e.clientX - downXY[0], e.clientY - downXY[1]);
+  downXY = null;
+  if (moved > 5) return;                               // it was an orbit-drag, not a pick
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(
+    ((e.clientX - r.left) / r.width) * 2 - 1,
+    -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const hits = ray.intersectObjects(meshes.filter(o => o.visible), false);
+  if (!hits.length) return;
+  const p = hits[0].point;
+  if (mpts.length === 2) { mpts = []; overlay.clear(); document.getElementById("mval").textContent = ""; }
+  mpts.push(p.clone());
+  const dot = new THREE.Mesh(
+    new THREE.SphereGeometry(Math.max(modelRadius * 0.012, 0.05)),
+    new THREE.MeshBasicMaterial({ color: 0xd59a5b, depthTest: false }));
+  dot.position.copy(p); dot.renderOrder = 999; overlay.add(dot);
+  if (mpts.length === 2) {
+    const ln = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(mpts),
+      new THREE.LineBasicMaterial({ color: 0xd59a5b, depthTest: false }));
+    ln.renderOrder = 999; overlay.add(ln);
+    const scale = current ? current.scale.x : 1;       // undo any display scaling
+    document.getElementById("mval").textContent =
+      (mpts[0].distanceTo(mpts[1]) / scale).toFixed(2) + " cm";
+  }
+});
+
+// ---- auto-reload: poll the manifest stamp; rebuilds hot-swap in place ----
+setInterval(async () => {
+  if (loading || !currentDef || !lastStamp) return;
+  try {
+    const man = await (await fetch(currentDef.file, { cache: "no-store" })).json();
+    if (man.stamp && man.stamp !== lastStamp) load(currentDef, { preserve: true });
+  } catch (e) { /* server briefly mid-write; retry next tick */ }
+}, 2500);
+
+// model selector: dropdown fed by the server's /models index, so newly
+// converted examples appear without editing this file. Falls back to the
+// static MODELS list when served without server.py.
+let modelList = MODELS;
+const msel = document.getElementById("modelSel");
+
+function fillSelector() {
+  msel.innerHTML = "";
+  for (const m of modelList) {
+    const o = document.createElement("option");
+    o.value = m.key; o.textContent = m.label;
+    msel.appendChild(o);
+  }
+}
+msel.addEventListener("change", () => {
+  const m = modelList.find(x => x.key === msel.value);
+  if (!m) return;
+  document.getElementById("explode").value = 0;
+  load(m);
+});
+
+async function initModels() {
+  try {
+    const r = await fetch("/models", { cache: "no-store" });
+    if (r.ok) {
+      const list = await r.json();
+      if (Array.isArray(list) && list.length) modelList = list;
+    }
+  } catch (e) { /* static fallback */ }
+  fillSelector();
+  load(modelList[0]);
+}
+
+function tick() {
+  requestAnimationFrame(tick);
+  if (spinning && current) current.rotation.z += 0.005;
+  controls.update();
+  renderer.render(scene, camera);
+}
+resize(); initModels(); tick();
+</script>
+</body>
+</html>

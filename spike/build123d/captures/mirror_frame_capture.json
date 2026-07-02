@@ -1,0 +1,1486 @@
+{
+  "designName": "(Unsaved)",
+  "designType": "Parametric",
+  "userParameters": [
+    {
+      "name": "mirror_w",
+      "expression": "24 in",
+      "unit": "in",
+      "value": 60.96,
+      "comment": ""
+    },
+    {
+      "name": "mirror_h",
+      "expression": "36 in",
+      "unit": "in",
+      "value": 91.44,
+      "comment": ""
+    },
+    {
+      "name": "frame_w",
+      "expression": "3 in",
+      "unit": "in",
+      "value": 7.62,
+      "comment": ""
+    },
+    {
+      "name": "frame_thick",
+      "expression": "0.75 in",
+      "unit": "in",
+      "value": 1.905,
+      "comment": ""
+    },
+    {
+      "name": "rabbet_d",
+      "expression": "0.375 in",
+      "unit": "in",
+      "value": 0.9525,
+      "comment": ""
+    },
+    {
+      "name": "rabbet_w",
+      "expression": "0.375 in",
+      "unit": "in",
+      "value": 0.9525,
+      "comment": ""
+    },
+    {
+      "name": "glass_thick",
+      "expression": "0.125 in",
+      "unit": "in",
+      "value": 0.3175,
+      "comment": ""
+    },
+    {
+      "name": "outer_w",
+      "expression": "mirror_w + 2 * frame_w",
+      "unit": "in",
+      "value": 76.2,
+      "comment": ""
+    },
+    {
+      "name": "outer_h",
+      "expression": "mirror_h + 2 * frame_w",
+      "unit": "in",
+      "value": 106.67999999999999,
+      "comment": ""
+    },
+    {
+      "name": "inner_w",
+      "expression": "mirror_w",
+      "unit": "in",
+      "value": 60.96,
+      "comment": ""
+    },
+    {
+      "name": "inner_h",
+      "expression": "mirror_h",
+      "unit": "in",
+      "value": 91.44,
+      "comment": ""
+    },
+    {
+      "name": "mid_x",
+      "expression": "outer_w / 2",
+      "unit": "in",
+      "value": 38.1,
+      "comment": ""
+    },
+    {
+      "name": "mid_z",
+      "expression": "outer_h / 2",
+      "unit": "in",
+      "value": 53.339999999999996,
+      "comment": ""
+    }
+  ],
+  "components": {
+    "name": "(Unsaved)",
+    "bodies": [],
+    "sketches": [],
+    "constructionPlanes": [],
+    "children": [
+      {
+        "name": "Frame",
+        "bodies": [
+          {
+            "name": "Bottom",
+            "volume": 1049.0922,
+            "boundingBox": {
+              "min": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "max": [
+                76.2,
+                1.905,
+                7.62
+              ]
+            }
+          },
+          {
+            "name": "Top",
+            "volume": 1049.0922,
+            "boundingBox": {
+              "min": [
+                0.0,
+                0.0,
+                99.06
+              ],
+              "max": [
+                76.2,
+                1.905,
+                106.68
+              ]
+            }
+          },
+          {
+            "name": "Left",
+            "volume": 1244.3927,
+            "boundingBox": {
+              "min": [
+                0.0,
+                0.0,
+                7.62
+              ],
+              "max": [
+                7.62,
+                1.905,
+                99.06
+              ]
+            }
+          },
+          {
+            "name": "Right",
+            "volume": 1244.3927,
+            "boundingBox": {
+              "min": [
+                68.58,
+                0.0,
+                7.62
+              ],
+              "max": [
+                76.2,
+                1.905,
+                99.06
+              ]
+            }
+          }
+        ],
+        "sketches": [
+          {
+            "name": "Bottom_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d14",
+                "expression": "outer_w",
+                "value": 76.2
+              },
+              {
+                "name": "d15",
+                "expression": "frame_w",
+                "value": 7.62
+              },
+              {
+                "name": "d16",
+                "expression": "abs(0 in)",
+                "value": 0.0
+              },
+              {
+                "name": "d17",
+                "expression": "abs(0 in)",
+                "value": 0.0
+              }
+            ]
+          },
+          {
+            "name": "Left_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d23",
+                "expression": "frame_w",
+                "value": 7.62
+              },
+              {
+                "name": "d24",
+                "expression": "inner_h",
+                "value": 91.44
+              },
+              {
+                "name": "d25",
+                "expression": "abs(0 in)",
+                "value": 0.0
+              },
+              {
+                "name": "d26",
+                "expression": "abs(frame_w)",
+                "value": 7.62
+              }
+            ]
+          },
+          {
+            "name": "Rabbet_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d33",
+                "expression": "inner_w + 2 * rabbet_d",
+                "value": 62.865
+              },
+              {
+                "name": "d34",
+                "expression": "inner_h + 2 * rabbet_d",
+                "value": 93.345
+              },
+              {
+                "name": "d35",
+                "expression": "abs(frame_w - rabbet_d)",
+                "value": 6.6675
+              },
+              {
+                "name": "d36",
+                "expression": "abs(frame_w - rabbet_d)",
+                "value": 6.6675
+              }
+            ]
+          }
+        ],
+        "constructionPlanes": [
+          "ZMid",
+          "XMid",
+          "Rabbet_Pl"
+        ],
+        "children": []
+      },
+      {
+        "name": "Glass",
+        "bodies": [
+          {
+            "name": "Glass",
+            "volume": 1769.8029,
+            "boundingBox": {
+              "min": [
+                7.62,
+                0.9525,
+                7.62
+              ],
+              "max": [
+                68.58,
+                1.27,
+                99.06
+              ]
+            }
+          }
+        ],
+        "sketches": [
+          {
+            "name": "Glass_Sk",
+            "dimensionCount": 4,
+            "dimensions": [
+              {
+                "name": "d40",
+                "expression": "mirror_w",
+                "value": 60.96
+              },
+              {
+                "name": "d41",
+                "expression": "mirror_h",
+                "value": 91.44
+              },
+              {
+                "name": "d42",
+                "expression": "outer_w - frame_w",
+                "value": 68.58
+              },
+              {
+                "name": "d43",
+                "expression": "frame_w",
+                "value": 7.62
+              }
+            ]
+          }
+        ],
+        "constructionPlanes": [
+          "Glass_Pl"
+        ],
+        "children": []
+      }
+    ]
+  },
+  "timeline": [
+    {
+      "index": 0,
+      "isGroup": false,
+      "isRolledBack": false,
+      "type": "ComponentCreation",
+      "name": "Frame"
+    },
+    {
+      "index": 1,
+      "isGroup": false,
+      "isRolledBack": false,
+      "type": "ComponentCreation",
+      "name": "Glass"
+    },
+    {
+      "index": 2,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Sketch",
+      "name": "Bottom_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "XZ",
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            0.0
+          ],
+          "end": [
+            76.2,
+            0.0
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            76.2,
+            0.0
+          ],
+          "end": [
+            76.2,
+            -7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            76.2,
+            -7.62
+          ],
+          "end": [
+            0.0,
+            -7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            -7.62
+          ],
+          "end": [
+            0.0,
+            0.0
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.0,
+            -7.62
+          ],
+          "max": [
+            76.2,
+            0.0
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "outer_w",
+          "value": 76.2,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "frame_w",
+          "value": 7.62,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "abs(0 in)",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "abs(0 in)",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        },
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 2
+          }
+        },
+        {
+          "type": "VerticalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 1
+          }
+        },
+        {
+          "type": "VerticalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 3
+          }
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Extrude",
+      "name": "BottomRail",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "frame_thick",
+      "taperAngle": "0.0 deg",
+      "sketch": "Bottom_Sk",
+      "sketchComponent": "Frame",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Bottom"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 4,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "ConstructionPlane",
+      "name": "ZMid",
+      "definitionType": "Offset",
+      "offset": "mid_z",
+      "basePlane": "XY",
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "origin": [
+        0.0,
+        0.0,
+        53.34
+      ]
+    },
+    {
+      "index": 5,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Mirror",
+      "name": "TopMir",
+      "mirrorPlane": {
+        "type": "ConstructionPlane",
+        "name": "ZMid",
+        "normal": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          53.34
+        ]
+      },
+      "inputBodies": [
+        "BottomRail"
+      ],
+      "bodies": [
+        "Top",
+        "Bottom"
+      ],
+      "computeOption": "Adjust"
+    },
+    {
+      "index": 6,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Sketch",
+      "name": "Left_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "XZ",
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            -7.62
+          ],
+          "end": [
+            7.62,
+            -7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            7.62,
+            -7.62
+          ],
+          "end": [
+            7.62,
+            -99.06
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            7.62,
+            -99.06
+          ],
+          "end": [
+            0.0,
+            -99.06
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            -99.06
+          ],
+          "end": [
+            0.0,
+            -7.62
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            0.0,
+            -99.06
+          ],
+          "max": [
+            7.62,
+            -7.62
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "frame_w",
+          "value": 7.62,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "inner_h",
+          "value": 91.44,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "abs(0 in)",
+          "value": 0.0,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "abs(frame_w)",
+          "value": 7.62,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        },
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 2
+          }
+        },
+        {
+          "type": "VerticalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 1
+          }
+        },
+        {
+          "type": "VerticalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 3
+          }
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Extrude",
+      "name": "LeftStile",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "frame_thick",
+      "taperAngle": "0.0 deg",
+      "sketch": "Left_Sk",
+      "sketchComponent": "Frame",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Left"
+      ],
+      "startFace": true
+    },
+    {
+      "index": 8,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "ConstructionPlane",
+      "name": "XMid",
+      "definitionType": "Offset",
+      "offset": "mid_x",
+      "basePlane": "YZ",
+      "normal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "origin": [
+        38.1,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "index": 9,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Mirror",
+      "name": "RightMir",
+      "mirrorPlane": {
+        "type": "ConstructionPlane",
+        "name": "XMid",
+        "normal": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "origin": [
+          38.1,
+          0.0,
+          0.0
+        ]
+      },
+      "inputBodies": [
+        "LeftStile"
+      ],
+      "bodies": [
+        "Right",
+        "Left"
+      ],
+      "computeOption": "Adjust"
+    },
+    {
+      "index": 10,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "ConstructionPlane",
+      "name": "Rabbet_Pl",
+      "definitionType": "Offset",
+      "offset": "frame_thick - rabbet_w",
+      "basePlane": "XZ",
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "origin": [
+        0.0,
+        0.9525,
+        0.0
+      ]
+    },
+    {
+      "index": 11,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Sketch",
+      "name": "Rabbet_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.9525,
+        0.0
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "Rabbet_Pl",
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "origin": [
+          0.0,
+          0.9525,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            6.6675,
+            -6.6675
+          ],
+          "end": [
+            69.5325,
+            -6.6675
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            69.5325,
+            -6.6675
+          ],
+          "end": [
+            69.5325,
+            -100.0125
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            69.5325,
+            -100.0125
+          ],
+          "end": [
+            6.6675,
+            -100.0125
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            6.6675,
+            -100.0125
+          ],
+          "end": [
+            6.6675,
+            -6.6675
+          ],
+          "isConstruction": false
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            6.6675,
+            -100.0125
+          ],
+          "max": [
+            69.5325,
+            -6.6675
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "inner_w + 2 * rabbet_d",
+          "value": 62.865,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "inner_h + 2 * rabbet_d",
+          "value": 93.345,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 1,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "abs(frame_w - rabbet_d)",
+          "value": 6.6675,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "abs(frame_w - rabbet_d)",
+          "value": 6.6675,
+          "entityOne": {
+            "type": "SketchPoint",
+            "role": "origin"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        },
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 2
+          }
+        },
+        {
+          "type": "VerticalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 1
+          }
+        },
+        {
+          "type": "VerticalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 3
+          }
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Extrude",
+      "name": "RabbetTool",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "rabbet_w",
+      "taperAngle": "0.0 deg",
+      "sketch": "Rabbet_Sk",
+      "sketchComponent": "Frame",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Body5"
+      ]
+    },
+    {
+      "index": 13,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Combine",
+      "name": "Rab_Bot",
+      "operation": "Cut",
+      "targetBody": "Bottom",
+      "targetComponent": "Frame",
+      "toolBodies": [
+        "Body5"
+      ],
+      "toolComponents": [
+        "Frame"
+      ],
+      "isKeepToolBodies": true,
+      "outputBodies": [
+        "Bottom",
+        "Body5"
+      ]
+    },
+    {
+      "index": 14,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Combine",
+      "name": "Rab_Top",
+      "operation": "Cut",
+      "targetBody": "Top",
+      "targetComponent": "Frame",
+      "toolBodies": [
+        "Body5"
+      ],
+      "toolComponents": [
+        "Frame"
+      ],
+      "isKeepToolBodies": true,
+      "outputBodies": [
+        "Top",
+        "Body5"
+      ]
+    },
+    {
+      "index": 15,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Combine",
+      "name": "Rab_Left",
+      "operation": "Cut",
+      "targetBody": "Left",
+      "targetComponent": "Frame",
+      "toolBodies": [
+        "Body5"
+      ],
+      "toolComponents": [
+        "Frame"
+      ],
+      "isKeepToolBodies": true,
+      "outputBodies": [
+        "Left",
+        "Body5"
+      ]
+    },
+    {
+      "index": 16,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Frame",
+      "type": "Combine",
+      "name": "Rab_Right",
+      "operation": "Cut",
+      "targetBody": "Right",
+      "targetComponent": "Frame",
+      "toolBodies": [
+        "Body5"
+      ],
+      "toolComponents": [
+        "Frame"
+      ],
+      "isKeepToolBodies": false,
+      "outputBodies": [
+        "Right"
+      ]
+    },
+    {
+      "index": 17,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Glass",
+      "type": "ConstructionPlane",
+      "name": "Glass_Pl",
+      "definitionType": "Offset",
+      "offset": "frame_thick - rabbet_w",
+      "basePlane": "XZ",
+      "normal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "origin": [
+        0.0,
+        0.9525,
+        0.0
+      ]
+    },
+    {
+      "index": 18,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Glass",
+      "type": "Sketch",
+      "name": "Glass_Sk",
+      "sketchOrigin": [
+        0.0,
+        0.9525,
+        0.0
+      ],
+      "sketchXDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "sketchYDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "plane": {
+        "type": "ConstructionPlane",
+        "name": "Glass_Pl",
+        "normal": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "origin": [
+          0.0,
+          0.9525,
+          0.0
+        ]
+      },
+      "curves": [
+        {
+          "type": "Line",
+          "start": [
+            7.62,
+            -7.62
+          ],
+          "end": [
+            68.58,
+            -7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            68.58,
+            -7.62
+          ],
+          "end": [
+            68.58,
+            -99.06
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            68.58,
+            -99.06
+          ],
+          "end": [
+            7.62,
+            -99.06
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            7.62,
+            -99.06
+          ],
+          "end": [
+            7.62,
+            -7.62
+          ],
+          "isConstruction": false
+        },
+        {
+          "type": "Line",
+          "start": [
+            76.2,
+            -7.62
+          ],
+          "end": [
+            0.0,
+            -7.62
+          ],
+          "isConstruction": true,
+          "isReference": true,
+          "projectedFrom": {
+            "type": "BRepFace",
+            "body": "Bottom"
+          }
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            -7.62
+          ],
+          "end": [
+            0.0,
+            0.0
+          ],
+          "isConstruction": true,
+          "isReference": true,
+          "projectedFrom": {
+            "type": "BRepFace",
+            "body": "Bottom"
+          }
+        },
+        {
+          "type": "Line",
+          "start": [
+            0.0,
+            0.0
+          ],
+          "end": [
+            76.2,
+            0.0
+          ],
+          "isConstruction": true,
+          "isReference": true,
+          "projectedFrom": {
+            "type": "BRepFace",
+            "body": "Bottom"
+          }
+        },
+        {
+          "type": "Line",
+          "start": [
+            76.2,
+            0.0
+          ],
+          "end": [
+            76.2,
+            -7.62
+          ],
+          "isConstruction": true,
+          "isReference": true,
+          "projectedFrom": {
+            "type": "BRepFace",
+            "body": "Bottom"
+          }
+        }
+      ],
+      "profileCount": 1,
+      "profiles": [
+        {
+          "index": 0,
+          "min": [
+            7.62,
+            -99.06
+          ],
+          "max": [
+            68.58,
+            -7.62
+          ]
+        }
+      ],
+      "dimensions": [
+        {
+          "type": "SketchLinearDimension",
+          "expression": "mirror_w",
+          "value": 60.96,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "end"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "mirror_h",
+          "value": 91.44,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 2,
+            "role": "end"
+          },
+          "orientation": "Vertical"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "outer_w - frame_w",
+          "value": 68.58,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 6,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Horizontal"
+        },
+        {
+          "type": "SketchLinearDimension",
+          "expression": "frame_w",
+          "value": 7.62,
+          "entityOne": {
+            "type": "SketchPoint",
+            "curveIndex": 6,
+            "role": "end"
+          },
+          "entityTwo": {
+            "type": "SketchPoint",
+            "curveIndex": 0,
+            "role": "start"
+          },
+          "orientation": "Vertical"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 0
+          }
+        },
+        {
+          "type": "VerticalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 1
+          }
+        },
+        {
+          "type": "HorizontalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 2
+          }
+        },
+        {
+          "type": "VerticalConstraint",
+          "line": {
+            "type": "SketchLine",
+            "curveIndex": 3
+          }
+        }
+      ]
+    },
+    {
+      "index": 19,
+      "isGroup": false,
+      "isRolledBack": false,
+      "component": "Glass",
+      "type": "Extrude",
+      "name": "GlassPanel",
+      "operation": "NewBody",
+      "extentType": "Distance",
+      "distance": "glass_thick",
+      "taperAngle": "0.0 deg",
+      "sketch": "Glass_Sk",
+      "sketchComponent": "Glass",
+      "profileCount": 1,
+      "profileIndex": 0,
+      "bodies": [
+        "Glass"
+      ],
+      "startFace": true
+    }
+  ]
+}
