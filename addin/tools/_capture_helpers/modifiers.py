@@ -37,17 +37,31 @@ def _capture_mirror(mir, design=None):
     except:
         pass
 
-    # Input entities — need rollTo for BRep-dependent access
+    # Input entities — need rollTo for BRep-dependent access. Classify by
+    # TYPE: a mirror can take bodies OR features (sp.mirror_feats), and
+    # converters need to know which replay semantics apply.
     def _try_inputs():
         try:
             inputs = mir.inputEntities
-            input_names = []
+            in_bodies, in_feats, src_tokens = [], [], []
             for ii in range(inputs.count):
                 e = inputs.item(ii)
-                if hasattr(e, 'name'):
-                    input_names.append(e.name)
-            if input_names:
-                info["inputBodies"] = input_names
+                b = adsk.fusion.BRepBody.cast(e)
+                if b:
+                    in_bodies.append(b.name)
+                    try:
+                        src_tokens.append(b.entityToken)
+                    except:
+                        pass
+                elif hasattr(e, 'name'):
+                    in_feats.append(e.name)
+            if in_bodies or in_feats:
+                info["inputBodies"] = in_bodies + in_feats   # back-compat
+                if in_bodies:
+                    info["inputBodyNames"] = in_bodies
+                if in_feats:
+                    info["inputFeatures"] = in_feats
+                info["_srcTokens"] = src_tokens
         except:
             pass
 
@@ -60,18 +74,36 @@ def _capture_mirror(mir, design=None):
     else:
         _try_inputs()
 
-    # Output bodies — try direct access first, rollTo if consumed downstream
-    out = [b.name for b in mir.bodies]
+    # Output bodies — try direct access first, rollTo if consumed downstream.
+    # MirrorFeature.bodies includes the SOURCE bodies, not just copies;
+    # newBodies (token diff against inputs) records which are actual copies.
+    def _read_out():
+        toks = set(info.get("_srcTokens") or [])
+        out, new = [], []
+        for i in range(mir.bodies.count):
+            b = mir.bodies.item(i)
+            out.append(b.name)
+            try:
+                if b.entityToken not in toks:
+                    new.append(b.name)
+            except:
+                pass
+        return out, new
+
+    out, new = _read_out()
     if not out and design:
         try:
             mir.timelineObject.rollTo(False)
             try:
-                out = [b.name for b in mir.bodies]
+                out, new = _read_out()
             finally:
                 design.timeline.moveToEnd()
         except:
             pass
     info["bodies"] = out
+    if new and len(new) < len(out):
+        info["newBodies"] = new
+    info.pop("_srcTokens", None)
 
     try:
         if mir.patternComputeOption == adsk.fusion.PatternComputeOptions.IdenticalPatternCompute:
@@ -443,6 +475,82 @@ def _match_profile_index_from_profile(profile, sk, info):
         return best_idx
     except:
         return None
+
+
+def _capture_loft(loft, design):
+    """Capture a LoftFeature: operation + section profiles (sketch name and
+    profile index each) + output bodies."""
+    info = {"type": "Loft", "name": loft.name}
+    op_map = {
+        adsk.fusion.FeatureOperations.NewBodyFeatureOperation: "NewBody",
+        adsk.fusion.FeatureOperations.CutFeatureOperation: "Cut",
+        adsk.fusion.FeatureOperations.JoinFeatureOperation: "Join",
+        adsk.fusion.FeatureOperations.IntersectFeatureOperation: "Intersect",
+    }
+    info["operation"] = op_map.get(loft.operation, str(loft.operation))
+    try:
+        with _roll_to_feature(loft, design):
+            secs = []
+            for i in range(loft.loftSections.count):
+                sec_info = {}
+                try:
+                    prof = adsk.fusion.Profile.cast(loft.loftSections.item(i).entity)
+                    if prof:
+                        sk = prof.parentSketch
+                        sec_info["sketch"] = sk.name
+                        idx = _match_profile_index_from_profile(prof, sk, sec_info)
+                        if idx is not None:
+                            sec_info["profileIndex"] = idx
+                    else:
+                        ent = loft.loftSections.item(i).entity
+                        sec_info["entityType"] = type(ent).__name__
+                        bface = adsk.fusion.BRepFace.cast(ent)
+                        if bface:
+                            try:
+                                sec_info["body"] = bface.body.name
+                            except:
+                                pass
+                            # planar section faces: record the outer-loop
+                            # vertex polygon so converters can rebuild them
+                            try:
+                                lp = None
+                                for li in range(bface.loops.count):
+                                    if bface.loops.item(li).isOuter:
+                                        lp = bface.loops.item(li)
+                                        break
+                                pts = []
+                                for ei in range(lp.coEdges.count):
+                                    ce = lp.coEdges.item(ei)
+                                    v = (ce.edge.endVertex if ce.isOpposedToEdge
+                                         else ce.edge.startVertex).geometry
+                                    pts.append([round(v.x, 4), round(v.y, 4),
+                                                round(v.z, 4)])
+                                if pts:
+                                    sec_info["outerVertices"] = pts
+                            except Exception as e2:
+                                sec_info["outerError"] = str(e2)
+                except Exception as e:
+                    sec_info["error"] = str(e)
+                secs.append(sec_info)
+            info["sections"] = secs
+    except Exception as e:
+        info["sectionsError"] = str(e)
+    body_names = [b.name for b in loft.bodies]
+    if not body_names and design:
+        try:
+            loft.timelineObject.rollTo(False)
+            try:
+                body_names = [b.name for b in loft.bodies]
+            finally:
+                design.timeline.moveToEnd()
+        except:
+            pass
+    info["bodies"] = body_names
+    try:
+        info["participantBodies"] = [b.name for b in loft.participantBodies]
+    except:
+        pass
+    return info
 
 
 def _capture_split_body(split, design):

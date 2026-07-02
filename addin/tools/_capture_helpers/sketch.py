@@ -268,8 +268,21 @@ def _capture_sketch(sk, design=None):
                         round(arc.endSketchPoint.geometry.y, 4)],
             }
             try:
-                _, _, _, _, sweep = arc.geometry.getData()
-                arc_info["sweepAngle"] = round(sweep, 4)
+                # Arc3D.getData returns 7 values (the old 5-way unpack always
+                # threw, so sweepAngle never landed in captures)
+                _, _, _, _, _, sa, ea = arc.geometry.getData()
+                arc_info["sweepAngle"] = round(ea - sa, 6)
+            except:
+                pass
+            try:
+                # exact ON-ARC midpoint — disambiguates minor vs major arc
+                # with no sign convention at all (three points define the arc)
+                ev_ = arc.geometry.evaluator
+                ok_, p0_, p1_ = ev_.getParameterExtents()
+                if ok_:
+                    ok2_, mp_ = ev_.getPointAtParameter((p0_ + p1_) / 2.0)
+                    if ok2_:
+                        arc_info["mid"] = [round(mp_.x, 4), round(mp_.y, 4)]
             except:
                 pass
             # Projection detection
@@ -329,6 +342,39 @@ def _capture_sketch(sk, design=None):
             except:
                 pass
             curves_info.append(arc_info)
+            continue
+        earc = adsk.fusion.SketchEllipticalArc.cast(c)
+        if earc:
+            # elliptical arcs (typically from sketch fillets against leaning
+            # projections): record sampled ON-CURVE points — converters can
+            # spline through them; exact params are convention-heavy
+            e_info = {"type": "EllipticalArc"}
+            try:
+                e_info["start"] = [round(earc.startSketchPoint.geometry.x, 4),
+                                   round(earc.startSketchPoint.geometry.y, 4)]
+                e_info["end"] = [round(earc.endSketchPoint.geometry.x, 4),
+                                 round(earc.endSketchPoint.geometry.y, 4)]
+            except:
+                pass
+            try:
+                ev_ = earc.geometry.evaluator
+                ok_, p0_, p1_ = ev_.getParameterExtents()
+                if ok_:
+                    n_ = 25
+                    ok2_, pts_ = ev_.getPointsAtParameters(
+                        [p0_ + (p1_ - p0_) * k_ / (n_ - 1) for k_ in range(n_)])
+                    if ok2_:
+                        e_info["points"] = [[round(p_.x, 4), round(p_.y, 4)]
+                                            for p_ in pts_]
+            except:
+                pass
+            e_info["isConstruction"] = earc.isConstruction
+            try:
+                if earc.isReference:
+                    e_info["isReference"] = True
+            except:
+                pass
+            curves_info.append(e_info)
             continue
         circle = adsk.fusion.SketchCircle.cast(c)
         if circle:
@@ -531,11 +577,18 @@ def _capture_sketch(sk, design=None):
         try:
             p = sk.profiles.item(pi)
             bb = p.boundingBox
-            profiles_info.append({
+            prof_info = {
                 "index": pi,
                 "min": [round(bb.minPoint.x, 4), round(bb.minPoint.y, 4)],
                 "max": [round(bb.maxPoint.x, 4), round(bb.maxPoint.y, 4)],
-            })
+            }
+            try:
+                # exact region-match gate for converters (bbox alone cannot
+                # distinguish regions split by live reference curves)
+                prof_info["area"] = round(p.areaProperties().area, 6)
+            except:
+                pass
+            profiles_info.append(prof_info)
         except:
             profiles_info.append({"index": pi})
     if profiles_info:

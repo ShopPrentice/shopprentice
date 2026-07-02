@@ -21,5 +21,5 @@ from .combine import _capture_combine, _infer_combine_tool_bodies
 from .modifiers import (
     _capture_mirror, _capture_move, _capture_chamfer, _capture_fillet,
     _capture_sweep, _match_profile_index_from_profile,
-    _capture_split_body, _capture_remove,
+    _capture_split_body, _capture_remove, _capture_loft,
 )
