@@ -255,7 +255,7 @@ async function load(m, opts = {}) {
       const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial(
         { color: col, metalness: 0.0, roughness: 0.72,
           map: grainOn ? woodTex : null }));
-      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.castShadow = true;   // parts don't RECEIVE: no acne
       mesh.name = p.name;
       mesh.userData.baseColor = col;
       // feature edges (CAD-style outline; child, so explode/hide follows)
