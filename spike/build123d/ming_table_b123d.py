@@ -31,6 +31,8 @@ PARAMS = {
     "apron_t": 0.375, "apron_w": 1.125, "spandrel_depth": 3.5625,
     "ap_end_inset": 0.875, "sp_edge_gap": 1.0,
     "shelf_z": 20.0, "sf_t": 0.875, "sp_panel_t": 0.3125,
+    "fbd_lip": 0.1, "fbd_pad": 0.1, "fbd_angle_deg": 10.0,
+    "fbd_tail_w": 0.225, "fbd_tail_count": 2,
 }
 
 
@@ -222,10 +224,56 @@ def build(overrides=None):
                          fillets=coves + bots)
     apron_b = apron_f.mirror(Plane.XZ)
     # short aprons: plain band between the legs, running in Y at x = -+ltx
-    sd_half = d2 - ap_end_inset
-    short = [(-sd_half, AT), (sd_half, AT), (sd_half, AB), (-sd_half, AB)]
-    apron_l = poly_prism(short, "x", -ltx - apron_t / 2, (apron_t, 0, 0))
+    # ------------------------------------------------------------------
+    # Apron RING with hidden full-blind dovetail corners (the original's
+    # 闷齿斗角榫): the short aprons sit at the table ends (x = +-la_half)
+    # and meet the long aprons corner to corner. At each corner the long
+    # apron keeps a LIP (fbd_lip) concealing the joint from the front;
+    # the short apron sends dovetail TAILS (stacked in Z, flaring toward
+    # the front so the ring cannot pull open) into sockets cut in the
+    # long apron's end block. A lip-thick wall also remains at the very
+    # end (tails start at X0+fbd_lip), so nothing shows end-on either.
+    # ------------------------------------------------------------------
+    fbd_lip = inch(p.get("fbd_lip", 0.1))
+    fbd_pad = inch(p.get("fbd_pad", 0.1))
+    fbd_angle = math.radians(p.get("fbd_angle_deg", 10.0))
+    fbd_tail_w = inch(p.get("fbd_tail_w", 0.225))
+    fbd_n = int(p.get("fbd_tail_count", 2))
+    X0 = -la_half
+    y0, y1 = -lty - apron_t / 2, -lty + apron_t / 2   # long apron band (front)
+    Ys = lty + apron_t / 2                            # short apron half-span
+    fbd_socket = apron_t - fbd_lip
+    fbd_nw = fbd_tail_w - 2 * fbd_socket * math.tan(fbd_angle)
+    fbd_pitch = (apron_w - 2 * fbd_pad) / fbd_n
+
+    tails = []
+    for k in range(fbd_n):
+        zc = AB + fbd_pad + (k + 0.5) * fbd_pitch
+        trap = [(y0 + fbd_lip, zc - fbd_tail_w / 2),   # deep end: WIDE
+                (y0 + fbd_lip, zc + fbd_tail_w / 2),
+                (y1, zc + fbd_nw / 2),                 # entry: narrow
+                (y1, zc - fbd_nw / 2)]
+        tails.append(poly_prism(trap, "x", X0 + fbd_lip,
+                                (apron_t - fbd_lip, 0, 0)))
+    tailsFL = fuse(tails)
+    tailsFR = tailsFL.mirror(Plane.YZ)
+    tailsBL = tailsFL.mirror(Plane.XZ)
+    tailsBR = tailsFR.mirror(Plane.XZ)
+
+    cubeFL = box(X0, X0 + apron_t, y0, y1, AB, AT)     # corner overlap block
+    cubeBL = cubeFL.mirror(Plane.XZ)
+    apron_l = (box(X0, X0 + apron_t, -Ys, Ys, AB, AT)
+               - cubeFL - cubeBL + tailsFL + tailsBL)
     apron_r = apron_l.mirror(Plane.YZ)
+    apron_f = apron_f - tailsFL - tailsFR              # dovetail sockets
+    apron_b = apron_b - tailsBL - tailsBR
+
+    # legs get SLOTS for the ring to pass through (the original's swept
+    # leg slot) — slotting the LEG keeps the apron band in one piece,
+    # where coping the apron on the leg would sever it into three lumps
+    ring_fb = apron_f + apron_b
+    for k_ in list(legs):
+        legs[k_] = legs[k_] - ring_fb
 
     # =====================================================================
     # SHELF -- frame-and-panel coped to the legs. Leg X/Y are further out at
@@ -339,8 +387,8 @@ def build(overrides=None):
         "TF_Front": (rail_f, FRAME), "TF_Back": (rail_b, FRAME),
         "TF_Left": (stile_l, FRAME), "TF_Right": (stile_r, FRAME),
         "TopPanel": (top_panel, PANEL),      # already coped (groove source)
-        "Apron_Front": (cope(apron_f), APRON), "Apron_Back": (cope(apron_b), APRON),
-        "Apron_Left": (cope(apron_l), APRON), "Apron_Right": (cope(apron_r), APRON),
+        "Apron_Front": (apron_f, APRON), "Apron_Back": (apron_b, APRON),
+        "Apron_Left": (apron_l, APRON), "Apron_Right": (apron_r, APRON),
         "ShelfLong_F": (sh_long_f, SHELF), "ShelfLong_B": (sh_long_b, SHELF),
         "ShelfShort_L": (sh_short_l, SHELF), "ShelfShort_R": (sh_short_r, SHELF),
         "ShelfPanel": (cope(sh_panel), PANEL),
