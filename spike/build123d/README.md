@@ -195,10 +195,16 @@ SplitBody tool refs), then re-capture.
 
 **Ming-table conversion status** (247 features, the hardest example): builds
 END-TO-END and passes validation (0 interference, 1 connected cluster).
-17/25 bodies at exact parity; the remaining 8 are all in the apron subsystem,
-within 1.5% volume (spandrels 0.12%), with two understood geometric deltas
-(apron ends ~0.9 cm, spandrel tops 0.6 mm) rooted in the original's
-overshoot-then-trim choreography on the leaning apron plane.
+**21/25 bodies at exact parity.** The remaining 4 are the spandrels at 0.12%
+volume / 0.6 mm bbox: the original tops them up via gable-connector joins
+past the projected underside line before trimming flat, a construction detail
+below the recorded profile-area resolution. Two capture fields closed most of
+the earlier gap: per-profile **area** (exact region-match gate for the
+arrangement fallback) and **isFullLength** on symmetric extrudes; the last
+big fix was direction handling for NEGATIVE captured distance expressions
+("-apron_t"): the end-face centroid gives the direction, the expression
+contributes only magnitude — double-applying the sign flipped the hidden
+dovetail lips outboard.
 
 Machinery added for the ming tier (capture side — reload_addin is invocable
 from a script via `sys.modules["tools.reload_addin"].handler()`):

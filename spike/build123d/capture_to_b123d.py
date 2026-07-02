@@ -235,8 +235,9 @@ def _arrangement_face(sk, profile_index):
     # flags at profile-consume time are unrecoverable), but the union of
     # inside-regions is exactly the Fusion profile
     exp = TopExp_Explorer(sp.Shape(), TopAbs_FACE)
-    inside = []
+    inside, outside = [], []
     tol = 2e-2
+    near = 0.35
     while exp.More():
         fc = Face(TopoDS.Face_s(exp.Current()))
         exp.Next()
@@ -244,9 +245,14 @@ def _arrangement_face(sk, profile_index):
         for vt in fc.vertices():
             rel = Vector(vt.X, vt.Y, vt.Z) - o
             u.append(rel.dot(xd)); v.append(rel.dot(yd))
-        if u and min(u) > pmin[0] - tol and min(v) > pmin[1] - tol \
+        if not u:
+            continue
+        if min(u) > pmin[0] - tol and min(v) > pmin[1] - tol \
                 and max(u) < pmax[0] + tol and max(v) < pmax[1] + tol:
             inside.append(fc)
+        elif min(u) > pmin[0] - near and min(v) > pmin[1] - near \
+                and max(u) < pmax[0] + near and max(v) < pmax[1] + near:
+            outside.append(fc)
     def _rebuild_poly(fc):
         """Rebuild a splitter-output face as a fresh polygonal face —
         splitter faces carry pcurve baggage that can poison later pairwise
@@ -270,6 +276,28 @@ def _arrangement_face(sk, profile_index):
         except Exception:
             return fc
 
+    target_area = prof.get("area")
+    if inside and target_area:
+        got = sum(f_.area for f_ in inside)
+        if got < target_area - max(0.001 * target_area, 0.02) and outside:
+            # union UNDER the recorded area: pull in the nearest excluded
+            # regions (e.g. overshoot slivers past the strict bbox tol)
+            outside.sort(key=lambda f_: f_.area)
+            for f_ in outside:
+                if got + f_.area <= target_area * 1.01 + 0.01:
+                    inside.append(f_); got += f_.area
+                if got >= target_area - max(0.001 * target_area, 0.02):
+                    break
+        if got > target_area * 1.01 + 0.01:
+            # prune extra slivers: greedily keep largest regions up to the
+            # recorded profile area
+            inside.sort(key=lambda f_: -f_.area)
+            kept, tot = [], 0.0
+            for f_ in inside:
+                if tot + f_.area <= target_area * 1.01 + 0.01:
+                    kept.append(f_); tot += f_.area
+            if kept and abs(tot - target_area) <= target_area * 0.02 + 0.01:
+                inside = kept
     if not inside:
         # relaxed tier: some separating curves only partially cross a region
         # (Fusion still splits profiles there; the splitter does not). Accept
@@ -290,7 +318,11 @@ def _arrangement_face(sk, profile_index):
                     and max(u) - min(u) < (pmax[0] - pmin[0]) + 2 * slack:
                 cands.append(fc)
         if cands:
-            return [_rebuild_poly(min(cands, key=lambda f_: f_.area))], xd.cross(yd)
+            if target_area:
+                pick = min(cands, key=lambda f_: abs(f_.area - target_area))
+            else:
+                pick = min(cands, key=lambda f_: f_.area)
+            return [_rebuild_poly(pick)], xd.cross(yd)
         raise ValueError(
             f"arrangement: no region matches profile {profile_index} of {sk['name']}")
     return [_rebuild_poly(f_) for f_ in inside], xd.cross(yd)
@@ -470,7 +502,8 @@ def convert(capture_path, verbose=True):
         if endc and sk:
             d = (Vector(*endc) - Vector(*sk["sketchOrigin"])).dot(normal)
             if abs(d) > 1e-6:
-                return extrude_faces(faces, normal * (dist if d > 0 else -dist))
+                mag = abs(dist)   # expression may be negative ("-apron_t")
+                return extrude_faces(faces, normal * (mag if d > 0 else -mag))
         cands = [extrude_faces(faces, normal * (s * dist)) for s in (1, -1)]
         op = f["operation"]
         parts = f.get("participantBodies") or f.get("bodies") or []
@@ -633,10 +666,11 @@ def convert(capture_path, verbose=True):
                 raise NotImplementedError(f"{f['name']}: {f['extentType']}")
             faces, normal = profile_face(sketches[f["sketch"]], f.get("profileIndex", 0))
             if f["extentType"] == "Symmetric":
-                # Fusion SymmetricExtentDefinition with isFullLength=False:
-                # distance applies PER SIDE (capture should record the flag;
-                # sp.ext_sym uses per-side)
+                # isFullLength=True -> distance is TOTAL; False/absent ->
+                # distance applies PER SIDE (sp.ext_sym convention)
                 d2_ = ev(f["distance"])
+                if f.get("isFullLength"):
+                    d2_ /= 2
                 tool = (extrude_faces(faces, normal * d2_)
                         + extrude_faces(faces, normal * -d2_))
             else:

@@ -577,11 +577,18 @@ def _capture_sketch(sk, design=None):
         try:
             p = sk.profiles.item(pi)
             bb = p.boundingBox
-            profiles_info.append({
+            prof_info = {
                 "index": pi,
                 "min": [round(bb.minPoint.x, 4), round(bb.minPoint.y, 4)],
                 "max": [round(bb.maxPoint.x, 4), round(bb.maxPoint.y, 4)],
-            })
+            }
+            try:
+                # exact region-match gate for converters (bbox alone cannot
+                # distinguish regions split by live reference curves)
+                prof_info["area"] = round(p.areaProperties().area, 6)
+            except:
+                pass
+            profiles_info.append(prof_info)
         except:
             profiles_info.append({"index": pi})
     if profiles_info:

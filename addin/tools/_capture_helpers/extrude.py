@@ -27,6 +27,12 @@ def _capture_extrude(ext, idx, tl, design=None):
         elif isinstance(extent, adsk.fusion.SymmetricExtentDefinition):
             info["extentType"] = "Symmetric"
             info["distance"] = extent.distance.expression
+            try:
+                # isFullLength=True: distance is the TOTAL length;
+                # False: distance applies PER SIDE
+                info["isFullLength"] = extent.isFullLength
+            except:
+                pass
         else:
             info["extentType"] = type(extent).__name__
     except:
@@ -39,6 +45,10 @@ def _capture_extrude(ext, idx, tl, design=None):
             sym_ext = adsk.fusion.SymmetricExtentDefinition.cast(ext.extentOne)
             if sym_ext:
                 info["distance"] = sym_ext.distance.expression
+                try:
+                    info["isFullLength"] = sym_ext.isFullLength
+                except:
+                    pass
     except:
         pass
 
