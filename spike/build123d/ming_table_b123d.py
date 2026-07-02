@@ -18,7 +18,7 @@ deg apron tilt is omitted -- invisible at this scale).
 """
 import math
 
-from build123d import Solid, Face, Wire, Vector, Plane, Location, fillet, chamfer
+from build123d import Solid, Face, Wire, Vector, Plane, Location, Axis, fillet, chamfer
 from b123d_common import Model, summarize, run_cli
 
 IN = 2.54
@@ -216,13 +216,13 @@ def build(overrides=None):
     spo = ltx + leg_r + sp_edge_gap
     spi = ltx - leg_r - sp_edge_gap
     LH = la_half
-    bracket = [(-LH, AT), (LH, AT), (LH, AB), (spo, AB), (spo, SB), (spi, SB),
+    ATT = AT + 0.15          # overshoot; sheared flat at tf_bot after the lean
+    bracket = [(-LH, ATT), (LH, ATT), (LH, AB), (spo, AB), (spo, SB), (spi, SB),
                (spi, AB), (-spi, AB), (-spi, SB), (-spo, SB), (-spo, AB), (-LH, AB)]
     coves = [(i, cove_r) for i in (3, 6, 7, 10)]     # band/spandrel coves
     bots = [(i, bot_r) for i in (4, 5, 8, 9)]        # spandrel bottom rounds
     apron_f = poly_prism(bracket, "y", -lty - apron_t / 2, (0, apron_t, 0),
                          fillets=coves + bots)
-    apron_b = apron_f.mirror(Plane.XZ)
     # short aprons: plain band between the legs, running in Y at x = -+ltx
     # ------------------------------------------------------------------
     # Apron RING with hidden full-blind dovetail corners (the original's
@@ -257,16 +257,38 @@ def build(overrides=None):
                                 (apron_t - fbd_lip, 0, 0)))
     tailsFL = fuse(tails)
     tailsFR = tailsFL.mirror(Plane.YZ)
+
+    # corner overlap block, extended past the band top/bottom so it still
+    # covers the full (vertical) short-apron column after the lean rotation
+    cubeFL = box(X0, X0 + apron_t, y0, y1, AB - 0.3, AT + 0.3)
+    cubeFR = cubeFL.mirror(Plane.YZ)
+    apron_f = apron_f - tailsFL - tailsFR              # dovetail sockets
+
+    # ---- the 1.5-deg lean: the apron plane contains the splayed leg
+    # centerlines. Rotate the whole front assembly (band+spandrels with
+    # sockets, tails, corner blocks) about the leg-top axis, then shear
+    # the overshot band top flat against the frame underside. The FBD
+    # pieces ride the same rigid rotation, so the joint fit is preserved.
+    ax_f = Axis((0, -lty, leg_tip_z), (1, 0, 0))
+    sdeg = p["splay_deg"]
+    shear = box(-l2 - 2, l2 + 2, -d2 - 5, d2 + 5, tf_bot, tf_bot + 3)
+    apron_f = apron_f.rotate(ax_f, -sdeg) - shear
+    tailsFL = tailsFL.rotate(ax_f, -sdeg)
+    tailsFR = tailsFR.rotate(ax_f, -sdeg)
+    cubeFL = cubeFL.rotate(ax_f, -sdeg)
+    cubeFR = cubeFR.rotate(ax_f, -sdeg)
+    apron_b = apron_f.mirror(Plane.XZ)
     tailsBL = tailsFL.mirror(Plane.XZ)
     tailsBR = tailsFR.mirror(Plane.XZ)
-
-    cubeFL = box(X0, X0 + apron_t, y0, y1, AB, AT)     # corner overlap block
     cubeBL = cubeFL.mirror(Plane.XZ)
+    cubeBR = cubeFR.mirror(Plane.XZ)
+
+    # short aprons stay vertical; their end faces come from subtracting the
+    # LEANED corner blocks, so they mate the leaning long aprons flush
     apron_l = (box(X0, X0 + apron_t, -Ys, Ys, AB, AT)
                - cubeFL - cubeBL + tailsFL + tailsBL)
-    apron_r = apron_l.mirror(Plane.YZ)
-    apron_f = apron_f - tailsFL - tailsFR              # dovetail sockets
-    apron_b = apron_b - tailsBL - tailsBR
+    apron_r = (box(la_half - apron_t, la_half, -Ys, Ys, AB, AT)
+               - cubeFR - cubeBR + tailsFR + tailsBR)
 
     # legs get SLOTS for the ring to pass through (the original's swept
     # leg slot) — slotting the LEG keeps the apron band in one piece,
@@ -289,8 +311,9 @@ def build(overrides=None):
     # meet inside the leg) -- same as the Fusion ShS_*_cope combine
     sh_short_l = sh_short_l - sh_long_f - sh_long_b
     sh_short_r = sh_short_l.mirror(Plane.YZ)
+    # flush shelf panel (like the original: top surface at shelf_z)
     sh_panel = box(-(lxs - leg_r), lxs - leg_r, -(lys - leg_r), lys - leg_r,
-                   sz0 + (sf_t - sp_panel_t) / 2, sz0 + (sf_t + sp_panel_t) / 2)
+                   sz1 - sp_panel_t, sz1)
 
     # =====================================================================
     # Seat everything against the round legs: subtract the legs from every
@@ -320,19 +343,57 @@ def build(overrides=None):
     tf_round = inch(0.25)
     sf_cham = inch(0.3125)
 
-    def soften_top(s, x=None, y=None):
-        es = edges_at(s, x=x, y=y, z=table_h)
-        return one_solid(fillet(es, tf_round))
-
-    rail_f = soften_top(cope(rail_f), y=-d2)
-    rail_b = soften_top(cope(rail_b), y=d2)
-    stile_l = soften_top(cope(stile_l), x=-l2)
-    stile_r = soften_top(cope(stile_r), x=l2)
+    # hollow spline edge molding on the frame's outer faces — the profile
+    # is the original's designed curve, sampled from the Fusion capture
+    # (offsets: dz up from tf_bot, dy inward from the outer face, cm)
+    MOLDING = [(0.0, 0.2171), (0.0131, 0.162), (0.2257, 0.1407),
+               (0.5282, 0.1383), (0.7732, 0.1334), (0.8897, 0.1122),
+               (0.9667, 0.079), (1.1405, 0.0477), (1.4297, 0.0259),
+               (1.7613, 0.0137), (2.0509, 0.0081), (2.2662, 0.0057),
+               (2.4266, 0.0043), (2.5648, 0.0026), (2.6988, 0.0)]
+    mold_f = poly_prism([(-d2 + dy, tf_bot + dz) for dz, dy in MOLDING]
+                        + [(-d2, tf_bot)], "x", -l2 - 1, (2 * (l2 + 1), 0, 0))
+    mold_b = mold_f.mirror(Plane.XZ)
+    mold_l = poly_prism([(-l2 + dy, tf_bot + dz) for dz, dy in MOLDING]
+                        + [(-l2, tf_bot)], "y", -d2 - 1, (0, 2 * (d2 + 1), 0))
+    mold_r = mold_l.mirror(Plane.YZ)
+    molding = mold_f + mold_b + mold_l + mold_r
+    rail_f = cope(rail_f) - molding
+    rail_b = cope(rail_b) - molding
+    stile_l = cope(stile_l) - molding
+    stile_r = cope(stile_r) - molding
 
     # the panel tongue cuts its groove into all four frame members
     top_panel = cope(top_panel)
     rail_f, rail_b = rail_f - top_panel, rail_b - top_panel
     stile_l, stile_r = stile_l - top_panel, stile_r - top_panel
+
+    # ------------------------------------------------------------------
+    # Sliding-dovetail battens under the top panel: dovetail ridge up into
+    # the panel, body stopped at the frame inner faces, a 2/3-height tenon
+    # into each rail. Battens cut their own panel groove + rail mortises.
+    # ------------------------------------------------------------------
+    bt_w, bt_off = inch(0.875), inch(7.0)
+    bt_h = tf_t - panel_t
+    dtb, dtt, dtd = inch(0.5), inch(0.75), inch(0.1875)
+    ihf = d2 - tf_w                        # frame inner face |y|
+
+    def batten(cx):
+        prof = [(cx - bt_w / 2, panel_under - bt_h), (cx - bt_w / 2, panel_under),
+                (cx - dtb / 2, panel_under), (cx - dtt / 2, panel_under + dtd),
+                (cx + dtt / 2, panel_under + dtd), (cx + dtb / 2, panel_under),
+                (cx + bt_w / 2, panel_under), (cx + bt_w / 2, panel_under - bt_h)]
+        b = poly_prism(prof, "y", -ihf, (0, 2 * ihf, 0))
+        tn_h = bt_h * 2 / 3
+        tnf = box(cx - bt_w / 2, cx + bt_w / 2, -ihf - inch(0.6), -ihf,
+                  panel_under - tn_h, panel_under)
+        return b + tnf + tnf.mirror(Plane.XZ)
+
+    batten_r = batten(bt_off)
+    batten_l = batten_r.mirror(Plane.YZ)
+    battens = batten_r + batten_l
+    top_panel = top_panel - battens        # sliding-dovetail grooves
+    rail_f, rail_b = rail_f - battens, rail_b - battens   # tenon mortises
 
     def cham_top(s, x=None, y=None):
         es = edges_at(s, x=x, y=y, z=sz1)
@@ -379,6 +440,23 @@ def build(overrides=None):
         shelf_longs[lk] = shelf_longs[lk] + t_long
         shelf_shorts[sk] = shelf_shorts[sk] + t_short
     sh_long_f, sh_long_b = shelf_longs["F"], shelf_longs["B"]
+
+    # ------------------------------------------------------------------
+    # 穿带 sliding batten under the shelf panel: dovetail ridge up into the
+    # panel underside, ends housed in the long shelf rails.
+    # ------------------------------------------------------------------
+    shb_w = inch(0.875)
+    pus = sz1 - sp_panel_t                 # shelf panel underside
+    ily = lys - leg_r                      # long rails' inner face |y|
+    prof = [(-shb_w / 2, sz0), (-shb_w / 2, pus),
+            (-dtb / 2, pus), (-dtt / 2, pus + dtd),
+            (dtt / 2, pus + dtd), (dtb / 2, pus),
+            (shb_w / 2, pus), (shb_w / 2, sz0)]
+    sh_batten = poly_prism(prof, "y", -(ily + inch(0.5)),
+                           (0, 2 * (ily + inch(0.5)), 0))
+    sh_panel = sh_panel - sh_batten        # dovetail groove
+    sh_long_f = sh_long_f - sh_batten      # housed ends
+    sh_long_b = sh_long_b - sh_batten
     sh_short_l, sh_short_r = shelf_shorts["L"], shelf_shorts["R"]
 
     parts = {
@@ -387,11 +465,13 @@ def build(overrides=None):
         "TF_Front": (rail_f, FRAME), "TF_Back": (rail_b, FRAME),
         "TF_Left": (stile_l, FRAME), "TF_Right": (stile_r, FRAME),
         "TopPanel": (top_panel, PANEL),      # already coped (groove source)
+        "Batten_R": (batten_r, FRAME), "Batten_L": (batten_l, FRAME),
         "Apron_Front": (apron_f, APRON), "Apron_Back": (apron_b, APRON),
         "Apron_Left": (apron_l, APRON), "Apron_Right": (apron_r, APRON),
         "ShelfLong_F": (sh_long_f, SHELF), "ShelfLong_B": (sh_long_b, SHELF),
         "ShelfShort_L": (sh_short_l, SHELF), "ShelfShort_R": (sh_short_r, SHELF),
         "ShelfPanel": (cope(sh_panel), PANEL),
+        "ShelfBatten": (sh_batten, SHELF),
     }
     comp = {"Leg": "Legs", "TF": "Top", "Top": "Top", "Apron": "Aprons",
             "Shelf": "Shelf"}
