@@ -32,6 +32,7 @@ from ._capture_helpers import (
     _capture_sweep,
     _capture_split_body,
     _capture_remove,
+    _capture_loft,
 )
 
 app = adsk.core.Application.get()
@@ -321,6 +322,13 @@ def handler() -> dict:
             sweep = adsk.fusion.SweepFeature.cast(entity)
             if sweep:
                 feat_info.update(_capture_sweep(sweep, design))
+                out["timeline"].append(feat_info)
+                continue
+
+            # Loft
+            loft = adsk.fusion.LoftFeature.cast(entity)
+            if loft:
+                feat_info.update(_capture_loft(loft, design))
                 out["timeline"].append(feat_info)
                 continue
 

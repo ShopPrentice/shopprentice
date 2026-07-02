@@ -122,6 +122,37 @@ def _capture_rectangular_pattern(pat, design=None):
     except:
         pass
 
+    # RESOLVED pattern directions (Vector3D properties on the feature) — the
+    # authoritative signed directions; the entity's natural direction may be
+    # flipped relative to the pattern (see the note on axisOne above).
+    for _key, _attr in (("directionOne", "directionOne"),
+                        ("directionTwo", "directionTwo")):
+        try:
+            _v = getattr(pat, _attr)
+            if _v:
+                info[_key] = [round(_v.x, 6), round(_v.y, 6), round(_v.z, 6)]
+        except:
+            pass
+    for _key, _attr in (("isSymmetricOne", "isSymmetricInDirectionOne"),
+                        ("isSymmetricTwo", "isSymmetricInDirectionTwo")):
+        try:
+            info[_key] = bool(getattr(pat, _attr))
+        except:
+            pass
+    # Per-element transforms — the exact offset of every copy, in element
+    # order (which matches Fusion's "Body (k)" copy naming). Removes all
+    # direction/sign/grid inference from converters.
+    try:
+        _offs = []
+        _els = pat.patternElements
+        for _ii in range(_els.count):
+            _t = _els.item(_ii).transform.translation
+            _offs.append([round(_t.x, 4), round(_t.y, 4), round(_t.z, 4)])
+        if _offs:
+            info["elementOffsets"] = _offs
+    except:
+        pass
+
     # Input entities — may need rollTo for BRep-dependent access
     def _try_inputs():
         try:
