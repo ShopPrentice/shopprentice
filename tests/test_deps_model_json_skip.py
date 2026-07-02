@@ -63,5 +63,44 @@ finally:
 path3, found3 = deps.resolve_model_json(None)
 check("resolve: no script path returns (None, False)", path3 is None and found3 is False)
 
+# 4. Tracked script path (fake DocumentTracker) → directory fallback.
+#    Regression guard: <dir>/model.json EXISTS and must report found=True —
+#    the original code returned found=False unconditionally for the fallback,
+#    silently disabling the deps gate for every example using a directory-level
+#    model.json.
+server_pkg = types.ModuleType("server")
+tracker_mod = types.ModuleType("server.document_tracker")
+
+
+class _FakeTracker:
+    _script_path = None
+
+
+tracker_mod.DocumentTracker = _FakeTracker
+sys.modules["server"] = server_pkg
+sys.modules["server.document_tracker"] = tracker_mod
+
+with tempfile.TemporaryDirectory() as td:
+    _FakeTracker._script_path = os.path.join(td, "bench.py")
+
+    # 4a. Neither <stem>_model.json nor model.json → fallback path, found=False.
+    p, f_ = deps.resolve_model_json(None)
+    check("resolve: dir without model.json returns fallback found=False",
+          p == os.path.join(td, "model.json") and f_ is False)
+
+    # 4b. Directory model.json exists → found=True (the regression).
+    with open(os.path.join(td, "model.json"), "w") as fh:
+        fh.write("{}")
+    p, f_ = deps.resolve_model_json(None)
+    check("resolve: dir model.json exists returns found=True",
+          p == os.path.join(td, "model.json") and f_ is True)
+
+    # 4c. Per-script <stem>_model.json takes precedence over dir model.json.
+    with open(os.path.join(td, "bench_model.json"), "w") as fh:
+        fh.write("{}")
+    p, f_ = deps.resolve_model_json(None)
+    check("resolve: per-script model.json preferred",
+          p == os.path.join(td, "bench_model.json") and f_ is True)
+
 print(f"\n{passed}/{passed + failed} cases passed")
 sys.exit(1 if failed else 0)

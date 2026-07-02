@@ -245,18 +245,21 @@ def run(context):
     domino.grid(apron_c, dm_fl, ("leg_size", "apron_thick/2", "dm_apron_z"),
         "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         fa_body, fl_p, "DM_FA_L", ev,
+        # anchor the far-y leg corner: (leg_size, 0, 0) coincides with this
+        # sketch's origin projection, which anchor_pt excludes
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
                     face_axis="x", face_dir=1,
-                    anchor_xyz=("leg_size", "0 in", "0 in"),
-                    off=(("y", "apron_thick/2"),
+                    anchor_xyz=("leg_size", "leg_size", "0 in"),
+                    off=(("y", "leg_size - apron_thick/2"),
                          ("z", "dm_apron_z - (dm_w - dm_t)/2"))))
     domino.grid(apron_c, dm_fr, ("bench_l - leg_size", "apron_thick/2", "dm_apron_z"),
         "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         fa_body, fr_p, "DM_FA_R", ev,
+        # far-y corner: (bench_l - leg_size, 0, 0) is this sketch's origin
         anchor=dict(parent_body=leg_fr, parent_occ=leg_occ,
                     face_axis="x", face_dir=-1,
-                    anchor_xyz=("bench_l - leg_size", "0 in", "0 in"),
-                    off=(("y", "apron_thick/2"),
+                    anchor_xyz=("bench_l - leg_size", "leg_size", "0 in"),
+                    off=(("y", "leg_size - apron_thick/2"),
                          ("z", "dm_apron_z - (dm_w - dm_t)/2"))))
 
     # Back apron → BL, BR legs
@@ -281,18 +284,20 @@ def run(context):
     domino.grid(apron_c, dm_lf, ("apron_thick/2", "leg_size", "dm_apron_z"),
         "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         la_body, fl_p, "DM_LA_F", ev,
+        # far-x corner: (0, leg_size, 0) is this sketch's origin
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
                     face_axis="y", face_dir=1,
-                    anchor_xyz=("0 in", "leg_size", "0 in"),
-                    off=(("x", "apron_thick/2"),
+                    anchor_xyz=("leg_size", "leg_size", "0 in"),
+                    off=(("x", "leg_size - apron_thick/2"),
                          ("z", "dm_apron_z - (dm_w - dm_t)/2"))))
     domino.grid(apron_c, dm_lb, ("apron_thick/2", "bench_w - leg_size", "dm_apron_z"),
         "z", "dm_apron_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         la_body, bl_p, "DM_LA_B", ev,
+        # far-x corner: (0, bench_w - leg_size, 0) is this sketch's origin
         anchor=dict(parent_body=leg_bl, parent_occ=leg_occ,
                     face_axis="y", face_dir=-1,
-                    anchor_xyz=("0 in", "bench_w - leg_size", "0 in"),
-                    off=(("x", "apron_thick/2"),
+                    anchor_xyz=("leg_size", "bench_w - leg_size", "0 in"),
+                    off=(("x", "leg_size - apron_thick/2"),
                          ("z", "dm_apron_z - (dm_w - dm_t)/2"))))
 
     # Right apron → FR, BR legs
@@ -322,17 +327,19 @@ def run(context):
     # Front stretcher → FL, FR legs (single domino each, centered in stretcher height)
     domino.single(apron_c, dm_fl, ("leg_size", "stretcher_thick/2", "dm_str_z"),
         "z", "dm_w", "dm_t", "dm_d", sf_body, fl_p, "DM_SF_L", ev,
+        # far-y corner: (leg_size, 0, 0) is this sketch's origin
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
                     face_axis="x", face_dir=1,
-                    anchor_xyz=("leg_size", "0 in", "0 in"),
-                    off=(("y", "stretcher_thick/2"),
+                    anchor_xyz=("leg_size", "leg_size", "0 in"),
+                    off=(("y", "leg_size - stretcher_thick/2"),
                          ("z", "dm_str_z - (dm_w - dm_t)/2"))))
     domino.single(apron_c, dm_fr, ("bench_l - leg_size", "stretcher_thick/2", "dm_str_z"),
         "z", "dm_w", "dm_t", "dm_d", sf_body, fr_p, "DM_SF_R", ev,
+        # far-y corner: (bench_l - leg_size, 0, 0) is this sketch's origin
         anchor=dict(parent_body=leg_fr, parent_occ=leg_occ,
                     face_axis="x", face_dir=-1,
-                    anchor_xyz=("bench_l - leg_size", "0 in", "0 in"),
-                    off=(("y", "stretcher_thick/2"),
+                    anchor_xyz=("bench_l - leg_size", "leg_size", "0 in"),
+                    off=(("y", "leg_size - stretcher_thick/2"),
                          ("z", "dm_str_z - (dm_w - dm_t)/2"))))
 
     # Back stretcher → BL, BR legs
