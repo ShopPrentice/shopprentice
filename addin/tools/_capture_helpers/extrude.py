@@ -104,6 +104,40 @@ def _capture_extrude(ext, idx, tl, design=None):
                                          round(c.z, 4)]
                     except:
                         pass
+                # Cut/Join direction ground truth when the end face is
+                # consumed (endFaces empty — top-trim cuts): each
+                # participant's volume+bbox just AFTER the feature. A
+                # converter simulates both directions and keeps the match.
+                try:
+                    if ext.operation in (
+                            adsk.fusion.FeatureOperations.CutFeatureOperation,
+                            adsk.fusion.FeatureOperations.JoinFeatureOperation):
+                        geo = {}
+                        bods = []
+                        try:
+                            pb = ext.participantBodies
+                            if pb and pb.count:
+                                bods = [pb.item(i) for i in range(pb.count)]
+                        except:
+                            pass
+                        if not bods:
+                            bods = [ext.bodies.item(i)
+                                    for i in range(ext.bodies.count)]
+                        for b in bods:
+                            bb = b.boundingBox
+                            geo[b.name] = {
+                                "volume": round(b.volume, 4),
+                                "bbMin": [round(bb.minPoint.x, 4),
+                                          round(bb.minPoint.y, 4),
+                                          round(bb.minPoint.z, 4)],
+                                "bbMax": [round(bb.maxPoint.x, 4),
+                                          round(bb.maxPoint.y, 4),
+                                          round(bb.maxPoint.z, 4)],
+                            }
+                        if geo:
+                            info["participantGeoAfter"] = geo
+                except:
+                    pass
             finally:
                 design.timeline.moveToEnd()
         except:
@@ -125,6 +159,13 @@ def _capture_extrude(ext, idx, tl, design=None):
         _match_profile_index(ext, sk_found, info)
     elif "sketchError" not in info and info.get("profileType") not in ("BRepFace", "Inaccessible"):
         info["sketchError"] = "no sketch found (all strategies failed)"
+
+    # Face-based extrudes (createInput(face) — the template find_face flows):
+    # the profile is a BRepFace, dead/unreadable at end-of-timeline. Roll to
+    # the feature, where it is alive, and record each face's outer-loop
+    # polygon + normal so converters can rebuild the profile with no sketch.
+    if design and info.get("profileType") in ("BRepFace", "Inaccessible"):
+        _capture_face_profiles(ext, design, info)
 
     body_names = [b.name for b in ext.bodies]
 
@@ -297,6 +338,55 @@ def _find_sketch_for_extrude(ext, idx, tl, info):
 def _find_sketch_for_extrude_no_timeline(ext, info):
     """Sketch finding for an extrude feature without timeline context."""
     return _find_sketch_from_profile(ext, info)
+
+
+def _capture_face_profiles(ext, design, info):
+    """Record BRepFace profiles at rollTo state (outer-loop polygon, normal,
+    owning body). Planar straight-edged faces only — curved loop edges are
+    recorded by their vertices, which the converter treats as a polygon."""
+    try:
+        with _roll_to_feature(ext, design):
+            profile = ext.profile
+            coll = adsk.core.ObjectCollection.cast(profile)
+            items = ([coll.item(i) for i in range(coll.count)] if coll
+                     else [profile])
+            faces = []
+            for it in items:
+                bface = adsk.fusion.BRepFace.cast(it)
+                if not bface:
+                    continue
+                lp = None
+                for li in range(bface.loops.count):
+                    if bface.loops.item(li).isOuter:
+                        lp = bface.loops.item(li)
+                        break
+                if lp is None:
+                    continue
+                pts = []
+                for ei in range(lp.coEdges.count):
+                    ce = lp.coEdges.item(ei)
+                    v = (ce.edge.endVertex if ce.isOpposedToEdge
+                         else ce.edge.startVertex).geometry
+                    pts.append([round(v.x, 4), round(v.y, 4), round(v.z, 4)])
+                if not pts:
+                    continue
+                entry = {"points": pts}
+                try:
+                    ok, nrm = bface.evaluator.getNormalAtPoint(bface.pointOnFace)
+                    if ok:
+                        entry["normal"] = [round(nrm.x, 6), round(nrm.y, 6),
+                                           round(nrm.z, 6)]
+                except:
+                    pass
+                try:
+                    entry["body"] = bface.body.name
+                except:
+                    pass
+                faces.append(entry)
+            if faces:
+                info["faceProfiles"] = faces
+    except Exception as e:
+        info["faceProfileError"] = str(e)[-200:]
 
 
 def _find_sketch_from_profile(ext, info):

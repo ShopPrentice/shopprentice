@@ -219,6 +219,25 @@ def _capture_chamfer(chamfer, design=None):
         except:
             pass
 
+    def _capture_faces():
+        # Ground truth for TwoDistances orientation: the capture records
+        # d1/d2 but NOT which face each applies to, and both orientations
+        # remove identical volume (parity-blind). The created bevel facets'
+        # centroids pin the orientation exactly.
+        try:
+            pts = []
+            for fi in range(chamfer.faces.count):
+                fc = chamfer.faces.item(fi)
+                try:
+                    c = fc.centroid
+                except:
+                    c = fc.pointOnFace
+                pts.append([round(c.x, 4), round(c.y, 4), round(c.z, 4)])
+            if pts:
+                info["faceCentroids"] = pts
+        except:
+            pass
+
     # Edge sets need rollTo (BRep-dependent)
     if design:
         try:
@@ -228,6 +247,10 @@ def _capture_chamfer(chamfer, design=None):
             _capture_edge_sets()
     else:
         _capture_edge_sets()
+
+    # faces must be read at FULL timeline state — feature.faces resolves to
+    # 0 entities while the timeline is rolled back
+    _capture_faces()
 
     info["bodies"] = [b.name for b in chamfer.bodies]
 
