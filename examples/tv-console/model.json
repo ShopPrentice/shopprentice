@@ -1,156 +1,156 @@
 {
-  "deps": [
-    {
-      "body": "Leg_FL",
-      "ref": "origin"
-    },
-    {
-      "body": "Leg_FR",
-      "ref": "Leg_FL"
-    },
-    {
-      "body": "Leg_BL",
-      "ref": "Leg_FL"
-    },
-    {
-      "body": "Leg_BR",
-      "ref": "Leg_FR"
-    },
-    {
-      "body": "FrontRail",
-      "ref": "Leg_FL"
-    },
-    {
-      "body": "BackRail",
-      "ref": "FrontRail"
-    },
-    {
-      "body": "SideRailL",
-      "ref": "Leg_FL"
-    },
-    {
-      "body": "SideRailR",
-      "ref": "SideRailL"
-    },
-    {
-      "body": "Bottom",
-      "ref": "Leg_FL"
-    },
-    {
-      "body": "Top",
-      "ref": "Bottom"
-    },
-    {
-      "body": "Left",
-      "ref": "Bottom"
-    },
-    {
-      "body": "Right",
-      "ref": "Left"
-    },
-    {
-      "body": "Back",
-      "ref": "Left"
-    },
-    {
-      "body": "Divider1",
-      "ref": "Bottom"
-    },
-    {
-      "body": "Divider2",
-      "ref": "Divider1"
-    },
-    {
-      "body": "DmDv1_Bot_0",
-      "ref": "Divider1"
-    },
-    {
-      "body": "DmDv1_Top_0",
-      "ref": "Divider1"
-    },
-    {
-      "body": "DmDv2_Bot_0",
-      "ref": "Divider2"
-    },
-    {
-      "body": "DmDv2_Top_0",
-      "ref": "Divider2"
-    },
-    {
-      "body": "dd_Front",
-      "ref": "Bottom"
-    },
-    {
-      "body": "dd_Back",
-      "ref": "dd_Front"
-    },
-    {
-      "body": "dd_Left",
-      "ref": "dd_Front"
-    },
-    {
-      "body": "dd_Right",
-      "ref": "dd_Left"
-    },
-    {
-      "body": "dd_Bottom",
-      "ref": "dd_Front"
-    },
-    {
-      "body": "LeftDoor",
-      "ref": "Left"
-    },
-    {
-      "body": "RightDoor",
-      "ref": "Right"
-    },
-    {
-      "body": "Cleat1",
-      "ref": "Bottom"
-    },
-    {
-      "body": "Cleat1_R",
-      "ref": "Cleat1"
-    },
-    {
-      "body": "Cleat2",
-      "ref": "Bottom"
-    },
-    {
-      "body": "Cleat2_R",
-      "ref": "Cleat2"
-    },
-    {
-      "body": "DmCl1_0",
-      "ref": "Cleat1"
-    },
-    {
-      "body": "DmCl1R_0",
-      "ref": "Cleat1_R"
-    },
-    {
-      "body": "DmCl2_0",
-      "ref": "Cleat2"
-    },
-    {
-      "body": "DmCl2R_0",
-      "ref": "Cleat2_R"
-    },
-    {
-      "body": "LDoor_H_Lo_Leaf",
-      "ref": "LeftDoor"
-    },
-    {
-      "body": "LDoor_H_Hi_Leaf",
-      "ref": "LeftDoor"
-    },
-    {
-      "body": "RDoor_H_Lo_Leaf",
-      "ref": "RightDoor"
-    },
-    {
-      "body": "RDoor_H_Hi_Leaf",
-      "ref": "RightDoor"
-    }
-  ]
+ "deps": [
+  {
+   "body": "Bottom",
+   "ref": "origin"
+  },
+  {
+   "body": "Leg_FL",
+   "ref": "Bottom"
+  },
+  {
+   "body": "Leg_FR",
+   "ref": "Leg_FL"
+  },
+  {
+   "body": "Leg_BL",
+   "ref": "Leg_FL"
+  },
+  {
+   "body": "Leg_BR",
+   "ref": "Leg_FR"
+  },
+  {
+   "body": "FrontRail",
+   "ref": "Leg_FL"
+  },
+  {
+   "body": "BackRail",
+   "ref": "FrontRail"
+  },
+  {
+   "body": "SideRailL",
+   "ref": "Leg_FL"
+  },
+  {
+   "body": "SideRailR",
+   "ref": "SideRailL"
+  },
+  {
+   "body": "Top",
+   "ref": "Bottom"
+  },
+  {
+   "body": "Left",
+   "ref": "Bottom"
+  },
+  {
+   "body": "Right",
+   "ref": "Left"
+  },
+  {
+   "body": "Back",
+   "ref": "Left"
+  },
+  {
+   "body": "Divider1",
+   "ref": "Bottom"
+  },
+  {
+   "body": "Divider2",
+   "ref": "Divider1"
+  },
+  {
+   "body": "DmDv1_Bot_0",
+   "ref": "Divider1"
+  },
+  {
+   "body": "DmDv1_Top_0",
+   "ref": "Divider1"
+  },
+  {
+   "body": "DmDv2_Bot_0",
+   "ref": "Divider2"
+  },
+  {
+   "body": "DmDv2_Top_0",
+   "ref": "Divider2"
+  },
+  {
+   "body": "dd_Front",
+   "ref": "Bottom"
+  },
+  {
+   "body": "dd_Back",
+   "ref": "dd_Front"
+  },
+  {
+   "body": "dd_Left",
+   "ref": "dd_Front"
+  },
+  {
+   "body": "dd_Right",
+   "ref": "dd_Left"
+  },
+  {
+   "body": "dd_Bottom",
+   "ref": "dd_Front"
+  },
+  {
+   "body": "LeftDoor",
+   "ref": "Left"
+  },
+  {
+   "body": "RightDoor",
+   "ref": "Right"
+  },
+  {
+   "body": "Cleat1",
+   "ref": "Bottom"
+  },
+  {
+   "body": "Cleat1_R",
+   "ref": "Cleat1"
+  },
+  {
+   "body": "Cleat2",
+   "ref": "Bottom"
+  },
+  {
+   "body": "Cleat2_R",
+   "ref": "Cleat2"
+  },
+  {
+   "body": "DmCl1_0",
+   "ref": "Cleat1"
+  },
+  {
+   "body": "DmCl1R_0",
+   "ref": "Cleat1_R"
+  },
+  {
+   "body": "DmCl2_0",
+   "ref": "Cleat2"
+  },
+  {
+   "body": "DmCl2R_0",
+   "ref": "Cleat2_R"
+  },
+  {
+   "body": "LDoor_H_Lo_Leaf",
+   "ref": "LeftDoor"
+  },
+  {
+   "body": "LDoor_H_Hi_Leaf",
+   "ref": "LeftDoor"
+  },
+  {
+   "body": "RDoor_H_Lo_Leaf",
+   "ref": "RightDoor"
+  },
+  {
+   "body": "RDoor_H_Hi_Leaf",
+   "ref": "RightDoor"
+  }
+ ]
 }

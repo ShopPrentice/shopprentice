@@ -234,9 +234,11 @@ def run(context):
     # Thin panel sits in rabbet at back of case
     back_pl = sp.off_plane(case_c, case_c.xZConstructionPlane,
         "console_d - back_thick", "Back_Pl")
+    # Panel extends board_thick/2 into Top and Bottom so the Rab_* cuts
+    # actually remove material (flush-fit panel = zero-impact rabbets).
     back_sk, back_pr = sp.sketch_rect_model(case_c, back_pl,
-        ("board_thick", "console_d - back_thick", "case_z + board_thick"),
-        {"x": "console_w - 2 * board_thick", "z": "case_h"},
+        ("board_thick", "console_d - back_thick", "case_z + board_thick / 2"),
+        {"x": "console_w - 2 * board_thick", "z": "case_h + board_thick"},
         "Back_Sk", ev=ev)
     # Anchor Back to Left's coplanar (y,+1) face at Y=console_d (deps: Back → Left)
     # Anchor to Left's diagonal corner (X=0, top) so both offset dims are non-zero.
@@ -269,8 +271,11 @@ def run(context):
         ("div1_x", "0 in", "case_z + board_thick"),
         {"y": "console_d - back_thick", "z": "case_h"},
         "Div1_Sk", ev=ev)
-    # Anchor Divider1 to Bottom's (x,-1) face (deps: Divider1 → Bottom)
-    div1_pr = (sp.reanchor(div1_sk, bot_body, None, "x", -1,
+    # Anchor Divider1 to Bottom's TOP (z,+1) face (deps: Divider1 →
+    # Bottom). The x-end faces are fragmented into dovetail pins by
+    # dovetail.box above, so no full-height end corner exists — the top
+    # face is a single face whose back-edge vertices project exactly.
+    div1_pr = (sp.reanchor(div1_sk, bot_body, None, "z", +1,
                            ("0 in", "console_d", "case_z + board_thick"))
                or sp.smallest_profile(div1_sk))
     div1_ext = sp.ext_new(case_c, div1_pr, "divider_thick", "Div1Board")
@@ -309,10 +314,14 @@ def run(context):
     # Build inside case_c (same component, no proxies needed).
     first_dv_dm_y = "dm_dv_sp"
 
-    for div_body, div_cx, div_name in [
-        (div1_body, "div1_x + divider_thick / 2", "DmDv1"),
-        (div2_body, "div2_x + divider_thick / 2", "DmDv2"),
+    for div_body, div_cx, div_lx, div_name in [
+        (div1_body, "div1_x + divider_thick / 2", "div1_x", "DmDv1"),
+        (div2_body, "div2_x + divider_thick / 2", "div2_x", "DmDv2"),
     ]:
+        # Anchor each slot to the divider face's FRONT-LEFT corner — the
+        # face-edge midpoint is not a projected vertex, and the front
+        # corner keeps both off= expressions simple and positive (the
+        # reference arc sits on the minus-y side of the first slot).
         # Bottom interface (Z = case_z + board_thick)
         dm_bot_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
             "case_z + board_thick", f"{div_name}_BotPl")
@@ -327,11 +336,9 @@ def run(context):
             name=f"{div_name}_Bot", ev=ev,
             anchor=dict(parent_body=div_body, parent_occ=None,
                         face_axis="z", face_dir=-1,
-                        anchor_xyz=(div_cx, "console_d - back_thick",
-                                    "case_z + board_thick"),
-                        off=(("x", "0 in"),
-                             ("y", "abs(dm_dv_sp - (dm_dv_long - dm_dv_short) / 2"
-                                   " - (console_d - back_thick))"))))
+                        anchor_xyz=(div_lx, "0 in", "case_z + board_thick"),
+                        off=(("x", "divider_thick / 2"),
+                             ("y", "dm_dv_sp - (dm_dv_long - dm_dv_short) / 2"))))
 
         # Top interface (Z = case_z + board_thick + case_h)
         dm_top_pl = sp.off_plane(case_c, case_c.xYConstructionPlane,
@@ -347,11 +354,10 @@ def run(context):
             name=f"{div_name}_Top", ev=ev,
             anchor=dict(parent_body=div_body, parent_occ=None,
                         face_axis="z", face_dir=+1,
-                        anchor_xyz=(div_cx, "console_d - back_thick",
+                        anchor_xyz=(div_lx, "0 in",
                                     "case_z + board_thick + case_h"),
-                        off=(("x", "0 in"),
-                             ("y", "abs(dm_dv_sp - (dm_dv_long - dm_dv_short) / 2"
-                                   " - (console_d - back_thick))"))))
+                        off=(("x", "divider_thick / 2"),
+                             ("y", "dm_dv_sp - (dm_dv_long - dm_dv_short) / 2"))))
 
     # Body-relative references: Domino voids depend on Divider1, Divider2
     ref_div1_2 = ctx.find_body("Divider1")
@@ -369,11 +375,19 @@ def run(context):
         "mid_y", "YMid_Frame")
 
     # ── Legs ───────────────────────────────────────────────────────
-    # Front-left leg at origin corner
+    # Front-left leg at origin corner. The frame is built AFTER the case,
+    # so the deps root is Bottom (case) and the leg anchors to Bottom's
+    # underside — anchor the far corner so both offsets are non-zero and
+    # away from any dovetail-socket cutouts (half-pin keeps the corner).
     _, leg_pr = sp.sketch_rect_model(frame_c, frame_c.xYConstructionPlane,
         ("0 in", "0 in", "0 in"),
         {"x": "leg_size", "y": "leg_size"},
-        "LegFL_Sk", ev=ev)
+        "LegFL_Sk", ev=ev,
+        anchor=dict(parent_body=bot_body, parent_occ=case_occ,
+                    face_axis="z", face_dir=-1,
+                    anchor_xyz=("console_w", "console_d", "case_z"),
+                    which=0, off1=("x", "console_w"),
+                    off2=("y", "console_d")))
     leg_fl_ext = sp.ext_new(frame_c, leg_pr, "leg_h", "LegFL")
     leg_fl = leg_fl_ext.bodies.item(0)
     leg_fl.name = "Leg_FL"
@@ -413,7 +427,11 @@ def run(context):
         ("leg_size - mt_td", "leg_size / 2 - rail_thick / 2",
          "leg_h - rail_w"),
         {"x": "console_w - 2 * leg_size + 2 * mt_td", "z": "rail_w"},
-        "FRail_Sk", ev=ev)
+        "FRail_Sk", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=None,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_size", "0 in", "leg_h"),
+                    which=0, off1=("x", "mt_td"), off2=("z", "rail_w")))
     frail_ext = sp.ext_new(frame_c, frail_pr, "rail_thick", "FrontRail")
     frail_body = frail_ext.bodies.item(0)
     frail_body.name = "FrontRail"
@@ -433,6 +451,19 @@ def run(context):
     _tt = ev("mt_tt")
     _cy = _ry + _rt / 2   # face center Y
     _cz = _rz + _rw / 2   # face center Z
+
+    def _pin_shoulder(sk, corner_pt, mx, my, mz, a1, e1, a2, e2):
+        """Pin a floating shoulder-tenon rect to the auto-projected face
+        corner at model (mx, my, mz). Sketch-on-face projects the face
+        boundary as reference curves, so the corner is a valid anchor
+        (deps: sketches must be fully constrained against projected
+        reference geometry — H/V + size dims alone leave the rect free)."""
+        aP = sp.anchor_pt(sk, mx, my, mz)
+        if aP is None:
+            return
+        orient = sp.probe_orientations(sk, mx, my, mz)
+        sp.rdim(sk, sk.sketchDimensions, aP, corner_pt, orient, a1, e1)
+        sp.rdim(sk, sk.sketchDimensions, aP, corner_pt, orient, a2, e2)
 
     # Left shoulder
     fr_lshoulder_face = sp.find_face(frail_body, "x", -1)
@@ -457,6 +488,10 @@ def run(context):
         rect_sh[1].startSketchPoint, rect_sh[1].endSketchPoint,
         VO, Point3D.create(p2.x+0.5, (p1.y+p2.y)/2, 0)
     ).parameter.expression = "mt_tt" if va == "y" else "mt_tw"
+    _pin_shoulder(sk_fls, rect_sh[0].startSketchPoint,
+                  _rx, _ry, _rz,
+                  'y', "(rail_thick - mt_tt) / 2",
+                  'z', "(rail_w - mt_tw) / 2")
     # Largest profile = shoulder ring (face minus tenon)
     best_prof = None
     best_area = 0
@@ -492,6 +527,10 @@ def run(context):
         rect_sh2[1].startSketchPoint, rect_sh2[1].endSketchPoint,
         VO, Point3D.create(p4.x+0.5, (p3.y+p4.y)/2, 0)
     ).parameter.expression = "mt_tt" if va == "y" else "mt_tw"
+    _pin_shoulder(sk_frs, rect_sh2[0].startSketchPoint,
+                  _rx2, _ry, _rz,
+                  'y', "(rail_thick - mt_tt) / 2",
+                  'z', "(rail_w - mt_tw) / 2")
     best_prof2 = None
     best_area2 = 0
     for pi in range(sk_frs.profiles.count):
@@ -513,7 +552,12 @@ def run(context):
          "leg_size / 2 - mt_tt / 2",
          "leg_h - rail_w / 2 - mt_tw / 4"),
         {"x": "notch_d", "z": "mt_tw / 2"},
-        "FRail_LNotch_Sk", ev=ev)
+        "FRail_LNotch_Sk", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=None,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_size", "0 in", "leg_h"),
+                    which=0, off1=("x", "mt_td"),
+                    off2=("z", "rail_w / 2 + mt_tw / 4")))
     sp.ext_op(frame_c, frn_lpr, "mt_tt", CUT, frail_body, "FRail_LNotch")
     # Right tenon — center notch
     _, frn_rpr = sp.sketch_rect_model(frame_c, frnotch_pl,
@@ -521,7 +565,12 @@ def run(context):
          "leg_size / 2 - mt_tt / 2",
          "leg_h - rail_w / 2 - mt_tw / 4"),
         {"x": "notch_d", "z": "mt_tw / 2"},
-        "FRail_RNotch_Sk", ev=ev)
+        "FRail_RNotch_Sk", ev=ev,
+        anchor=dict(parent_body=leg_fr, parent_occ=None,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("console_w", "0 in", "leg_h"),
+                    which=0, off1=("x", "leg_size - mt_td + notch_d"),
+                    off2=("z", "rail_w / 2 + mt_tw / 4")))
     sp.ext_op(frame_c, frn_rpr, "mt_tt", CUT, frail_body, "FRail_RNotch")
 
     # Body-relative reference: BackRail depends on FrontRail
@@ -545,7 +594,11 @@ def run(context):
         ("leg_size / 2 - rail_thick / 2", "leg_size - mt_td",
          "leg_h - rail_w"),
         {"y": "console_d - 2 * leg_size + 2 * mt_td", "z": "rail_w"},
-        "SRailL_Sk", ev=ev)
+        "SRailL_Sk", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "leg_size", "leg_h"),
+                    which=0, off1=("y", "mt_td"), off2=("z", "rail_w")))
     srail_ext = sp.ext_new(frame_c, srail_pr, "rail_thick", "SideRailL")
     srail_body = srail_ext.bodies.item(0)
     srail_body.name = "SideRailL"
@@ -579,6 +632,10 @@ def run(context):
         rect_sr[1].startSketchPoint, rect_sr[1].endSketchPoint,
         VO, Point3D.create(ps2.x+0.5, (ps1.y+ps2.y)/2, 0)
     ).parameter.expression = "mt_tw" if vas == "z" else "mt_tt"
+    _pin_shoulder(sk_srf, rect_sr[0].startSketchPoint,
+                  _sx, _sy, _sz,
+                  'x', "(rail_thick - mt_tt) / 2",
+                  'z', "(rail_w - mt_tw) / 2")
     best_sr = None
     best_sra = 0
     for pi in range(sk_srf.profiles.count):
@@ -613,6 +670,10 @@ def run(context):
         rect_sr2[1].startSketchPoint, rect_sr2[1].endSketchPoint,
         VO, Point3D.create(ps4.x+0.5, (ps3.y+ps4.y)/2, 0)
     ).parameter.expression = "mt_tw" if vas == "z" else "mt_tt"
+    _pin_shoulder(sk_srb, rect_sr2[0].startSketchPoint,
+                  _sx, _sy2, _sz,
+                  'x', "(rail_thick - mt_tt) / 2",
+                  'z', "(rail_w - mt_tw) / 2")
     best_sr2 = None
     best_sra2 = 0
     for pi in range(sk_srb.profiles.count):
@@ -633,7 +694,12 @@ def run(context):
          "leg_size - mt_td",
          "leg_h - rail_w / 2 + mt_tw / 4"),
         {"y": "notch_d", "z": "mt_tw / 4"},
-        "SRailL_FNotchT_Sk", ev=ev)
+        "SRailL_FNotchT_Sk", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "leg_size", "leg_h"),
+                    which=0, off1=("y", "mt_td"),
+                    off2=("z", "rail_w / 2 - mt_tw / 4")))
     sp.ext_op(frame_c, srn_ft_pr, "mt_tt", CUT, srail_body, "SRailL_FNotchT")
     # Front tenon — bottom notch
     _, srn_fb_pr = sp.sketch_rect_model(frame_c, srnotch_pl,
@@ -641,7 +707,12 @@ def run(context):
          "leg_size - mt_td",
          "leg_h - rail_w / 2 - mt_tw / 2"),
         {"y": "notch_d", "z": "mt_tw / 4"},
-        "SRailL_FNotchB_Sk", ev=ev)
+        "SRailL_FNotchB_Sk", ev=ev,
+        anchor=dict(parent_body=leg_fl, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "leg_size", "leg_h"),
+                    which=0, off1=("y", "mt_td"),
+                    off2=("z", "rail_w / 2 + mt_tw / 2")))
     sp.ext_op(frame_c, srn_fb_pr, "mt_tt", CUT, srail_body, "SRailL_FNotchB")
     # Back tenon — top notch
     _, srn_bt_pr = sp.sketch_rect_model(frame_c, srnotch_pl,
@@ -649,7 +720,12 @@ def run(context):
          "console_d - leg_size + mt_td - notch_d",
          "leg_h - rail_w / 2 + mt_tw / 4"),
         {"y": "notch_d", "z": "mt_tw / 4"},
-        "SRailL_BNotchT_Sk", ev=ev)
+        "SRailL_BNotchT_Sk", ev=ev,
+        anchor=dict(parent_body=leg_bl, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "console_d", "leg_h"),
+                    which=0, off1=("y", "leg_size - mt_td + notch_d"),
+                    off2=("z", "rail_w / 2 - mt_tw / 4")))
     sp.ext_op(frame_c, srn_bt_pr, "mt_tt", CUT, srail_body, "SRailL_BNotchT")
     # Back tenon — bottom notch
     _, srn_bb_pr = sp.sketch_rect_model(frame_c, srnotch_pl,
@@ -657,7 +733,12 @@ def run(context):
          "console_d - leg_size + mt_td - notch_d",
          "leg_h - rail_w / 2 - mt_tw / 2"),
         {"y": "notch_d", "z": "mt_tw / 4"},
-        "SRailL_BNotchB_Sk", ev=ev)
+        "SRailL_BNotchB_Sk", ev=ev,
+        anchor=dict(parent_body=leg_bl, parent_occ=None,
+                    face_axis="x", face_dir=-1,
+                    anchor_xyz=("0 in", "console_d", "leg_h"),
+                    which=0, off1=("y", "leg_size - mt_td + notch_d"),
+                    off2=("z", "rail_w / 2 + mt_tw / 2")))
     sp.ext_op(frame_c, srn_bb_pr, "mt_tt", CUT, srail_body, "SRailL_BNotchB")
 
     # Body-relative reference: SideRailR depends on SideRailL

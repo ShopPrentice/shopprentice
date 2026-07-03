@@ -171,7 +171,7 @@ def run(context):
         long_axis="x", long_expr="dm_back_h",
         short_expr="dm_back_w", depth_expr="dm_back_d",
         body_a=sh_body, body_b=sh_body,
-        name="ShDm", ev=ctx.ev,
+        name="DM_Sh", ev=ctx.ev,
         anchor=dict(parent_body=left_side, parent_occ=sides_occ,
                     face_axis="y", face_dir=+1,
                     anchor_xyz=("board_thick", "total_depth", "0 in"),
@@ -186,7 +186,7 @@ def run(context):
     all_shelf_bodies = [sh_body]
     for i in range(shelf_pat.bodies.count):
         b = shelf_pat.bodies.item(i)
-        if not b.name.startswith("ShDm"):
+        if not b.name.startswith("DM_Sh"):
             all_shelf_bodies.append(b)
 
     # Z-pattern template voids for backboard CUT at all levels
@@ -243,8 +243,11 @@ def run(context):
         count_expr="dm_kick_count",
         long_axis="z", long_expr="dm_kick_h",
         short_expr="dm_kick_w", depth_expr="dm_kick_d",
-        body_a=kick_body,
-        name="KDm_L", ev=ctx.ev,
+        # No cut here: the mirror below returns ALL four tenons (sources
+        # included), so KDm_CutR mortises the kick for both sides in one
+        # combine — grid's internal CutA would just be a duplicate no-op.
+        cut=False,
+        name="DM_KL", ev=ctx.ev,
         anchor=dict(parent_body=left_side, parent_occ=sides_occ,
                     face_axis="x", face_dir=+1,
                     anchor_xyz=("board_thick", "total_depth", "0 in"),
@@ -256,7 +259,7 @@ def run(context):
     dm_kick_right = []
     for i in range(mir_k.bodies.count):
         b = mir_k.bodies.item(i)
-        b.name = f"KDm_R_{i}"
+        b.name = f"DM_KR_{i}"
         dm_kick_right.append(b)
     sp.combine(kick_body, dm_kick_right, CUT, True, "KDm_CutR")
 
