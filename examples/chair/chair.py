@@ -254,10 +254,14 @@ def run(context):
     _, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("leg_size", "0 in", "apron_z"),
         {"x": "short_apron_l", "y": "apron_thick"}, "FrontApron_Sk", ev,
+        # Anchor the (0, leg_size) top-face corner — (0, 0) projects onto
+        # the sketch origin, which anchor_pt excludes (silent wrong-corner
+        # match would drag the rect).
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
                     face_axis="z", face_dir=+1,
-                    anchor_xyz=("0 in", "0 in", "front_leg_h"),
-                    which=3, off1=("x", "leg_size"), off2=("y", "apron_thick")))
+                    anchor_xyz=("0 in", "leg_size", "front_leg_h"),
+                    which=3, off1=("x", "leg_size"),
+                    off2=("y", "leg_size - apron_thick")))
     fa_ext = sp.ext_new(apron_c, pr, "apron_h", "FrontApron")
     front_apron = fa_ext.bodies.item(0); front_apron.name = "Apron_Front"
 
@@ -306,11 +310,13 @@ def run(context):
     _, pr = sp.sketch_rect_model(str_c, str_z_pl,
         ("leg_size", "leg_size / 2 - str_thick / 2", "str_z"),
         {"x": "front_str_l", "y": "str_thick"}, "FrontStr_Sk", ev,
+        # (0, 0) projects onto the sketch origin (excluded) — anchor the
+        # (0, leg_size) corner instead.
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
                     face_axis="z", face_dir=+1,
-                    anchor_xyz=("0 in", "0 in", "front_leg_h"),
+                    anchor_xyz=("0 in", "leg_size", "front_leg_h"),
                     which=0, off1=("x", "leg_size"),
-                    off2=("y", "leg_size / 2 - str_thick / 2")))
+                    off2=("y", "leg_size / 2 + str_thick / 2")))
     fs_ext = sp.ext_new(str_c, pr, "str_h", "FrontStr")
     str_front = fs_ext.bodies.item(0); str_front.name = "Str_Front"
 
@@ -319,9 +325,9 @@ def run(context):
         {"x": "front_str_l", "y": "str_thick"}, "BackStr_Sk", ev,
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
                     face_axis="z", face_dir=+1,
-                    anchor_xyz=("0 in", "0 in", "front_leg_h"),
+                    anchor_xyz=("0 in", "leg_size", "front_leg_h"),
                     which=0, off1=("x", "leg_size"),
-                    off2=("y", "seat_d - leg_size / 2 - str_thick / 2")))
+                    off2=("y", "seat_d - leg_size / 2 - str_thick / 2 - leg_size")))
     bs_ext = sp.ext_new(str_c, pr, "str_h", "BackStr")
     str_back = bs_ext.bodies.item(0); str_back.name = "Str_Back"
 
@@ -330,8 +336,8 @@ def run(context):
         {"x": "str_thick", "y": "long_apron_l"}, "LeftStr_Sk", ev,
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
                     face_axis="z", face_dir=+1,
-                    anchor_xyz=("0 in", "0 in", "front_leg_h"),
-                    which=0, off1=("x", "leg_size / 2 - str_thick / 2"),
+                    anchor_xyz=("leg_size", "0 in", "front_leg_h"),
+                    which=0, off1=("x", "leg_size / 2 + str_thick / 2"),
                     off2=("y", "leg_size")))
     ls_ext = sp.ext_new(str_c, pr, "str_h", "LeftStr")
     str_left = ls_ext.bodies.item(0); str_left.name = "Str_Left"
@@ -474,27 +480,43 @@ def run(context):
     ).parameter.expression = "scoop_trans_r"
 
     orient_pa = sp.probe_orientations(path_sk, 0, ev("mid_y"), seat_top_z)
-    origin_pa = path_sk.originPoint
 
-    path_dims.addDistanceDimension(
-        origin_pa, arc.startSketchPoint, orient_pa['z'],
-        P3.create(ps_start.x - 2, ps_start.y, 0)
-    ).parameter.expression = "seat_h + scoop_depth"
-    path_dims.addDistanceDimension(
-        origin_pa, arc.startSketchPoint, orient_pa['y'],
-        P3.create(ps_start.x, ps_start.y + 2, 0)
-    ).parameter.expression = "scoop_back_y"
-    path_dims.addDistanceDimension(
-        origin_pa, level_line.endSketchPoint, orient_pa['y'],
-        P3.create(ps_front.x, ps_front.y + 2, 0)
-    ).parameter.expression = "scoop_front_y"
-
-    # Retarget the 4 origin dims to the projected Seat back-top corner (x=-1 face,
-    # parallel to this YZ midplane) — geometry preserved, origin reference removed
-    # (deps rules 1-3). reanchor self-checks and reverts safely if the anchor is
-    # wrong. The returned profile is unused; we sweep the arc curve directly.
-    sp.reanchor(path_sk, seat_body, None, "x", -1,
-                ("0 in", "seat_d", "seat_h"))
+    # Anchor the path to the projected Left Apron outer (x=0) face —
+    # parallel to this YZ midplane and NEVER modified after this point.
+    # The Seat's own faces are a trap here: SeatNotch and the top-edge
+    # fillet later regenerate the projection and the dims fail to solve
+    # on rebuild. reanchor's per-axis retarget over-constrains on the
+    # arc, so don't route through it. Anchor = apron top-front corner.
+    sp.project_face(path_sk, left_apron, apron_occ, "x", -1)
+    pa_anchor = sp.anchor_pt(path_sk, 0.0, ev("leg_size"), ev("front_leg_h"))
+    if pa_anchor is not None:
+        sp.rdim(path_sk, path_dims, pa_anchor, arc.startSketchPoint,
+                orient_pa, "z", "seat_thick + scoop_depth")
+        sp.rdim(path_sk, path_dims, pa_anchor, arc.startSketchPoint,
+                orient_pa, "y", "scoop_back_y - leg_size")
+        sp.rdim(path_sk, path_dims, pa_anchor, level_line.endSketchPoint,
+                orient_pa, "y", "scoop_front_y - leg_size")
+        # Pin the level height (seat top) — without it the arc can swing
+        # on re-solve (projection updates re-solve the sketch) and the
+        # level-end position dim fails intermittently. (A tangent
+        # constraint would be the full fix but the 3-point arc is tangent
+        # only within float error and the solver rejects it.)
+        sp.rdim(path_sk, path_dims, pa_anchor, level_line.endSketchPoint,
+                orient_pa, "z", "seat_thick")
+    else:
+        origin_pa = path_sk.originPoint
+        path_dims.addDistanceDimension(
+            origin_pa, arc.startSketchPoint, orient_pa['z'],
+            P3.create(ps_start.x - 2, ps_start.y, 0)
+        ).parameter.expression = "seat_h + scoop_depth"
+        path_dims.addDistanceDimension(
+            origin_pa, arc.startSketchPoint, orient_pa['y'],
+            P3.create(ps_start.x, ps_start.y + 2, 0)
+        ).parameter.expression = "scoop_back_y"
+        path_dims.addDistanceDimension(
+            origin_pa, level_line.endSketchPoint, orient_pa['y'],
+            P3.create(ps_front.x, ps_front.y + 2, 0)
+        ).parameter.expression = "scoop_front_y"
 
     # Create chained path from arc (picks up connected level_line)
     sweep_path = seat_c.features.createPath(arc, True)
@@ -613,10 +635,14 @@ def run(context):
     sp.combine(seat_p, [bl_p, br_p], CUT, True, "SeatNotch")
 
     # Slat stub-mortises into rails
-    all_slat_bodies = [vslat_body]
+    # vs_pat.bodies INCLUDES the source slat (it was renamed VSlat_{i+2}
+    # above) — adding vslat_body as well would cut each rail twice with
+    # the same tool, and the duplicate combine removes nothing.
     if vs_pat:
-        for i in range(vs_pat.bodies.count):
-            all_slat_bodies.append(vs_pat.bodies.item(i))
+        all_slat_bodies = [vs_pat.bodies.item(i)
+                           for i in range(vs_pat.bodies.count)]
+    else:
+        all_slat_bodies = [vslat_body]
 
     slat_proxies = [b.createForAssemblyContext(back_occ) for b in all_slat_bodies]
     for i, slat_p in enumerate(slat_proxies):
@@ -668,12 +694,47 @@ def run(context):
         sk_d.addDistanceDimension(l1.startSketchPoint, l1.endSketchPoint,
             ALI_d, cpts[2]).parameter.expression = "dm_w"
         sk_orient = sp.probe_orientations(sk, center_x, y_rot, z_rot)
-        sk_d.addDistanceDimension(sk.originPoint, l0.startSketchPoint,
-            sk_orient['y'], cpts[0]).parameter.expression = f"{y_rot + dy_l + dy_s} cm"
-        sk_d.addDistanceDimension(sk.originPoint, l0.startSketchPoint,
-            sk_orient['z'], cpts[0]).parameter.expression = f"{z_rot + dz_l + dz_s} cm"
-        sp.reanchor(sk, leg_body, None, "x", -1 if center_x < ev("seat_w") / 2 else +1,
-            (f"{center_x} cm", f"{y_rot} cm", f"{z_rot} cm"))
+        # Anchor to the projected raked post's nearest outline vertex (no
+        # geometric corner sits at the domino center, so reanchor's
+        # exact-corner retarget can't work here). Dims are baked cm like
+        # the rest of this rotated-coordinate sketch.
+        sp.project_face(sk, leg_body, None, "x",
+                        -1 if center_x < ev("seat_w") / 2 else +1)
+        aP = sp.anchor_pt(sk, center_x, y_rot, z_rot)
+        if aP is not None:
+            am = sk.sketchToModelSpace(adsk.core.Point3D.create(
+                aP.geometry.x, aP.geometry.y, 0))
+            sk_d.addDistanceDimension(aP, l0.startSketchPoint,
+                sk_orient['y'], cpts[0]).parameter.expression = \
+                f"{abs(am.y - (y_rot + dy_l + dy_s))} cm"
+            sk_d.addDistanceDimension(aP, l0.startSketchPoint,
+                sk_orient['z'], cpts[0]).parameter.expression = \
+                f"{abs(am.z - (z_rot + dz_l + dz_s))} cm"
+            # Pin the remaining tilt DOF: the domino's long side runs
+            # parallel to the raked post edge in the projection.
+            s2m = sk.sketchToModelSpace
+            for ci in range(sk.sketchCurves.sketchLines.count):
+                cl = sk.sketchCurves.sketchLines.item(ci)
+                if not cl.isConstruction:
+                    continue
+                g0 = s2m(adsk.core.Point3D.create(
+                    cl.startSketchPoint.geometry.x,
+                    cl.startSketchPoint.geometry.y, 0))
+                g1 = s2m(adsk.core.Point3D.create(
+                    cl.endSketchPoint.geometry.x,
+                    cl.endSketchPoint.geometry.y, 0))
+                vy, vz = g1.y - g0.y, g1.z - g0.z
+                vl = math.hypot(vy, vz)
+                if vl < 1e-6:
+                    continue
+                if abs((vy * dy_l + vz * dz_l) / (vl * half_l)) > 0.9999:
+                    sk_gc.addParallel(l1, cl)
+                    break
+        else:
+            sk_d.addDistanceDimension(sk.originPoint, l0.startSketchPoint,
+                sk_orient['y'], cpts[0]).parameter.expression = f"{y_rot + dy_l + dy_s} cm"
+            sk_d.addDistanceDimension(sk.originPoint, l0.startSketchPoint,
+                sk_orient['z'], cpts[0]).parameter.expression = f"{z_rot + dz_l + dz_s} cm"
         prof = sk.profiles.item(0)
         ext_inp = back_c.features.extrudeFeatures.createInput(
             prof, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
@@ -740,56 +801,56 @@ def run(context):
         anchor=dict(parent_body=front_apron, parent_occ=None,
                     face_axis="x", face_dir=-1,
                     anchor_xyz=("leg_size", "0 in", "apron_z"),
-                    off=(("y", "apron_thick/2"), ("z", "dm_z_start - apron_z"))))
+                    off=(("y", "apron_thick/2"), ("z", "dm_z_start - apron_z - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, a_dm_fr, ("seat_w - leg_size", "apron_thick/2", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         front_apron, fr_p, "DM_FA_R", ev,
         anchor=dict(parent_body=front_apron, parent_occ=None,
                     face_axis="x", face_dir=+1,
                     anchor_xyz=("seat_w - leg_size", "0 in", "apron_z"),
-                    off=(("y", "apron_thick/2"), ("z", "dm_z_start - apron_z"))))
+                    off=(("y", "apron_thick/2"), ("z", "dm_z_start - apron_z - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, a_dm_fl, ("leg_size", "seat_d - apron_thick/2", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         back_apron, bl_p, "DM_BA_L", ev,
         anchor=dict(parent_body=back_apron, parent_occ=None,
                     face_axis="x", face_dir=-1,
                     anchor_xyz=("leg_size", "seat_d - apron_thick", "apron_z"),
-                    off=(("y", "apron_thick/2"), ("z", "dm_z_start - apron_z"))))
+                    off=(("y", "apron_thick/2"), ("z", "dm_z_start - apron_z - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, a_dm_fr, ("seat_w - leg_size", "seat_d - apron_thick/2", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         back_apron, br_p, "DM_BA_R", ev,
         anchor=dict(parent_body=back_apron, parent_occ=None,
                     face_axis="x", face_dir=+1,
                     anchor_xyz=("seat_w - leg_size", "seat_d - apron_thick", "apron_z"),
-                    off=(("y", "apron_thick/2"), ("z", "dm_z_start - apron_z"))))
+                    off=(("y", "apron_thick/2"), ("z", "dm_z_start - apron_z - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, a_dm_lf, ("apron_thick/2", "leg_size", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         left_apron, fl_p, "DM_LA_F", ev,
         anchor=dict(parent_body=left_apron, parent_occ=None,
                     face_axis="y", face_dir=-1,
                     anchor_xyz=("0 in", "leg_size", "apron_z"),
-                    off=(("x", "apron_thick/2"), ("z", "dm_z_start - apron_z"))))
+                    off=(("x", "apron_thick/2"), ("z", "dm_z_start - apron_z - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, a_dm_lb, ("apron_thick/2", "seat_d - leg_size", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         left_apron, bl_p, "DM_LA_B", ev,
         anchor=dict(parent_body=left_apron, parent_occ=None,
                     face_axis="y", face_dir=+1,
                     anchor_xyz=("0 in", "seat_d - leg_size", "apron_z"),
-                    off=(("x", "apron_thick/2"), ("z", "dm_z_start - apron_z"))))
+                    off=(("x", "apron_thick/2"), ("z", "dm_z_start - apron_z - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, a_dm_lf, ("seat_w - apron_thick/2", "leg_size", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         right_apron, fr_p, "DM_RA_F", ev,
         anchor=dict(parent_body=right_apron, parent_occ=None,
                     face_axis="y", face_dir=-1,
                     anchor_xyz=("seat_w - apron_thick", "leg_size", "apron_z"),
-                    off=(("x", "apron_thick/2"), ("z", "dm_z_start - apron_z"))))
+                    off=(("x", "apron_thick/2"), ("z", "dm_z_start - apron_z - (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, a_dm_lb, ("seat_w - apron_thick/2", "seat_d - leg_size", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d",
         right_apron, br_p, "DM_RA_B", ev,
         anchor=dict(parent_body=right_apron, parent_occ=None,
                     face_axis="y", face_dir=+1,
                     anchor_xyz=("seat_w - apron_thick", "seat_d - leg_size", "apron_z"),
-                    off=(("x", "apron_thick/2"), ("z", "dm_z_start - apron_z"))))
+                    off=(("x", "apron_thick/2"), ("z", "dm_z_start - apron_z - (dm_w - dm_t) / 2"))))
 
     # Stretcher dominos (8 joints, 1 each) — voids in str_c, native body_a, leg
     # proxy body_b. Each template slot anchored to its native stretcher end face.
@@ -799,56 +860,56 @@ def run(context):
         anchor=dict(parent_body=str_front, parent_occ=None,
                     face_axis="x", face_dir=-1,
                     anchor_xyz=("leg_size", "leg_size / 2 - str_thick / 2", "str_z"),
-                    off=(("y", "str_thick / 2"), ("z", "str_dm_z - str_z"))))
+                    off=(("y", "str_thick / 2"), ("z", "str_dm_z - str_z - (dm_w - dm_t) / 2"))))
     domino.grid(str_c, s_dm_fr, ("seat_w - leg_size", "leg_size / 2", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
         str_front, fr_p, "DM_FS_R", ev,
         anchor=dict(parent_body=str_front, parent_occ=None,
                     face_axis="x", face_dir=+1,
                     anchor_xyz=("seat_w - leg_size", "leg_size / 2 - str_thick / 2", "str_z"),
-                    off=(("y", "str_thick / 2"), ("z", "str_dm_z - str_z"))))
+                    off=(("y", "str_thick / 2"), ("z", "str_dm_z - str_z - (dm_w - dm_t) / 2"))))
     domino.grid(str_c, s_dm_fl, ("leg_size", "seat_d - leg_size / 2", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
         str_back, bl_p, "DM_BS_L", ev,
         anchor=dict(parent_body=str_back, parent_occ=None,
                     face_axis="x", face_dir=-1,
                     anchor_xyz=("leg_size", "seat_d - leg_size / 2 - str_thick / 2", "str_z"),
-                    off=(("y", "str_thick / 2"), ("z", "str_dm_z - str_z"))))
+                    off=(("y", "str_thick / 2"), ("z", "str_dm_z - str_z - (dm_w - dm_t) / 2"))))
     domino.grid(str_c, s_dm_fr, ("seat_w - leg_size", "seat_d - leg_size / 2", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
         str_back, br_p, "DM_BS_R", ev,
         anchor=dict(parent_body=str_back, parent_occ=None,
                     face_axis="x", face_dir=+1,
                     anchor_xyz=("seat_w - leg_size", "seat_d - leg_size / 2 - str_thick / 2", "str_z"),
-                    off=(("y", "str_thick / 2"), ("z", "str_dm_z - str_z"))))
+                    off=(("y", "str_thick / 2"), ("z", "str_dm_z - str_z - (dm_w - dm_t) / 2"))))
     domino.grid(str_c, s_dm_lf, ("leg_size / 2", "leg_size", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
         str_left, fl_p, "DM_LS_F", ev,
         anchor=dict(parent_body=str_left, parent_occ=None,
                     face_axis="y", face_dir=-1,
                     anchor_xyz=("leg_size / 2 - str_thick / 2", "leg_size", "str_z"),
-                    off=(("x", "str_thick / 2"), ("z", "str_dm_z - str_z"))))
+                    off=(("x", "str_thick / 2"), ("z", "str_dm_z - str_z - (dm_w - dm_t) / 2"))))
     domino.grid(str_c, s_dm_lb, ("leg_size / 2", "seat_d - leg_size", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
         str_left, bl_p, "DM_LS_B", ev,
         anchor=dict(parent_body=str_left, parent_occ=None,
                     face_axis="y", face_dir=+1,
                     anchor_xyz=("leg_size / 2 - str_thick / 2", "seat_d - leg_size", "str_z"),
-                    off=(("x", "str_thick / 2"), ("z", "str_dm_z - str_z"))))
+                    off=(("x", "str_thick / 2"), ("z", "str_dm_z - str_z - (dm_w - dm_t) / 2"))))
     domino.grid(str_c, s_dm_lf, ("seat_w - leg_size / 2", "leg_size", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
         str_right, fr_p, "DM_RS_F", ev,
         anchor=dict(parent_body=str_right, parent_occ=None,
                     face_axis="y", face_dir=-1,
                     anchor_xyz=("seat_w - leg_size / 2 - str_thick / 2", "leg_size", "str_z"),
-                    off=(("x", "str_thick / 2"), ("z", "str_dm_z - str_z"))))
+                    off=(("x", "str_thick / 2"), ("z", "str_dm_z - str_z - (dm_w - dm_t) / 2"))))
     domino.grid(str_c, s_dm_lb, ("seat_w - leg_size / 2", "seat_d - leg_size", "str_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d",
         str_right, br_p, "DM_RS_B", ev,
         anchor=dict(parent_body=str_right, parent_occ=None,
                     face_axis="y", face_dir=+1,
                     anchor_xyz=("seat_w - leg_size / 2 - str_thick / 2", "seat_d - leg_size", "str_z"),
-                    off=(("x", "str_thick / 2"), ("z", "str_dm_z - str_z"))))
+                    off=(("x", "str_thick / 2"), ("z", "str_dm_z - str_z - (dm_w - dm_t) / 2"))))
 
     print(">>> Dominos: 16 joints (aprons + stretchers)")
 

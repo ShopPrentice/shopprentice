@@ -1,36 +1,36 @@
 {
-  "deps": [
-    {
-      "body": "Side_Left",
-      "ref": "origin"
-    },
-    {
-      "body": "Side_Right",
-      "ref": "Side_Left"
-    },
-    {
-      "body": "Shelf",
-      "ref": "Side_Left"
-    },
-    {
-      "body": "ShDm_0",
-      "ref": "Shelf"
-    },
-    {
-      "body": "TopBoard",
-      "ref": "Side_Left"
-    },
-    {
-      "body": "KickBoard",
-      "ref": "Side_Left"
-    },
-    {
-      "body": "KDm_R_0",
-      "ref": "KickBoard"
-    },
-    {
-      "body": "BackPanel",
-      "ref": "Side_Left"
-    }
-  ]
+ "deps": [
+  {
+   "body": "Side_Left",
+   "ref": "origin"
+  },
+  {
+   "body": "Side_Right",
+   "ref": "Side_Left"
+  },
+  {
+   "body": "Shelf",
+   "ref": "Side_Left"
+  },
+  {
+   "body": "DM_Sh_0",
+   "ref": "Shelf"
+  },
+  {
+   "body": "TopBoard",
+   "ref": "Side_Left"
+  },
+  {
+   "body": "KickBoard",
+   "ref": "Side_Left"
+  },
+  {
+   "body": "DM_KR_0",
+   "ref": "KickBoard"
+  },
+  {
+   "body": "BackPanel",
+   "ref": "Side_Left"
+  }
+ ]
 }

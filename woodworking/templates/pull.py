@@ -162,12 +162,16 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         d = sk.sketchDimensions
         cp = circle.centerSketchPoint
         cg = cp.geometry
+        # Distance dims are unsigned — a negative sketch coordinate would
+        # flip the circle to the other side of the origin (model -Z on
+        # planes whose sketch-Y maps to -Z). Dimension the magnitude so
+        # the geometry stays put.
         d.addDistanceDimension(sk.originPoint, cp, H_o,
             Point3D.create(cg.x / 2, cg.y - 0.5, 0)
-        ).parameter.expression = f"{pos[0]} cm"
+        ).parameter.expression = f"{abs(pos[0])} cm"
         d.addDistanceDimension(sk.originPoint, cp, V_o,
             Point3D.create(cg.x + 0.5, cg.y / 2, 0)
-        ).parameter.expression = f"{pos[1]} cm"
+        ).parameter.expression = f"{abs(pos[1])} cm"
         if anchor is not None:
             # Profile not needed — CUT uses sk.profiles.item(0) for circles
             _ = sp.reanchor(sk, anchor["parent_body"], anchor.get("parent_occ"),
@@ -276,11 +280,11 @@ def install(comp, body, plane, center, pull_axis, depth_axis,
         d.addDistanceDimension(sk.originPoint,
             rect.item(0).startSketchPoint, H_o,
             Point3D.create(s1.x / 2, s1.y - 1, 0)
-        ).parameter.expression = f"{s1.x} cm"
+        ).parameter.expression = f"{abs(s1.x)} cm"
         d.addDistanceDimension(sk.originPoint,
             rect.item(0).startSketchPoint, V_o,
             Point3D.create(s1.x + 1, s1.y / 2, 0)
-        ).parameter.expression = f"{s1.y} cm"
+        ).parameter.expression = f"{abs(s1.y)} cm"
         if anchor is not None:
             new_prof = sp.reanchor(sk, anchor["parent_body"],
                                    anchor.get("parent_occ"),

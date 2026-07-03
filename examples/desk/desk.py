@@ -216,9 +216,12 @@ def run(context):
     # ==============================================================
     az_pl = sp.off_plane(apron_c, apron_c.xYConstructionPlane, "apron_z", "AZ_Pl")
 
-    # Back apron (full height) — anchored to Leg_BL top face (clean, parallel)
+    # Back apron (full height) — anchored to Leg_BL top face (clean, parallel).
+    # Flush with the back of the legs (desk_w - apron_thick) so its end faces
+    # butt the legs' inner X faces — inset in front of the legs it would
+    # float with no leg contact and the DM_BA dominos would cut nothing.
     sk_ba, pr = sp.sketch_rect_model(apron_c, az_pl,
-        ("leg_size", "desk_w - leg_size - apron_thick", "apron_z"),
+        ("leg_size", "desk_w - apron_thick", "apron_z"),
         {"x": "long_apron_l", "y": "apron_thick"}, "BackApron_Sk", ev)
     # Anchor to Leg_BL's outer-back-inner corner (both offsets non-zero).
     pr = sp.reanchor(sk_ba, ref_bl, leg_occ, "z", +1,
@@ -255,7 +258,7 @@ def run(context):
     # — anchored to Leg_BL top face
     sk_div, pr = sp.sketch_rect_model(apron_c, az_pl,
         ("mid_x - divider_thick / 2", "apron_thick", "apron_z"),
-        {"x": "divider_thick", "y": "desk_w - leg_size - 2 * apron_thick"}, "Divider_Sk", ev)
+        {"x": "divider_thick", "y": "desk_w - 2 * apron_thick"}, "Divider_Sk", ev)
     pr = sp.reanchor(sk_div, ref_bl, leg_occ, "z", +1,
                      ("leg_size", "desk_w - leg_size", "leg_h")) \
         or sp.smallest_profile(sk_div)
@@ -391,14 +394,17 @@ def run(context):
     # face (y=0, Y-normal, parallel to the front-board sketch plane). The
     # template then anchors the back/left/bottom boards + dovetails internally
     # off the front board. anchor_xyz is a real corner of Leg_FL's front face.
+    # Anchor the TOP inner corner (leg_h) — the bottom inner corner is
+    # tapered away (leg_taper below apron_z), so (leg_size, 0, 0) does
+    # not exist on the projected face.
     ddl_result = dovetailed_drawer.build(drawer_l_c, prefix="ddl", ev=ev,
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
                     face_axis="y", face_dir=-1,
-                    anchor_xyz=("leg_size", "0 in", "0 in")))
+                    anchor_xyz=("leg_size", "0 in", "leg_h")))
     ddr_result = dovetailed_drawer.build(drawer_r_c, prefix="ddr", ev=ev,
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ,
                     face_axis="y", face_dir=-1,
-                    anchor_xyz=("leg_size", "0 in", "0 in")))
+                    anchor_xyz=("leg_size", "0 in", "leg_h")))
     print(f">>> Drawers: {len(ddl_result['all_bodies'])} + {len(ddr_result['all_bodies'])} bodies")
 
     # Body-relative refs: drawer parts reference drawer fronts
@@ -451,61 +457,64 @@ def run(context):
     # Anchor each template slot to the mating leg's clean OUTER face (parallel
     # to the slot plane, never cut). off = (lateral, vertical) from that leg
     # corner to the slot's reference (lower) arc center.
-    domino.grid(apron_c, dm_fl, ("leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
+    # NOTE: anchor the TOP corners (z = leg_h) — the bottom inner corners are
+    # tapered away (leg_taper below apron_z), so z=0 corners on any face
+    # bounded by a tapered face do not exist on the projection.
+    domino.grid(apron_c, dm_fl, ("leg_size", "desk_w - apron_thick/2", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_body, bl_p, "DM_BA_L", ev,
         anchor=dict(parent_body=leg_bl, parent_occ=leg_occ, face_axis="x", face_dir=-1,
-                    anchor_xyz=("0 in", "desk_w - leg_size", "0 in"),
+                    anchor_xyz=("0 in", "desk_w", "leg_h"),
                     off=(("y", "apron_thick / 2"),
-                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
-    domino.grid(apron_c, dm_fr, ("desk_l - leg_size", "desk_w - leg_size - apron_thick/2", "dm_z_start"),
+                         ("z", "leg_h - dm_z_start + (dm_w - dm_t) / 2"))))
+    domino.grid(apron_c, dm_fr, ("desk_l - leg_size", "desk_w - apron_thick/2", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ba_body, br_p, "DM_BA_R", ev,
         anchor=dict(parent_body=leg_br, parent_occ=leg_occ, face_axis="x", face_dir=+1,
-                    anchor_xyz=("desk_l", "desk_w - leg_size", "0 in"),
+                    anchor_xyz=("desk_l", "desk_w", "leg_h"),
                     off=(("y", "apron_thick / 2"),
-                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
+                         ("z", "leg_h - dm_z_start + (dm_w - dm_t) / 2"))))
 
     # Left apron → FL, BL
     domino.grid(apron_c, dm_lf, ("apron_thick/2", "leg_size", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_body, fl_p, "DM_LA_F", ev,
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ, face_axis="y", face_dir=-1,
-                    anchor_xyz=("leg_size", "0 in", "0 in"),
+                    anchor_xyz=("leg_size", "0 in", "leg_h"),
                     off=(("x", "leg_size - apron_thick / 2"),
-                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
+                         ("z", "leg_h - dm_z_start + (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, dm_lb, ("apron_thick/2", "desk_w - leg_size", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", la_body, bl_p, "DM_LA_B", ev,
         anchor=dict(parent_body=leg_bl, parent_occ=leg_occ, face_axis="y", face_dir=+1,
-                    anchor_xyz=("leg_size", "desk_w", "0 in"),
+                    anchor_xyz=("leg_size", "desk_w", "leg_h"),
                     off=(("x", "leg_size - apron_thick / 2"),
-                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
+                         ("z", "leg_h - dm_z_start + (dm_w - dm_t) / 2"))))
 
     # Right apron → FR, BR
     domino.grid(apron_c, dm_lf, ("desk_l - apron_thick/2", "leg_size", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_body, fr_p, "DM_RA_F", ev,
         anchor=dict(parent_body=leg_fr, parent_occ=leg_occ, face_axis="y", face_dir=-1,
-                    anchor_xyz=("desk_l - leg_size", "0 in", "0 in"),
+                    anchor_xyz=("desk_l - leg_size", "0 in", "leg_h"),
                     off=(("x", "leg_size - apron_thick / 2"),
-                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
+                         ("z", "leg_h - dm_z_start + (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, dm_lb, ("desk_l - apron_thick/2", "desk_w - leg_size", "dm_z_start"),
         "z", "dm_sp", "dm_count", "z", "dm_w", "dm_t", "dm_d", ra_body, br_p, "DM_RA_B", ev,
         anchor=dict(parent_body=leg_br, parent_occ=leg_occ, face_axis="y", face_dir=+1,
-                    anchor_xyz=("desk_l - leg_size", "desk_w", "0 in"),
+                    anchor_xyz=("desk_l - leg_size", "desk_w", "leg_h"),
                     off=(("x", "leg_size - apron_thick / 2"),
-                         ("z", "dm_z_start - (dm_w - dm_t) / 2"))))
+                         ("z", "leg_h - dm_z_start + (dm_w - dm_t) / 2"))))
 
     # Front stretcher → FL, FR legs (1 domino each, centered in stretcher)
     params.add("fr_dm_z", VI("apron_z + stretcher_h / 2"), "in", "")
     domino.grid(apron_c, dm_fl, ("leg_size", "apron_thick / 2", "fr_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_body, fl_p, "DM_FR_L", ev,
         anchor=dict(parent_body=leg_fl, parent_occ=leg_occ, face_axis="x", face_dir=-1,
-                    anchor_xyz=("0 in", "leg_size", "0 in"),
+                    anchor_xyz=("0 in", "leg_size", "leg_h"),
                     off=(("y", "leg_size - apron_thick / 2"),
-                         ("z", "fr_dm_z - (dm_w - dm_t) / 2"))))
+                         ("z", "leg_h - fr_dm_z + (dm_w - dm_t) / 2"))))
     domino.grid(apron_c, dm_fr, ("desk_l - leg_size", "apron_thick / 2", "fr_dm_z"),
         "z", "0 in", "1", "z", "dm_w", "dm_t", "dm_d", fr_body, fr_p, "DM_FR_R", ev,
         anchor=dict(parent_body=leg_fr, parent_occ=leg_occ, face_axis="x", face_dir=+1,
-                    anchor_xyz=("desk_l", "leg_size", "0 in"),
+                    anchor_xyz=("desk_l", "leg_size", "leg_h"),
                     off=(("y", "leg_size - apron_thick / 2"),
-                         ("z", "fr_dm_z - (dm_w - dm_t) / 2"))))
+                         ("z", "leg_h - fr_dm_z + (dm_w - dm_t) / 2"))))
 
     # Divider → front rail and back apron (auto-placed in mating area)
     # domino.between() finds where the bodies overlap and places dominos there.
@@ -515,21 +524,22 @@ def run(context):
     params.add("div_dm_d", VI("apron_thick / 2"), "in", "")
     dm_div_f = sp.off_plane(apron_c, apron_c.xZConstructionPlane, "apron_thick", "DM_DivF")
     dm_div_b = sp.off_plane(apron_c, apron_c.xZConstructionPlane,
-                             "desk_w - leg_size - apron_thick", "DM_DivB")
+                             "desk_w - apron_thick", "DM_DivB")
     # Divider dominos — between() auto-orients: long_axis=Z (longer
     # mating dimension), step along X. Standard dm_w/dm_t fit.
+    # Divider bottom sits at apron_z (not z=0) — anchor its real bottom corners.
     domino.between(apron_c, dm_div_f, div_body, fr_body,
         interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
         long_expr="dm_w", count=1, name="DM_Div_F", ev=ev,
         anchor=dict(parent_body=div_body, parent_occ=None,
                     face_axis="y", face_dir=-1,
-                    anchor_xyz=("desk_l / 2 - divider_thick / 2", "0 in", "0 in")))
+                    anchor_xyz=("desk_l / 2 - divider_thick / 2", "apron_thick", "apron_z")))
     domino.between(apron_c, dm_div_b, div_body, ba_body,
         interface_axis="y", short_expr="dm_t", depth_expr="div_dm_d",
         long_expr="dm_w", count=2, name="DM_Div_B", ev=ev,
         anchor=dict(parent_body=div_body, parent_occ=None,
                     face_axis="y", face_dir=+1,
-                    anchor_xyz=("desk_l / 2 + divider_thick / 2", "desk_w - leg_size", "0 in")))
+                    anchor_xyz=("desk_l / 2 + divider_thick / 2", "desk_w - apron_thick", "apron_z")))
 
     # Top → aprons via L-brackets (slotted holes allow cross-grain movement)
     # Vertical leg against apron inner face, horizontal leg under top
@@ -543,10 +553,10 @@ def run(context):
 
     # Back apron: 2 brackets (one per drawer opening, centered in each)
     # Skip center — divider is there
-    back_y = ev("desk_w") - ev("leg_size") - ev("apron_thick")
+    back_y = ev("desk_w") - ev("apron_thick")
     ba_anchor = dict(parent_body=ba_body, parent_occ=apron_occ,
                      face_axis="y", face_dir=-1,
-                     anchor_xyz=("leg_size", "desk_w - leg_size - apron_thick", "leg_h"))
+                     anchor_xyz=("leg_size", "desk_w - apron_thick", "leg_h"))
     tabletop_bracket.single(bracket_c, face_axis="y", face_dir=-1,
         pos=(left_center, back_y, top_z), name="TB_BL", ev=ev, anchor=ba_anchor)
     tabletop_bracket.single(bracket_c, face_axis="y", face_dir=-1,
@@ -568,9 +578,11 @@ def run(context):
         step_axis="y", step_expr=str(ev("short_apron_l") / 3),
         count=2, name="TB_R", ev=ev, anchor=ra_anchor)
 
+    # Front stretcher is at the BOTTOM of the apron zone — its back (+y)
+    # face has no corner at leg_h. Anchor its real top-back corner.
     fr_anchor = dict(parent_body=fr_body, parent_occ=apron_occ,
                      face_axis="y", face_dir=+1,
-                     anchor_xyz=("leg_size", "apron_thick", "leg_h"))
+                     anchor_xyz=("leg_size", "apron_thick", "apron_z + stretcher_h"))
     front_y = ev("apron_thick")
     tabletop_bracket.single(bracket_c, face_axis="y", face_dir=1,
         pos=(left_center, front_y, top_z), name="TB_FL", ev=ev, anchor=fr_anchor)

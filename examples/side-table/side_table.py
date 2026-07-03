@@ -153,23 +153,42 @@ def run(context):
     H = adsk.fusion.DimensionOrientations.HorizontalDimensionOrientation
     V = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
 
-    # X-taper on XZ plane (inner X face tapers inward at foot)
+    # X-taper on XZ plane (inner X face tapers inward at foot).
+    # Sketch-Y on this plane maps to model -Z, so place points via
+    # modelToSketchSpace — raw coords would land below the floor and
+    # the CUT would miss the leg entirely.
     sk_tx = leg_c.sketches.add(leg_c.xZConstructionPlane)
+    m1s = sk_tx.modelToSketchSpace
+    a1 = m1s(P3(ls_v, 0, az_v))
+    b1 = m1s(P3(ls_v, 0, 0))
+    c1 = m1s(P3(ls_v - lt_v, 0, 0))
     l_tx = sk_tx.sketchCurves.sketchLines
-    la = l_tx.addByTwoPoints(P3(ls_v, az_v, 0), P3(ls_v, 0, 0))
-    lb = l_tx.addByTwoPoints(la.endSketchPoint, P3(ls_v - lt_v, 0, 0))
+    la = l_tx.addByTwoPoints(P3(a1.x, a1.y, 0), P3(b1.x, b1.y, 0))
+    lb = l_tx.addByTwoPoints(la.endSketchPoint, P3(c1.x, c1.y, 0))
     l_tx.addByTwoPoints(lb.endSketchPoint, la.startSketchPoint)
-    sk_tx.geometricConstraints.addVertical(la)
-    sk_tx.geometricConstraints.addHorizontal(lb)
+    orient1 = sp.probe_orientations(sk_tx, ls_v, 0, az_v)
+    V_enum = adsk.fusion.DimensionOrientations.VerticalDimensionOrientation
+    if orient1['z'] == V_enum:
+        sk_tx.geometricConstraints.addVertical(la)
+    else:
+        sk_tx.geometricConstraints.addHorizontal(la)
+    if orient1['x'] == V_enum:
+        sk_tx.geometricConstraints.addVertical(lb)
+    else:
+        sk_tx.geometricConstraints.addHorizontal(lb)
     d_tx = sk_tx.sketchDimensions
-    d_tx.addDistanceDimension(sk_tx.originPoint, la.startSketchPoint, H,
-        P3(ls_v / 2, az_v + 1, 0)).parameter.expression = "leg_size"
-    d_tx.addDistanceDimension(sk_tx.originPoint, la.startSketchPoint, V,
-        P3(ls_v + 1, az_v / 2, 0)).parameter.expression = "apron_z"
-    d_tx.addDistanceDimension(lb.startSketchPoint, lb.endSketchPoint, H,
-        P3(ls_v - lt_v / 2, -1, 0)).parameter.expression = "leg_taper"
-    d_tx.addDistanceDimension(la.startSketchPoint, la.endSketchPoint, V,
-        P3(ls_v + 2, az_v / 2, 0)).parameter.expression = "apron_z"
+    d_tx.addDistanceDimension(sk_tx.originPoint, la.startSketchPoint,
+        orient1['x'], P3(a1.x / 2, a1.y + 1, 0)
+        ).parameter.expression = "leg_size"
+    d_tx.addDistanceDimension(sk_tx.originPoint, la.startSketchPoint,
+        orient1['z'], P3(a1.x + 1, (a1.y + b1.y) / 2, 0)
+        ).parameter.expression = "apron_z"
+    d_tx.addDistanceDimension(lb.startSketchPoint, lb.endSketchPoint,
+        orient1['x'], P3((b1.x + c1.x) / 2, b1.y - 1, 0)
+        ).parameter.expression = "leg_taper"
+    d_tx.addDistanceDimension(la.startSketchPoint, la.endSketchPoint,
+        orient1['z'], P3(a1.x + 2, (a1.y + b1.y) / 2, 0)
+        ).parameter.expression = "apron_z"
     sk_tx.name = "TaperX_Sk"
     sp.ext_op(leg_c, sp.smallest_profile(sk_tx), "leg_size",
               CUT, leg_fl, "TaperX_Cut")
