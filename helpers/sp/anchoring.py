@@ -30,6 +30,45 @@ Point3D = adsk.core.Point3D
 _REANCHOR_ADVISED = False
 
 
+def _own_face_boundary_present(child_sk, face, _tol=1e-4):
+    """True when ``face`` is the face ``child_sk`` was created ON and its
+    boundary already sits in the sketch as auto-projected reference curves.
+
+    Fusion auto-projects a face's boundary edges into a sketch created on
+    that face. Calling ``Sketch.project()`` with that same face afterwards
+    adds nothing (the curves dedupe) but BREAKS the auto-projected curves'
+    links — ``isReference`` flips to False — so ``refs_to_construction``
+    no longer demotes them and ``anchor_pt`` sees zero candidates (its
+    ``None`` return then surfaces as ``InternalValidationError: pointOne``
+    on the caller's first anchored dimension). The projection must be
+    SKIPPED in this case; demoting the existing boundary is both necessary
+    and sufficient, and keeps the sketch fully constrained (the links stay
+    live, so the boundary stays pinned to the BRep).
+
+    Face identity is geometric (same area + centroid): entityToken string
+    comparison between ``Sketch.referencePlane`` and a ``find_face`` result
+    returns different tokens for the same face, so it cannot be used.
+    """
+    try:
+        rp = child_sk.referencePlane
+        if rp is None or rp.objectType != adsk.fusion.BRepFace.classType():
+            return False
+        if abs(rp.area - face.area) > _tol * max(1.0, abs(face.area)):
+            return False
+        if rp.centroid.distanceTo(face.centroid) > _tol:
+            return False
+    except Exception:
+        return False
+    # Auto-projection is preference-dependent: only treat the face as
+    # already-projected if reference curves are actually present. With the
+    # preference off the sketch starts empty and project() must still run.
+    for i in range(child_sk.sketchCurves.count):
+        c = child_sk.sketchCurves.item(i)
+        if getattr(c, "isReference", False):
+            return True
+    return False
+
+
 def project_face(child_sk, parent_body, parent_occ, axis, direction):
     """Project a parent body's outermost ``axis``/``direction`` face into a
     child-component sketch as a construction reference (associative).
@@ -39,6 +78,11 @@ def project_face(child_sk, parent_body, parent_occ, axis, direction):
     cross-component dependency pattern the validator requires (deps rule 2).
     Reference curves are demoted to construction so they don't split the
     profile (see ``refs_to_construction``).
+
+    Safe to call with the sketch's OWN support face (a sketch created via
+    ``sketches.add(face)`` anchoring to that same face): the auto-projected
+    boundary is reused instead of re-projected — see
+    ``_own_face_boundary_present`` for why re-projecting would break it.
 
     Args:
         child_sk: Sketch in the child component to project into.
@@ -56,7 +100,8 @@ def project_face(child_sk, parent_body, parent_occ, axis, direction):
     face = find_face(parent_body, axis, direction)
     if parent_occ is not None:
         face = face.createForAssemblyContext(parent_occ)
-    child_sk.project(face)
+    if not _own_face_boundary_present(child_sk, face):
+        child_sk.project(face)
     refs_to_construction(child_sk)
 
 
