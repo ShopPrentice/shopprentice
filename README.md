@@ -95,6 +95,7 @@ The agent can also work from images — show it a photo or sketch of a piece and
 </tr>
 <tr>
 <td align="center"><a href="examples/bookcase-with-drawers/"><img src="examples/bookcase-with-drawers/screenshots/iso-top-right.png" width="220" /><br /><b>Bookcase with Drawers</b></a></td>
+<td align="center"><a href="examples/growth-chair/"><img src="examples/growth-chair/screenshots/iso-top-right.png" width="220" /><br /><b>Growth Chair</b></a></td>
 </tr>
 </table>
 

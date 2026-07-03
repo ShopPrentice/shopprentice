@@ -1,0 +1,35 @@
+{
+  "deps": [
+    {"body": "Leg_Left", "ref": "origin"},
+    {"body": "Runner_Left", "ref": "Leg_Left"},
+    {"body": "Leg_Right", "ref": "Leg_Left"},
+    {"body": "Runner_Right", "ref": "Runner_Left"},
+    {"body": "Seat", "ref": ["Leg_Left", "Leg_Right"]},
+    {"body": "Footrest", "ref": ["Leg_Left", "Leg_Right"]},
+    {"body": "Rail_Top", "ref": ["Leg_Left", "Leg_Right"]},
+    {"body": "Rail_Low", "ref": ["Leg_Left", "Leg_Right"]},
+    {"body": "Stretcher", "ref": ["Runner_Left", "Runner_Right"]},
+    {"body": "Rod_Seat", "ref": ["Leg_Left", "Leg_Right"]},
+    {"body": "Rod_Foot", "ref": ["Leg_Left", "Leg_Right"]}
+  ],
+  "joints": [
+    {"type": "mortise_tenon", "tenon": "Runner_Left", "mortise": "Leg_Left", "axis": "y",
+     "species": "hardwood", "width": "run_ten_h", "thickness": "run_ten_t",
+     "depth": "leg_w / lean_c", "through": true},
+    {"type": "mortise_tenon", "tenon": "Runner_Right", "mortise": "Leg_Right", "axis": "y",
+     "species": "hardwood", "width": "run_ten_h", "thickness": "run_ten_t",
+     "depth": "leg_w / lean_c", "through": true},
+    {"type": "mortise_tenon", "tenon": "Rail_Top", "mortise": "Leg_Left", "axis": "x",
+     "species": "hardwood", "width": "rt_tw", "thickness": "rt_tt", "depth": "rt_td"},
+    {"type": "mortise_tenon", "tenon": "Rail_Top", "mortise": "Leg_Right", "axis": "x",
+     "species": "hardwood", "width": "rt_tw", "thickness": "rt_tt", "depth": "rt_td"},
+    {"type": "mortise_tenon", "tenon": "Rail_Low", "mortise": "Leg_Left", "axis": "x",
+     "species": "hardwood", "width": "rt_tw", "thickness": "rt_tt", "depth": "rt_td"},
+    {"type": "mortise_tenon", "tenon": "Rail_Low", "mortise": "Leg_Right", "axis": "x",
+     "species": "hardwood", "width": "rt_tw", "thickness": "rt_tt", "depth": "rt_td"},
+    {"type": "mortise_tenon", "tenon": "Stretcher", "mortise": "Runner_Left", "axis": "x",
+     "species": "hardwood", "width": "st_tt", "thickness": "st_tw", "depth": "st_td"},
+    {"type": "mortise_tenon", "tenon": "Stretcher", "mortise": "Runner_Right", "axis": "x",
+     "species": "hardwood", "width": "st_tt", "thickness": "st_tw", "depth": "st_td"}
+  ]
+}
