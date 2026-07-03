@@ -49,20 +49,8 @@
       "ref": "Vise_Chop"
     },
     {
-      "body": "Vise_Handle",
-      "ref": "Vise_Screw"
-    },
-    {
       "body": "Vise_Guide",
       "ref": "Vise_Chop"
-    },
-    {
-      "body": "LSPinL_0",
-      "ref": "LS_Front"
-    },
-    {
-      "body": "SSPinF_0",
-      "ref": "SS_Left"
     }
   ]
 }

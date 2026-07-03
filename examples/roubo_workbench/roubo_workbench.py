@@ -72,7 +72,10 @@ def run(context):
         # Through-tenon: long stretchers through legs
         ("st_tw",        "3 in",     "in", "Stretcher tenon width (Z)"),
         ("st_tt",        "1.5 in",   "in", "Stretcher tenon thickness (Y)"),
-        ("st_blind",     "1 in",     "in", "Blind tenon stop depth inside leg"),
+        # 2.5 in keeps the SS blind tenon (Y >= st_blind) clear of the LS
+        # through-tenon (Y <= (ls_t + st_tt) / 2 = 2.25 in) where both cross
+        # inside the same leg — at 1 in they collided over y in [1, 2.25] in.
+        ("st_blind",     "2.5 in",   "in", "Blind tenon stop depth inside leg"),
         # Drawbore pins
         ("pin_dia",      "0.375 in", "in", "Drawbore pin diameter"),
         ("pin_sp",       "2 in",     "in", "Vertical spacing between 2 pins"),
@@ -95,6 +98,7 @@ def run(context):
         ("vise_handle_dia","1 in",   "in", "Vise handle diameter"),
         ("vise_guide_w", "1 in",     "in", "Parallel guide width (Y)"),
         ("vise_guide_h", "3 in",     "in", "Parallel guide height (Z)"),
+        ("vise_collar_t","0.5 in",   "in", "Screw collar/garter thickness (Y)"),
         # Chamfers
         ("ch_top",       "0.125 in", "in", "Top edge chamfer"),
         ("ch_vise_chop", "1 in",    "in", "Vise chop outer top chamfer"),
@@ -128,7 +132,9 @@ def run(context):
          "Number of deadman dog holes"),
         # Vise derived
         ("vise_screw_z", "leg_h - 5 in", "in", "Vise screw center Z"),
-        ("vise_guide_z", "ls_z + ls_w + 1 in", "in",
+        # Guide bottom (center - h/2) must clear the LS through-tenon top
+        # (ls_z + ls_w = 8 in) where both pass through the FL leg.
+        ("vise_guide_z", "ls_z + ls_w + 2 in", "in",
          "Parallel guide center Z"),
     ]:
         params.add(pname, VI(expr), unit, desc)
@@ -154,21 +160,9 @@ def run(context):
     YMid = sp.off_plane(root, root.xZConstructionPlane, "mid_y", "YMid")
 
     # ==============================================================
-    #  TOP
-    # ==============================================================
-    top_occ = sp.make_comp(root, "Top")
-    top_c = top_occ.component
-
-    _, pr = sp.sketch_rect_model(top_c, root.xZConstructionPlane,
-        ("0 in", "0 in", "leg_h"),
-        {"x": "bench_l", "z": "top_thick"},
-        "Top_Sk", ev=ev)
-    top_ext = sp.ext_new(top_c, pr, "bench_w", "TopSlab")
-    top_body = top_ext.bodies.item(0)
-    top_body.name = "Top"
-
-    # ==============================================================
     #  LEGS (front flush Y=0, back flush Y=bench_w-leg_d)
+    #  Built FIRST: Leg_FL is the dependency-tree origin root, so every
+    #  other part (including the top) anchors to it.
     # ==============================================================
     leg_occ = sp.make_comp(root, "Legs")
     leg_c = leg_occ.component
@@ -362,6 +356,24 @@ def run(context):
     ref_leg_bl_bb = ref_leg_bl.boundingBox
 
     # ==============================================================
+    #  TOP (anchored to the FL leg — the dependency-tree origin root)
+    # ==============================================================
+    top_occ = sp.make_comp(root, "Top")
+    top_c = top_occ.component
+
+    _, pr = sp.sketch_rect_model(top_c, root.xZConstructionPlane,
+        ("0 in", "0 in", "leg_h"),
+        {"x": "bench_l", "z": "top_thick"},
+        "Top_Sk", ev=ev,
+        anchor=dict(parent_body=ref_leg_fl, parent_occ=leg_occ,
+                    face_axis="y", face_dir=-1,
+                    anchor_xyz=("leg_setback", "0 in", "0 in"),
+                    off1=("x", "leg_setback"), off2=("z", "leg_h")))
+    top_ext = sp.ext_new(top_c, pr, "bench_w", "TopSlab")
+    top_body = top_ext.bodies.item(0)
+    top_body.name = "Top"
+
+    # ==============================================================
     #  LONG STRETCHERS — proper combine-based joinery workflow:
     #  1. Stretcher body (full cross-section, spans between legs)
     #  2. Sketch tenon on end face → extrude through leg + proud
@@ -443,6 +455,10 @@ def run(context):
     d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
         V, P.create(g0.x - 1, (g0.y + g1.y) / 2, 0)
     ).parameter.expression = "pin_sp"
+    # The pins share a model-X coordinate: align the centers so the second
+    # circle is fully constrained (pin_sp fixes only its vertical DOF).
+    ls_pin_sk.geometricConstraints.addVerticalPoints(
+        c0.centerSketchPoint, c1.centerSketchPoint)
     _refs_to_construction(ls_pin_sk)
     ls_pin_bodies = []
     for j in range(ls_pin_sk.profiles.count):
@@ -563,6 +579,14 @@ def run(context):
     d.addDistanceDimension(c0.centerSketchPoint, c1.centerSketchPoint,
         z_orient, P.create(g0.x - 1, (g0.y + g1.y) / 2, 0)
     ).parameter.expression = "pin_sp"
+    # The pins differ only in model Z: align the centers along the other
+    # sketch axis so the second circle is fully constrained.
+    if y_is_H:   # model z maps to sketch V — centers share sketch X
+        ss_pin_sk.geometricConstraints.addVerticalPoints(
+            c0.centerSketchPoint, c1.centerSketchPoint)
+    else:        # model z maps to sketch H — centers share sketch Y
+        ss_pin_sk.geometricConstraints.addHorizontalPoints(
+            c0.centerSketchPoint, c1.centerSketchPoint)
     _refs_to_construction(ss_pin_sk)
     ss_pin_bodies = []
     for j in range(ss_pin_sk.profiles.count):
@@ -875,8 +899,11 @@ def run(context):
     ).parameter.expression = "vise_screw_z"
 
     screw_prof = sp.smallest_profile(screw_sk)
+    # Rod runs past the leg back face by the collar thickness so the collar
+    # JOIN below overlaps solid material (a face-touching join is fragile).
     screw_ext = sp.ext_new(vise_c, screw_prof,
-        "vise_chop_t + leg_d + vise_handle_gap + vise_distance", "ViseScrew")
+        "vise_chop_t + leg_d + vise_handle_gap + vise_distance + vise_collar_t",
+        "ViseScrew")
     screw_body = screw_ext.bodies.item(0)
     screw_body.name = "Vise_Screw"
 
@@ -929,7 +956,45 @@ def run(context):
     handle_body = handle_ext.bodies.item(0)
     handle_body.name = "Vise_Handle"
 
-    # -- Body-relative references: vise guide + handle relative to chop + screw --
+    # Collar/garter — a disc on the rod bearing against the leg's BACK face.
+    # This is the hardware's one PLANAR contact with the bench: cylinder-in-
+    # bore contact doesn't count for connectivity, the collar face does
+    # (same pattern as the moravian workbench vise).
+    vise_collar_pl = sp.off_plane(vise_c, root.xZConstructionPlane,
+        "leg_d", "ViseCollar_Pl")
+    collar_sk = vise_c.sketches.add(vise_collar_pl)
+    collar_sk.name = "ViseCollar_Sk"
+    collar_m2s = collar_sk.modelToSketchSpace
+    collar_ctr = collar_m2s(P.create(_vise_cx, ev("leg_d"), ev("vise_screw_z")))
+    collar_r = ev("vise_screw_dia / 2 + 0.25 in")
+    collar_sk.sketchCurves.sketchCircles.addByCenterRadius(
+        P.create(collar_ctr.x, collar_ctr.y, 0), collar_r)
+    collar_circle = collar_sk.sketchCurves.sketchCircles.item(0)
+    dcl = collar_sk.sketchDimensions
+    dcl.addRadialDimension(
+        collar_circle, P.create(collar_ctr.x + collar_r + 1, collar_ctr.y, 0)
+    ).parameter.expression = "vise_screw_dia / 2 + 0.25 in"
+    # Anchor to the FL leg BACK face (normal Y, coplanar with this plane)
+    sp.project_face(collar_sk, ref_leg_fl, leg_occ, "y", 1)
+    collar_anchor = sp.anchor_pt(collar_sk, ev("leg_setback"), ev("leg_d"), 0)
+    dcl.addDistanceDimension(
+        collar_anchor, collar_circle.centerSketchPoint,
+        H, P.create(collar_ctr.x - 1, collar_ctr.y - 2, 0)
+    ).parameter.expression = "leg_w / 2"
+    dcl.addDistanceDimension(
+        collar_anchor, collar_circle.centerSketchPoint,
+        V, P.create(collar_ctr.x - 2, collar_ctr.y / 2, 0)
+    ).parameter.expression = "vise_screw_z"
+    collar_ext = sp.ext_new(vise_c, sp.smallest_profile(collar_sk),
+        "vise_collar_t", "ViseCollar")
+    collar_body = collar_ext.bodies.item(0)
+    collar_body.name = "Vise_Collar"
+
+    # One hardware body: handle and collar both overlap the rod → solid JOINs.
+    sp.combine(screw_body, [handle_body, collar_body], JOIN, False,
+               "ViseHW_Join")
+
+    # -- Body-relative references: vise guide relative to chop + screw --
     ref_vise_chop = find_body("Vise_Chop")
     ref_vise_chop_bb = ref_vise_chop.boundingBox
     ref_vise_screw = find_body("Vise_Screw")
@@ -1066,39 +1131,48 @@ def run(context):
     leg_proxies = get_proxies(leg_occ)
     sp.combine(top_proxy, leg_proxies, CUT, True, "LegMortise_Cut")
 
-    # CUT legs with long stretcher proxies (through-mortises)
-    ls_proxies = get_proxies(ls_occ)
+    # CUT legs with stretcher proxies (mortises) — stretcher bodies only:
+    # the drawbore pins drill their own holes below, so including them here
+    # would leave the pin-hole cuts with nothing to remove (zero-impact).
+    ls_stretchers = [b for b in get_proxies(ls_occ) if "Pin" not in b.name]
+    ss_stretchers = [b for b in get_proxies(ss_occ) if "Pin" not in b.name]
     for i in range(leg_c.bRepBodies.count):
         lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-        sp.combine(lp, ls_proxies, CUT, True, f"LSMort_Leg{i}")
+        sp.combine(lp, ls_stretchers, CUT, True, f"LSMort_Leg{i}")
+        sp.combine(lp, ss_stretchers, CUT, True, f"SSMort_Leg{i}")
 
-    # Pin holes in legs — pins are in stretcher components, CUT via proxies
-    for prefix, s_c, s_occ in [("LS", ls_c, ls_occ), ("SS", ss_c, ss_occ)]:
-        pin_proxies = [s_c.bRepBodies.item(i).createForAssemblyContext(s_occ)
-                       for i in range(s_c.bRepBodies.count)
-                       if "Pin" in s_c.bRepBodies.item(i).name]
-        if pin_proxies:
-            for i in range(leg_c.bRepBodies.count):
-                lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-                sp.combine(lp, pin_proxies, CUT, True,
-                           f"{prefix}PinHole_Leg{i}")
+    # Drawbore pin holes — each pin passes through exactly one leg. CUT that
+    # leg with its pins and CONSUME them (keep_tool=False): the pins are
+    # tooling for the holes; the finished bench has pin HOLES, not pin
+    # bodies (they could never pass planar-contact connectivity anyway).
+    def _bb_overlap(a, b):
+        return (a.minPoint.x < b.maxPoint.x and b.minPoint.x < a.maxPoint.x
+                and a.minPoint.y < b.maxPoint.y and b.minPoint.y < a.maxPoint.y
+                and a.minPoint.z < b.maxPoint.z and b.minPoint.z < a.maxPoint.z)
 
-    # CUT FL leg with vise screw bore and guide slot (not chop/handle)
+    all_pin_proxies = [b for occ_ in (ls_occ, ss_occ)
+                       for b in get_proxies(occ_) if "Pin" in b.name]
+    for i in range(leg_c.bRepBodies.count):
+        leg_b = leg_c.bRepBodies.item(i)
+        hit = [p for p in all_pin_proxies
+               if _bb_overlap(p.boundingBox, leg_b.boundingBox)]
+        if hit:
+            lp = leg_b.createForAssemblyContext(leg_occ)
+            sp.combine(lp, hit, CUT, False, f"PinHoles_Leg{i}")
+
+    # CUT FL leg with vise screw bore and guide slot (not chop)
     vise_screw_p = vise_c.bRepBodies.itemByName("Vise_Screw").createForAssemblyContext(vise_occ)
     vise_guide_p = vise_c.bRepBodies.itemByName("Vise_Guide").createForAssemblyContext(vise_occ)
     fl_proxy = leg_c.bRepBodies.item(0).createForAssemblyContext(leg_occ)
     sp.combine(fl_proxy, [vise_screw_p, vise_guide_p], CUT, True, "ViseMort_FL")
 
-    # CUT chop with screw bore
+    # CUT chop with screw bore and guide mortise. The guide's through-mortise
+    # gives the chop its planar contact with the guide (and via the guide,
+    # the leg) — the screw bore alone is cylindrical contact only.
     chop_proxy = vise_c.bRepBodies.itemByName("Vise_Chop").createForAssemblyContext(vise_occ)
     screw_proxy = vise_c.bRepBodies.itemByName("Vise_Screw").createForAssemblyContext(vise_occ)
     sp.combine(chop_proxy, [screw_proxy], CUT, True, "ViseScrew_ChopCut")
-
-    # CUT legs with short stretcher proxies (SS passes through legs)
-    ss_proxies = get_proxies(ss_occ)
-    for i in range(leg_c.bRepBodies.count):
-        lp = leg_c.bRepBodies.item(i).createForAssemblyContext(leg_occ)
-        sp.combine(lp, ss_proxies, CUT, True, f"SSMort_Leg{i}")
+    sp.combine(chop_proxy, [vise_guide_p], CUT, True, "ViseGuide_ChopCut")
 
     # Deadman tongue grooves — built in target components (local combine).
     # Groove depth into material = dm_tongue_h - dm_gap.
