@@ -30,6 +30,7 @@ from ._capture_helpers import (
     _capture_chamfer,
     _capture_fillet,
     _capture_sweep,
+    _capture_revolve,
     _capture_split_body,
     _capture_remove,
     _capture_loft,
@@ -166,6 +167,24 @@ def handler() -> dict:
         if _expanded_any:
             adsk.doEvents()
 
+        # Pre-scan base features: index-mapped where the timeline index is
+        # readable, else queued in occurrence order (hinge sub-assembly
+        # base features raise InternalValidationError on .timelineObject).
+        _bf_by_idx = {}
+        _bf_queue = []
+        try:
+            for _comp in [design.rootComponent] + [
+                    occ.component for occ
+                    in design.rootComponent.allOccurrences]:
+                for _fi in range(_comp.features.baseFeatures.count):
+                    _bf = _comp.features.baseFeatures.item(_fi)
+                    try:
+                        _bf_by_idx[_bf.timelineObject.index] = (_bf, _comp.name)
+                    except:
+                        _bf_queue.append((_bf, _comp.name))
+        except:
+            pass
+
         for idx in range(tl.count):
             item = tl.item(idx)
             try:
@@ -203,7 +222,53 @@ def handler() -> dict:
                             break
                 except:
                     pass
+                # BaseFeature (direct-modeling temp-BRep bodies, e.g. hinge
+                # hardware): item.entity raises too. Export the bodies as
+                # native .brep at the state just AFTER the feature (later
+                # Moves reposition them; replayers re-apply those Moves).
+                # Some base features cannot even report their timeline index
+                # (InternalValidationError) — those are matched to skipped
+                # group-ish items in occurrence order via _bf_queue.
+                bf_found = False
                 if not cpb_found:
+                    try:
+                        ent_bf = _bf_by_idx.get(idx)
+                        if ent_bf is None and _bf_queue:
+                            ent_bf = _bf_queue.pop(0)
+                        if ent_bf is not None:
+                            import os as _os, tempfile as _tf
+                            bf, _cname = ent_bf
+                            tl.markerPosition = idx + 1
+                            try:
+                                names = [bf.bodies.item(k).name
+                                         for k in range(bf.bodies.count)]
+                                tmp = adsk.fusion.TemporaryBRepManager.get()
+                                copies = [tmp.copy(bf.bodies.item(k))
+                                          for k in range(bf.bodies.count)]
+                                _dir = _os.path.join(
+                                    _tf.gettempdir(), "shopprentice_captures")
+                                _os.makedirs(_dir, exist_ok=True)
+                                path = _os.path.join(
+                                    _dir, "basefeat_%s_%d.brep"
+                                    % (design.rootComponent.name.replace(
+                                        " ", "_")[:20], idx))
+                                tmp.exportToFile(copies, path)
+                            finally:
+                                tl.moveToEnd()
+                            out["timeline"].append({
+                                "index": idx,
+                                "isGroup": False,
+                                "isRolledBack": item.isRolledBack,
+                                "type": "BaseFeature",
+                                "name": bf.name,
+                                "component": _cname,
+                                "bodies": names,
+                                "brepFile": path,
+                            })
+                            bf_found = True
+                    except:
+                        pass
+                if not cpb_found and not bf_found:
                     try:
                         out["timeline"].append({
                             "index": idx,
@@ -315,6 +380,13 @@ def handler() -> dict:
             fillet = adsk.fusion.FilletFeature.cast(entity)
             if fillet:
                 feat_info.update(_capture_fillet(fillet, design))
+                out["timeline"].append(feat_info)
+                continue
+
+            # Revolve
+            rev = adsk.fusion.RevolveFeature.cast(entity)
+            if rev:
+                feat_info.update(_capture_revolve(rev, design))
                 out["timeline"].append(feat_info)
                 continue
 
