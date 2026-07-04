@@ -576,6 +576,48 @@ def _capture_sweep(sweep, design):
     # Bodies (accessible without rollTo)
     info["bodies"] = [b.name for b in sweep.bodies]
 
+    # Cut/Join ground truth: each participant's volume+bbox just AFTER the
+    # sweep (mirrors extrude.py). The extent fractions (distanceOne/Two)
+    # run from the profile's station along the path, and which fraction
+    # runs toward which path end is not recoverable from the record — the
+    # replayer simulates the candidates and keeps the exact match (stool
+    # leg-shoulder trim: full-path vs 14%-of-path is a 6x volume miss).
+    try:
+        if design and sweep.operation in (
+                adsk.fusion.FeatureOperations.CutFeatureOperation,
+                adsk.fusion.FeatureOperations.JoinFeatureOperation):
+            _tl = design.timeline
+            try:
+                _tl.markerPosition = sweep.timelineObject.index + 1
+                geo = {}
+                bods = []
+                try:
+                    pb = sweep.participantBodies
+                    if pb:
+                        bods = list(pb)
+                except:
+                    pass
+                if not bods:
+                    bods = [sweep.bodies.item(i)
+                            for i in range(sweep.bodies.count)]
+                for b in bods:
+                    bb = b.boundingBox
+                    geo[b.name] = {
+                        "volume": round(b.volume, 4),
+                        "bbMin": [round(bb.minPoint.x, 4),
+                                  round(bb.minPoint.y, 4),
+                                  round(bb.minPoint.z, 4)],
+                        "bbMax": [round(bb.maxPoint.x, 4),
+                                  round(bb.maxPoint.y, 4),
+                                  round(bb.maxPoint.z, 4)],
+                    }
+                if geo:
+                    info["participantGeoAfter"] = geo
+            finally:
+                _tl.moveToEnd()
+    except:
+        pass
+
     return info
 
 
