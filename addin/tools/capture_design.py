@@ -30,6 +30,7 @@ from ._capture_helpers import (
     _capture_chamfer,
     _capture_fillet,
     _capture_sweep,
+    _capture_revolve,
     _capture_split_body,
     _capture_remove,
     _capture_loft,
@@ -166,6 +167,24 @@ def handler() -> dict:
         if _expanded_any:
             adsk.doEvents()
 
+        # Pre-scan base features: index-mapped where the timeline index is
+        # readable, else queued in occurrence order (hinge sub-assembly
+        # base features raise InternalValidationError on .timelineObject).
+        _bf_by_idx = {}
+        _bf_queue = []
+        try:
+            for _comp in [design.rootComponent] + [
+                    occ.component for occ
+                    in design.rootComponent.allOccurrences]:
+                for _fi in range(_comp.features.baseFeatures.count):
+                    _bf = _comp.features.baseFeatures.item(_fi)
+                    try:
+                        _bf_by_idx[_bf.timelineObject.index] = (_bf, _comp)
+                    except:
+                        _bf_queue.append((_bf, _comp))
+        except:
+            pass
+
         for idx in range(tl.count):
             item = tl.item(idx)
             try:
@@ -181,8 +200,36 @@ def handler() -> dict:
                             cpb = _comp.features.copyPasteBodies.item(_fi)
                             if cpb.timelineObject.index == idx:
                                 src_names = []
-                                for _si in range(cpb.sourceBody.count):
-                                    src_names.append(cpb.sourceBody.item(_si).name)
+                                src_comps = []
+
+                                def _read_src():
+                                    for _si in range(cpb.sourceBody.count):
+                                        _sb = cpb.sourceBody.item(_si)
+                                        src_names.append(_sb.name)
+                                        try:
+                                            src_comps.append(
+                                                _sb.parentComponent.name)
+                                        except:
+                                            src_comps.append(None)
+                                try:
+                                    _read_src()
+                                except:
+                                    pass
+                                if not src_names:
+                                    # sourceBody is only readable with the
+                                    # marker just BEFORE the feature (API
+                                    # doc); at end state it reads empty —
+                                    # which left volume+bbox matching to
+                                    # guess between a folded hinge's two
+                                    # bbox-identical leaves (tv-console)
+                                    try:
+                                        cpb.timelineObject.rollTo(True)
+                                        try:
+                                            _read_src()
+                                        finally:
+                                            tl.moveToEnd()
+                                    except:
+                                        pass
                                 out_names = []
                                 for _bi in range(cpb.bodies.count):
                                     out_names.append(cpb.bodies.item(_bi).name)
@@ -194,6 +241,7 @@ def handler() -> dict:
                                     "name": cpb.name,
                                     "component": _comp.name,
                                     "sourceBody": src_names,
+                                    "sourceBodyComponents": src_comps,
                                     "bodies": out_names,
                                 }
                                 out["timeline"].append(feat_info)
@@ -203,16 +251,119 @@ def handler() -> dict:
                             break
                 except:
                     pass
+                # BaseFeature (direct-modeling temp-BRep bodies, e.g. hinge
+                # hardware): item.entity raises too, and its timeline item
+                # reports isGroup=True. TemporaryBRepManager.exportToFile
+                # rejects every filename, but design.exportManager STEP
+                # export at a ROLLED markerPosition works (the rolled state
+                # is a real document state — proven on bookcase FootFlare_Y).
+                # Export the bf's parent COMPONENT just after the feature;
+                # per-body volume+bbox recorded at the same state let the
+                # replayer match STEP solids (mm) back to body names.
+                # Some base features cannot even report their timeline index
+                # (InternalValidationError) — those are matched to skipped
+                # group-ish items in occurrence order via _bf_queue.
+                bf_found = False
+                bf_err = None
                 if not cpb_found:
                     try:
-                        out["timeline"].append({
+                        ent_bf = _bf_by_idx.get(idx)
+                        if ent_bf is None and _bf_queue:
+                            ent_bf = _bf_queue.pop(0)
+                        if ent_bf is not None:
+                            import os as _os, tempfile as _tf
+                            bf, _bcomp = ent_bf
+                            tl.markerPosition = idx + 1
+                            # STEP export SKIPS invisible geometry, and
+                            # visibility is not timeline-rolled: designs
+                            # hide hardware template bodies after pasting
+                            # copies (tv-console leaves), so force every
+                            # light bulb on — bf bodies AND the component's
+                            # occurrence chain — and restore afterwards.
+                            _lit = []
+                            try:
+                                for k in range(bf.bodies.count):
+                                    b_ = bf.bodies.item(k)
+                                    if not b_.isLightBulbOn:
+                                        _lit.append(b_)
+                                        b_.isLightBulbOn = True
+                                for _occ in design.rootComponent \
+                                        .allOccurrencesByComponent(_bcomp):
+                                    _o = _occ
+                                    while _o is not None:
+                                        if not _o.isLightBulbOn:
+                                            _lit.append(_o)
+                                            _o.isLightBulbOn = True
+                                        _o = _o.assemblyContext
+                            except:
+                                pass
+                            try:
+                                names, geo = [], []
+                                for k in range(bf.bodies.count):
+                                    b_ = bf.bodies.item(k)
+                                    names.append(b_.name)
+                                    bb_ = b_.boundingBox
+                                    geo.append({
+                                        "name": b_.name,
+                                        "volume": round(b_.volume, 4),
+                                        "bbMin": [round(v, 4) for v in
+                                                  (bb_.minPoint.x,
+                                                   bb_.minPoint.y,
+                                                   bb_.minPoint.z)],
+                                        "bbMax": [round(v, 4) for v in
+                                                  (bb_.maxPoint.x,
+                                                   bb_.maxPoint.y,
+                                                   bb_.maxPoint.z)],
+                                    })
+                                _dir = _os.path.join(
+                                    _tf.gettempdir(), "shopprentice_captures")
+                                _os.makedirs(_dir, exist_ok=True)
+                                path = _os.path.join(
+                                    _dir, "basefeat_%s_%d.step"
+                                    % (design.rootComponent.name.replace(
+                                        " ", "_")[:20], idx))
+                                _em = design.exportManager
+                                _opts = _em.createSTEPExportOptions(
+                                    path, _bcomp)
+                                _em.execute(_opts)
+                            finally:
+                                for _e in _lit:
+                                    try:
+                                        _e.isLightBulbOn = False
+                                    except:
+                                        pass
+                                tl.moveToEnd()
+                            try:
+                                _bfname = bf.name
+                            except:
+                                _bfname = "BaseFeature_%d" % idx
+                            out["timeline"].append({
+                                "index": idx,
+                                "isGroup": False,
+                                "isRolledBack": item.isRolledBack,
+                                "type": "BaseFeature",
+                                "name": _bfname,
+                                "component": _bcomp.name,
+                                "bodies": names,
+                                "bodyGeo": geo,
+                                "stepFile": path,
+                            })
+                            bf_found = True
+                    except Exception as _e:
+                        bf_err = str(_e)[-160:]
+                if not cpb_found and not bf_found:
+                    try:
+                        rec = {
                             "index": idx,
                             "isGroup": item.isGroup,
                             "isRolledBack": item.isRolledBack,
                             "type": "Unknown",
                             "name": f"_skipped_{idx}",
                             "_entityError": "RuntimeError",
-                        })
+                        }
+                        if bf_err:
+                            rec["_bfError"] = bf_err
+                        out["timeline"].append(rec)
                     except:
                         pass
                 continue
@@ -318,6 +469,13 @@ def handler() -> dict:
                 out["timeline"].append(feat_info)
                 continue
 
+            # Revolve
+            rev = adsk.fusion.RevolveFeature.cast(entity)
+            if rev:
+                feat_info.update(_capture_revolve(rev, design))
+                out["timeline"].append(feat_info)
+                continue
+
             # Sweep
             sweep = adsk.fusion.SweepFeature.cast(entity)
             if sweep:
@@ -404,13 +562,39 @@ def handler() -> dict:
                 if entity.objectType == "adsk::fusion::CopyPasteBody":
                     cpb = adsk.fusion.CopyPasteBody.cast(entity)
                     if cpb:
-                        src_names = [cpb.sourceBody.item(i).name
-                                     for i in range(cpb.sourceBody.count)]
+                        src_names, src_comps = [], []
+
+                        def _read_src():
+                            for _si in range(cpb.sourceBody.count):
+                                _sb = cpb.sourceBody.item(_si)
+                                src_names.append(_sb.name)
+                                try:
+                                    src_comps.append(_sb.parentComponent.name)
+                                except:
+                                    src_comps.append(None)
+                        try:
+                            _read_src()
+                        except:
+                            pass
+                        if not src_names:
+                            # sourceBody reads empty unless the marker sits
+                            # just BEFORE the feature (API doc) — without it
+                            # volume+bbox matching must guess between a
+                            # folded hinge's two bbox-identical leaves
+                            try:
+                                cpb.timelineObject.rollTo(True)
+                                try:
+                                    _read_src()
+                                finally:
+                                    tl.moveToEnd()
+                            except:
+                                pass
                         out_names = [cpb.bodies.item(i).name
                                      for i in range(cpb.bodies.count)]
                         feat_info["type"] = "CopyPasteBody"
                         feat_info["name"] = cpb.name
                         feat_info["sourceBody"] = src_names
+                        feat_info["sourceBodyComponents"] = src_comps
                         feat_info["bodies"] = out_names
                         out["timeline"].append(feat_info)
                         continue

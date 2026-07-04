@@ -295,6 +295,110 @@ def _capture_fillet(fillet, design=None):
     return info
 
 
+def _capture_revolve(rev, design):
+    """Capture a RevolveFeature: operation, sketch profile ref, axis
+    geometry (world origin + direction), and angle expression."""
+    info = {"type": "Revolve", "name": rev.name}
+    op_map = {
+        adsk.fusion.FeatureOperations.NewBodyFeatureOperation: "NewBody",
+        adsk.fusion.FeatureOperations.CutFeatureOperation: "Cut",
+        adsk.fusion.FeatureOperations.JoinFeatureOperation: "Join",
+        adsk.fusion.FeatureOperations.IntersectFeatureOperation: "Intersect",
+    }
+    try:
+        info["operation"] = op_map.get(rev.operation, str(rev.operation))
+    except:
+        pass
+
+    def _read():
+        # profile(s) -> sketch name + matched indices
+        try:
+            prof = rev.profile
+            coll = adsk.core.ObjectCollection.cast(prof)
+            profs = ([coll.item(i) for i in range(coll.count)] if coll
+                     else [prof])
+            idxs = []
+            for p_ in profs:
+                p_ = adsk.fusion.Profile.cast(p_)
+                if not p_:
+                    continue
+                sk = p_.parentSketch
+                if "sketch" not in info:
+                    info["sketch"] = sk.name
+                    try:
+                        info["sketchComponent"] = sk.parentComponent.name
+                    except:
+                        pass
+                tmp = {}
+                idx = _match_profile_index_from_profile(p_, sk, tmp)
+                if idx is not None:
+                    idxs.append(idx)
+            if idxs:
+                info["profileIndices"] = idxs
+                info["profileIndex"] = idxs[0]
+        except Exception as e:
+            info["profileError"] = str(e)[-120:]
+        # axis -> world line (sketch line / construction axis / edge)
+        try:
+            ax = rev.axis
+            o = d = None
+            sl = adsk.fusion.SketchLine.cast(ax)
+            if sl:
+                g0 = sl.worldGeometry.startPoint
+                g1 = sl.worldGeometry.endPoint
+                o = (g0.x, g0.y, g0.z)
+                d = (g1.x - g0.x, g1.y - g0.y, g1.z - g0.z)
+            else:
+                ca = adsk.fusion.ConstructionAxis.cast(ax)
+                if ca:
+                    g = ca.geometry
+                    o = (g.origin.x, g.origin.y, g.origin.z)
+                    d = (g.direction.x, g.direction.y, g.direction.z)
+                else:
+                    ed = adsk.fusion.BRepEdge.cast(ax)
+                    if ed:
+                        g0 = ed.startVertex.geometry
+                        g1 = ed.endVertex.geometry
+                        o = (g0.x, g0.y, g0.z)
+                        d = (g1.x - g0.x, g1.y - g0.y, g1.z - g0.z)
+            if o and d:
+                info["axisOrigin"] = [round(v, 6) for v in o]
+                info["axisDirection"] = [round(v, 6) for v in d]
+        except Exception as e:
+            info["axisError"] = str(e)[-120:]
+        # angle
+        try:
+            ae = adsk.fusion.AngleExtentDefinition.cast(rev.extentDefinition)
+            if ae:
+                info["angle"] = ae.angle.expression
+                try:
+                    info["isSymmetric"] = ae.isSymmetric
+                except:
+                    pass
+        except Exception as e:
+            info["angleError"] = str(e)[-120:]
+
+    # profile/axis entities are alive just BEFORE the feature
+    if design:
+        try:
+            with _roll_to_feature(rev, design):
+                _read()
+        except:
+            _read()
+    else:
+        _read()
+
+    info["bodies"] = [b.name for b in rev.bodies]
+    try:
+        pb = rev.participantBodies
+        if pb and pb.count:
+            info["participantBodies"] = [pb.item(i).name
+                                         for i in range(pb.count)]
+    except:
+        pass
+    return info
+
+
 def _capture_sweep(sweep, design):
     """Capture a SweepFeature with profile, path, and extent details."""
     info = {"type": "Sweep", "name": sweep.name}
