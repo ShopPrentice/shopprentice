@@ -200,8 +200,36 @@ def handler() -> dict:
                             cpb = _comp.features.copyPasteBodies.item(_fi)
                             if cpb.timelineObject.index == idx:
                                 src_names = []
-                                for _si in range(cpb.sourceBody.count):
-                                    src_names.append(cpb.sourceBody.item(_si).name)
+                                src_comps = []
+
+                                def _read_src():
+                                    for _si in range(cpb.sourceBody.count):
+                                        _sb = cpb.sourceBody.item(_si)
+                                        src_names.append(_sb.name)
+                                        try:
+                                            src_comps.append(
+                                                _sb.parentComponent.name)
+                                        except:
+                                            src_comps.append(None)
+                                try:
+                                    _read_src()
+                                except:
+                                    pass
+                                if not src_names:
+                                    # sourceBody is only readable with the
+                                    # marker just BEFORE the feature (API
+                                    # doc); at end state it reads empty —
+                                    # which left volume+bbox matching to
+                                    # guess between a folded hinge's two
+                                    # bbox-identical leaves (tv-console)
+                                    try:
+                                        cpb.timelineObject.rollTo(True)
+                                        try:
+                                            _read_src()
+                                        finally:
+                                            tl.moveToEnd()
+                                    except:
+                                        pass
                                 out_names = []
                                 for _bi in range(cpb.bodies.count):
                                     out_names.append(cpb.bodies.item(_bi).name)
@@ -213,6 +241,7 @@ def handler() -> dict:
                                     "name": cpb.name,
                                     "component": _comp.name,
                                     "sourceBody": src_names,
+                                    "sourceBodyComponents": src_comps,
                                     "bodies": out_names,
                                 }
                                 out["timeline"].append(feat_info)
@@ -245,6 +274,29 @@ def handler() -> dict:
                             import os as _os, tempfile as _tf
                             bf, _bcomp = ent_bf
                             tl.markerPosition = idx + 1
+                            # STEP export SKIPS invisible geometry, and
+                            # visibility is not timeline-rolled: designs
+                            # hide hardware template bodies after pasting
+                            # copies (tv-console leaves), so force every
+                            # light bulb on — bf bodies AND the component's
+                            # occurrence chain — and restore afterwards.
+                            _lit = []
+                            try:
+                                for k in range(bf.bodies.count):
+                                    b_ = bf.bodies.item(k)
+                                    if not b_.isLightBulbOn:
+                                        _lit.append(b_)
+                                        b_.isLightBulbOn = True
+                                for _occ in design.rootComponent \
+                                        .allOccurrencesByComponent(_bcomp):
+                                    _o = _occ
+                                    while _o is not None:
+                                        if not _o.isLightBulbOn:
+                                            _lit.append(_o)
+                                            _o.isLightBulbOn = True
+                                        _o = _o.assemblyContext
+                            except:
+                                pass
                             try:
                                 names, geo = [], []
                                 for k in range(bf.bodies.count):
@@ -275,6 +327,11 @@ def handler() -> dict:
                                     path, _bcomp)
                                 _em.execute(_opts)
                             finally:
+                                for _e in _lit:
+                                    try:
+                                        _e.isLightBulbOn = False
+                                    except:
+                                        pass
                                 tl.moveToEnd()
                             try:
                                 _bfname = bf.name
@@ -505,13 +562,39 @@ def handler() -> dict:
                 if entity.objectType == "adsk::fusion::CopyPasteBody":
                     cpb = adsk.fusion.CopyPasteBody.cast(entity)
                     if cpb:
-                        src_names = [cpb.sourceBody.item(i).name
-                                     for i in range(cpb.sourceBody.count)]
+                        src_names, src_comps = [], []
+
+                        def _read_src():
+                            for _si in range(cpb.sourceBody.count):
+                                _sb = cpb.sourceBody.item(_si)
+                                src_names.append(_sb.name)
+                                try:
+                                    src_comps.append(_sb.parentComponent.name)
+                                except:
+                                    src_comps.append(None)
+                        try:
+                            _read_src()
+                        except:
+                            pass
+                        if not src_names:
+                            # sourceBody reads empty unless the marker sits
+                            # just BEFORE the feature (API doc) — without it
+                            # volume+bbox matching must guess between a
+                            # folded hinge's two bbox-identical leaves
+                            try:
+                                cpb.timelineObject.rollTo(True)
+                                try:
+                                    _read_src()
+                                finally:
+                                    tl.moveToEnd()
+                            except:
+                                pass
                         out_names = [cpb.bodies.item(i).name
                                      for i in range(cpb.bodies.count)]
                         feat_info["type"] = "CopyPasteBody"
                         feat_info["name"] = cpb.name
                         feat_info["sourceBody"] = src_names
+                        feat_info["sourceBodyComponents"] = src_comps
                         feat_info["bodies"] = out_names
                         out["timeline"].append(feat_info)
                         continue
