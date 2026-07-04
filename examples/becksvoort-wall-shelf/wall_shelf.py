@@ -233,7 +233,7 @@ def run(context):
         drawer_w="drawer_w", drawer_d="drawer_d", drawer_h="topdr_h",
         front_thick="front_t", side_thick="side_t", bottom_thick="bottom_t",
         bg_up="gu",
-        x_offset="dr_left", y_offset="0 in", z_offset="topdr_zbot",
+        x_offset="dr_left", z_offset="topdr_zbot",
         dt_tail_w="0.625 in", front_tail_count="3", back_tail_count="3")
     td = ddt.build(dt_c, prefix="td", ev=ev)
     tf, tsL, tsR = td["front"], td["left"], td["right"]
@@ -279,7 +279,7 @@ def run(context):
         drawer_w="drawer_w", drawer_d="drawer_d", drawer_h="botdr_h",
         front_thick="front_t", side_thick="side_t", bottom_thick="bottom_t",
         bg_up="gu",
-        x_offset="dr_left", y_offset="0 in", z_offset="botdr_zbot",
+        x_offset="dr_left", z_offset="botdr_zbot",
         dt_tail_w="0.625 in", front_tail_count="4", back_tail_count="4")
     bd = ddt.build(db_c, prefix="bd", ev=ev)
     bf = bd["front"]
