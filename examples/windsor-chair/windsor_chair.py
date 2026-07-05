@@ -388,7 +388,7 @@ def run(context):
     # Compute splay/rake offsets in Python (Fusion expressions don't support tan/pi)
     def build_leg(comp, seat_body, seat_occ, name,
                   top_x_expr, top_y_expr, splay_dir_x, splay_dir_y,
-                  front_y=0.0, side_x=0.0):
+                  front_y=0.0, side_x=0.0, proud=True):
         """Turned leg via Revolve. Axis sketch at seat underside.
         Top point (seat joint) is fixed. Foot position derived from splay offset.
         splay_dir_x/y: -1 or +1 for foot offset direction from top point.
@@ -707,15 +707,21 @@ def run(context):
         rf = comp.features.revolveFeatures.add(rev)
         rf.name = name; body = rf.bodies.item(0); body.name = name
 
-        # Tenon extension: extrude the tenon end face outward
-        tenon_face = find_face(body, "z", +1)
-        if tenon_face and tenon_face.loops.count > 0:
-            te_ext = comp.features.extrudeFeatures.createInput(
-                tenon_face, JOIN)
-            te_ext.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
-            te_ext.participantBodies = [body]
-            te_f = comp.features.extrudeFeatures.add(te_ext)
-            te_f.name = name + "_TenExt"
+        # Tenon extension: extrude the tenon end face outward (proud through-tenon).
+        # Skipped when proud=False so the tenon sits FLUSH at the seat top — then the
+        # trim phase needs no split/remove/rejoin on the leg, which is what keeps the
+        # per-leg foot chamfer and wedge-slot cut from being orphaned (a body that is
+        # split+rejoined loses its features' face associations → they read as
+        # zero-impact even though the geometry is there).
+        if proud:
+            tenon_face = find_face(body, "z", +1)
+            if tenon_face and tenon_face.loops.count > 0:
+                te_ext = comp.features.extrudeFeatures.createInput(
+                    tenon_face, JOIN)
+                te_ext.setDistanceExtent(False, adsk.core.ValueInput.createByString("tenon_ext"))
+                te_ext.participantBodies = [body]
+                te_f = comp.features.extrudeFeatures.add(te_ext)
+                te_f.name = name + "_TenExt"
 
         print("Built " + name)
         return rf, body
@@ -786,7 +792,7 @@ def run(context):
         ("Leg_BR", +1, +1, seat_d_v, seat_w_v),
     ]:
         _f, _b = build_leg(comp, Seat_body_ref, Seat_occ_ref, nm,
-            "leg_inset", "leg_inset", sdx, sdy, front_y=fy, side_x=sx)
+            "leg_inset", "leg_inset", sdx, sdy, front_y=fy, side_x=sx, proud=False)
         _chamfer_foot(_b, nm)
         _wedge = tw.round_tenon(comp, tenon_body=_b,
             mortise_body=Seat_body_ref,
@@ -953,12 +959,16 @@ def run(context):
         for ef in pfaces[:2]:
             fc = ef.pointOnFace
             near_a = _mstr_w.sqrt((fc.x - a_cx) ** 2 + (fc.y - a_cy) ** 2) < 10
+            # defer_cut: the stretcher is SplitBody-trimmed at the leg later, so
+            # cut each wedge's slot AFTER the trim (post-trim pass below) to keep
+            # the cut the stretcher's last feature — otherwise the split orphans
+            # its faces and validate_design reports it zero-impact.
             tw.round_tenon(Legs_c, tenon_body=str_body,
                 mortise_body=legA if near_a else legB,
                 end_face=ef,
                 tenon_depth_expr="leg_dia",
                 tenon_diam_expr="str_end_dia",
-                name=nameA if near_a else nameB, ev=ev)
+                name=nameA if near_a else nameB, ev=ev, defer_cut=True)
 
     _wedge_side_stretcher(Str_Left, fl_body, "TW_SL_FL", bl_body, "TW_SL_BL")
     _wedge_side_stretcher(Str_Right, fr_body, "TW_SR_0", br_body, "TW_SR_1")
@@ -979,7 +989,7 @@ def run(context):
                 mortise_body=mort, end_face=ef,
                 tenon_depth_expr="stc_mid_dia",
                 tenon_diam_expr="stc_end_dia",
-                name=wname, ev=ev)
+                name=wname, ev=ev, defer_cut=True)
 
     print("Stretchers: " + str(sum(1 for s in [Str_Left, Str_Right, Str_Cross] if s)) + " built via template")
 
@@ -1510,81 +1520,30 @@ def run(context):
         print(f"  {label}: {removed} tips removed")
 
     if _legs_c and _seat_b:
-        # ── A) Leg tenons through seat ──────────────────────────
-        # Position-based approach: splitting mirror-source bodies
-        # causes Fusion to regenerate the mirror, losing FL/BL names.
-        # Instead of name-matching, use Z-height to classify fragments.
+        # ── A) Leg tenons into seat ─────────────────────────────
+        # Legs are built FLUSH (proud=False): the tenon top sits at the seat
+        # top, so there are no proud tips to trim. Skip the split/remove/rejoin
+        # entirely — that keeps each leg a single, un-regenerated body, so its
+        # foot chamfer and wedge-slot cut keep their face associations (a
+        # split+rejoined body orphans them → they read as zero-impact even
+        # though the geometry is there) and the leg keeps its clean name.
+        mid_x = ev("mid_x")
+        mid_y = ev("mid_y")
         seat_top_z = ev("seat_h")
         seat_bot_z = seat_top_z - ev("seat_t")
         _sp = _seat_b.createForAssemblyContext(_seat_occ)
 
-        # 1. Split all leg + wedge bodies at seat surface.
-        #    (Skip stretchers — they don't go through the seat.)
-        for bi in range(_legs_c.bRepBodies.count - 1, -1, -1):
-            b = _legs_c.bRepBodies.item(bi)
-            if "Str" in b.name:
-                continue
-            try:
-                si = root.features.splitBodyFeatures.createInput(
-                    b.createForAssemblyContext(_legs_occ2), _sp, True)
-                root.features.splitBodyFeatures.add(si)
-            except Exception:
-                pass
-
-        # 2. Remove fragments on the +Z side of the seat (proud tips).
-        #    Uses body_side (not Z-threshold) so the scooped surface
-        #    is accounted for correctly.
-        removed = 0
-        for bi in range(_legs_c.bRepBodies.count - 1, -1, -1):
-            b = _legs_c.bRepBodies.item(bi)
-            if "Str" in b.name:
-                continue
-            if _sp_trim.body_side(b, _seat_b, (0, 0, 1)) == 'outside':
-                try:
-                    root.features.removeFeatures.add(
-                        b.createForAssemblyContext(_legs_occ2))
-                    removed += 1
-                except Exception:
-                    pass
-
-        # 3. Rejoin LEG interior fragments only (tenon pieces inside
-        #    the seat). Group by XY quadrant. SKIP wedge bodies (TW_)
-        #    — they must stay as separate bodies (contrasting wood).
-        mid_x = ev("mid_x")
-        mid_y = ev("mid_y")
-        quadrants = {}
-        for bi in range(_legs_c.bRepBodies.count):
-            b = _legs_c.bRepBodies.item(bi)
-            if "Str" in b.name or "TW" in b.name:
-                continue
-            com = b.physicalProperties.centerOfMass
-            qx = "L" if com.x < mid_x else "R"
-            qy = "F" if com.y < mid_y else "B"
-            q = qx + qy
-            quadrants.setdefault(q, []).append(b)
-
-        for q, bodies in quadrants.items():
-            if len(bodies) <= 1:
-                continue
-            bodies.sort(key=lambda b: b.volume, reverse=True)
-            main = bodies[0]
-            mp = main.createForAssemblyContext(_legs_occ2)
-            for frag in bodies[1:]:
-                try:
-                    _sp_trim.combine(
-                        mp, frag.createForAssemblyContext(_legs_occ2),
-                        JOIN_t, False, f"Leg_{q}_Rejoin")
-                except Exception:
-                    pass
-        print(f"  Legs → Seat: {removed} tips removed, fragments rejoined")
-
-        # 4. CUT seat mortises with ALL leg + wedge bodies.
+        # CUT the seat socket with each LEG and its wedge (keepTool). The wedge
+        # must cut too: the leg (minus its wedge slot) leaves a thin slot-shaped
+        # sliver of seat material, which the wedge body then fills — so without
+        # the wedge cut the wedge interferes with that sliver. Stretcher wedges
+        # (TW_S*, at stretcher height) don't reach the seat and are excluded by
+        # the Z-overlap test. Legs are flush, so no split/rejoin is needed.
         for bi in range(_legs_c.bRepBodies.count):
             b = _legs_c.bRepBodies.item(bi)
             if "Str" in b.name:
                 continue
             bb = b.boundingBox
-            # Only use bodies that reach INTO the seat (overlap seat Z range)
             if bb.maxPoint.z > seat_bot_z and bb.minPoint.z < seat_top_z:
                 try:
                     _sp_trim.combine(
@@ -1592,7 +1551,7 @@ def run(context):
                         CUT_t, True, f"{b.name}_Mort")
                 except Exception:
                     pass
-        print("  Seat mortises + wedge pockets cut")
+        print("  Seat mortises cut (legs flush — no tip trim)")
 
         # ── B) Side stretcher tenons through legs ───────────────
         # Find legs by XY quadrant position (names unreliable after
@@ -1632,7 +1591,9 @@ def run(context):
                     [sname] + wnames, leg, _legs_occ2, d,
                     f"{sname} → {qx}{qy}")
 
-            # Mortises: CUT leg with stretcher
+            # Mortises: CUT leg with stretcher only. (Cutting the leg with the
+            # wedge too is a no-op — the wedge sits inside the mortise the
+            # stretcher just carved, so it removes nothing: zero-impact.)
             sb = _find_best(_legs_c, sname)
             if sb:
                 for qx, qy in leg_qs:
@@ -1642,16 +1603,6 @@ def run(context):
                             _sp_trim.combine(leg, sb, CUT_t, True,
                                              f"{sname}_{qx}{qy}_Mort")
                         except Exception: pass
-                for wn in wnames:
-                    wb = _find_best(_legs_c, wn)
-                    if not wb: continue
-                    for qx, qy in leg_qs:
-                        leg = _find_leg(_legs_c, qx, qy)
-                        if leg:
-                            try:
-                                _sp_trim.combine(leg, wb, CUT_t, True,
-                                                 f"{wn}_{qx}{qy}_Mort")
-                            except Exception: pass
 
         # ── C) Cross stretcher through side stretchers ──────────
         xb = _find_best(_legs_c, "Str_Cross")
@@ -1668,6 +1619,9 @@ def run(context):
                     f"Str_Cross → {ss_name}")
             xb = _find_best(_legs_c, "Str_Cross")
             if xb:
+                # CUT each side stretcher with the cross stretcher only (the
+                # cross wedge sits in that mortise void — cutting with it is a
+                # zero-impact no-op).
                 for ss_name in ["Str_Left", "Str_Right"]:
                     ss = _find_best(_legs_c, ss_name)
                     if ss:
@@ -1675,16 +1629,24 @@ def run(context):
                             _sp_trim.combine(ss, xb, CUT_t, True,
                                              f"SC_{ss_name}_Mort")
                         except Exception: pass
-                for wn in ["TW_SC_L", "TW_SC_R"]:
-                    wb = _find_best(_legs_c, wn)
-                    if wb:
-                        for ss_name in ["Str_Left", "Str_Right"]:
-                            ss = _find_best(_legs_c, ss_name)
-                            if ss:
-                                try:
-                                    _sp_trim.combine(ss, wb, CUT_t, True,
-                                                     f"{wn}_Mort")
-                                except Exception: pass
+
+        # ── C2) Deferred stretcher wedge SLOT cuts ──────────────
+        # The side + cross stretcher wedges were built with defer_cut=True: cut
+        # each slot into its host stretcher NOW, after the host's SplitBody trim
+        # (sections B/C), so the cut is the stretcher's last feature and its
+        # faces aren't orphaned (which read as zero-impact). Done before the
+        # section-D wedge intersect-trim, while the wedge still overlaps the
+        # stretcher tenon.
+        for wn, host_name in [("TW_SL_FL", "Str_Left"), ("TW_SL_BL", "Str_Left"),
+                              ("TW_SR_0", "Str_Right"), ("TW_SR_1", "Str_Right"),
+                              ("TW_SC_L", "Str_Cross"), ("TW_SC_R", "Str_Cross")]:
+            wb = _find_best(_legs_c, wn)
+            host = _find_best(_legs_c, host_name)
+            if wb and host:
+                try:
+                    _sp_trim.combine(host, wb, CUT_t, True, f"{wn}_Cut")
+                except Exception as _e:
+                    print("  deferred slot cut fail " + wn + ": " + str(_e))
 
         # ── D) Final cleanup: split + trim remaining stretcher wedges ──
         # Mirror recompute renames TW_SL_* → TW_SR_*, so section B
