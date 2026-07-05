@@ -387,10 +387,19 @@ def run(context):
 
     # Compute splay/rake offsets in Python (Fusion expressions don't support tan/pi)
     def build_leg(comp, seat_body, seat_occ, name,
-                  top_x_expr, top_y_expr, splay_dir_x, splay_dir_y):
+                  top_x_expr, top_y_expr, splay_dir_x, splay_dir_y,
+                  front_y=0.0, side_x=0.0):
         """Turned leg via Revolve. Axis sketch at seat underside.
         Top point (seat joint) is fixed. Foot position derived from splay offset.
         splay_dir_x/y: -1 or +1 for foot offset direction from top point.
+
+        front_y / side_x select WHICH seat corner this leg anchors to, so the
+        SAME routine builds all four legs independently (no Mirror — mirroring a
+        leg that later gets split/combined in the trim phase makes Fusion
+        regenerate the mirror and scramble body identities). front_y is the model
+        Y of the near end-edge (0 = front arc, seat_d = back arc); side_x is the
+        model X of the near side-edge (0 = left line, seat_w = right line). The
+        corner, its inward perpendicular, and the splay all derive from these.
         """
         import math as _ml
         from helpers import sp as _sp
@@ -416,8 +425,8 @@ def run(context):
 
         # ---- Find projected seat edges ----
         front_edge = None; side_edge = None
-        front_ref_pt = m2s_ax(P(ev("mid_x"), 0, top_z))
-        side_ref_pt = m2s_ax(P(0, ev("mid_y"), top_z))
+        front_ref_pt = m2s_ax(P(ev("mid_x"), front_y, top_z))
+        side_ref_pt = m2s_ax(P(side_x, ev("mid_y"), top_z))
 
         best_front_d = 1e10; best_side_d = 1e10
         for ci in range(ax_sk.sketchCurves.count):
@@ -733,118 +742,67 @@ def run(context):
                     Seat_body_ref = occ.component.bRepBodies.item(j)
             break
 
-    # FL: front-left. Top at (leg_inset, leg_inset). Foot splays outward (-X, -Y)
-    # Build FL only, then mirror for all other legs
-    # FL: foot splays outward (-X = left, -Y = forward)
-    fl_feat, fl_body = build_leg(comp, Seat_body_ref, Seat_occ_ref, "Leg_FL",
-        "leg_inset", "leg_inset", -1, -1)
-
-    # Mirror plane perpendicular to seat side edge at its midpoint
-    # Draw line from (0,0) to (back_edge_x, seat_d) with parametric dimensions
-    # so it updates when seat_d or seat_back_w change.
-    import math as _mlg
+    # ── Four legs, each built INDEPENDENTLY at its own seat corner ─────
+    # NOT via Mirror: a mirrored leg is regenerated (and its body identity
+    # scrambled: Leg_FL → "Leg_FR (1) (1)") the moment the through-tenon trim
+    # phase later SplitBody/Combines it, which then makes the per-leg seat
+    # mortise + wedge-slot cuts miss their now-renamed targets (zero-impact
+    # features) and leaves the legs disconnected from the seat. Building each
+    # leg from its own corner keeps every body reference stable through the
+    # trim. The four legs are congruent by symmetry — that trips the
+    # replication advisory (advisory only, never fails the build); the
+    # independent construction is deliberate and required here.
     from helpers import sp as _sp_mir
+    from woodworking.templates import tenon_wedge as tw
+    import importlib; importlib.reload(tw)
+    tw.define_params(params, prefix="tw", slot_w="0.08 in",
+                     depth_ratio="1 / 2", offset_ratio="1 / 4")
 
-    side_sk = comp.sketches.add(comp.xYConstructionPlane)
-    side_sk.name = "SideEdge_Sk"
-    m2s_side = side_sk.modelToSketchSpace
-    bex = ev("back_edge_x")
-    sd = ev("seat_d")
-    s_front = m2s_side(P(0, 0, 0))
-    s_back = m2s_side(P(bex, sd, 0))
-    side_line = side_sk.sketchCurves.sketchLines.addByTwoPoints(
-        P(s_front.x, s_front.y, 0), P(s_back.x, s_back.y, 0))
-    side_line.isConstruction = True
+    seat_w_v = ev("seat_w")
+    seat_d_v = ev("seat_d")
 
-    # ANCHOR (non-root: Legs component): the side line runs between the seat's
-    # front-left corner (0,0) and back-left corner (back_edge_x, seat_d). Project
-    # the Seat (parent) outline and tie BOTH endpoints to the projected seat
-    # corners via coincidence — no dimension touches the sketch origin. The
-    # front-left corner sits at world (0,0), so anchor_pt is called with
-    # exclude_origin=False to grab that real projected parent vertex (the
-    # constraint references parent geometry, NOT side_sk.originPoint).
-    _sp_mir.project_face(side_sk, Seat_body_ref, Seat_occ_ref, "z", -1)
-    _front_anchor = _sp_mir.anchor_pt(side_sk, 0, 0, 0, exclude_origin=False)
-    _back_anchor = _sp_mir.anchor_pt(side_sk, bex, sd, 0)
-    if _front_anchor and _back_anchor:
-        side_sk.geometricConstraints.addCoincident(
-            side_line.startSketchPoint, _front_anchor)
-        side_sk.geometricConstraints.addCoincident(
-            side_line.endSketchPoint, _back_anchor)
-    else:
-        print(f"WARNING: windsor side_sk anchor_pt returned None "
-              f"(front={_front_anchor}, back={_back_anchor}), "
-              f"sketch left under-constrained")
-
-    # Create path from side line, then plane at midpoint (0.5 = 50%)
-    side_path = comp.features.createPath(side_line, False)
-    side_mid_inp = comp.constructionPlanes.createInput()
-    side_mid_inp.setByDistanceOnPath(side_path, adsk.core.ValueInput.createByString("0.5"))
-    side_mid_pl = comp.constructionPlanes.add(side_mid_inp)
-    side_mid_pl.name = "LegSideMid"
-
-    # Chamfer FL leg foot edges BEFORE mirroring (mirrors replicate it)
-    if ev("ch_leg") > 0:
+    def _chamfer_foot(body, nm):
+        if ev("ch_leg") <= 0:
+            return
         bot_edges = adsk.core.ObjectCollection.create()
-        for ei in range(fl_body.edges.count):
-            e = fl_body.edges.item(ei)
-            if e.startVertex and e.endVertex and e.startVertex.geometry.z < 0.5 and e.endVertex.geometry.z < 0.5:
+        for ei in range(body.edges.count):
+            e = body.edges.item(ei)
+            if e.startVertex and e.endVertex and \
+               e.startVertex.geometry.z < 0.5 and e.endVertex.geometry.z < 0.5:
                 bot_edges.add(e)
         if bot_edges.count > 0:
             ch = comp.features.chamferFeatures.createInput2()
             ch.chamferEdgeSets.addEqualDistanceChamferEdgeSet(
                 bot_edges, adsk.core.ValueInput.createByString("ch_leg"), True)
-            comp.features.chamferFeatures.add(ch).name = "Leg_FL_Ch"
+            comp.features.chamferFeatures.add(ch).name = nm + "_Ch"
 
-    # Mirror FL across side edge midplane → BL (before wedges)
-    mir_y = mirror_bodies(comp, [fl_body], side_mid_pl, "LegMirY")
-    bl_body = mir_y.bodies.item(0)
-    bl_body.name = "Leg_BL"
+    leg_bodies = {}
+    leg_wedges = {}
+    # (name, splay_dir_x, splay_dir_y, front_y, side_x) — one per corner.
+    for nm, sdx, sdy, fy, sx in [
+        ("Leg_FL", -1, -1, 0.0,      0.0),
+        ("Leg_FR", +1, -1, 0.0,      seat_w_v),
+        ("Leg_BL", -1, +1, seat_d_v, 0.0),
+        ("Leg_BR", +1, +1, seat_d_v, seat_w_v),
+    ]:
+        _f, _b = build_leg(comp, Seat_body_ref, Seat_occ_ref, nm,
+            "leg_inset", "leg_inset", sdx, sdy, front_y=fy, side_x=sx)
+        _chamfer_foot(_b, nm)
+        _wedge = tw.round_tenon(comp, tenon_body=_b,
+            mortise_body=Seat_body_ref,
+            end_face=find_face(_b, "z", +1),
+            tenon_depth_expr="seat_t",
+            tenon_diam_expr="leg_tenon_dia",
+            grain_dir=(0, 1, 0),  # seat grain front-to-back (Y)
+            name="TW_" + nm.split("_")[1], ev=ev)
+        leg_bodies[nm] = _b
+        leg_wedges[nm] = _wedge
 
-    # Tenon wedges on FL and BL independently (correct grain_dir on each)
-    from woodworking.templates import tenon_wedge as tw
-    import importlib; importlib.reload(tw)
-    tw.define_params(params, prefix="tw", slot_w="0.08 in",
-                     depth_ratio="1 / 2", offset_ratio="1 / 4")
-    fl_end_face = find_face(fl_body, "z", +1)
-    fl_wedge = tw.round_tenon(comp, tenon_body=fl_body,
-        mortise_body=Seat_body_ref,
-        end_face=fl_end_face,
-        tenon_depth_expr="seat_t",
-        tenon_diam_expr="leg_tenon_dia",
-        grain_dir=(0, 1, 0),  # seat grain front-to-back (Y)
-        name="TW_FL", ev=ev)
-    bl_end_face = find_face(bl_body, "z", +1)
-    bl_wedge = tw.round_tenon(comp, tenon_body=bl_body,
-        mortise_body=Seat_body_ref,
-        end_face=bl_end_face,
-        tenon_depth_expr="seat_t",
-        tenon_diam_expr="leg_tenon_dia",
-        grain_dir=(0, 1, 0),  # seat grain front-to-back (Y)
-        name="TW_BL", ev=ev)
-
-    # Mirror FL+BL across XMid → FR+BR (slots replicate via mirror)
-    mir_coll = adsk.core.ObjectCollection.create()
-    mir_coll.add(fl_body)
-    mir_coll.add(bl_body)
-    mir_inp = comp.features.mirrorFeatures.createInput(mir_coll, XMid)
-    mir_feat = comp.features.mirrorFeatures.add(mir_inp)
-    mir_feat.name = "LegMirX"
-    for i in range(mir_feat.bodies.count):
-        b = mir_feat.bodies.item(i)
-        if b.boundingBox.minPoint.y < ev("mid_y"):
-            b.name = "Leg_FR"
-        else:
-            b.name = "Leg_BR"
-    # Mirror wedge bodies separately across XMid
-    mir_w_x = mirror_bodies(comp, [fl_wedge, bl_wedge], XMid, "WedgeMirX")
-    for i in range(mir_w_x.bodies.count):
-        b = mir_w_x.bodies.item(i)
-        if b.boundingBox.minPoint.y < ev("mid_y"):
-            b.name = "TW_FR"
-        else:
-            b.name = "TW_BR"
-    print("Legs: 4 + 4 wedges (chamfered, wedged, mirrored)")
+    fl_body = leg_bodies["Leg_FL"]
+    bl_body = leg_bodies["Leg_BL"]
+    fr_body = leg_bodies["Leg_FR"]
+    br_body = leg_bodies["Leg_BR"]
+    print("Legs: 4 built independently + 4 wedges")
 
     # Body-relative refs: stretchers reference legs, wedges reference legs
     ref_leg_fl = find_body("Leg_FL")
@@ -932,6 +890,8 @@ def run(context):
 
     fl_axis = _leg_axis(Legs_c, fl_body, "FL")
     bl_axis = _leg_axis(Legs_c, bl_body, "BL")
+    fr_axis = _leg_axis(Legs_c, fr_body, "FR")
+    br_axis = _leg_axis(Legs_c, br_body, "BR")
 
     # ---- Left side stretcher (FL → BL) via template ----
     Str_Left = ts.build(Legs_c, axis_a=fl_axis, axis_b=bl_axis,
@@ -940,13 +900,19 @@ def run(context):
                         profile="barrel",
                         name="Str_Left", ev=ev)
 
-    # Mirror left stretcher → right stretcher
-    if Str_Left:
-        StrMirX = mirror_bodies(Legs_c, [Str_Left], XMid, "StrMirX")
-        Str_Right = StrMirX.bodies.item(0)
-        Str_Right.name = "Str_Right"
-    else:
-        Str_Right = None
+    # ---- Right side stretcher (FR → BR) — built INDEPENDENTLY from the FR/BR
+    # leg axes, not mirrored from Str_Left. A mirror of a turned-stretcher body
+    # (which carries tenon combine history) fits the mirror-image of the LEFT
+    # legs, not the actual FR/BR legs, so its tenons miss and it ends up a
+    # disconnected cluster. Building it from FR/BR axes seats its tenons in the
+    # real right-hand legs. ----
+    Str_Right = None
+    if fr_axis and br_axis:
+        Str_Right = ts.build(Legs_c, axis_a=fr_axis, axis_b=br_axis,
+                             dist_a="str_z", dist_b="str_z",
+                             body_dia_expr="str_leg_dia", prefix="str",
+                             profile="barrel",
+                             name="Str_Right", ev=ev)
 
     # Body-relative refs: cross stretcher references side stretchers
     ref_str_left = find_body("Str_Left")
@@ -969,36 +935,33 @@ def run(context):
                                  name="Str_Cross", ev=ev)
 
     # ---- Wedges on stretcher joints ----
-    # Side stretcher wedges (FL and BL ends)
-    sl_wedges = []
-    if Str_Left:
-        pfaces = []
-        for fi in range(Str_Left.faces.count):
-            f = Str_Left.faces.item(fi)
-            if isinstance(f.geometry, adsk.core.Plane):
-                pfaces.append(f)
+    # Wedge BOTH side stretchers independently (Str_Right is no longer a
+    # mirror, so its wedges must be built against the real FR/BR legs). Each
+    # stretcher has two small planar end faces (the tenon ends); wedge the one
+    # nearer each leg into that leg.
+    import math as _mstr_w
+
+    def _wedge_side_stretcher(str_body, legA, nameA, legB, nameB):
+        if not str_body:
+            return
+        pfaces = [str_body.faces.item(fi) for fi in range(str_body.faces.count)
+                  if isinstance(str_body.faces.item(fi).geometry, adsk.core.Plane)]
         pfaces.sort(key=lambda f: f.area)
-        fl_bb = fl_body.boundingBox
-        fl_cx = (fl_bb.minPoint.x + fl_bb.maxPoint.x) / 2
-        fl_cy = (fl_bb.minPoint.y + fl_bb.maxPoint.y) / 2
-        for wi, ef in enumerate(pfaces[:2]):
+        abb = legA.boundingBox
+        a_cx = (abb.minPoint.x + abb.maxPoint.x) / 2
+        a_cy = (abb.minPoint.y + abb.maxPoint.y) / 2
+        for ef in pfaces[:2]:
             fc = ef.pointOnFace
-            import math as _mstr_w
-            d_fl = _mstr_w.sqrt((fc.x - fl_cx)**2 + (fc.y - fl_cy)**2)
-            mort = fl_body if d_fl < 10 else bl_body
-            wname = "TW_SL_FL" if d_fl < 10 else "TW_SL_BL"
-            w = tw.round_tenon(Legs_c, tenon_body=Str_Left,
-                mortise_body=mort, end_face=ef,
+            near_a = _mstr_w.sqrt((fc.x - a_cx) ** 2 + (fc.y - a_cy) ** 2) < 10
+            tw.round_tenon(Legs_c, tenon_body=str_body,
+                mortise_body=legA if near_a else legB,
+                end_face=ef,
                 tenon_depth_expr="leg_dia",
                 tenon_diam_expr="str_end_dia",
-                name=wname, ev=ev)
-            sl_wedges.append(w)
+                name=nameA if near_a else nameB, ev=ev)
 
-    # Mirror stretcher wedges
-    if sl_wedges:
-        sl_w_mir = mirror_bodies(Legs_c, sl_wedges, XMid, "StrWedgeMirX")
-        for wi in range(sl_w_mir.bodies.count):
-            sl_w_mir.bodies.item(wi).name = "TW_SR_" + str(wi)
+    _wedge_side_stretcher(Str_Left, fl_body, "TW_SL_FL", bl_body, "TW_SL_BL")
+    _wedge_side_stretcher(Str_Right, fr_body, "TW_SR_0", br_body, "TW_SR_1")
 
     # Cross stretcher wedges
     if Str_Cross:
@@ -1781,6 +1744,56 @@ def run(context):
             print(f"  Final cleanup: {final_trimmed} wedges intersect-trimmed")
 
     print("All through-tenons trimmed, mortises + wedge pockets cut")
+
+    # ══════════════════════════════════════════════════════════════
+    # SPINDLE SOCKETS — seat (base) + crest rail (top)
+    # Each spindle is a full-length turned cylinder; without sockets its
+    # ends interpenetrate the seat and crest (real interferences) and the
+    # crest floats as its own cluster. Cut each socket with the spindle as
+    # tool (keepTool) so the spindle tenon fills a mortise: overlap becomes
+    # clean face contact, tying the crest into the assembly. ("If it fits,
+    # it cuts.")
+    # ══════════════════════════════════════════════════════════════
+    _back_c = _back_occ = None
+    for _oi in range(root.occurrences.count):
+        _o = root.occurrences.item(_oi)
+        if _o.component.name == "Back":
+            _back_c = _o.component; _back_occ = _o; break
+    _sk_seat_c = _sk_seat_occ = _sk_seat_b = None
+    for _oi in range(root.occurrences.count):
+        _o = root.occurrences.item(_oi)
+        if _o.component.name == "Seat":
+            _sk_seat_occ = _o; _sk_seat_c = _o.component
+            for _bi in range(_sk_seat_c.bRepBodies.count):
+                if _sk_seat_c.bRepBodies.item(_bi).name == "Seat":
+                    _sk_seat_b = _sk_seat_c.bRepBodies.item(_bi); break
+            break
+    _crest_b = None
+    if _back_c:
+        for _bi in range(_back_c.bRepBodies.count):
+            if _back_c.bRepBodies.item(_bi).name == "CrestRail":
+                _crest_b = _back_c.bRepBodies.item(_bi); break
+    if _back_c and _sk_seat_b:
+        _seat_pxy = _sk_seat_b.createForAssemblyContext(_sk_seat_occ)
+        _n_skt = 0
+        for _bi in range(_back_c.bRepBodies.count):
+            b = _back_c.bRepBodies.item(_bi)
+            if not b.name.startswith("Spin_"):
+                continue
+            try:
+                _sp_trim.combine(_seat_pxy,
+                    b.createForAssemblyContext(_back_occ),
+                    CUT_t, True, b.name + "_SeatSkt")
+            except Exception as _e:
+                print("  spindle seat socket fail " + b.name + ": " + str(_e))
+            if _crest_b:
+                try:
+                    _sp_trim.combine(_crest_b, b, CUT_t, True,
+                                     b.name + "_CrestSkt")
+                    _n_skt += 1
+                except Exception as _e:
+                    print("  spindle crest socket fail " + b.name + ": " + str(_e))
+        print("  Spindle sockets cut: seat + crest (%d spindles)" % _n_skt)
 
     # ── HIDE CONSTRUCTION ─────────────────────────────────────────
     def _hide_construction(c):
