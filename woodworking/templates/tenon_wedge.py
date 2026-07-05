@@ -185,11 +185,22 @@ def rect(comp, tenon_body, mortise_body,
 def round_tenon(comp, tenon_body, mortise_body,
                 tenon_depth_expr, tenon_diam_expr,
                 tenon_axis=None, tenon_dir=None, end_face=None,
-                grain_dir=None, prefix="tw", name="TW", ev=None):
+                grain_dir=None, prefix="tw", name="TW", ev=None,
+                defer_cut=False):
     """One centred wedge on a round tenon, trimmed to the cylinder.
 
     *grain_dir* overrides auto-detected mortise grain.  Pass a tuple
     ``(x, y, z)`` when the mortise piece has ambiguous proportions.
+
+    *defer_cut*: when True, build and trim the wedge but DO NOT cut its slot
+    into the tenon — the caller is responsible for cutting the slot LATER
+    (``sp.combine(tenon, wedge, CUT, True)``). Use this when the tenon will be
+    SplitBody/rejoined downstream (e.g. a through-tenon trimmed flush): a slot
+    cut made before that split has its faces orphaned when the body is
+    regenerated, so ``validate_design`` reports it as zero-impact even though
+    the slot is physically there. Deferring the cut until after the split keeps
+    it the tenon's last feature, so its faces stay associated. The returned
+    wedge still overlaps the tenon until the caller performs the cut.
     """
     ev = ev or _default_ev()
     end_face = _resolve_end_face(
@@ -206,7 +217,8 @@ def round_tenon(comp, tenon_body, mortise_body,
     # operations route via combine so they work whether
     # tenon_body shares ``comp`` or lives in another component.
     _intersect_trim(wedge, tenon_body, f"{name}_Trim")
-    sp.combine(tenon_body, wedge, CUT, True, f"{name}_Cut")
+    if not defer_cut:
+        sp.combine(tenon_body, wedge, CUT, True, f"{name}_Cut")
 
     return wedge
 

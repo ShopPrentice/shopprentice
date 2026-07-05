@@ -529,7 +529,6 @@ def run(context):
         dt_angle="8 deg", dt_tail_w="0.625 in",
         front_tail_count="3", back_tail_count="3",
         x_offset="case_t + door_comp_w + part_t + drawer_gap",
-        y_offset="0 in",
         z_offset="leg_h + case_t + drawer_gap")
     # Cove params (need dd_ft from the template)
     padd("cove_dia",   "1.5 in",  "in", "Drawer cove recess diameter")

@@ -45,11 +45,31 @@ Each leg is positioned from its own seat corner: `leg_to_edge` along the near si
 - Stretcher wedges use auto-detected grain via principal axes of inertia — works correctly for splayed legs and angled stretchers
 - FL and BL legs are wedged independently (not mirrored from FL) to ensure correct slot orientation on each side of the angled mirror plane
 
-## Build Status (2026-07-04)
+## Build Status (2026-07-05)
+
+`validate_design` status: **interference PASS (0), featureImpact PASS, deps
+dependency-tree PASS**; still failing: **connectivity** (round turned joints, see
+below — an accepted limitation) and **deps sketch-traceability** (sketches not yet
+fully-constrained/anchored — in progress). Progress this round:
+
+- **featureImpact → PASS.** Legs are now built FLUSH (`build_leg(proud=False)`), so
+  the trim needs no split/rejoin on them — that stops their foot chamfer and wedge
+  slot cut from being orphaned (a split+rejoined body loses its features' face
+  associations → they read as zero-impact). Redundant wedge→mortise cuts (the wedge
+  sits in the socket void) were removed. Stretcher wedge slot cuts are DEFERRED
+  (`tenon_wedge.round_tenon(defer_cut=True)`) until after the stretcher's flush-trim,
+  so they stay the last feature and aren't orphaned.
+- **Connectivity 8 → 4 clusters.** Flush leg tenons + cutting the seat with each leg
+  wedge give the legs planar contact with the seat, so all four legs, the wedges, the
+  spindles and the crest now form one 17-body cluster. The three stretcher
+  sub-assemblies remain separate (round tenons — see below).
+- **Clean body names + deps tree PASS.** No split/rejoin means legs keep their names
+  (`Leg_FL`…`Leg_BR`), so `model.json`'s `Leg_* → Seat` rows resolve.
+
+### Earlier (2026-07-04)
 
 The example was committed **unvalidated** (`3273fc7 WIP: fan-out anchor drafts …`)
-and did not build. It now **builds start-to-finish** and is substantially closer to
-green, but `validate_design` does **not** yet pass. Fixed so far:
+and did not build. Fixed:
 
 - **Line-770 anchoring over-constraint** (`VCS_SKETCH_SOLVING_FAILED`). The
   side-edge mirror-plane sketch drew a construction line between the seat's
@@ -68,21 +88,19 @@ green, but `validate_design` does **not** yet pass. Fixed so far:
   (spindles were full cylinders interpenetrating both). The crest+spindles+seat are
   now one connected cluster.
 
-### Remaining defects (punch-list — NOT yet green)
+### Remaining (NOT yet green)
 
-1. **Connectivity: 8 clusters, need 1.** `check_connectivity` counts only **planar**
-   face contact. The leg→seat and stretcher→leg joints are **turned/round** (conical
-   shoulders, cylindrical tenons) → zero planar contact → read as disconnected though
-   physically joined. Fix requires **redesigning those joints to have flat mating
-   faces** (flat shoulder at the seat underside; blind flat-bottomed leg mortises for
-   stretcher tenons) — a joinery/aesthetic decision.
-2. **featureImpact: zero-impact `tenon_wedge` cuts.** Every wedge slot/mortise
-   combine removes nothing — a **pre-existing bug in the shared `tenon_wedge`
-   template**, plus the 4 leg-foot chamfers modify no faces (the foot's full-circle
-   edge has no start/end vertices, so the z<0.5 vertex filter selects nothing usable).
-3. **deps: sketch traceability.** ~19 non-root sketches (from `build_leg` profiles and
-   the shared `turned_stretcher` / `tenon_wedge` templates) aren't anchored to
-   projected parent geometry — same class as line 770 but systemic across shared
-   templates. Also `model.json`'s leg entries (`Leg_FL` …) need updating: the trim
-   renames them (`Leg_FL (1)` …), so the `Leg_* → Seat` deps rows report "body not
-   found".
+1. **Connectivity: 4 clusters, need 1** — the three stretcher sub-assemblies
+   (`Str_Left`, `Str_Right`, `Str_Cross`, each with its wedges) remain separate.
+   `check_connectivity` counts only **planar** face contact, and the round stretcher
+   tenons into the round legs / round cross-into-side have only cylindrical contact.
+   The legs reached the seat cluster because their FLUSH tenons + wedge-cut sockets
+   give a little planar contact (though weak, <1 cm² on the front legs). Fully closing
+   this needs the stretcher joints reworked to blind flat-bottomed mortises — the
+   joinery tradeoff the maintainer chose to defer (keep the wedges).
+2. **deps: sketch traceability** — ~7 sketch-creation sites produce non-anchored or
+   under-constrained sketches: `build_leg`'s `Leg_*_Prof`, the seat outline
+   `Seat_Sk`, `ScoopPath_Sk`, the spindle `Spin_*_Prof`, the crest sketches, plus the
+   shared `turned_stretcher` (windsor-only, safe to edit) and `tenon_wedge` (used by
+   8+ examples → any anchoring must be opt-in). Each fix anchors/​fully-constrains one
+   site (fixes all its instances).
