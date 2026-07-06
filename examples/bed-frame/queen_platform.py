@@ -371,8 +371,24 @@ def run(context):
         {"y": "bed_l", "z": "beam_w"}, "Beam_Sk", ev,
         anchor=dict(parent_body=post_fl, parent_occ=post_occ,
                     face_axis="x", face_dir=+1,
-                    anchor_xyz=("post_size", "0 in", "0 in"),
-                    off1=("y", "post_size"), off2=("z", "beam_h - beam_w")))
+                    # Same fix as the side rails: the beam is anchored to the
+                    # post's +x SIDE face, where anchor_pt() resolves to the
+                    # INNER corner (y=post_size, the y=0 corner being dropped as
+                    # the sketch-origin projection). Anchor the far (+y) corner
+                    # (which=1) and span the full bed_l off it — a large,
+                    # single-sided offset with no abs() sign-flip — so the near
+                    # end lands at y=post_size (the front post inner face)
+                    # instead of y=0. This also removes the residual
+                    # Rail_Foot ∩ CenterBeam overlap the y=0 front end caused.
+                    #
+                    # NOTE: the slats and beam legs below are anchored to the
+                    # post's -z (bottom) face instead, where anchor_pt() resolves
+                    # to the OUTER corner (aP.y=0), so their post_size-style
+                    # offsets already land correctly (verified live: Slat_2
+                    # y[23.9,31.5], BeamLeg_1 y[73.4,77.3]) and are left as-is.
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    which=1,
+                    off1=("y", "bed_l"), off2=("z", "beam_h - beam_w")))
     beam_ext = sp.ext_new(support_c, pr, "beam_thick", "CenterBeam")
     beam = beam_ext.bodies.item(0); beam.name = "CenterBeam"
 
