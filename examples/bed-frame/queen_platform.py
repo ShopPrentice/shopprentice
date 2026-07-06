@@ -176,8 +176,18 @@ def run(context):
         {"y": "side_rail_l", "z": "rail_h - post_chamfer"}, "LeftRail_Sk", ev,
         anchor=dict(parent_body=post_fl, parent_occ=post_occ,
                     face_axis="x", face_dir=+1,
-                    anchor_xyz=("post_size", "0 in", "0 in"),
-                    off1=("y", "post_size"), off2=("z", "rail_z")))
+                    # Anchor the FAR (back) corner of the rail (which=1, the +y
+                    # corner) to the front post's INNER corner. anchor_pt()
+                    # reliably resolves to the inner post corner (the outer,
+                    # y=0 corner coincides with the sketch-origin projection and
+                    # is dropped by exclude_origin), so we anchor to it
+                    # explicitly and span the whole rail length off it. The
+                    # side_rail_l offset is large and unambiguous (no abs()
+                    # sign-flip), which leaves the near end at y=post_size (the
+                    # post inner face) instead of y=0.
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    which=1,
+                    off1=("y", "side_rail_l"), off2=("z", "rail_z")))
     lr_ext = sp.ext_new(rail_c, pr, "rail_thick", "LeftRail")
     rail_left = lr_ext.bodies.item(0); rail_left.name = "Rail_Left"
 
@@ -193,8 +203,15 @@ def run(context):
         {"x": "end_rail_l", "z": "rail_h - post_chamfer"}, "FootRail_Sk", ev,
         anchor=dict(parent_body=post_fl, parent_occ=post_occ,
                     face_axis="y", face_dir=+1,
-                    anchor_xyz=("0 in", "post_size", "0 in"),
-                    off1=("x", "post_size"), off2=("z", "rail_z")))
+                    # Anchor the FAR (+x) corner of the foot rail (which=1) to
+                    # the front-left post's INNER corner and span the full
+                    # end_rail_l off it (large, unambiguous offset — no sign
+                    # flip). Near end lands at x=post_size, far end at
+                    # post_size+end_rail_l == outer_w-post_size (right post
+                    # inner face).
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    which=1,
+                    off1=("x", "end_rail_l"), off2=("z", "rail_z")))
     fr_ext = sp.ext_new(rail_c, pr, "rail_thick", "FootRail")
     rail_foot = fr_ext.bodies.item(0); rail_foot.name = "Rail_Foot"
 
@@ -206,8 +223,13 @@ def run(context):
         {"x": "end_rail_l", "z": "back_rail_h"}, "BackRail_Sk", ev,
         anchor=dict(parent_body=post_bl, parent_occ=post_occ,
                     face_axis="y", face_dir=-1,
-                    anchor_xyz=("0 in", "bed_l + post_size", "0 in"),
-                    off1=("x", "post_size"), off2=("z", "rail_z")))
+                    # Anchor the FAR (+x) corner of the back rail (which=1) to
+                    # the back-left post's INNER corner (its -y/front face is at
+                    # y = outer_l - post_size = bed_l + post_size). Span the
+                    # full end_rail_l off it; near end lands at x=post_size.
+                    anchor_xyz=("post_size", "bed_l + post_size", "0 in"),
+                    which=1,
+                    off1=("x", "end_rail_l"), off2=("z", "rail_z")))
     back_rail_ext = sp.ext_new(rail_c, pr, "rail_thick", "BackRail")
     rail_back = back_rail_ext.bodies.item(0); rail_back.name = "Rail_Back"
 
@@ -225,8 +247,12 @@ def run(context):
         {"y": "side_rail_l", "z": "ledger_h"}, "LedgerL_Sk", ev,
         anchor=dict(parent_body=post_fl, parent_occ=post_occ,
                     face_axis="x", face_dir=+1,
-                    anchor_xyz=("post_size", "0 in", "0 in"),
-                    off1=("y", "post_size"), off2=("z", "ledger_z")))
+                    # Same anchoring fix as the side rails: anchor the far (+y)
+                    # ledger corner (which=1) to the front post inner corner and
+                    # span side_rail_l off it. Near end lands at y=post_size.
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    which=1,
+                    off1=("y", "side_rail_l"), off2=("z", "ledger_z")))
     ll_ext = sp.ext_new(rail_c, pr, "ledger_thick", "LedgerLeft")
     ledger_left = ll_ext.bodies.item(0); ledger_left.name = "Ledger_Left"
 
@@ -246,8 +272,13 @@ def run(context):
         {"x": "end_rail_l", "z": "hb_top_rail_h"}, "HBTopRail_Sk", ev,
         anchor=dict(parent_body=post_bl, parent_occ=post_occ,
                     face_axis="y", face_dir=+1,
-                    anchor_xyz=("0 in", "outer_l", "0 in"),
-                    off1=("x", "post_size"),
+                    # Anchor the far (+x) corner of the HB top rail (which=1) to
+                    # the back-left post's inner corner (x=post_size) on its +y
+                    # face, spanning end_rail_l. Near end lands at x=post_size so
+                    # the rail reaches both posts (closes the prior 7.62 gap).
+                    anchor_xyz=("post_size", "outer_l", "0 in"),
+                    which=1,
+                    off1=("x", "end_rail_l"),
                     off2=("z", "headboard_h - hb_top_rail_h")))
     hb_tr_ext = sp.ext_new(hb_c, pr, "hb_rail_thick", "HBTopRail")
     hb_top_rail = hb_tr_ext.bodies.item(0); hb_top_rail.name = "HB_TopRail"
@@ -258,8 +289,12 @@ def run(context):
         {"x": "end_rail_l", "z": "hb_bot_rail_h"}, "HBBotRail_Sk", ev,
         anchor=dict(parent_body=post_bl, parent_occ=post_occ,
                     face_axis="y", face_dir=+1,
-                    anchor_xyz=("0 in", "outer_l", "0 in"),
-                    off1=("x", "post_size"), off2=("z", "front_post_h")))
+                    # Same fix as the HB top rail: far (+x) corner (which=1)
+                    # anchored to the post inner corner, spanning end_rail_l, so
+                    # the bottom rail reaches both back posts.
+                    anchor_xyz=("post_size", "outer_l", "0 in"),
+                    which=1,
+                    off1=("x", "end_rail_l"), off2=("z", "front_post_h")))
     hb_br_ext = sp.ext_new(hb_c, pr, "hb_rail_thick", "HBBotRail")
     hb_bot_rail = hb_br_ext.bodies.item(0); hb_bot_rail.name = "HB_BotRail"
 
@@ -336,8 +371,24 @@ def run(context):
         {"y": "bed_l", "z": "beam_w"}, "Beam_Sk", ev,
         anchor=dict(parent_body=post_fl, parent_occ=post_occ,
                     face_axis="x", face_dir=+1,
-                    anchor_xyz=("post_size", "0 in", "0 in"),
-                    off1=("y", "post_size"), off2=("z", "beam_h - beam_w")))
+                    # Same fix as the side rails: the beam is anchored to the
+                    # post's +x SIDE face, where anchor_pt() resolves to the
+                    # INNER corner (y=post_size, the y=0 corner being dropped as
+                    # the sketch-origin projection). Anchor the far (+y) corner
+                    # (which=1) and span the full bed_l off it — a large,
+                    # single-sided offset with no abs() sign-flip — so the near
+                    # end lands at y=post_size (the front post inner face)
+                    # instead of y=0. This also removes the residual
+                    # Rail_Foot ∩ CenterBeam overlap the y=0 front end caused.
+                    #
+                    # NOTE: the slats and beam legs below are anchored to the
+                    # post's -z (bottom) face instead, where anchor_pt() resolves
+                    # to the OUTER corner (aP.y=0), so their post_size-style
+                    # offsets already land correctly (verified live: Slat_2
+                    # y[23.9,31.5], BeamLeg_1 y[73.4,77.3]) and are left as-is.
+                    anchor_xyz=("post_size", "post_size", "0 in"),
+                    which=1,
+                    off1=("y", "bed_l"), off2=("z", "beam_h - beam_w")))
     beam_ext = sp.ext_new(support_c, pr, "beam_thick", "CenterBeam")
     beam = beam_ext.bodies.item(0); beam.name = "CenterBeam"
 
