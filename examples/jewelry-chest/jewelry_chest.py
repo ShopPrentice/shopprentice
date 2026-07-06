@@ -594,24 +594,28 @@ def run(context):
             off2=("y", "abs((lid_rab + lid_frame_w) - (board_thick - groove_depth))"),
             which=0))
     ldv = sp.ext_new(lid_c, prof, "lid_frame_h", "LDV").bodies.item(0); ldv.name = "Lid_Div"
+    # Panel groove (left side): inset by lid_tenon_l at each end so it stops at
+    # the tenon shoulders, leaving a solid shoulder behind each end tenon. This
+    # keeps the tenon a plain full-width rectangular prism (no cross-notch).
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
-        ("box_length / 2 - lid_frame_w / 2","lid_rab + lid_frame_w","lid_groove_z"),
-        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LDV_GL_Sk", ev=ev,
+        ("box_length / 2 - lid_frame_w / 2","lid_rab + lid_frame_w + lid_tenon_l","lid_groove_z"),
+        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab - 2 * lid_tenon_l"}, "LDV_GL_Sk", ev=ev,
         anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
             anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
                         "groove_up + bottom_thick"),
             off1=("x", "abs((box_length / 2 - lid_frame_w / 2) - (board_thick - groove_depth))"),
-            off2=("y", "abs((lid_rab + lid_frame_w) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w + lid_tenon_l) - (board_thick - groove_depth))"),
             which=0))
     gl = sp.ext_new(lid_c, prof, "lid_groove_t", "LDV_GLT").bodies.item(0); sp.combine(ldv, gl, CUT, False, "LDV_GL")
+    # Panel groove (right side): same inset by lid_tenon_l at each end.
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
-        ("box_length / 2 + lid_frame_w / 2 - lid_tongue_l","lid_rab + lid_frame_w","lid_groove_z"),
-        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab"}, "LDV_GR_Sk", ev=ev,
+        ("box_length / 2 + lid_frame_w / 2 - lid_tongue_l","lid_rab + lid_frame_w + lid_tenon_l","lid_groove_z"),
+        {"x":"lid_tongue_l","y":"box_width - 2 * lid_frame_w - lid_rab - 2 * lid_tenon_l"}, "LDV_GR_Sk", ev=ev,
         anchor=dict(parent_body=bp, parent_occ=bot_occ, face_axis="z", face_dir=+1,
             anchor_xyz=("board_thick - groove_depth", "board_thick - groove_depth",
                         "groove_up + bottom_thick"),
             off1=("x", "abs((box_length / 2 + lid_frame_w / 2 - lid_tongue_l) - (board_thick - groove_depth))"),
-            off2=("y", "abs((lid_rab + lid_frame_w) - (board_thick - groove_depth))"),
+            off2=("y", "abs((lid_rab + lid_frame_w + lid_tenon_l) - (board_thick - groove_depth))"),
             which=0))
     gr = sp.ext_new(lid_c, prof, "lid_groove_t", "LDV_GRT").bodies.item(0); sp.combine(ldv, gr, CUT, False, "LDV_GR")
     sk, prof = sp.sketch_rect_model(lid_c, lgp,
