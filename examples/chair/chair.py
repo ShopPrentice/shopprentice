@@ -445,78 +445,141 @@ def run(context):
     cy = back_y_v - h_span
     cz = seat_top_z + R_v
 
-    # Arc: three points — start, midpoint on arc, end (tangent point)
     arc_start_y = back_y_v;            arc_start_z = seat_top_z + d_v
     arc_end_y   = cy;                  arc_end_z   = seat_top_z
-    # Midpoint: compute from center at mid-angle between start and end vectors
-    ang_start = math.atan2(arc_start_z - cz, arc_start_y - cy)
-    ang_end   = math.atan2(arc_end_z - cz, arc_end_y - cy)  # = -pi/2 (directly below)
-    # Ensure we sweep in the correct direction (clockwise: decreasing angle)
-    if ang_start < ang_end:
-        ang_start += 2 * math.pi
-    ang_mid = (ang_start + ang_end) / 2
-    mid_y = cy + R_v * math.cos(ang_mid)
-    mid_z = cz + R_v * math.sin(ang_mid)
 
-    ps_start = m2s_pa(P3.create(0, arc_start_y, arc_start_z))
-    ps_mid   = m2s_pa(P3.create(0, mid_y, mid_z))
-    ps_end   = m2s_pa(P3.create(0, arc_end_y, arc_end_z))
-    ps_front = m2s_pa(P3.create(0, front_y_v, seat_top_z))
-
-    arc = path_sk.sketchCurves.sketchArcs.addByThreePoints(
-        P3.create(ps_start.x, ps_start.y, 0),
-        P3.create(ps_mid.x, ps_mid.y, 0),
-        P3.create(ps_end.x, ps_end.y, 0))
-
-    # Level line from arc end tangent point forward
-    level_line = path_sk.sketchCurves.sketchLines.addByTwoPoints(
-        arc.endSketchPoint,
-        P3.create(ps_front.x, ps_front.y, 0))
-
-    path_sk.geometricConstraints.addHorizontal(level_line)
-    path_dims = path_sk.sketchDimensions
-    path_dims.addRadialDimension(
-        arc, P3.create(ps_mid.x + 0.5, ps_mid.y + 0.5, 0)
-    ).parameter.expression = "scoop_trans_r"
-
-    orient_pa = sp.probe_orientations(path_sk, 0, ev("mid_y"), seat_top_z)
-
-    # Anchor the path to the projected Left Apron outer (x=0) face —
-    # parallel to this YZ midplane and NEVER modified after this point.
-    # The Seat's own faces are a trap here: SeatNotch and the top-edge
-    # fillet later regenerate the projection and the dims fail to solve
-    # on rebuild. reanchor's per-axis retarget over-constrains on the
-    # arc, so don't route through it. Anchor = apron top-front corner.
+    # The path is built on a CONSTRUCTION-POINT SKELETON: project the
+    # anchor face and fully dimension three sketch points (arc start,
+    # tangent point, arc center) FIRST, then create the arc directly on
+    # those pinned points with its sweep direction chosen explicitly.
+    # History behind this: every recipe that let the solver near an
+    # under-determined arc — endpoint distance dims from the anchor, a
+    # start↔end span dim, addTangent, center↔end alignment — would
+    # sooner or later re-seat the arc on a wrong DISCRETE branch during
+    # some later dimension add: the MIRROR solution (tangent point
+    # BEHIND the start, path doubling back on itself) or the MAJOR
+    # solution (~340° wrap the long way, endpoints unchanged). Both kill
+    # the sweep with ASM_SWEEP_PATH_SEGMENTS_ANTIPARALLEL. No constraint
+    # set can exclude those branches (they satisfy every constraint);
+    # the robust order is: rigid points first, arc last, zero DOF at
+    # birth.
+    #
+    # Anchor = Left Apron outer (x=0) face — parallel to this YZ
+    # midplane and never modified after this point. The Seat's own faces
+    # are a trap: SeatNotch and the top-edge fillet later regenerate the
+    # projection and the dims fail to solve on rebuild.
     sp.project_face(path_sk, left_apron, apron_occ, "x", -1)
     pa_anchor = sp.anchor_pt(path_sk, 0.0, ev("leg_size"), ev("front_leg_h"))
+    orient_pa = sp.probe_orientations(path_sk, 0, ev("mid_y"), seat_top_z)
+
+    # Frame probe: H/V constraints act in SKETCH space, and the YZ-plane
+    # frame is not guaranteed to map world axes the intuitive way (live
+    # builds re-frame with xDir=(0,0,-1), where addHorizontal pins
+    # constant world-Y and the "level" line re-solves into a vertical
+    # trench cut through the seat).
+    _fa = m2s_pa(P3.create(0, back_y_v, seat_top_z))
+    _fb = m2s_pa(P3.create(0, back_y_v + 1.0, seat_top_z))
+    world_y_is_sketch_h = abs(_fb.y - _fa.y) < 1e-6
+
+    ps_start = m2s_pa(P3.create(0, arc_start_y, arc_start_z))
+    ps_tan   = m2s_pa(P3.create(0, arc_end_y, arc_end_z))
+    ps_ctr   = m2s_pa(P3.create(0, cy, cz))
+    ps_front = m2s_pa(P3.create(0, front_y_v, seat_top_z))
+
+    pt_start = path_sk.sketchPoints.add(P3.create(ps_start.x, ps_start.y, 0))
+    pt_tan   = path_sk.sketchPoints.add(P3.create(ps_tan.x, ps_tan.y, 0))
+    pt_ctr   = path_sk.sketchPoints.add(P3.create(ps_ctr.x, ps_ctr.y, 0))
+
+    path_dims = path_sk.sketchDimensions
+    gc_pa = path_sk.geometricConstraints
+    # sqrt(2*R*d - d^2) is the tangency identity (see the derivation
+    # above); with the center stacked over the tangent point it forces
+    # the solved radius to equal scoop_trans_r exactly, so there is no
+    # radial dimension (one would be redundant and over-constrain).
+    _tan_y_off = "sqrt(2 * scoop_trans_r * scoop_depth - scoop_depth ^ 2)"
     if pa_anchor is not None:
-        sp.rdim(path_sk, path_dims, pa_anchor, arc.startSketchPoint,
+        sp.rdim(path_sk, path_dims, pa_anchor, pt_start,
                 orient_pa, "z", "seat_thick + scoop_depth")
-        sp.rdim(path_sk, path_dims, pa_anchor, arc.startSketchPoint,
+        sp.rdim(path_sk, path_dims, pa_anchor, pt_start,
                 orient_pa, "y", "scoop_back_y - leg_size")
-        sp.rdim(path_sk, path_dims, pa_anchor, level_line.endSketchPoint,
-                orient_pa, "y", "scoop_front_y - leg_size")
-        # Pin the level height (seat top) — without it the arc can swing
-        # on re-solve (projection updates re-solve the sketch) and the
-        # level-end position dim fails intermittently. (A tangent
-        # constraint would be the full fix but the 3-point arc is tangent
-        # only within float error and the solver rejects it.)
-        sp.rdim(path_sk, path_dims, pa_anchor, level_line.endSketchPoint,
+        sp.rdim(path_sk, path_dims, pa_anchor, pt_tan,
                 orient_pa, "z", "seat_thick")
+        sp.rdim(path_sk, path_dims, pa_anchor, pt_tan,
+                orient_pa, "y", "scoop_back_y - leg_size - " + _tan_y_off)
+        sp.rdim(path_sk, path_dims, pa_anchor, pt_ctr,
+                orient_pa, "z", "seat_thick + scoop_trans_r")
     else:
         origin_pa = path_sk.originPoint
+        for _pt, _ax, _expr, _dx, _dy in [
+                (pt_start, 'z', "seat_h + scoop_depth", -2, 0),
+                (pt_start, 'y', "scoop_back_y", 0, 2),
+                (pt_tan,   'z', "seat_h", -2, 0),
+                (pt_tan,   'y', "scoop_back_y - " + _tan_y_off, 0, 2),
+                (pt_ctr,   'z', "seat_h + scoop_trans_r", -2, 0)]:
+            _g = _pt.geometry
+            path_dims.addDistanceDimension(
+                origin_pa, _pt, orient_pa[_ax],
+                P3.create(_g.x + _dx, _g.y + _dy, 0)
+            ).parameter.expression = _expr
+    # Center directly above the tangent point (stacked along world-Z) —
+    # the tangency condition, expressed between bare points.
+    if world_y_is_sketch_h:
+        gc_pa.addVerticalPoints(pt_ctr, pt_tan)
+    else:
+        gc_pa.addHorizontalPoints(pt_ctr, pt_tan)
+
+    # Arc LAST, directly on the pinned points (SketchPoints merge, so
+    # the arc is born with zero DOF and no later solve can re-seat it).
+    # addByCenterStartEnd sweeps CCW from start to end around the sketch
+    # normal — order the endpoints so the CCW sweep is the SHORT side.
+    _gs, _gt, _gc = pt_start.geometry, pt_tan.geometry, pt_ctr.geometry
+    _cross = ((_gs.x - _gc.x) * (_gt.y - _gc.y) -
+              (_gs.y - _gc.y) * (_gt.x - _gc.x))
+    if _cross > 0:
+        arc = path_sk.sketchCurves.sketchArcs.addByCenterStartEnd(
+            pt_ctr, pt_start, pt_tan)
+    else:
+        arc = path_sk.sketchCurves.sketchArcs.addByCenterStartEnd(
+            pt_ctr, pt_tan, pt_start)
+    # addByCenterStartEnd merges the endpoint SketchPoints but creates
+    # its OWN center point at pt_ctr's location — coincident-bind it or
+    # the arc keeps a free DOF (and the sketch fails fully-constrained).
+    gc_pa.addCoincident(arc.centerSketchPoint, pt_ctr)
+
+    # Level line from the tangent point forward — shares pt_tan with the
+    # arc so createPath can chain them. Constrained level in frame
+    # terms; the front end's remaining DOF is closed by the world-Y dim.
+    level_line = path_sk.sketchCurves.sketchLines.addByTwoPoints(
+        pt_tan, P3.create(ps_front.x, ps_front.y, 0))
+    if world_y_is_sketch_h:
+        gc_pa.addHorizontal(level_line)
+    else:
+        gc_pa.addVertical(level_line)
+    if pa_anchor is not None:
+        sp.rdim(path_sk, path_dims, pa_anchor, level_line.endSketchPoint,
+                orient_pa, "y", "scoop_front_y - leg_size")
+    else:
+        _g = level_line.endSketchPoint.geometry
         path_dims.addDistanceDimension(
-            origin_pa, arc.startSketchPoint, orient_pa['z'],
-            P3.create(ps_start.x - 2, ps_start.y, 0)
-        ).parameter.expression = "seat_h + scoop_depth"
-        path_dims.addDistanceDimension(
-            origin_pa, arc.startSketchPoint, orient_pa['y'],
-            P3.create(ps_start.x, ps_start.y + 2, 0)
-        ).parameter.expression = "scoop_back_y"
-        path_dims.addDistanceDimension(
-            origin_pa, level_line.endSketchPoint, orient_pa['y'],
-            P3.create(ps_front.x, ps_front.y + 2, 0)
+            path_sk.originPoint, level_line.endSketchPoint,
+            orient_pa['y'], P3.create(_g.x, _g.y + 2, 0)
         ).parameter.expression = "scoop_front_y"
+
+    # A wrong-branch arc fails the sweep with a cryptic error — verify
+    # and fail loudly instead, covering both historical failure modes:
+    # MAJOR (length) and MIRROR (tangent point position).
+    s2m_pa = path_sk.sketchToModelSpace
+    _end_w = s2m_pa(pt_tan.geometry)
+    if arc.length > 0.5 * math.pi * arc.radius:
+        raise RuntimeError(
+            f"SEAT SCOOP path solved as the MAJOR arc "
+            f"(length {arc.length:.2f} cm, radius {arc.radius:.2f} cm); "
+            f"expected the short tangent transition")
+    if abs(_end_w.y - cy) > 0.05 or abs(_end_w.z - seat_top_z) > 0.05:
+        raise RuntimeError(
+            f"SEAT SCOOP tangent point solved at (y={_end_w.y:.3f}, "
+            f"z={_end_w.z:.3f}) cm; expected (y={cy:.3f}, "
+            f"z={seat_top_z:.3f}) — arc re-seated on a wrong branch")
 
     # Create chained path from arc (picks up connected level_line)
     sweep_path = seat_c.features.createPath(arc, True)

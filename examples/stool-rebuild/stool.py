@@ -412,94 +412,32 @@ def run(context):
     split_feat = legs_c.features.splitBodyFeatures.add(split_inp)
     split_feat.name = "Split1"
 
-    # Multi-tool split workaround: expected 3 pieces from 1 body
-    # API only supports 1 tool per split — try additional planes
-    _pre_count = legs_c.bRepBodies.count
-    _need = 3 - (legs_c.bRepBodies.count - _pre_count + 2)
-    # 2 = minimum pieces from first split
-    _got = 0
-    for _bi in range(legs_c.bRepBodies.count):
-        _bn = legs_c.bRepBodies.item(_bi).name
-        import re as _re
-        if _re.sub(r"(\s*\(\d+\))+\s*$", "", _bn) == "Leg_NL": _got += 1
-    if _got < 3:
-        # Try each construction plane as supplementary split tool
-        _biggest = None
-        for _bi in range(legs_c.bRepBodies.count):
-            _b = legs_c.bRepBodies.item(_bi)
-            if _re.sub(r"(\s*\(\d+\))+\s*$", "", _b.name) == "Leg_NL":
-                if _biggest is None or _b.volume > _biggest.volume: _biggest = _b
-        if _biggest:
-            # Try every candidate tool, score by volume match, pick best
-            _tools = []
-            for _pi in range(legs_c.constructionPlanes.count):
-                _tools.append(legs_c.constructionPlanes.item(_pi))
-            for _bi3 in range(legs_c.bRepBodies.count):
-                _bod = legs_c.bRepBodies.item(_bi3)
-                if _bod != _biggest:
-                    for _fi in range(_bod.faces.count):
-                        _tools.append(_bod.faces.item(_fi))
-            # Record pre-supplementary volumes to detect new pieces
-            _pre_vols = set()
-            for _bi4 in range(legs_c.bRepBodies.count):
-                _pre_vols.add(round(legs_c.bRepBodies.item(_bi4).volume, 4))
-            _best_tool = None
-            _best_new_vol = 1e10
-            for _pl in _tools:
-                try:
-                    _si = legs_c.features.splitBodyFeatures.createInput(_biggest, _pl, True)
-                    _sf = legs_c.features.splitBodyFeatures.add(_si)
-                    # Find the smallest NEW piece (not in pre-split volumes)
-                    _new_min = 1e10
-                    for _bi2 in range(legs_c.bRepBodies.count):
-                        _bx = legs_c.bRepBodies.item(_bi2)
-                        _bv = round(_bx.volume, 4)
-                        if _bv not in _pre_vols and _bv < _new_min: _new_min = _bv
-                    if _new_min < _best_new_vol:
-                        _best_new_vol = _new_min
-                        _best_tool = _pl
-                    _sf.deleteMe()
-                except:
-                    pass
-            # Apply the best tool (smallest new piece = closest to trim waste)
-            if _best_tool is not None:
-                _si = legs_c.features.splitBodyFeatures.createInput(_biggest, _best_tool, True)
-                _sf = legs_c.features.splitBodyFeatures.add(_si)
-                _sf.name = "Split1_sup"
-    _found = set()
-    Seat = find_body("Seat")
-    if Seat: _found.add("Seat")
-    Leg_NL_1 = find_body("Leg_NL (1)")
-    if Leg_NL_1: _found.add("Leg_NL (1)")
-    Leg_NL_2 = find_body("Leg_NL (2)")
-    if Leg_NL_2: _found.add("Leg_NL (2)")
-    Leg_NL = find_body("Leg_NL")
-    if Leg_NL: _found.add("Leg_NL")
-    _expected = ['Seat', 'Leg_NL (1)', 'Leg_NL (2)', 'Leg_NL']
-    _missing = [n for n in _expected if n not in _found]
-    if _missing:
-        _unmatched = []
-        for _bi in range(legs_c.bRepBodies.count):
-            _b = legs_c.bRepBodies.item(_bi)
-            if _b.name not in _found: _unmatched.append(_b)
-        _unmatched.sort(key=lambda b: -b.volume)
-        _missing.sort(key=lambda n: -max((b.volume for b in _unmatched), default=0) if not any(b.name == n for b in _unmatched) else 0)
-        for _nm in _missing:
-            if _unmatched:
-                _ub = _unmatched.pop(0)
-                _ub.name = _nm
-        if not Seat: Seat = find_body("Seat")
-        if not Leg_NL_1: Leg_NL_1 = find_body("Leg_NL (1)")
-        if not Leg_NL_2: Leg_NL_2 = find_body("Leg_NL (2)")
-        if not Leg_NL: Leg_NL = find_body("Leg_NL")
+    # [12b] SplitBody: Split1_sup — trim the leg flush with the Seat's TOP
+    # face (z = seat_z + seat_t). Split1 severed the foot shim; this second
+    # cut severs the sweep-shoulder offcut above the seat. The tool face
+    # lives in seat_c, so the split is a cross-component operation and goes
+    # in root via assembly proxies (same rule as cross-component combines).
+    import re as _re
+    def _leg_fragments():
+        return [legs_c.bRepBodies.item(_i) for _i in range(legs_c.bRepBodies.count)
+                if _re.sub(r"(\s*\(\d+\))+\s*$", "",
+                           legs_c.bRepBodies.item(_i).name) == "Leg_NL"]
 
-    # [13] Remove: RemoveBody-Leg_NL (in legs_c)
-    _rm = Leg_NL
-    if _rm: legs_c.features.removeFeatures.add(_rm)
+    _biggest = max(_leg_fragments(), key=lambda b: b.volume)
+    _seat_top = find_face(sp.body_for_root(find_body("Seat"), root), "z", +1)
+    _si = root.features.splitBodyFeatures.createInput(
+        sp.body_for_root(_biggest, root), _seat_top, True)
+    _sf = root.features.splitBodyFeatures.add(_si)
+    _sf.name = "Split1_sup"
 
-    # [14] Remove: RemoveBody-Leg_NL (2) (in legs_c)
-    _rm = Leg_NL_2
-    if _rm: legs_c.features.removeFeatures.add(_rm)
+    # [13][14] Remove offcuts, keep the leg. Deterministic selection: of the
+    # three fragments (leg-with-tenon ~185 cm³, shoulder offcut ~16, foot
+    # shim ~1.2) the leg is always the largest by a wide margin.
+    _frags = sorted(_leg_fragments(), key=lambda b: -b.volume)
+    Leg_NL_1 = _frags[0]
+    for _b in _frags[1:]:
+        legs_c.features.removeFeatures.add(_b)
+    Leg_NL_1.name = "Leg_NL (1)"
 
     # Body-relative refs: Leg_NR depends on Seat
     ref_body = find_body("Seat")
