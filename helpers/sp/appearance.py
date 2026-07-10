@@ -5,28 +5,39 @@ import os as _os
 
 Point3D = adsk.core.Point3D
 
+# Wood species → ordered appearance search terms. Terms are tried strictly
+# in order, so later entries are stand-in species for libraries that lack the
+# real one. The stock library ("Fusion Appearance Library", renamed from
+# "Fusion 360 Appearance Library") ships woods named plainly ("Oak",
+# "Walnut") — as of 2026-07: Bamboo, Cherry, Mahogany, Oak, Pine, Walnut
+# plus "3D " procedural variants. Every chain ends in one of those.
 _SPECIES_MAP = {
-    "cherry":      ["Cherry"],
+    "cherry":      ["Cherry", "Mahogany", "Walnut"],
     "walnut":      ["Walnut"],
     "oak":         ["Oak"],
-    "white oak":   ["Oak"],
-    "red oak":     ["Oak"],
-    "maple":       ["Maple", "Oak"],
+    "white oak":   ["White Oak", "Oak, White", "Oak"],
+    "red oak":     ["Red Oak", "Oak, Red", "Oak"],
+    "maple":       ["Maple", "Beech", "Oak"],
     "ash":         ["Ash", "Oak"],
-    "birch":       ["Birch", "Oak"],
-    "pine":        ["Pine"],
-    "cedar":       ["Cedar", "Pine"],
-    "mahogany":    ["Mahogany"],
-    "teak":        ["Teak", "Mahogany"],
-    "beech":       ["Beech", "Oak"],
+    "birch":       ["Birch", "Maple", "Oak"],
+    "pine":        ["Pine", "Fir", "Oak"],
+    "cedar":       ["Cedar", "Pine", "Oak"],
+    "mahogany":    ["Mahogany", "Sapele", "Walnut"],
+    "teak":        ["Teak", "Mahogany", "Walnut"],
+    "beech":       ["Beech", "Maple", "Oak"],
     "poplar":      ["Poplar", "Oak"],
-    "hickory":     ["Hickory", "Oak"],
+    "hickory":     ["Hickory", "Ash", "Oak"],
     "ebony":       ["Ebony", "Walnut"],
     "rosewood":    ["Rosewood", "Walnut"],
-    "sapele":      ["Sapele", "Mahogany"],
+    "sapele":      ["Sapele", "Mahogany", "Walnut"],
     "bamboo":      ["Bamboo"],
-    "douglas fir": ["Douglas Fir", "Pine"],
+    "douglas fir": ["Douglas Fir", "Fir", "Pine", "Oak"],
 }
+
+# Stand-in bases when a _SPECIES_TEXTURE base is missing from the installed
+# libraries. Any stock wood works as a base: the bitmap is swapped and
+# reflectance overridden, so the base only supplies the shader plumbing.
+_BASE_FALLBACKS = ["Walnut", "Oak"]
 
 _SPECIES_TEXTURE = {
     "teak":              {"base": "Mahogany", "texture": "teak.jpg",
@@ -151,6 +162,53 @@ def _natural_size_cm(cfg, axis, eg=False):
     if unit == "in":
         return val * 2.54
     return val
+
+
+def _library_appearances():
+    """Yield (library, appearance) across all material libraries.
+
+    Guarded per library — some libraries (material-only or cloud libraries)
+    can raise when their appearances are enumerated, and one bad library
+    must not abort the whole scan.
+    """
+    app = adsk.core.Application.get()
+    libs = app.materialLibraries
+    for li in range(libs.count):
+        lib = libs.item(li)
+        try:
+            lib_appearances = lib.appearances
+            n = lib_appearances.count
+        except Exception:
+            continue
+        for ai in range(n):
+            try:
+                yield lib, lib_appearances.item(ai)
+            except Exception:
+                continue
+
+
+def _find_base_appearance(base_name):
+    """Find a library appearance to serve as a texture-swap base.
+
+    Tries `base_name` exactly, then _BASE_FALLBACKS — installed libraries
+    vary by Fusion version and the stock library has been renamed and
+    reshuffled before ("Fusion Appearance Library", previously "Fusion 360
+    Appearance Library"), so a declared base may be absent. Prefers
+    appearance libraries (both library names contain "appearance") and
+    skips "3D " variants.
+    """
+    for name in [base_name] + [f for f in _BASE_FALLBACKS if f != base_name]:
+        best = None
+        for lib, a in _library_appearances():
+            if a.name != name or a.name.startswith("3D "):
+                continue
+            if "appearance" in lib.name.lower():
+                return a
+            if best is None:
+                best = a
+        if best:
+            return best
+    return None
 
 
 def fit_scale_y_cm(body, species_key,
@@ -308,24 +366,12 @@ def per_body_appearance(body, species_key):
     local = design.appearances.itemByName(local_name)
     if not local:
         base_name = cfg.get("base", "Mahogany")
-        base_app = None
-        libs = app.materialLibraries
-        for li in range(libs.count):
-            lib = libs.item(li)
-            for ai in range(lib.appearances.count):
-                a = lib.appearances.item(ai)
-                if a.name == base_name and not a.name.startswith("3D "):
-                    if "appearance" in lib.name.lower():
-                        base_app = a
-                        break
-                    if base_app is None:
-                        base_app = a
-            if base_app and "appearance" in lib.name.lower():
-                break
+        base_app = _find_base_appearance(base_name)
         if base_app is None:
             raise RuntimeError(
                 f"Cannot create appearance for '{species_key}': "
-                f"base '{base_name}' not found in material libraries")
+                f"base '{base_name}' (and fallbacks {_BASE_FALLBACKS}) "
+                f"not found in material libraries")
         local = design.appearances.addByCopy(base_app, local_name)
 
     _apply_custom_texture(local, species_key)
@@ -463,6 +509,33 @@ def _grain_transform(grain_dir):
     return m
 
 
+def ensure_custom_appearance(species_key):
+    """Get or create the shared design-local SP_<species_key> appearance
+    with the species texture from textures/wood/ applied.
+
+    Returns None if species_key has no _SPECIES_TEXTURE entry, no usable
+    base appearance exists in the libraries, or the texture file is missing
+    — callers should fall back to a plain library-species lookup.
+    """
+    cfg = _SPECIES_TEXTURE.get(species_key)
+    if not cfg:
+        return None
+    app = adsk.core.Application.get()
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    if not design:
+        return None
+    local_name = f"SP_{species_key}"
+    local = design.appearances.itemByName(local_name)
+    if not local:
+        base_app = _find_base_appearance(cfg.get("base", "Mahogany"))
+        if base_app is None:
+            return None
+        local = design.appearances.addByCopy(base_app, local_name)
+    if not _apply_custom_texture(local, species_key, _force=True):
+        return None
+    return local
+
+
 def apply_appearance(species="white oak", bodies=None):
     """Apply wood appearance to bodies with grain-aligned texture.
 
@@ -491,23 +564,11 @@ def apply_appearance(species="white oak", bodies=None):
         local_name = f"SP_{species_lower}"
         local = design.appearances.itemByName(local_name)
         if not local:
-            base_app = None
-            libs = app.materialLibraries
-            for li in range(libs.count):
-                lib = libs.item(li)
-                for ai in range(lib.appearances.count):
-                    a = lib.appearances.item(ai)
-                    if a.name == base_name and not a.name.startswith("3D "):
-                        if "appearance" in lib.name.lower():
-                            base_app = a
-                            break
-                        if base_app is None:
-                            base_app = a
-                if base_app and "appearance" in lib.name.lower():
-                    break
+            base_app = _find_base_appearance(base_name)
             if base_app is None:
-                print(f"WARNING: Base appearance '{base_name}' not found "
-                      f"for custom species '{species}'")
+                print(f"WARNING: Base appearance '{base_name}' (and fallbacks "
+                      f"{_BASE_FALLBACKS}) not found for custom species "
+                      f"'{species}'")
                 return
             local = design.appearances.addByCopy(base_app, local_name)
         if not _apply_custom_texture(local, species_lower, _force=True):
@@ -518,28 +579,27 @@ def apply_appearance(species="white oak", bodies=None):
         search_terms = _SPECIES_MAP.get(species_lower, [species])
         appearance = None
         for term in search_terms:
+            t = term.lower()
             for i in range(design.appearances.count):
                 a = design.appearances.item(i)
-                if term.lower() in a.name.lower() and not a.name.startswith("3D "):
+                if t in a.name.lower() and not a.name.startswith("3D "):
                     appearance = a
                     break
             if appearance:
                 break
-            libs = app.materialLibraries
-            for li in range(libs.count):
-                lib = libs.item(li)
-                for ai in range(lib.appearances.count):
-                    a = lib.appearances.item(ai)
-                    if term.lower() in a.name.lower():
-                        if a.name.startswith("3D "):
-                            continue
-                        if "appearance" in lib.name.lower():
-                            appearance = a
-                            break
-                        if appearance is None:
-                            appearance = a
-                if appearance and "appearance" in lib.name.lower():
-                    break
+            best = None
+            best_rank = None
+            for lib, a in _library_appearances():
+                a_name = a.name.lower()
+                if a.name.startswith("3D ") or t not in a_name:
+                    continue
+                # exact name beats substring; appearance libs beat the rest
+                rank = (0 if "appearance" in lib.name.lower() else 1,
+                        0 if a_name == t else 1,
+                        len(a_name))
+                if best_rank is None or rank < best_rank:
+                    best, best_rank = a, rank
+            appearance = best
             if appearance:
                 break
 
@@ -569,21 +629,8 @@ def apply_appearance(species="white oak", bodies=None):
         eg_name = f"SP_{species_lower}_endgrain"
         eg_local = design.appearances.itemByName(eg_name)
         if not eg_local:
-            base_app = None
-            libs = app.materialLibraries
             cfg = _SPECIES_TEXTURE[species_lower]
-            for li in range(libs.count):
-                lib = libs.item(li)
-                for ai in range(lib.appearances.count):
-                    a = lib.appearances.item(ai)
-                    if a.name == cfg["base"] and not a.name.startswith("3D "):
-                        if "appearance" in lib.name.lower():
-                            base_app = a
-                            break
-                        if base_app is None:
-                            base_app = a
-                if base_app and "appearance" in lib.name.lower():
-                    break
+            base_app = _find_base_appearance(cfg.get("base", "Mahogany"))
             if base_app:
                 eg_local = design.appearances.addByCopy(base_app, eg_name)
         if eg_local:
