@@ -21,32 +21,43 @@ import adsk.fusion
 
 app = adsk.core.Application.get()
 
-# Wood species → Fusion appearance library search terms.
-# Fusion 360's built-in "Fusion 360 Appearance Library" has wood appearances
-# named like "Wood (Cherry)", "Wood (Walnut)", etc. We map common species
-# names to search patterns.
+# Wood species → ordered appearance search terms. Terms are tried strictly
+# in order, so later entries are stand-in species for libraries that lack
+# the real one. The stock library ("Fusion Appearance Library", renamed from
+# "Fusion 360 Appearance Library") ships woods named plainly ("Oak",
+# "Walnut") — as of 2026-07: Bamboo, Cherry, Mahogany, Oak, Pine, Walnut
+# plus "3D " procedural variants. Species beyond that set (teak, ash,
+# hickory, ...) need a fallback chain ending in a stock wood; when a
+# stand-in is used the tool reports it in the result's "note" field.
 SPECIES_MAP = {
-    "cherry":     ["Cherry"],
+    "cherry":     ["Cherry", "Mahogany", "Walnut"],
     "walnut":     ["Walnut"],
     "oak":        ["Oak"],
-    "white oak":  ["Oak, White", "Oak"],
-    "red oak":    ["Oak, Red", "Oak"],
-    "maple":      ["Maple", "Oak"],
+    "white oak":  ["White Oak", "Oak, White", "Oak"],
+    "red oak":    ["Red Oak", "Oak, Red", "Oak"],
+    "maple":      ["Maple", "Beech", "Oak"],
     "ash":        ["Ash", "Oak"],
-    "birch":      ["Birch", "Oak"],
-    "pine":       ["Pine"],
-    "cedar":      ["Cedar", "Pine"],
-    "mahogany":   ["Mahogany"],
-    "teak":       ["Teak"],
-    "beech":      ["Beech"],
-    "poplar":     ["Poplar"],
-    "hickory":    ["Hickory"],
-    "ebony":      ["Ebony"],
-    "rosewood":   ["Rosewood"],
-    "sapele":     ["Sapele"],
+    "birch":      ["Birch", "Maple", "Oak"],
+    "pine":       ["Pine", "Fir", "Oak"],
+    "cedar":      ["Cedar", "Pine", "Oak"],
+    "mahogany":   ["Mahogany", "Sapele", "Walnut"],
+    "teak":       ["Teak", "Mahogany", "Walnut"],
+    "beech":      ["Beech", "Maple", "Oak"],
+    "poplar":     ["Poplar", "Oak"],
+    "hickory":    ["Hickory", "Ash", "Oak"],
+    "ebony":      ["Ebony", "Walnut"],
+    "rosewood":   ["Rosewood", "Walnut"],
+    "sapele":     ["Sapele", "Mahogany", "Walnut"],
     "bamboo":     ["Bamboo"],
-    "douglas fir": ["Douglas Fir", "Fir"],
+    "douglas fir": ["Douglas Fir", "Fir", "Pine", "Oak"],
 }
+
+# Substrings that identify a wood appearance in the hint listing. The old
+# check ("wood" in the appearance name) matched the pre-rename "Wood
+# (Cherry)"-style names and finds nothing in the current library, where
+# woods are named plainly ("Oak", "Walnut", "Bamboo Light - Semigloss").
+_WOOD_TERMS = sorted(
+    {t.lower() for terms in SPECIES_MAP.values() for t in terms} | {"wood"})
 
 
 def _find_body_recursive(comp, name):
@@ -269,58 +280,87 @@ def _grain_transform(grain_dir):
     return m
 
 
+def _iter_library_appearances():
+    """Yield (library, appearance) across all material libraries.
+
+    Guarded per library — some libraries (material-only or cloud libraries)
+    can raise when their appearances are enumerated, and one bad library
+    must not abort the whole scan.
+    """
+    libs = app.materialLibraries
+    for li in range(libs.count):
+        lib = libs.item(li)
+        try:
+            lib_appearances = lib.appearances
+            n = lib_appearances.count
+        except Exception:
+            continue
+        for ai in range(n):
+            try:
+                yield lib, lib_appearances.item(ai)
+            except Exception:
+                continue
+
+
 def _find_appearance(species):
-    """Search Fusion 360 material libraries for a wood appearance matching
-    the given species name.
+    """Search Fusion material libraries for a wood appearance matching the
+    given species name.
 
-    Strategy:
-    1. Look in the design's local appearances first (user may have customized)
-    2. Search all material libraries for appearances containing the species name
-    3. Prefer appearances from "Fusion Appearance Library" or "Fusion 360"
+    Search terms are tried strictly in order, so a stand-in species (e.g.
+    walnut for teak) is only used when no earlier term matches. Per term:
+    1. the design's local appearances win (user may have customized),
+    2. then all material libraries, preferring appearance libraries (both
+       the current "Fusion Appearance Library" and the pre-rename
+       "Fusion 360 Appearance Library" names contain "appearance"), exact
+       name matches, and non-"3D" variants.
 
-    Returns: (Appearance, source_description) or (None, error_msg)
+    Returns: (Appearance, source_description, matched_term)
+             or (None, error_msg, None)
     """
     design = adsk.fusion.Design.cast(app.activeProduct)
     species_lower = species.lower().strip()
-
-    # Get search terms
     search_terms = SPECIES_MAP.get(species_lower, [species])
 
-    # 1. Check design's local appearances
-    for i in range(design.appearances.count):
-        a = design.appearances.item(i)
-        a_name = a.name.lower()
-        for term in search_terms:
-            if term.lower() in a_name:
-                return a, f"design:{a.name}"
+    for term in search_terms:
+        t = term.lower()
 
-    # 2. Search material libraries — prefer Fusion Appearance Library
-    libs = app.materialLibraries
-    best = None
-    best_source = ""
+        # 1. Design-local appearances
+        for i in range(design.appearances.count):
+            a = design.appearances.item(i)
+            if t in a.name.lower():
+                return a, f"design:{a.name}", term
 
-    for li in range(libs.count):
-        lib = libs.item(li)
-        lib_appearances = lib.appearances
-
-        for ai in range(lib_appearances.count):
-            a = lib_appearances.item(ai)
+        # 2. Material libraries, ranked
+        best = None
+        best_rank = None
+        best_source = ""
+        for lib, a in _iter_library_appearances():
             a_name = a.name.lower()
+            if t not in a_name:
+                continue
+            rank = (0 if "appearance" in lib.name.lower() else 1,
+                    0 if not a.name.startswith("3D ") else 1,
+                    0 if a_name == t else 1,
+                    len(a_name))
+            if best_rank is None or rank < best_rank:
+                best, best_rank = a, rank
+                best_source = f"{lib.name}:{a.name}"
+        if best:
+            return best, best_source, term
 
-            for term in search_terms:
-                if term.lower() in a_name:
-                    source = f"{lib.name}:{a.name}"
-                    # Prefer the Fusion Appearance Library
-                    if "appearance" in lib.name.lower():
-                        return a, source
-                    if best is None:
-                        best = a
-                        best_source = source
+    return None, f"No appearance found for species '{species}'", None
 
-    if best:
-        return best, best_source
 
-    return None, f"No appearance found for species '{species}'"
+def _list_wood_appearances(limit=30):
+    """Names of wood appearances across all libraries, for error hints."""
+    names = []
+    seen = set()
+    for _lib, a in _iter_library_appearances():
+        n = a.name.lower()
+        if a.name not in seen and any(t in n for t in _WOOD_TERMS):
+            seen.add(a.name)
+            names.append(a.name)
+    return names[:limit]
 
 
 def _copy_to_design(appearance):
@@ -360,29 +400,46 @@ def handler(species: str, bodies: list = None,
         # Analyze dovetail constraints from timeline
         dt_constraints = _analyze_dovetail_constraints(design)
 
-        # Find the appearance
-        appearance, source = _find_appearance(species)
-        if appearance is None:
-            # List available wood appearances for help
-            available = []
-            for li in range(app.materialLibraries.count):
-                lib = app.materialLibraries.item(li)
-                for ai in range(lib.appearances.count):
-                    a = lib.appearances.item(ai)
-                    if "wood" in a.name.lower():
-                        available.append(a.name)
-            avail_str = ", ".join(available[:20])
-            return {
-                "content": [{"type": "text", "text": json.dumps({
-                    "error": source,
-                    "availableWoodAppearances": available[:20],
-                    "hint": f"Available: {avail_str}"
-                }, indent=2)}],
-                "isError": True
-            }
+        # Species with real texture files in the repo (teak & friends):
+        # build the design-local SP_<species> appearance via helpers so the
+        # actual wood texture is used instead of a stand-in stock species.
+        species_key = species.lower().strip()
+        local_appearance = None
+        source = ""
+        note = None
+        try:
+            from helpers.sp import appearance as sp_appearance
+            if species_key in sp_appearance._SPECIES_TEXTURE:
+                local_appearance = sp_appearance.ensure_custom_appearance(
+                    species_key)
+                if local_appearance:
+                    source = f"custom-texture:{local_appearance.name}"
+        except Exception:
+            local_appearance = None
 
-        # Copy to design
-        local_appearance = _copy_to_design(appearance)
+        if local_appearance is None:
+            # Find a library appearance
+            appearance, source, matched_term = _find_appearance(species)
+            if appearance is None:
+                available = _list_wood_appearances()
+                avail_str = ", ".join(available)
+                return {
+                    "content": [{"type": "text", "text": json.dumps({
+                        "error": source,
+                        "availableWoodAppearances": available,
+                        "hint": f"Available: {avail_str}"
+                    }, indent=2)}],
+                    "isError": True
+                }
+
+            primary = SPECIES_MAP.get(species_key, [species])[0]
+            if matched_term != primary:
+                note = (f"No '{primary}' appearance in the installed "
+                        f"libraries; used closest stock match "
+                        f"'{appearance.name}'.")
+
+            # Copy to design
+            local_appearance = _copy_to_design(appearance)
 
         # Resolve target bodies
         if bodies:
@@ -448,6 +505,8 @@ def handler(species: str, bodies: list = None,
             "applied": applied,
             "appliedCount": len(applied),
         }
+        if note:
+            result["note"] = note
         if dt_constraints:
             result["dovetailConstraints"] = {
                 k: list(v) for k, v in dt_constraints.items()
@@ -495,6 +554,13 @@ The texture map is rotated so the wood grain pattern aligns with the detected
 Supported species: cherry, walnut, oak, white oak, red oak, maple, ash, birch,
 pine, cedar, mahogany, teak, beech, poplar, hickory, ebony, rosewood, sapele,
 bamboo, douglas fir.
+
+Species with bundled texture files (teak and variants, brazilian rosewood,
+cocobolo, ziricote, spalted maple) get a real texture via the repo's
+textures/wood/ library. Other species missing from the installed Fusion
+appearance libraries fall back to the closest stock wood (stock woods:
+Bamboo, Cherry, Mahogany, Oak, Pine, Walnut); the result's "note" field
+reports when a stand-in was used.
 
 Examples:
   Apply cherry to all bodies:
