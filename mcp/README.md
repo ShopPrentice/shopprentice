@@ -52,6 +52,45 @@ The installer (`./install.sh --mcp`) auto-configures this. To set it up manually
 }
 ```
 
+## Security
+
+The add-in runs on startup and listens on `localhost:9100` for as long as Fusion is open, and `execute_script` runs arbitrary Python as you. The server therefore refuses any request that looks like it came from a web page:
+
+| Rule | Why |
+|------|-----|
+| Requests carrying an `Origin` header are rejected | Browsers always send it; MCP clients (`mcp-remote`, Claude Code, `codex`, `curl`) never do |
+| `POST` must be `Content-Type: application/json` | Forces a CORS preflight the server does not answer, so a cross-site `fetch()` never delivers its body. Parameters like `; charset=utf-8` are fine |
+| `Host` must name the loopback server | Blocks DNS rebinding |
+| No `Access-Control-Allow-Origin` is sent | A browser cannot read a reply even if a request slips through |
+
+`GET /health` and `GET /tools` are gated too, but exempt from the Content-Type rule so the `curl` examples below keep working.
+
+### Optional shared secret
+
+The rules above stop web pages, not other programs running as you. To also require a token, create the file — it is **opt-in**, and existing client configs keep working unchanged while it is absent:
+
+```bash
+mkdir -p ~/.shopprentice
+umask 077 && openssl rand -hex 32 > ~/.shopprentice/mcp_token
+chmod 600 ~/.shopprentice/mcp_token
+```
+
+Then pass it on every request, as either header:
+
+```bash
+curl -H "X-ShopPrentice-Token: $(cat ~/.shopprentice/mcp_token)" http://localhost:9100/health
+# or:  -H "Authorization: Bearer <token>"
+```
+
+For Claude Code:
+
+```bash
+claude mcp add --transport http -s user fusion360 http://localhost:9100/ \
+  --header "X-ShopPrentice-Token: $(cat ~/.shopprentice/mcp_token)"
+```
+
+The file is re-read per request, so creating or deleting it takes effect without restarting Fusion. Delete it to turn the requirement back off.
+
 ## Workflow with `/woodworking`
 
 1. Invoke `/woodworking` and describe your piece
@@ -75,3 +114,7 @@ curl http://localhost:9100/tools     # lists all 11 tools
 | Add-in not visible | Verify the symlink exists in your AddIns directory |
 | Script errors | Check Fusion 360's Text Commands window for stack traces |
 | MCP server not detected | Restart Claude Code after editing settings.json |
+| `403 Origin header not accepted` | Something browser-like is calling the server. Use an MCP client or `curl`, not a web page |
+| `403 Host header does not name this loopback server` | Connect to `localhost`/`127.0.0.1`, not a hostname that resolves to them |
+| `415 POST requires Content-Type: application/json` | Add `-H "Content-Type: application/json"` to the POST |
+| `401 Missing or invalid ShopPrentice MCP token` | `~/.shopprentice/mcp_token` exists — send the token header, or delete the file |
