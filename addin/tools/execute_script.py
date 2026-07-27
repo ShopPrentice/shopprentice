@@ -41,6 +41,51 @@ def _pin_helpers_to_main():
     return main
 
 
+# Colon-separated extra roots for users who keep model scripts outside
+# the repo.  Read from the Fusion process environment, which no MCP
+# caller can influence — unlike script_path itself.
+SCRIPT_ROOTS_ENV = "SHOPPRENTICE_SCRIPT_ROOTS"
+
+
+def _allowed_script_roots():
+    """Directories a tracked ``script_path`` is allowed to live under."""
+    # repo root = three levels up from addin/tools/execute_script.py
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))))
+    roots = [repo_root, os.path.join(os.path.expanduser("~"), ".shopprentice")]
+    roots.extend(p for p in os.environ.get(SCRIPT_ROOTS_ENV, "").split(os.pathsep) if p)
+    return [os.path.realpath(os.path.expanduser(r)) for r in roots]
+
+
+def validate_script_path(script_path):
+    """Vet a caller-supplied ``script_path``; returns ``(safe_path, error)``.
+
+    ``script_path`` arrives over MCP and is *stored*, not used: the
+    palette's Rebuild button writes the patched script to it much later,
+    on a click the user makes for unrelated reasons.  Unvalidated that is
+    an arbitrary-file-overwrite primitive with a delayed fuse — point it
+    at ``~/.zshrc``, a LaunchAgent plist, or a ``sitecustomize.py`` on
+    sys.path and the next Rebuild plants attacker-chosen Python.
+
+    So: resolve symlinks, require a real ``.py`` file, and require
+    containment under a root we own.  Rejection returns a message rather
+    than dropping the path silently — a Rebuild that quietly stops
+    writing is indistinguishable from a bug.
+    """
+    if not script_path:
+        return None, None
+    resolved = os.path.realpath(os.path.expanduser(str(script_path)))
+    if not resolved.endswith(".py"):
+        return None, (f"script_path must be a .py file — refusing {script_path!r}")
+    roots = _allowed_script_roots()
+    if not any(resolved == r or resolved.startswith(r + os.sep) for r in roots):
+        return None, (
+            f"script_path must live under one of {roots} — refusing "
+            f"{script_path!r}. Set {SCRIPT_ROOTS_ENV} to allow another root."
+        )
+    return resolved, None
+
+
 def _execute_sandbox(script):
     """Run script in a throwaway document and return a design snapshot."""
     import adsk.fusion
@@ -335,6 +380,13 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
             "isError": True,
         }
 
+    # Vet script_path at the trust boundary, before anything stores it.
+    # A rejected path only disables palette write-back / auto-reclaim —
+    # the build itself still runs — but the caller is told why.
+    script_path, script_path_error = validate_script_path(script_path)
+    if script_path_error:
+        app.log(f"[security] {script_path_error}")
+
     if sandbox:
         return _execute_sandbox(script)
 
@@ -497,6 +549,16 @@ def handler(script: str, sandbox: bool = False, clean: bool = False,
                     "text": res
                 }
             ]
+        if script_path_error:
+            # Loud, not silent: palette Rebuild will not write this file.
+            result.setdefault("content", []).insert(0, {
+                "type": "text",
+                "text": (
+                    f"WARNING: script_path was rejected, so palette Rebuild "
+                    f"will not write parameter changes back to disk. "
+                    f"{script_path_error}"
+                ),
+            })
         return result
     except Exception as e:
         if transaction_started and transacted_doc.isValid:
@@ -588,7 +650,7 @@ tool = Tool.create_simple(
 ).add_input_property(
     "script_path", {
         "type": "string",
-        "description": "File path of the script on disk. Tracked for palette parameter sync — palette Rebuild writes param changes back to this file."
+        "description": "File path of the script on disk. Tracked for palette parameter sync — palette Rebuild writes param changes back to this file. Must be a .py file inside the repo or ~/.shopprentice; anything else is refused (with a warning in the result) and simply disables write-back."
     }
 ).add_input_property(
     "force_clean", {

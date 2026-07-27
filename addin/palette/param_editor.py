@@ -113,14 +113,21 @@ def _refresh_callback(data):
         current_params = _get_user_params()
         patched_script = _patch_script(script, current_params)
 
-        # Write patched script back to file on disk (if path is known)
-        script_path = DocumentTracker._script_path
-        if script_path and os.path.isfile(script_path):
+        # Write patched script back to file on disk (if path is known).
+        # Re-validate at the sink, not just where execute_script stored
+        # it: _script_path is also restored from the on-disk provenance
+        # file after an add-in restart, so it can outlive the call that
+        # vetted it. os.path.isfile() alone would happily overwrite any
+        # existing file this process can write.
+        from tools.execute_script import handler as exec_handler, validate_script_path
+        script_path, path_error = validate_script_path(DocumentTracker._script_path)
+        if path_error:
+            app.log(f"ParamEditor: refusing to write params — {path_error}")
+        elif script_path and os.path.isfile(script_path):
             with open(script_path, "w") as f:
                 f.write(patched_script)
             app.log(f"ParamEditor: saved params to {script_path}")
 
-        from tools.execute_script import handler as exec_handler
         start = time.time()
         # Palette Rebuild is explicit user action — bypass the clean=True
         # provenance guard (may legitimately fire with needsSync=true right

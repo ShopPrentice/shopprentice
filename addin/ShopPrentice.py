@@ -30,7 +30,11 @@ mcp = None
 server = None
 thread = None
 
-HOST = 'localhost'
+# Bind the loopback ADDRESS, not the name: 'localhost' goes through the
+# resolver, and a hosts-file or resolver change could point it somewhere
+# else. The request gate in server/mcp_server.py validates the Host header
+# against this same socket, so the two must agree on a literal.
+HOST = '127.0.0.1'
 PORT = 9100
 
 

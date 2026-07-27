@@ -11,7 +11,9 @@ single-session (legacy) behaviour.
 """
 
 import asyncio
+import hmac
 import json
+import os
 import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -28,6 +30,136 @@ try:
     app = adsk.core.Application.get()
 except:
     pass
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Request gating — DO NOT "simplify" these checks away.
+#
+# The add-in auto-starts with Fusion (runOnStartup) and listens on a
+# loopback port for as long as Fusion is open, so *any* web page the
+# user happens to visit can aim a cross-origin fetch() at it.  The
+# execute_script tool runs arbitrary Python as the user, which makes an
+# unguarded endpoint a drive-by remote-code-execution hole.  Three
+# header checks close the browser vector; each one matters on its own:
+#
+#   1. Origin        Browsers attach it to every cross-origin request
+#                    (and to every cross-origin POST, simple or not).
+#                    Real MCP clients — mcp-remote, Claude Code's HTTP
+#                    transport, mcporter, curl — never send it.  So
+#                    "Origin present" means "a browser sent this", and
+#                    we reject it.  The MCP spec requires local HTTP
+#                    servers to validate Origin for exactly this reason.
+#   2. Content-Type  Requiring application/json on POST makes the
+#                    request non-"simple" under CORS, so a browser must
+#                    preflight with OPTIONS first.  We answer no
+#                    preflight, so the request dies before its body is
+#                    ever delivered.  Without this rule an attacker just
+#                    uses text/plain and skips preflight entirely.
+#   3. Host          Pins the request to our own loopback authority.
+#                    Closes DNS rebinding: attacker.example re-resolved
+#                    to 127.0.0.1 still arrives as Host: attacker.example.
+#
+# Responses deliberately carry no Access-Control-Allow-Origin header —
+# without it a browser cannot read a reply even if a request slips past
+# the checks above.
+# ─────────────────────────────────────────────────────────────────────
+
+# Optional shared secret guarding the *local-process* vector (see
+# read_shared_secret).  Lives beside the add-in's other state.
+TOKEN_FILE = os.path.join(os.path.expanduser("~"), ".shopprentice", "mcp_token")
+
+# Populated by start_mcp_server() once the listening port is known.
+_allowed_hosts = frozenset()
+
+
+def loopback_hosts(port: int) -> frozenset:
+    """``Host:`` values that legitimately name this server's own socket."""
+    hosts = set()
+    for name in ("localhost", "127.0.0.1", "[::1]", "::1"):
+        hosts.add(name)
+        hosts.add(f"{name}:{port}")
+    return frozenset(hosts)
+
+
+def read_shared_secret(path: Optional[str] = None) -> Optional[str]:
+    """Return the optional shared secret, or ``None`` when not configured.
+
+    The header checks above stop web pages, but any *other process* or
+    local account on this machine can still talk to the port directly.
+    Creating ``~/.shopprentice/mcp_token`` (mode 0600) switches on a
+    required token header for every request.
+
+    This is opt-in on purpose: making it mandatory would break every
+    existing client config the moment the add-in is upgraded.  Absent or
+    empty file => unchanged behaviour.
+
+    Read per request (not cached) so creating or deleting the token file
+    takes effect without restarting Fusion.
+    """
+    try:
+        with open(path or TOKEN_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def _token_matches(headers, secret: str) -> bool:
+    """Constant-time check of ``X-ShopPrentice-Token`` / bearer token."""
+    presented = headers.get("X-ShopPrentice-Token")
+    if not presented:
+        auth = headers.get("Authorization") or ""
+        if auth[:7].lower() == "bearer ":
+            presented = auth[7:]
+    if not presented:
+        return False
+    return hmac.compare_digest(presented.strip(), secret)
+
+
+def check_request_allowed(
+    headers,
+    command: str,
+    allowed_hosts=None,
+    secret: Optional[str] = None,
+) -> Tuple[bool, Optional[int], Optional[str]]:
+    """Decide whether an inbound HTTP request may reach the tool surface.
+
+    Returns ``(True, None, None)`` when allowed, else
+    ``(False, status_code, reason)``.  Kept as a pure function of the
+    request headers — no Fusion, no socket — so it can be unit-tested
+    outside Fusion 360 (see ``tests/test_mcp_request_guard.py``).
+
+    *headers* is any case-insensitive mapping with ``.get()`` (the
+    ``email.message.Message`` that BaseHTTPRequestHandler hands us).
+    *secret* of ``None`` means no shared secret is configured.
+
+    Every returned reason is a fixed ASCII literal: it goes into the
+    HTTP status line, so it must never carry caller-controlled text
+    (that would be a response-splitting hole).
+    """
+    # 1. Only browsers send Origin. Legitimate MCP clients never do.
+    if headers.get("Origin") is not None:
+        return False, 403, "Origin header not accepted"
+
+    # 2. Host must name our own loopback socket (anti DNS-rebinding).
+    host = (headers.get("Host") or "").strip().lower()
+    allowed = _allowed_hosts if allowed_hosts is None else allowed_hosts
+    if host not in allowed:
+        return False, 403, "Host header does not name this loopback server"
+
+    # 3. Bodies must be JSON, which forces a CORS preflight we never
+    #    answer.  GET carries no body, and the documented
+    #    `curl http://localhost:9100/health` sends no Content-Type, so
+    #    the rule applies to POST only.
+    if command == "POST":
+        ctype = (headers.get("Content-Type") or "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            return False, 415, "POST requires Content-Type: application/json"
+
+    # 4. Optional shared secret — off unless the user created the file.
+    if secret and not _token_matches(headers, secret):
+        return False, 401, "Missing or invalid ShopPrentice MCP token"
+
+    return True, None, None
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -521,12 +653,58 @@ class SimpleMCPServer:
 class MCPHandler(BaseHTTPRequestHandler):
     """HTTP request handler for MCP protocol over HTTP."""
 
+    # Cap on how much of a *rejected* request body we drain before
+    # replying, so a bogus Content-Length cannot keep us reading.
+    _MAX_DRAIN = 65536
+
     def __init__(self, *args, mcp_server=None, **kwargs):
         self.mcp_server = mcp_server
         super().__init__(*args, **kwargs)
 
+    def _drain_body(self):
+        """Discard a rejected request's body.
+
+        Without this the client sees a connection reset instead of our
+        error response, which turns a clear "you're missing the token"
+        into a mystery for anyone with a misconfigured client.
+        """
+        try:
+            remaining = min(max(int(self.headers.get('Content-Length', 0)), 0),
+                            self._MAX_DRAIN)
+        except (TypeError, ValueError):
+            return
+        while remaining > 0:
+            chunk = self.rfile.read(min(remaining, 8192))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+
+    def _gate(self) -> bool:
+        """Apply the request gate; answer the client and return False on deny.
+
+        Called from every do_* method. Any HTTP method without a do_*
+        handler is already refused by BaseHTTPRequestHandler with 501,
+        so gating GET and POST covers everything that can reach a tool.
+        """
+        allowed, status, reason = check_request_allowed(
+            self.headers, self.command, secret=read_shared_secret(),
+        )
+        if allowed:
+            return True
+        if app:
+            app.log(
+                f"[security] rejected {self.command} {self.path}: {reason} "
+                f"(Origin={self.headers.get('Origin')!r} "
+                f"Host={self.headers.get('Host')!r})"
+            )
+        self._drain_body()
+        self.send_error(status, reason)
+        return False
+
     def do_POST(self):
         """Handle MCP protocol requests"""
+        if not self._gate():
+            return
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
@@ -549,6 +727,10 @@ class MCPHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Handle GET requests for health checks"""
+        # Gated too: /tools leaks the whole tool surface, and a wide-open
+        # /health is a fingerprint telling a page the add-in is running.
+        if not self._gate():
+            return
         if self.path == '/health':
             self._send_json_response({"status": "healthy", "server": "ShopPrentice"})
         elif self.path == '/tools':
@@ -566,7 +748,10 @@ class MCPHandler(BaseHTTPRequestHandler):
         """Send JSON response, optionally including ``Mcp-Session-Id``."""
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
+        # No Access-Control-Allow-Origin: a browser must not be able to
+        # read these replies. Removing the old wildcard is the backstop
+        # behind the Origin/Host/Content-Type gate.
+        self.send_header('X-Content-Type-Options', 'nosniff')
         if session_id:
             self.send_header('Mcp-Session-Id', session_id)
         self.end_headers()
@@ -580,13 +765,21 @@ class MCPHandler(BaseHTTPRequestHandler):
 
 
 def start_mcp_server(
-    host: str = 'localhost',
+    host: str = '127.0.0.1',
     port: int = 9100,
     tools: Optional[Dict[str, Any]] = None,
     resources: Optional[Dict[str, Any]] = None
 ) -> Tuple[Optional[SimpleMCPServer], Optional[ThreadedHTTPServer], Optional[threading.Thread]]:
-    """Start the ShopPrentice MCP server over HTTP."""
+    """Start the ShopPrentice MCP server over HTTP.
+
+    *host* defaults to the literal loopback address rather than the name
+    ``localhost`` so a hijacked resolver cannot widen the bind.
+    """
+    global _allowed_hosts
     try:
+        # Teach the request gate which Host: values name this socket.
+        _allowed_hosts = loopback_hosts(port)
+
         mcp = SimpleMCPServer("ShopPrentice")
 
         if tools:
@@ -612,9 +805,10 @@ def start_mcp_server(
         )
         server_thread.start()
 
-        print(f"ShopPrentice server started on http://{host}:{port}")
+        auth = "token required" if read_shared_secret() else f"no token ({TOKEN_FILE} absent)"
+        print(f"ShopPrentice server started on http://{host}:{port} [{auth}]")
         if app:
-            app.log(f"ShopPrentice server started on http://{host}:{port}")
+            app.log(f"ShopPrentice server started on http://{host}:{port} [{auth}]")
         return mcp, http_server, server_thread
 
     except Exception as e:

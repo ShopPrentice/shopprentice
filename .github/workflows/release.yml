@@ -17,16 +17,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Extract version from tag
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Package skill
-        run: ./dev/package-clawhub.sh "${{ steps.version.outputs.version }}"
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: ./dev/package-clawhub.sh "$VERSION"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: |
             dist/shopprentice-${{ steps.version.outputs.version }}.skill
@@ -40,16 +43,19 @@ jobs:
           node-version: '20'
 
       - name: Install ClawHub CLI
-        run: npm i -g clawhub
+        run: npm i -g clawhub@0.23.1
 
       - name: Generate SKILL.md for ClawHub publish
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           # Extract SKILL.md from the packaged .skill zip
-          unzip -o dist/shopprentice-${{ steps.version.outputs.version }}.skill SKILL.md -d .
+          unzip -o "dist/shopprentice-${VERSION}.skill" SKILL.md -d .
 
       - name: Publish to ClawHub
         env:
           CLAWHUB_TOKEN: ${{ secrets.OPENCLAW_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           clawhub auth login --token "$CLAWHUB_TOKEN"
-          clawhub publish . --version "${{ steps.version.outputs.version }}" --no-input
+          clawhub publish . --version "$VERSION" --no-input
