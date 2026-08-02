@@ -166,10 +166,14 @@ def run(context):
     print(">>> Top: 1")
 
     # ==== KICK ====
-    # Anchor to Side_Left (clean Case body). KickFront_Sk is on the xZ plane
-    # (normal y); project Side_Left's front face (y,-1) at corner (0,0,kick_h)
-    # and let reanchor retarget the x/z origin dims (signs via abs()).
-    sk, pr = sp.sketch_rect_model(kick_c, kick_c.xZConstructionPlane,
+    # Anchor to Side_Left (clean Case body). KickFront_Sk is on an xZ-parallel
+    # plane RECESSED to y=kick_inset (the kick is set back from the case front
+    # for toe clearance). Sketching on the bare xZ plane (y=0) would flatten the
+    # y=kick_inset origin onto y=0 and build the kick flush with the front —
+    # the off-plane-origin bug. reanchor then retargets the in-plane x/z dims.
+    kick_f_pl = sp.off_plane(kick_c, kick_c.xZConstructionPlane,
+                             "kick_inset", "KickF_Pl")
+    sk, pr = sp.sketch_rect_model(kick_c, kick_f_pl,
         ("kick_inset", "kick_inset", "0 in"),
         {"x": "case_w - 2 * kick_inset", "z": "kick_h"}, "KickFront_Sk", ev)
     pr = (sp.reanchor(sk, ref_side_left, case_occ, "y", -1,
@@ -184,9 +188,12 @@ def run(context):
     k_ymid = sp.off_plane(kick_c, kick_c.xZConstructionPlane, "case_d / 2", "KYMid")
     sp.mirror_feats(kick_c, [kf_ext], k_ymid, "KickBackMir").bodies.item(0).name = "Kick_Back"
 
-    # KickLeft_Sk on the yZ plane (normal x); project Side_Left's left face
-    # (x,-1) at corner (0,0,kick_h) and reanchor the y/z origin dims.
-    sk, pr = sp.sketch_rect_model(kick_c, kick_c.yZConstructionPlane,
+    # KickLeft_Sk on a yZ-parallel plane RECESSED to x=kick_inset (kick set in
+    # from the case side). Bare yZ (x=0) would flatten the x=kick_inset origin
+    # onto x=0 and build the kick flush with the side — the off-plane-origin bug.
+    kick_l_pl = sp.off_plane(kick_c, kick_c.yZConstructionPlane,
+                             "kick_inset", "KickL_Pl")
+    sk, pr = sp.sketch_rect_model(kick_c, kick_l_pl,
         ("kick_inset", "kick_inset + board_thick", "0 in"),
         {"y": "case_d - 2 * kick_inset - 2 * board_thick", "z": "kick_h"},
         "KickLeft_Sk", ev)
