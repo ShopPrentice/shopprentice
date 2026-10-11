@@ -1,11 +1,13 @@
 ---
 name: woodworking
-description: Use when the user wants to design, modify, or analyze parametric furniture in Fusion 360 with ShopPrentice. Applies to greenfield builds, additive edits to existing models, joinery, hardware, lofted/organic forms, screenshots, and Fusion MCP workflows.
+description: Use when the user wants to design, modify, or analyze parametric furniture in Autodesk Fusion 360 (the local Fusion MCP on localhost:9100). Applies to greenfield builds, additive edits to existing models, joinery, hardware, lofted/organic forms, screenshots, and Fusion MCP workflows. NOT for the shopprentice.com website or its hosted Studio MCP (tools like write_script/build/get_view) — that site has its own engine; use its MCP tools and the shopprentice://skill resource instead, and never drive the website in a browser to build.
 metadata:
   short-description: Fusion 360 parametric furniture modeling with ShopPrentice
 ---
 
 # ShopPrentice For Codex
+
+> **Not for shopprentice.com.** This skill drives Autodesk Fusion 360 on this computer. If the user asks to build on the shopprentice.com website (ShopPrentice Studio), stop here: use that site's own MCP server (connect with `codex mcp add shopprentice --url https://shopprentice.com/mcp`, then `codex mcp login shopprentice`) and load its `shopprentice://skill` resource.
 
 ShopPrentice's primary operating rules live in [`WOODWORKING.md`](WOODWORKING.md). Read that file first when this skill is invoked. It is a generated local copy of the canonical `commands/woodworking.md`, with the user's screenshot-mode config applied at install time.
 
