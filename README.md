@@ -4,6 +4,8 @@ Parametric furniture modeling for Fusion 360, driven by AI agents via MCP.
 
 Describe a piece of furniture in natural language (or show a photo) and ShopPrentice generates a Fusion 360 parametric model, executes it live in Fusion via MCP, and iterates with you until it's right.
 
+> **New: [ShopPrentice Studio](https://shopprentice.com)** — this skill's big sibling, a website built just for woodworking. Connect the AI agent you already use and it designs on our own furniture engine, with no Fusion 360 needed: shop drawings, cut lists, joint strength checks, real wood grain, and a shared library of projects. [How it differs from this skill ↓](#shopprentice-studio-the-skill-grown-into-a-website)
+
 | Overview demo | Getting started tutorial |
 |---|---|
 | [![ShopPrentice Demo](https://img.youtube.com/vi/yb9XpCFWsMs/mqdefault.jpg)](https://www.youtube.com/watch?v=yb9XpCFWsMs) | [![Getting Started](https://img.youtube.com/vi/nQNU3LeYulE/mqdefault.jpg)](https://www.youtube.com/watch?v=nQNU3LeYulE) |
@@ -23,6 +25,33 @@ ShopPrentice agent:
 ```
 
 Rectilinear dimensions are parameter-driven — change any value in the palette or in Modify > Change Parameters and those features recompute incrementally. Organic features (spline outlines, lofted sections, revolved profiles) carry baked fit-point coordinates instead of named dimensions; refine them by dragging control points in Fusion, or prompt the agent to reshape, and it re-bakes the captured points into the script.
+
+## ShopPrentice Studio: the skill, grown into a website
+
+This repo is the **Fusion 360 skill**: your agent writes a script and builds the model inside Fusion on your computer. **[ShopPrentice Studio](https://shopprentice.com)** started from it and went where Fusion can't — a hosted furniture engine made only for woodworking, which any AI agent can drive.
+
+| | **ShopPrentice skill** (this repo) | **[ShopPrentice Studio](https://shopprentice.com)** |
+|---|---|---|
+| Where the model lives | Fusion 360, on your computer | Your studio account, in the browser |
+| What you install | Fusion 360 + this skill | Nothing — add one link to your agent |
+| Which agents | Claude Code, Codex, OpenClaw | Any MCP client: Claude Code, Claude desktop, Codex, Cursor, … |
+| Joinery | 12 joint templates | A joinery vocabulary where every joint must prove it can actually be assembled, with a strength rating |
+| Drawings & cut lists | — | Multi-sheet shop drawings with sections and joint callouts, cut lists with board layout, STEP/STL export |
+| Wood | Fusion appearance textures | A lumber yard of grown wood: each part is cut from a virtual tree, so grain runs true across every face |
+| Upholstery | — | Papercord, leather and cloth seats |
+| Editing | Fusion timeline + parameter palette | Sliders and curve editors your agent sets up for each piece |
+| Sharing | Your own files | A community library to browse, fork and publish |
+| Cost & license | Free, MIT open source | Hosted service; sign in to use |
+
+**Pick the skill** if you want the model in Fusion 360 — its full timeline, your own CAD workflow, everything local. **Pick the Studio** if you want to go from an idea to plans you can take to the bench without opening a CAD program.
+
+To connect your agent to the Studio (it opens a browser sign-in — no API key):
+
+```bash
+claude mcp add --transport http shopprentice https://shopprentice.com/mcp
+```
+
+Codex, Claude desktop, Cursor and other clients: see [shopprentice.com/connect](https://shopprentice.com/connect).
 
 ## Install
 
@@ -172,7 +201,7 @@ Projects are saved to `~/shopprentice-projects/<project-name>/` with a script an
 
 - **Advanced curved forms** — bent laminations, cabriole legs, steam-bent backs, Chinese traditional furniture (sculpted organic solids, turned parts, scooped surfaces, and lofted bodies are already supported — see Organic Shapes above)
 - **More joinery** — castle joint, sliding dovetail, Japanese joinery (mortise & tenon, dovetail, box joint, domino, drawbore, dowel, dado/rabbet, lap, bridle, miter, spline, pocket hole, and wedged tenon are already implemented)
-- **Output** — cut lists, CNC toolpath hints, shop drawings
+- **Output** — cut lists, CNC toolpath hints, shop drawings (cut lists and shop drawings already ship in [ShopPrentice Studio](https://shopprentice.com))
 - **Other CAD platforms** — FreeCAD, Shapr3D, Onshape
 - **Image-to-model** — better dimension extraction and 3D reconstruction from reference photos
 
