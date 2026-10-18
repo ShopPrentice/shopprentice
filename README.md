@@ -4,7 +4,7 @@ Parametric furniture modeling for Fusion 360, driven by AI agents via MCP.
 
 Describe a piece of furniture in natural language (or show a photo) and ShopPrentice generates a Fusion 360 parametric model, executes it live in Fusion via MCP, and iterates with you until it's right.
 
-> **New: [ShopPrentice Studio](https://shopprentice.com)** — this skill's big sibling, a website built just for woodworking. Connect the AI agent you already use and it designs on our own furniture engine, with no Fusion 360 needed: shop drawings, cut lists, joint strength checks, real wood grain, and a shared library of projects. [How it differs from this skill ↓](#shopprentice-studio-the-skill-grown-into-a-website)
+> **New: [ShopPrentice Studio](https://shopprentice.com)** — agent-native CAD for woodworking: bring your own agent, connected over MCP. It is this skill's big sibling, a website built just for woodworking. Connect the AI agent you already use and it designs on our own furniture engine, with no Fusion 360 needed: shop drawings, cut lists, joint strength checks, real wood grain, and a shared library of projects. [How it differs from this skill ↓](#shopprentice-studio-the-skill-grown-into-a-website)
 
 | Overview demo | Getting started tutorial |
 |---|---|
