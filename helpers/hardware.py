@@ -16,7 +16,8 @@ Catalog and STEP files live in the shopprentice repo under hardware/.
     door_flush   — Vertical pin, leaves between boards, hidden.
                    Cabinet door, clean exterior.
 
-STEP model reference frame (McMaster 1603A series):
+STEP model reference frame (catalog brass butt hinges, built by
+dev/make_hardware_steps.py from published sizes; no vendor CAD ships here):
     Pin along X, leaves in XZ plane, thin in Y.
     leaf_a = +Z side, leaf_b = -Z side.
     Leaf plate faces at Y = -0.1473 (screw/outer) and Y = -0.0838 (inner).

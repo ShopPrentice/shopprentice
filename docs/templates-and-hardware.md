@@ -24,7 +24,7 @@ Reference for available reusable templates and hardware. Check this before writi
 
 | Hardware | Function | Status |
 |----------|----------|--------|
-| Butt hinge (McMaster catalog) | `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` | Tested |
+| Butt hinge (catalog) | `hardware.recommend_hinge()` + `hardware.install_butt_hinge()` | Tested |
 | Screw holes | `hardware.cut_screw_holes()` | Tested |
 
 ## Needed Templates (by type)
@@ -45,9 +45,9 @@ Reference for available reusable templates and hardware. Check this before writi
 | Hardware | Needed by types | Priority | Source |
 |----------|----------------|----------|--------|
 | Euro concealed hinge | cabinet, wardrobe | Phase 2 | Blum/Grass catalog dims |
-| Lid stay / chain | chest | Phase 2 | McMaster or generic |
-| Drawer pull / knob | dresser, desk, cabinet, chest | Phase 2 | McMaster or generic cylinder |
-| Catch / latch | cabinet, wardrobe, chest | Phase 2 | McMaster |
+| Lid stay / chain | chest | Phase 2 | Parametric |
+| Drawer pull / knob | dresser, desk, cabinet, chest | Phase 2 | Parametric or generic cylinder |
+| Catch / latch | cabinet, wardrobe, chest | Phase 2 | Parametric |
 | Shelf pin holes | cabinet, bookshelf | Phase 2 | Standard 5mm pattern |
 | Bed rail fastener | bed-frame | Phase 2 | Hook plate + strike plate pair — detachable rail-to-post connection |
 | Bed bolt (IKEA-style) | bed-frame | Phase 2 | Barrel nut + bolt — alternative detachable connection |
