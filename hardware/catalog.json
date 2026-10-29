@@ -1,17 +1,20 @@
 {
   "parts": {
     "1603a2": {
-      "name": "McMaster 1603A2 Brass Surface-Mount Hinge",
+      "name": "Brass butt hinge, 3/4 in (box hinge)",
       "category": "hinge",
-      "step_file": "hinges/1603A2.step",
-      "assembly_step": "assemblies/hinge_1603A2_with_screws.step",
+      "source": "parametric",
+      "step_file": "hinges/brass_butt_hinge_small.step",
+      "assembly_step": "assemblies/brass_butt_hinge_small_with_screws.step",
       "dimensions": {
         "length": "0.75 in",
         "leaf_width": "0.313 in",
         "leaf_thickness": "0.116 in",
+        "plate_thickness": "0.025 in",
         "pin_diameter": "0.066 in",
-        "screw_hole_diameter": "0.086 in",
-        "holes_per_leaf": 1
+        "knuckles": 3,
+        "screw_hole_diameter": "0.129 in",
+        "holes_per_leaf": 2
       },
       "anchor": {
         "origin": [0, 0, 0],
@@ -19,20 +22,23 @@
       },
       "screw": "92114a079",
       "mcmaster_pn": "1603A2",
-      "notes": "Small brass surface-mount hinge. Good for jewelry boxes, small lids under 6 inches."
+      "notes": "Small brass butt hinge. Good for jewelry boxes, small lids under 6 inches. Modelled by dev/make_hardware_steps.py from published sizes; buy as McMaster 1603A2 or any same-size brass butt hinge."
     },
     "1603a3": {
-      "name": "McMaster 1603A3 Brass Surface-Mount Hinge",
+      "name": "Brass butt hinge, 1 in (box hinge)",
       "category": "hinge",
-      "step_file": "hinges/1603A3.step",
-      "assembly_step": "assemblies/hinge_1603A3_with_screws.step",
+      "source": "parametric",
+      "step_file": "hinges/brass_butt_hinge_medium.step",
+      "assembly_step": "assemblies/brass_butt_hinge_medium_with_screws.step",
       "dimensions": {
         "length": "1.0 in",
         "leaf_width": "0.375 in",
         "leaf_thickness": "0.116 in",
+        "plate_thickness": "0.025 in",
         "pin_diameter": "0.066 in",
-        "screw_hole_diameter": "0.086 in",
-        "holes_per_leaf": 1
+        "knuckles": 5,
+        "screw_hole_diameter": "0.129 in",
+        "holes_per_leaf": 2
       },
       "anchor": {
         "origin": [0, 0, 0],
@@ -40,19 +46,22 @@
       },
       "screw": "92114a079",
       "mcmaster_pn": "1603A3",
-      "notes": "Medium brass surface-mount hinge. Good for boxes 6-12 inches, small chests."
+      "notes": "Medium brass butt hinge. Good for boxes 6-12 inches, small chests. Modelled by dev/make_hardware_steps.py from published sizes; buy as McMaster 1603A3 or any same-size brass butt hinge."
     },
     "1603a7": {
-      "name": "McMaster 1603A7 Brass Surface-Mount Hinge",
+      "name": "Brass butt hinge, 2 in (box hinge)",
       "category": "hinge",
-      "step_file": "hinges/1603A7.step",
-      "assembly_step": "assemblies/hinge_1603A7_with_screws.step",
+      "source": "parametric",
+      "step_file": "hinges/brass_butt_hinge_large.step",
+      "assembly_step": "assemblies/brass_butt_hinge_large_with_screws.step",
       "dimensions": {
         "length": "2.0 in",
         "leaf_width": "0.5 in",
         "leaf_thickness": "0.166 in",
+        "plate_thickness": "0.04 in",
         "pin_diameter": "0.086 in",
-        "screw_hole_diameter": "0.212 in",
+        "knuckles": 5,
+        "screw_hole_diameter": "0.258 in",
         "holes_per_leaf": 3
       },
       "anchor": {
@@ -61,12 +70,13 @@
       },
       "screw": "92114a196",
       "mcmaster_pn": "1603A7",
-      "notes": "Large brass surface-mount hinge. Good for chests, blanket boxes, lids over 12 inches."
+      "notes": "Large brass butt hinge. Good for chests, blanket boxes, lids over 12 inches. Modelled by dev/make_hardware_steps.py from published sizes; buy as McMaster 1603A7 or any same-size brass butt hinge."
     },
     "92114a079": {
-      "name": "McMaster 92114A079 #2 x 3/8\" Brass Flat Head Wood Screw",
+      "name": "#2 x 3/8\" Brass Flat Head Wood Screw",
       "category": "screw",
-      "step_file": "screws/92114A079.step",
+      "source": "parametric",
+      "step_file": "screws/wood_screw_2x3-8_flat.step",
       "dimensions": {
         "screw_size": "#2",
         "length": "0.375 in",
@@ -77,23 +87,24 @@
         "origin": [0, 0, 0]
       },
       "mcmaster_pn": "92114A079",
-      "notes": "Brass Phillips flat head wood screw. For 1603A2 and 1603A3 hinges."
+      "notes": "Brass Phillips flat head wood screw. For the 3/4 in and 1 in hinges. Modelled by dev/make_hardware_steps.py; buy as McMaster 92114A079 or any same-size screw."
     },
     "92114a196": {
-      "name": "McMaster 92114A196 #8 x 5/8\" Brass Flat Head Wood Screw",
+      "name": "#8 x 5/8\" Brass Flat Head Wood Screw",
       "category": "screw",
-      "step_file": "screws/92114A196.step",
+      "source": "parametric",
+      "step_file": "screws/wood_screw_8x5-8_flat.step",
       "dimensions": {
         "screw_size": "#8",
         "length": "0.625 in",
-        "head_diameter": "0.332 in",
-        "shank_diameter": "0.166 in"
+        "head_diameter": "0.328 in",
+        "shank_diameter": "0.164 in"
       },
       "anchor": {
         "origin": [0, 0, 0]
       },
       "mcmaster_pn": "92114A196",
-      "notes": "Brass Phillips flat head wood screw. For 1603A7 hinges."
+      "notes": "Brass Phillips flat head wood screw. For the 2 in hinge. Modelled by dev/make_hardware_steps.py; buy as McMaster 92114A196 or any same-size screw."
     }
   },
   "selection_guide": {

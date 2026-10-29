@@ -1,6 +1,8 @@
 # Hardware Catalog
 
-Parametric hardware installation for Fusion 360 furniture models. Imports real McMaster-Carr STEP files, positions them, and CUTs rebate pockets into boards.
+Parametric hardware installation for Fusion 360 furniture models. Imports hardware STEP files, positions them, and CUTs rebate pockets into boards.
+
+The hinge and screw STEP files are our own, built from published sizes by `dev/make_hardware_steps.py` (needs `pip install build123d`, not Fusion). No vendor CAD ships here: McMaster-Carr's terms forbid redistributing theirs, so their part numbers stay in the catalog only as a buy-as reference (`mcmaster_pn`). To change a size, edit `catalog.json` and rerun the script.
 
 ## Catalog
 
@@ -189,12 +191,12 @@ Install a pair at 1/5 and 4/5 of the length along the pin axis. Accepts all `ins
 
 Generic hardware install (pulls, locks, etc.). CUTs the entire part as a mortise.
 
-## McMaster-Carr Parts
+## Catalog Parts
 
-| Part ID | PN | Size | Length | Leaf Width | Screws |
-|---------|-----|------|--------|------------|--------|
-| `1603a2` | 1603A2 | Small | 0.75" | 0.313" | 2x #2 x 3/8" |
-| `1603a3` | 1603A3 | Medium | 1.0" | 0.375" | 4x #2 x 3/8" |
-| `1603a7` | 1603A7 | Large | 2.0" | 0.5" | 6x #8 x 5/8" |
+| Part ID | Part | Length | Leaf Width | Screws | Buy as |
+|---------|------|--------|------------|--------|--------|
+| `1603a2` | Brass butt hinge, small | 0.75" | 0.313" | 4x #2 x 3/8" | McMaster 1603A2 |
+| `1603a3` | Brass butt hinge, medium | 1.0" | 0.375" | 4x #2 x 3/8" | McMaster 1603A3 |
+| `1603a7` | Brass butt hinge, large | 2.0" | 0.5" | 6x #8 x 5/8" | McMaster 1603A7 |
 
-Assembly STEPs in `assemblies/`. Bare hinge STEPs in `hinges/`. Screw STEPs in `screws/`.
+The part IDs are kept from the original catalog so existing scripts keep working. Assembly STEPs in `assemblies/`, bare hinge STEPs in `hinges/`, screw STEPs in `screws/`, all written by `dev/make_hardware_steps.py`.

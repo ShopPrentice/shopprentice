@@ -9,7 +9,7 @@ End-to-end test:
   6. CUT mortise into a test board
   7. Verify body count
 
-This test is self-contained — no manual McMaster-Carr download needed.
+This test is self-contained — no catalog STEP file needed.
 
 Expected bodies:
   T1: 1 board + 1 imported hinge (inside child component) = 1 root body
