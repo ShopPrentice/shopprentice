@@ -206,6 +206,15 @@ When a constraint chain has N terms, at most N-1 can be independent. Choose the 
 - Derived: `open_height = box_height - board_thick - lid_thick - bottom_thick` (usable interior)
 - Or alternatively: `open_height` is the user param and `box_height` is derived — whichever the maker thinks in terms of.
 
+**Principle: parameters are DIMENSIONS, never absolute coordinates.** Every user parameter must be a quantity you could measure on the physical piece — a length, width, thickness, depth, gap, radius, angle, or count. **Never make a parameter an absolute position** (`top_z`, `bottom_z`, `shelf_bot`, `apron_top_z = 24.9 in`). A coordinate parameter is brittle: it does not survive moving the model, and worse, it does not track other changes — bump `table_h` and a hardcoded `sp_botz = 24.9 in` stays put while everything around it rises, silently distorting or breaking the joint.
+
+Positions are **derived in the build from dimensions and references**, not stored as independent parameters:
+- A part's position = its parent's reference face/edge ± a *dimension*. Build the spandrel bottom as `apron_bottom - spandrel_depth` (a depth dimension), not as an absolute `sp_botz`.
+- If you need a named position for readability, make it a **derived expression** of dimensions (`leg_tip_z = table_h - tf_t + leg_embed`) so it tracks every change — never a literal coordinate.
+- The only thing measured from the world origin is the **root** (legs on the floor at Z=0); everything else chains off a parent (rule 10).
+
+**Litmus test:** for each parameter ask *"if the customer moved this table across the room, or made it 2 inches taller, would this value still be correct as written?"* A length/angle/depth passes (it describes the piece). An absolute coordinate fails. If you catch yourself writing a `_z`/`_top`/`_bot` literal as a `params.add(...)`, convert it to a depth/height **extent** and derive the position from a reference.
+
 **Principle: define count, derive spacing.** When elements repeat across a dimension (tails, slats, fingers), make the *count* a user parameter and derive the *spacing* from `board_dimension / count`. This guarantees elements always fill the space exactly. The alternative — defining element width + gap width independently and using `floor()` to compute count — leaves uneven remainders that break symmetry.
 
 **Parametric positions (MANDATORY):** `ev()` is for approximate placement ONLY. Every `ev()` call that positions sketch geometry MUST be followed by `addDistanceDimension` with a parametric expression. Without this, geometry stays at stale positions when parameters change. This was the #1 source of broken models in testing — dog holes, pins, and vise components all failed when parameters changed because they had `ev()` placement without parametric dimensions.
