@@ -76,8 +76,8 @@ def install(comp, post_body, rail_body,
             return None
         tmpl_occ = imported[0][0]
         tmpl_occ.isLightBulbOn = False
-        for bi in range(tmpl_occ.component.bRepBodies.count):
-            tmpl_occ.component.bRepBodies.item(bi).isVisible = False
+        for b in sp.bodies_in(tmpl_occ.component):
+            b.isVisible = False
         _plate_cache[part_id] = tmpl_occ
         hw_mgr._hardware_occurrences.append((tmpl_occ, root))
         return hw_mgr._copy_from_template(tmpl_occ, root)

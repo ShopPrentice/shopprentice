@@ -241,11 +241,7 @@ def kanawa_tsugi(comp, body_a, body_b, splice_face,
     features.append(split_feat)
 
     # Find the two halves (everything except the two timbers)
-    halves = []
-    for i in range(comp.bRepBodies.count):
-        b = comp.bRepBodies.item(i)
-        if b != body_a and b != body_b:
-            halves.append(b)
+    halves = [b for b in sp.bodies_in(comp) if b != body_a and b != body_b]
 
     # Sort: half closer to body_a = half_a
     a_center = _body_center(body_a, grain_axis)

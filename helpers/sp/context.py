@@ -42,3 +42,35 @@ class DesignContext:
         results = []
         _collect_bodies_recursive(comp, pattern, results)
         return results
+
+
+# ── Standalone body lookups (no DesignContext instance needed) ───────────────
+# These are the ONE site for raw `bRepBodies` iteration / name-based body
+# identification. Templates call these instead of rolling their own
+# `_all_bodies`/`_find_body` loops, so the fragile bits (name collisions after
+# mirror/pattern renames, proxy vs native) live in a single hardenable place.
+
+def bodies_in(comp, recursive=False):
+    """All bodies in a component. Shallow by default (the component's own
+    bodies — matches the old per-template `_all_bodies`); pass recursive=True to
+    walk descendants."""
+    if recursive:
+        out = []
+        _collect_bodies_recursive(comp, "*", out)
+        return out
+    return [comp.bRepBodies.item(i) for i in range(comp.bRepBodies.count)]
+
+
+def find_body(name, comp):
+    """Find a body by exact name within `comp` (checks the component's own
+    bodies first, then descendants). Canonical replacement for local
+    `_find_body` helpers."""
+    return _find_body_recursive(comp, name)
+
+
+def find_bodies(pattern, comp):
+    """Bodies whose name matches a glob `pattern` within `comp` (walks
+    descendants)."""
+    out = []
+    _collect_bodies_recursive(comp, pattern, out)
+    return out

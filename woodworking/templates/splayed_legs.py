@@ -357,9 +357,5 @@ def define_stretcher_params(params, name, height_expr,
 
 
 def _find_body(comp, name):
-    """Find body by name in component."""
-    for i in range(comp.bRepBodies.count):
-        b = comp.bRepBodies.item(i)
-        if b.name == name:
-            return b
-    return sp.DesignContext().find_body(name, comp)
+    """Find body by name in component (delegates to sp.find_body)."""
+    return sp.find_body(name, comp)

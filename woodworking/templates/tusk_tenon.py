@@ -321,4 +321,4 @@ def through(comp,
 
 
 def _all_bodies(comp):
-    return [comp.bRepBodies.item(i) for i in range(comp.bRepBodies.count)]
+    return sp.bodies_in(comp)  # single site for raw bRepBodies iteration
