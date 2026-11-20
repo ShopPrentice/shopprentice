@@ -34,6 +34,19 @@ if [ -f "$CLAUDE_SKILL" ]; then
     removed+=("$CLAUDE_SKILL")
 fi
 
+CLAUDE_PLANNER="$HOME/.claude/commands/woodworking-planner.md"
+if [ -f "$CLAUDE_PLANNER" ]; then
+    rm "$CLAUDE_PLANNER"
+    removed+=("$CLAUDE_PLANNER")
+fi
+
+# --- Remove Codex planner skill (only if ShopPrentice-managed) ---
+CODEX_PLANNER="$HOME/.codex/skills/woodworking-planner"
+if [ -f "$CODEX_PLANNER/.shopprentice-managed" ]; then
+    rm -rf "$CODEX_PLANNER"
+    removed+=("$CODEX_PLANNER/")
+fi
+
 # --- Remove /woodworking hint from global CLAUDE.md ---
 CLAUDE_MD="$HOME/.claude/CLAUDE.md"
 HINT_MARKER="<!-- shopprentice -->"

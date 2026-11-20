@@ -211,6 +211,19 @@ Path('$CODEX_SKILL_DIR/SKILL.md').write_text(template)
 "
     printf '%s\n' "$REPO_DIR" > "$CODEX_MANAGED_MARKER"
     echo "Installed woodworking skill to $CODEX_SKILL_DIR"
+
+    # Planner skill: single-file skill, copied straight from the canonical command
+    PLANNER_SKILL_DIR="$CODEX_SKILLS_DIR/woodworking-planner"
+    PLANNER_MARKER="$PLANNER_SKILL_DIR/.shopprentice-managed"
+    if [ -e "$PLANNER_SKILL_DIR" ] && [ ! -f "$PLANNER_MARKER" ]; then
+        echo "Warning: $PLANNER_SKILL_DIR already exists and is not a ShopPrentice-managed install — skipping planner skill."
+    else
+        rm -rf "$PLANNER_SKILL_DIR"
+        mkdir -p "$PLANNER_SKILL_DIR"
+        cp "$REPO_DIR/commands/woodworking-planner.md" "$PLANNER_SKILL_DIR/SKILL.md"
+        printf '%s\n' "$REPO_DIR" > "$PLANNER_MARKER"
+        echo "Installed woodworking-planner skill to $PLANNER_SKILL_DIR"
+    fi
     echo
 fi
 
@@ -230,6 +243,9 @@ if [ "$opt_claude_code" = true ]; then
     patch_screenshot_mode "$CLAUDE_CMD_DIR/woodworking.md" && echo "  Screenshot mode: $SS_MODE"
 
     echo "Installed /woodworking skill to $CLAUDE_CMD_DIR/woodworking.md"
+
+    cp "$REPO_DIR/commands/woodworking-planner.md" "$CLAUDE_CMD_DIR/woodworking-planner.md"
+    echo "Installed /woodworking-planner skill to $CLAUDE_CMD_DIR/woodworking-planner.md"
 
     # Add global hint so agents know /woodworking exists
     CLAUDE_MD="$HOME/.claude/CLAUDE.md"
@@ -322,8 +338,8 @@ fi
 # --- Summary ---
 echo "=== Done ==="
 echo "  Source:  $REPO_DIR"
-[ "$opt_codex" = true ]       && echo "  Codex:       woodworking skill installed"
-[ "$opt_claude_code" = true ] && echo "  Claude Code: /woodworking skill installed"
+[ "$opt_codex" = true ]       && echo "  Codex:       woodworking + woodworking-planner skills installed"
+[ "$opt_claude_code" = true ] && echo "  Claude Code: /woodworking + /woodworking-planner skills installed"
 [ "$opt_mcp" = true ]         && echo "  MCP:         fusion360 server installed + configured"
 echo
 echo "To update later: cd $REPO_DIR && ./install.sh"

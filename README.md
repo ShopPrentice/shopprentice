@@ -72,6 +72,15 @@ Build a 48" x 18" coffee table with tapered legs and a slatted top
 
 In Codex, invoke the `woodworking` skill instead of using the Claude-style slash command.
 
+To plan a piece on paper first — cut list, board feet, sheet-goods layout, joinery for your tools, structural checks, and a build sequence — use the planner:
+
+```
+/woodworking-planner
+Plan a 36" wide bookcase in 3/4" birch ply; I have a table saw and a pocket-hole jig
+```
+
+When the plan is settled, ask for it to be modeled and the agent hands off to `/woodworking`. In Codex, invoke the `woodworking-planner` skill.
+
 The agent can also work from images — show it a photo or sketch of a piece and it will extract dimensions, proportions, and joint types to generate the parametric model.
 
 ## Examples
@@ -164,7 +173,7 @@ All joinery uses the **combine-based** approach: build the tenon/tail as a body,
 
 ```
 shopprentice/
-  commands/            Canonical woodworking instructions + Claude Code entrypoint
+  commands/            Canonical woodworking + woodworking-planner instructions (Claude Code entrypoints)
   codex/               Codex skill wrapper(s)
   woodworking/         Skill topic files + joinery reference guides + templates
   helpers/             Standalone script library (sp.py)
